@@ -51,6 +51,7 @@ def _get_tools() -> McpToolCommand:
             session=shared.agent_session_orchestrator,
             setup=shared.agent_setup_orchestrator,
             workspace=shared.workspace,
+            jobs=shared.agent_job_orchestrator,
         )
     return _container
 
@@ -62,6 +63,8 @@ _TOOL_METHOD_MAP: dict[str, str] = {
     "process_direct_prompt": "process_direct_prompt",
     "process_prompt_file_only": "process_prompt_file_only",
     "process_prompt_with_attachment": "process_prompt_with_attachment",
+    "get_job_status": "get_job_status",
+    "list_jobs": "list_jobs",
     "check_session": "check_session",
     "delete_session": "delete_session",
     "setup_session": "setup_session",
@@ -132,7 +135,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="process_prompt_file_only",
-        description="Process a single Markdown prompt file (no attachment) on chat.qwen.ai.",
+        description="Process a single Markdown prompt file (no attachment) on chat.qwen.ai. By default, dispatches asynchronously in background and returns a job_id to prevent MCP client timeouts.",
         input_schema={
             "type": "object",
             "properties": {
@@ -152,13 +155,18 @@ TOOLS: list[Tool] = [
                     "description": "Run the browser headlessly (True) or with visible UI (False).",
                     "default": True,
                 },
+                "async_run": {
+                    "type": "boolean",
+                    "description": "Run asynchronously in background to avoid MCP timeout (default: True).",
+                    "default": True,
+                },
             },
             "required": ["input_file"],
         },
     ),
     Tool(
         name="process_prompt_with_attachment",
-        description="Process a Markdown prompt file with a document attachment on chat.qwen.ai. Attachment must be a supported text/document format (.txt, .md, .pdf, code files) and at most 100 MB. Archives and binaries (.zip, .tar, .gz, .tgz, .7z, .rar, .bz2, .xz, .exe, .bin, .iso, .dmg, .so, .dll, .dylib) are rejected.",
+        description="Process a Markdown prompt file with a document attachment on chat.qwen.ai. Attachment must be a supported text/document format (.txt, .md, .pdf, code files) and at most 100 MB. Archives and binaries (.zip, .tar, .gz, .tgz, .7z, .rar, .bz2, .xz, .exe, .bin, .iso, .dmg, .so, .dll, .dylib) are rejected. By default, dispatches asynchronously in background and returns a job_id to prevent MCP client timeouts.",
         input_schema={
             "type": "object",
             "properties": {
@@ -183,8 +191,43 @@ TOOLS: list[Tool] = [
                     "description": "Run the browser headlessly (True) or with visible UI (False).",
                     "default": True,
                 },
+                "async_run": {
+                    "type": "boolean",
+                    "description": "Run asynchronously in background to avoid MCP timeout (default: True).",
+                    "default": True,
+                },
             },
             "required": ["prompt_file", "attachment_file"],
+        },
+    ),
+    Tool(
+        name="get_job_status",
+        description="Query the current status, timing, progress, and result preview of an asynchronous background job.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "The job ID returned from process_prompt_file_only or process_prompt_with_attachment.",
+                    "examples": ["file_20260827_051800_abc123"],
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="list_jobs",
+        description="List recently submitted asynchronous background prompt processing jobs.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of recent jobs to return (default: 10).",
+                    "default": 10,
+                    "minimum": 1,
+                },
+            },
         },
     ),
     Tool(
@@ -223,6 +266,8 @@ init = _async_tool("init")
 process_direct_prompt = _async_tool("process_direct_prompt")
 process_prompt_file_only = _async_tool("process_prompt_file_only")
 process_prompt_with_attachment = _async_tool("process_prompt_with_attachment")
+get_job_status = _async_tool("get_job_status")
+list_jobs = _async_tool("list_jobs")
 check_session = _async_tool("check_session")
 delete_session = _async_tool("delete_session")
 setup_session = _async_tool("setup_session")
@@ -240,7 +285,12 @@ MCP_TOOL_SPECS: list[dict[str, Any]] = [
         "name": "process_prompt_file_only",
         "method": "process_prompt_file_only",
         "doc": "Process a single Markdown prompt file (no attachment) on chat.qwen.ai.",
-        "params": [("input_file", "str", True), ("output_file", "Any", False, None), ("headless", "bool", False, True)],
+        "params": [
+            ("input_file", "str", True),
+            ("output_file", "Any", False, None),
+            ("headless", "bool", False, True),
+            ("async_run", "bool", False, True),
+        ],
     },
     {
         "name": "process_prompt_with_attachment",
@@ -251,7 +301,20 @@ MCP_TOOL_SPECS: list[dict[str, Any]] = [
             ("attachment_file", "str", True),
             ("output_file", "Any", False, None),
             ("headless", "bool", False, True),
+            ("async_run", "bool", False, True),
         ],
+    },
+    {
+        "name": "get_job_status",
+        "method": "get_job_status",
+        "doc": "Query the current status and result preview of an asynchronous background job.",
+        "params": [("job_id", "str", True)],
+    },
+    {
+        "name": "list_jobs",
+        "method": "list_jobs",
+        "doc": "List recently submitted asynchronous background prompt processing jobs.",
+        "params": [("limit", "int", False, 10)],
     },
     {
         "name": "setup_session",

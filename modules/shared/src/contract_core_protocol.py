@@ -21,6 +21,9 @@ from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     HeadlessFlag,
     InjectorConfig,
+    JobId,
+    JobLimit,
+    JobRecord,
     LoggerName,
     MaxFileSizeMb,
     MessageCount,
@@ -274,6 +277,22 @@ class IMetricsProtocol(ABC):
         """Return a shallow copy of all counters."""
 
 
+class IJobStorageProtocol(ABC):
+    """Job persistence and state storage contract."""
+
+    @abstractmethod
+    def save_job(self, record: JobRecord) -> None:
+        """Persist a job record to disk."""
+
+    @abstractmethod
+    def get_job(self, job_id: JobId | str) -> JobRecord | None:
+        """Retrieve a job record by ID."""
+
+    @abstractmethod
+    def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
+        """List recently recorded jobs."""
+
+
 __all__ = [
     "IUploadProtocol",
     "IInjectionProtocol",
@@ -286,4 +305,5 @@ __all__ = [
     "IWorkspaceProtocol",
     "IStatusProtocol",
     "IMetricsProtocol",
+    "IJobStorageProtocol",
 ]

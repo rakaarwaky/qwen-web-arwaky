@@ -10,6 +10,7 @@ from __future__ import annotations
 from .contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
+    IJobManagerAggregate,
     IPromptFileAggregate,
     IPromptFlowAggregate,
     ISessionAggregate,
@@ -20,6 +21,7 @@ from .contract_core_aggregate import (
 from .contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
+    IJobStorageProtocol,
     IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
@@ -34,6 +36,7 @@ from .taxonomy_core_constant import (
     CHALLENGE_KEYWORDS,
     CHAT_URL,
     COMBINED_MESSAGE_SELECTOR,
+    DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
@@ -122,6 +125,7 @@ from .taxonomy_core_vo import (
     DEFAULT_SENDER_CONFIG,
     DEFAULT_UPLOAD_CONFIG,
     AppConfig,
+    AsyncRunFlag,
     AtomicWriteFlag,
     BackoffDelaySec,
     BrowserConfig,
@@ -140,6 +144,9 @@ from .taxonomy_core_vo import (
     InjectorConfig,
     InputChars,
     InputPath,
+    JobId,
+    JobLimit,
+    JobRecord,
     MaxFileSizeMb,
     MaxRetries,
     MCPServerConfig,
@@ -216,6 +223,7 @@ from .utility_core_validation import validate_file, validate_response_content
 
 __all__ = [
     # VOs
+    "AsyncRunFlag",
     "AtomicWriteFlag",
     "BackoffDelaySec",
     "CardRenderTimeoutMs",
@@ -233,6 +241,9 @@ __all__ = [
     "IncludeHeaderFlag",
     "InputChars",
     "InputPath",
+    "JobId",
+    "JobLimit",
+    "JobRecord",
     "MaxFileSizeMb",
     "MaxRetries",
     "MessageCount",
@@ -331,6 +342,7 @@ __all__ = [
     "DEFAULT_LOG",
     "DEFAULT_SESSION",
     "DEFAULT_VENV",
+    "DEFAULT_JOBS_DIR",
     "XDG_SKILL_MD",
     "get_playwright_browsers_path",
     "MAX_ATTEMPTS",
@@ -361,6 +373,7 @@ __all__ = [
     # Contracts
     "IUploadProtocol",
     "IInjectionProtocol",
+    "IJobStorageProtocol",
     "ISendProtocol",
     "IStreamProtocol",
     "IBrowserProtocol",
@@ -368,6 +381,7 @@ __all__ = [
     "IObservabilityProtocol",
     "IAttachmentPromptAggregate",
     "IDirectPromptAggregate",
+    "IJobManagerAggregate",
     "IPromptFileAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
