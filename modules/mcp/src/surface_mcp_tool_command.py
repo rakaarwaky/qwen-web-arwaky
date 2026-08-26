@@ -14,6 +14,7 @@ from typing import Any
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
+    IJobManagerAggregate,
     IPromptFileAggregate,
     ISessionAggregate,
     ISetupAggregate,
@@ -22,6 +23,7 @@ from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
+    JobId,
     PromptText,
     TimeoutSec,
 )
@@ -96,6 +98,7 @@ class McpToolCommand:
         session: ISessionAggregate,
         setup: ISetupAggregate,
         workspace: IWorkspaceProtocol,
+        jobs: IJobManagerAggregate | None = None,
     ) -> None:
         """Inject individual agent aggregate contracts."""
         self._direct = direct
@@ -104,6 +107,7 @@ class McpToolCommand:
         self._session = session
         self._setup = setup
         self._workspace = workspace
+        self._jobs = jobs
 
     def process_direct_prompt(self, prompt: str, timeout_sec: int = 120, headless: bool = True) -> str:
         """Process a direct text prompt string to chat.qwen.ai.
@@ -142,6 +146,7 @@ class McpToolCommand:
         input_file: str,
         output_file: str | None = None,
         headless: bool = True,
+        async_run: bool = True,
     ) -> str:
         """Process a single Markdown prompt file from disk without attachment.
 
@@ -149,9 +154,10 @@ class McpToolCommand:
             input_file: Path to Markdown prompt file.
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
+            async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
 
         Returns:
-            JSON string containing success status, resolved output path, and result preview.
+            JSON string containing success status, resolved output path, and result preview (or job_id if async).
         """
         p_path = Path(input_file).expanduser().resolve()
         if not p_path.exists():
@@ -163,6 +169,34 @@ class McpToolCommand:
             )
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
+
+        if async_run and self._jobs is not None:
+            try:
+                record = self._jobs.submit_file_job(
+                    prompt_file=FilePath(p_path),
+                    output_file=FilePath(out_path) if out_path else None,
+                    headless=HeadlessFlag(headless),
+                )
+                return json.dumps(
+                    {
+                        "success": True,
+                        "job_id": record.job_id,
+                        "latest_event": record.latest_event,
+                        "completed": record.completed,
+                        "created_at": record.created_at,
+                        "input_file": record.input_file,
+                        "output_file": record.output_file,
+                        "message": "Prompt processing job submitted in background. Poll with get_job_status.",
+                    },
+                    indent=2,
+                )
+            except Exception as exc:
+                return _format_error_payload(
+                    code="JOB_SUBMIT_FAILED",
+                    message=str(exc),
+                    hint="Failed to schedule asynchronous job.",
+                    retryable=True,
+                )
 
         try:
             res = self._file_only.process_prompt_file_only(
@@ -188,6 +222,7 @@ class McpToolCommand:
         attachment_file: str,
         output_file: str | None = None,
         headless: bool = True,
+        async_run: bool = True,
     ) -> str:
         """Process a Markdown prompt file with a document attachment.
 
@@ -196,9 +231,10 @@ class McpToolCommand:
             attachment_file: Path to document attachment file (PDF, TXT, MD).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
+            async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
 
         Returns:
-            JSON string containing success status, resolved output path, and result.
+            JSON string containing success status, resolved output path, and result (or job_id if async).
         """
         p_path = Path(prompt_file).expanduser().resolve()
         if not p_path.exists():
@@ -220,6 +256,36 @@ class McpToolCommand:
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 
+        if async_run and self._jobs is not None:
+            try:
+                record = self._jobs.submit_attachment_job(
+                    prompt_file=FilePath(p_path),
+                    attachment_file=FilePath(a_path),
+                    output_file=FilePath(out_path) if out_path else None,
+                    headless=HeadlessFlag(headless),
+                )
+                return json.dumps(
+                    {
+                        "success": True,
+                        "job_id": record.job_id,
+                        "latest_event": record.latest_event,
+                        "completed": record.completed,
+                        "created_at": record.created_at,
+                        "input_file": record.input_file,
+                        "attachment_file": record.attachment_file,
+                        "output_file": record.output_file,
+                        "message": "Attachment job submitted in background. Poll with get_job_status.",
+                    },
+                    indent=2,
+                )
+            except Exception as exc:
+                return _format_error_payload(
+                    code="JOB_SUBMIT_FAILED",
+                    message=str(exc),
+                    hint="Failed to schedule asynchronous job.",
+                    retryable=True,
+                )
+
         try:
             res = self._attachment.process_prompt_with_attachment(
                 FilePath(p_path),
@@ -238,6 +304,90 @@ class McpToolCommand:
                 hint="Ensure attachment format is supported by Qwen Web.",
                 retryable=True,
             )
+
+    def get_job_status(self, job_id: str) -> str:
+        """Query status and details of a background prompt processing job.
+
+        Args:
+            job_id: The job ID returned when the prompt was submitted.
+
+        Returns:
+            JSON string containing job status, progress, timing, and result preview.
+        """
+        if not job_id or not job_id.strip():
+            return _format_error_payload(
+                code="VALIDATION_ERROR",
+                message="job_id must not be empty.",
+                hint="Provide a valid job_id string.",
+                field="job_id",
+            )
+
+        if self._jobs is None:
+            return _format_error_payload(
+                code="SERVICE_UNAVAILABLE",
+                message="Job manager is not configured.",
+                hint="Check MCP server setup.",
+            )
+
+        record = self._jobs.get_job_status(JobId(job_id))
+        if record is None:
+            return _format_error_payload(
+                code="JOB_NOT_FOUND",
+                message=f"Job not found: {job_id}",
+                hint="Verify the job_id or use list_jobs tool.",
+                field="job_id",
+            )
+
+        payload: dict[str, Any] = {
+            "success": True,
+            "job_id": record.job_id,
+            "latest_event": record.latest_event,
+            "completed": record.completed,
+            "created_at": record.created_at,
+            "started_at": record.started_at,
+            "completed_at": record.completed_at,
+            "duration_sec": record.duration_sec,
+            "input_file": record.input_file,
+            "attachment_file": record.attachment_file,
+            "output_file": record.output_file,
+            "error": record.error,
+            "result_preview": record.result_preview,
+        }
+        return json.dumps(payload, indent=2)
+
+    def list_jobs(self, limit: int = 10) -> str:
+        """List recently submitted background prompt processing jobs.
+
+        Args:
+            limit: Maximum number of recent jobs to return (default: 10).
+
+        Returns:
+            JSON string containing a list of job records.
+        """
+        if self._jobs is None:
+            return _format_error_payload(
+                code="SERVICE_UNAVAILABLE",
+                message="Job manager is not configured.",
+                hint="Check MCP server setup.",
+            )
+
+        records = self._jobs.list_jobs(limit=limit)
+        items = [
+            {
+                "job_id": rec.job_id,
+                "latest_event": rec.latest_event,
+                "completed": rec.completed,
+                "created_at": rec.created_at,
+                "completed_at": rec.completed_at,
+                "duration_sec": rec.duration_sec,
+                "input_file": rec.input_file,
+                "attachment_file": rec.attachment_file,
+                "output_file": rec.output_file,
+                "error": rec.error,
+            }
+            for rec in records
+        ]
+        return json.dumps({"success": True, "total": len(items), "jobs": items}, indent=2)
 
     def check_session(self) -> str:
         """Check status and validity of saved browser session tokens.

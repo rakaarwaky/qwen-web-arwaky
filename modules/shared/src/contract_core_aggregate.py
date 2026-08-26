@@ -23,6 +23,8 @@ from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
     HeadlessFlag,
+    JobId,
+    JobRecord,
     MessageCount,
     OutputPath,
     PromptPath,
@@ -127,9 +129,41 @@ class ISetupAggregate(ABC):
         """Validate or establish a persistent manual login session."""
 
 
+class IJobManagerAggregate(ABC):
+    """Job management aggregate contract for async execution and tracking."""
+
+    @abstractmethod
+    def submit_file_job(
+        self,
+        prompt_file: Path | PromptPath | str,
+        output_file: Path | OutputPath | str | None = None,
+        headless: HeadlessFlag = HeadlessFlag(True),
+    ) -> JobRecord:
+        """Submit a prompt file job for asynchronous background processing."""
+
+    @abstractmethod
+    def submit_attachment_job(
+        self,
+        prompt_file: Path | PromptPath | str,
+        attachment_file: Path | AttachmentPath | str,
+        output_file: Path | OutputPath | str | None = None,
+        headless: HeadlessFlag = HeadlessFlag(True),
+    ) -> JobRecord:
+        """Submit a prompt with attachment job for asynchronous background processing."""
+
+    @abstractmethod
+    def get_job_status(self, job_id: JobId | str) -> JobRecord | None:
+        """Query status and details of a submitted job."""
+
+    @abstractmethod
+    def list_jobs(self, limit: int = 10) -> list[JobRecord]:
+        """List recently submitted jobs."""
+
+
 __all__ = [
     "IAttachmentPromptAggregate",
     "IDirectPromptAggregate",
+    "IJobManagerAggregate",
     "IPromptFileAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",

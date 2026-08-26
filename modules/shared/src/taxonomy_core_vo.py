@@ -62,6 +62,29 @@ class ProcessingOutcome:
     failed_path: Path | None = None
 
 
+JobId = NewType("JobId", str)
+AsyncRunFlag = NewType("AsyncRunFlag", bool)
+
+
+@dataclass(frozen=True)
+class JobRecord:
+    """Immutable representation of a background job state."""
+
+    job_id: str
+    created_at: str
+    latest_event: str | None = None
+    completed: bool = False
+    started_at: str | None = None
+    completed_at: str | None = None
+    duration_sec: float | None = None
+    input_file: str | None = None
+    attachment_file: str | None = None
+    output_file: str | None = None
+    prompt_text: str | None = None
+    error: str | None = None
+    result_preview: str | None = None
+
+
 # ─── Brand types: timing & limits ─────────────────────────────
 TypingDelayMs = NewType("TypingDelayMs", int)
 WaitTimeoutMs = NewType("WaitTimeoutMs", int)
