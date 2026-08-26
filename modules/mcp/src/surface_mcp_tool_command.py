@@ -364,6 +364,14 @@ class McpToolCommand:
         Returns:
             JSON string containing a list of job records.
         """
+        if limit < 1:
+            return _format_error_payload(
+                code="VALIDATION_ERROR",
+                message=f"limit must be greater than or equal to 1, got {limit}.",
+                hint="Provide a positive integer limit (e.g. limit=10).",
+                field="limit",
+            )
+
         if self._jobs is None:
             return _format_error_payload(
                 code="SERVICE_UNAVAILABLE",

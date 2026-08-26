@@ -22,7 +22,6 @@ from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,
-    EVENT_WEB_LOADED,
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
@@ -33,6 +32,7 @@ from modules.shared.src.taxonomy_core_vo import (
     OutputPath,
     PromptPath,
 )
+from modules.shared.src.utility_core_response import detect_processing_failure
 
 
 def _utc_now_iso() -> str:
@@ -47,7 +47,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         storage: IJobStorageProtocol,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
-        max_workers: int = 2,
+        max_workers: int = 1,
     ) -> None:
         self._storage = storage
         self._file_only = file_only
@@ -140,7 +140,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 JobRecord(
                     job_id=rec.job_id,
                     created_at=rec.created_at,
-                    latest_event=EVENT_WEB_LOADED.value,
+                    latest_event=rec.latest_event or EVENT_DISPATCH_ACKNOWLEDGED.value,
                     completed=False,
                     started_at=started_at,
                     input_file=rec.input_file,
@@ -155,7 +155,35 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 headless=headless,
             )
             duration = round(time.perf_counter() - start_t, 2)
-            preview = str(res)[:500] if res else None
+            res_str = str(res) if res is not None else ""
+            fail_msg = detect_processing_failure(res_str) or (res_str if res_str.startswith("ERROR") else None)
+
+            if fail_msg:
+                self._storage.save_job(
+                    JobRecord(
+                        job_id=str(job_id),
+                        created_at=rec.created_at if rec else started_at,
+                        latest_event="EVENT_FAILED",
+                        completed=True,
+                        started_at=started_at,
+                        completed_at=_utc_now_iso(),
+                        duration_sec=duration,
+                        input_file=str(prompt_path),
+                        output_file=str(output_path) if output_path else None,
+                        error=fail_msg,
+                    )
+                )
+                return
+
+            preview: str | None = None
+            if output_path and output_path.exists():
+                try:
+                    preview = output_path.read_text(encoding="utf-8")[:500]
+                except Exception:
+                    preview = res_str[:500] if res_str else None
+            elif res_str:
+                preview = res_str[:500]
+
             self._storage.save_job(
                 JobRecord(
                     job_id=str(job_id),
@@ -203,7 +231,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 JobRecord(
                     job_id=rec.job_id,
                     created_at=rec.created_at,
-                    latest_event=EVENT_WEB_LOADED.value,
+                    latest_event=rec.latest_event or EVENT_DISPATCH_ACKNOWLEDGED.value,
                     completed=False,
                     started_at=started_at,
                     input_file=rec.input_file,
@@ -220,7 +248,36 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 headless=headless,
             )
             duration = round(time.perf_counter() - start_t, 2)
-            preview = str(res)[:500] if res else None
+            res_str = str(res) if res is not None else ""
+            fail_msg = detect_processing_failure(res_str) or (res_str if res_str.startswith("ERROR") else None)
+
+            if fail_msg:
+                self._storage.save_job(
+                    JobRecord(
+                        job_id=str(job_id),
+                        created_at=rec.created_at if rec else started_at,
+                        latest_event="EVENT_FAILED",
+                        completed=True,
+                        started_at=started_at,
+                        completed_at=_utc_now_iso(),
+                        duration_sec=duration,
+                        input_file=str(prompt_path),
+                        attachment_file=str(attachment_path),
+                        output_file=str(output_path) if output_path else None,
+                        error=fail_msg,
+                    )
+                )
+                return
+
+            preview: str | None = None
+            if output_path and output_path.exists():
+                try:
+                    preview = output_path.read_text(encoding="utf-8")[:500]
+                except Exception:
+                    preview = res_str[:500] if res_str else None
+            elif res_str:
+                preview = res_str[:500]
+
             self._storage.save_job(
                 JobRecord(
                     job_id=str(job_id),

@@ -9,7 +9,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from modules.core.src.utility_core_io_writer import atomic_write_text, ensure_dir
+from modules.core.src.utility_core_io_writer import atomic_write_text
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
@@ -26,7 +26,7 @@ class JobManager(IJobStorageProtocol):
 
     def __init__(self, storage_dir: Path | None = None) -> None:
         self.storage_dir = storage_dir or DEFAULT_JOBS_DIR
-        ensure_dir(self.storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _job_file_path(self, job_id: JobId | str) -> Path:
         clean_id = str(job_id).replace("/", "_").replace("\\", "_")
@@ -34,7 +34,7 @@ class JobManager(IJobStorageProtocol):
 
     def save_job(self, record: JobRecord) -> None:
         """Persist a job record to an atomic JSON file."""
-        ensure_dir(self.storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
         target = self._job_file_path(record.job_id)
         data = asdict(record)
         content = json.dumps(data, indent=2)
@@ -69,7 +69,7 @@ class JobManager(IJobStorageProtocol):
 
     def list_jobs(self, limit: int = 10) -> list[JobRecord]:
         """List recently recorded jobs sorted newest to oldest."""
-        ensure_dir(self.storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
         records: list[JobRecord] = []
         files = sorted(self.storage_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         for path in files[:limit]:
