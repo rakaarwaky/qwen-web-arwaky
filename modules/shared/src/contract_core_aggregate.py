@@ -24,6 +24,7 @@ from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
     HeadlessFlag,
     JobId,
+    JobLimit,
     JobRecord,
     MessageCount,
     OutputPath,
@@ -156,7 +157,7 @@ class IJobManagerAggregate(ABC):
         """Query status and details of a submitted job."""
 
     @abstractmethod
-    def list_jobs(self, limit: int = 10) -> list[JobRecord]:
+    def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
 
 

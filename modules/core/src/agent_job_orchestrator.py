@@ -28,6 +28,7 @@ from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
     JobId,
+    JobLimit,
     JobRecord,
     OutputPath,
     PromptPath,
@@ -315,6 +316,6 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         """Query status and details of a submitted job."""
         return self._storage.get_job(job_id)
 
-    def list_jobs(self, limit: int = 10) -> list[JobRecord]:
+    def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
-        return self._storage.list_jobs(limit)
+        return self._storage.list_jobs(JobLimit(int(limit)))

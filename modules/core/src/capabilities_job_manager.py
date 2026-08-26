@@ -15,6 +15,7 @@ from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_vo import (
     JobId,
+    JobLimit,
     JobRecord,
 )
 
@@ -67,7 +68,7 @@ class JobManager(IJobStorageProtocol):
             log.error("job_read_failed", job_id=str(job_id), error=str(exc))
             return None
 
-    def list_jobs(self, limit: int = 10) -> list[JobRecord]:
+    def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
         """List recently recorded jobs sorted newest to oldest."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         records: list[JobRecord] = []

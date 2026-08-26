@@ -63,6 +63,7 @@ class ProcessingOutcome:
 
 
 JobId = NewType("JobId", str)
+JobLimit = NewType("JobLimit", int)
 AsyncRunFlag = NewType("AsyncRunFlag", bool)
 
 

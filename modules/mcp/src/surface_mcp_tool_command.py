@@ -24,6 +24,7 @@ from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
     JobId,
+    JobLimit,
     PromptText,
     TimeoutSec,
 )
@@ -379,7 +380,7 @@ class McpToolCommand:
                 hint="Check MCP server setup.",
             )
 
-        records = self._jobs.list_jobs(limit=limit)
+        records = self._jobs.list_jobs(limit=JobLimit(limit))
         items = [
             {
                 "job_id": rec.job_id,
