@@ -45,7 +45,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
@@ -118,7 +118,8 @@ class SharedContainer:
             browser=self.browser,
             observability=self.observability,
         )
-        self.job_manager = JobManager()
+        DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        self.job_manager = JobManager(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(
             storage=self.job_manager,
             file_only=self.agent_prompt_file_orchestrator,
