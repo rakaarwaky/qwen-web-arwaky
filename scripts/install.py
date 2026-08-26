@@ -21,7 +21,14 @@ def log(msg: str) -> None:
 
 
 def get_venv_dir() -> Path:
-    return PROJECT_ROOT / "venv"
+    if os.environ.get("XDG_DATA_HOME"):
+        return Path(os.environ["XDG_DATA_HOME"]) / "qwen-web" / "venv"
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(local_app_data) / "qwen-web" / "venv"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "qwen-web" / "venv"
+    return Path.home() / ".local/share/qwen-web/venv"
 
 
 def get_venv_python(venv_dir: Path) -> Path:
@@ -42,8 +49,11 @@ def ensure_venv() -> Path:
         log(f"⚡ [install] Using active virtual environment: {sys.prefix}")
         return Path(sys.executable)
 
-    if not venv_dir.exists():
+    python_bin = get_venv_python(venv_dir)
+    if not venv_dir.exists() or not python_bin.exists():
         log(f"🐍 [install] Creating virtual environment at {venv_dir}...")
+        if venv_dir.exists():
+            shutil.rmtree(venv_dir, ignore_errors=True)
         subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
 
     python_bin = get_venv_python(venv_dir)

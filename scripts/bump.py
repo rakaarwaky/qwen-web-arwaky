@@ -96,7 +96,7 @@ def run_git_release(new_version: str) -> None:
     tag_name = f"v{new_version}"
     subprocess.run(["git", "tag", "-a", tag_name, "-m", commit_msg], check=True, cwd=ROOT_DIR)
     print(f"  ✓ Created commit '{commit_msg}' and tag '{tag_name}'")
-    print(f"  💡 Run `git push && git push --tags` to publish to GitHub Releases.")
+    print("  💡 Run `git push && git push --tags` to publish to GitHub Releases.")
 
 
 def main(argv: list[str] | None = None) -> None:
