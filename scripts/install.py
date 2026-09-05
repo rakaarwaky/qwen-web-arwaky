@@ -192,7 +192,7 @@ def setup_bin_links(python_bin: Path) -> None:
     local_bin.mkdir(parents=True, exist_ok=True)
 
     venv_bin_dir = python_bin.parent
-    for name in ("qwen-web-cli", "qwc", "qwen-web-mcp"):
+    for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
         src = venv_bin_dir / name
         dst = local_bin / name
         if src.exists():

@@ -23,6 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
+qwen-web-arwaky = "modules.root_cli_main_entry:main"
+qwa = "modules.root_cli_main_entry:main"
 qwen-web-cli = "modules.root_cli_main_entry:main"
 qwc = "modules.root_cli_main_entry:main"
 qwen-web-mcp = "modules.root_mcp_main_entry:main"
