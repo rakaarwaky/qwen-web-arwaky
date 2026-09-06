@@ -13,6 +13,7 @@ import sys
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
+    IJobManagerAggregate,
     IPromptFileAggregate,
     ISessionAggregate,
     ISetupAggregate,
@@ -33,6 +34,7 @@ class InteractiveController:
         attachment: IAttachmentPromptAggregate,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
+        jobs: IJobManagerAggregate | None = None,
     ) -> None:
         """Inject the specialized pipeline orchestrators, workspace, and setup."""
         self._workspace = workspace
@@ -41,6 +43,7 @@ class InteractiveController:
         self._attachment = attachment
         self._setup = setup
         self._session = session
+        self._jobs = jobs
 
     @safe_handle
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
@@ -62,6 +65,7 @@ class InteractiveController:
                 self._attachment,
                 self._setup,
                 self._session,
+                self._jobs,
             )
             app.run()
             return success_response("TUI Session Closed.")
