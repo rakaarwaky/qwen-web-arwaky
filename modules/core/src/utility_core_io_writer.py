@@ -13,7 +13,9 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import OutputWriteError
+from modules.shared.src.taxonomy_core_event import EVENT_OUTPUT_COPIED
 
 
 def _atomic_write(target: Path, content: str) -> None:
@@ -68,8 +70,9 @@ def save_orchestrator_output(
     text: str,
     dur: float,
     ctx: Any,
+    emitter: LifecycleEmitter | None = None,
 ) -> None:
-    """Save output text to file via saver capability."""
+    """Save output and emit the terminal event only after filesystem verification."""
     from modules.shared.src.taxonomy_core_vo import FilePath, OutputChars, ResponseText
 
     prompt_len = p_path.stat().st_size if p_path.exists() else 0
@@ -82,3 +85,10 @@ def save_orchestrator_output(
         prompt_len,
         OutputChars(len(text)),
     )
+    if not out_path.is_file() or out_path.stat().st_size == 0:
+        raise OutputWriteError(f"Output saver returned without a readable file: {out_path}")
+    if emitter is not None:
+        emitter.emit(
+            EVENT_OUTPUT_COPIED,
+            {"path": str(out_path), "bytes": out_path.stat().st_size},
+        )

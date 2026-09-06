@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
+
+import pytest
 
 from modules.core.src.capabilities_output_saver import Saver
-from modules.core.src.utility_core_io_writer import ensure_dir
+from modules.core.src.utility_core_io_writer import ensure_dir, save_orchestrator_output
 from modules.shared.src import RunContext, SaverConfig
+from modules.shared.src.taxonomy_core_error import OutputWriteError
 from modules.shared.src.utility_core_text import strip_ui_noise
 
 
@@ -124,3 +128,25 @@ class TestWriteOutputExtended:
         content = out_file.read_text()
         assert "Qwen3" not in content
         assert "Real content here" in content
+
+    def test_orchestrator_output_emits_terminal_event_after_file_write(self, tmp_path):
+        out_file = tmp_path / "result.md"
+        prompt_file = tmp_path / "prompt.md"
+        prompt_file.write_text("prompt")
+        emitter = MagicMock()
+
+        save_orchestrator_output(Saver(), out_file, prompt_file, "AI answer", 0.1, RunContext(), emitter=emitter)
+
+        assert out_file.is_file()
+        assert out_file.read_text()
+        emitter.emit.assert_called_once()
+        assert str(emitter.emit.call_args.args[0]) == "EVENT_OUTPUT_COPIED"
+
+    def test_orchestrator_output_rejects_saver_without_file(self, tmp_path):
+        out_file = tmp_path / "missing.md"
+        prompt_file = tmp_path / "prompt.md"
+        prompt_file.write_text("prompt")
+        saver = MagicMock()
+
+        with pytest.raises(OutputWriteError, match="readable file"):
+            save_orchestrator_output(saver, out_file, prompt_file, "AI answer", 0.1, RunContext())

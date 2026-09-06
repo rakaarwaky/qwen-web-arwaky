@@ -19,6 +19,7 @@ from modules.shared.src import (
     OutputValidationError,
 )
 from modules.shared.src.taxonomy_core_constant import JS_GET_RESPONSE_TEXT
+from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
 
 # ─── validate_response_content ──────────────────────────────────────────────
 
@@ -181,16 +182,68 @@ class TestWaitForResponseEdgeCases:
                 page, timeout_sec=10, msg_count_before=0, emitter=emitter, dispatch_acknowledged=False
             )
 
-    def test_timeout_returns_none(self):
+    def test_safety_circuit_breaker_raises_after_configured_budget(self):
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=1),
             patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
         ):
-            mock_time.time.side_effect = [0, 0, 0, 9999]
+            mock_time.time.side_effect = [0, 14_400]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(ResponseDetectionTimeoutError, match="circuit breaker"):
+                StreamMonitor(safety_timeout_sec=14_400).wait_for_response(
+                    page,
+                    timeout_sec=120,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
+
+    def test_playwright_timeout_is_recovered_without_failing(self):
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+        response = "A response recovered after a transient browser timeout."
+
+        with (
+            patch(
+                "modules.core.src.capabilities_stream_monitor._dom_latest",
+                side_effect=[None, TimeoutError("temporary"), response, response],
+            ),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 1, 2, 3, 4, 5]
+            mock_time.sleep = MagicMock()
+
+            result = StreamMonitor(safety_timeout_sec=100).wait_for_response(
+                page,
+                timeout_sec=1,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=1,
+            )
+
+        assert result == response
+
+    def test_timeout_hint_does_not_end_wait_before_terminal_event(self):
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+        response = "A delayed response that must wait for the explicit completed signal."
+
+        with (
+            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=1),
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 9999, 9999, 9999]
             mock_time.sleep = MagicMock()
 
             result = StreamMonitor().wait_for_response(
@@ -199,8 +252,38 @@ class TestWaitForResponseEdgeCases:
                 msg_count_before=1,
                 emitter=emitter,
                 polling_interval_sec=0,
+                stability_checks=1,
             )
-            assert result is None
+
+        assert result == response
+
+    def test_stable_text_without_terminal_event_is_not_accepted(self):
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+        response = "A response whose text is stable while Qwen is still generating."
+
+        with (
+            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=1),
+            patch(
+                "modules.core.src.capabilities_stream_monitor._dom_latest",
+                side_effect=[None, response, response, response],
+            ),
+            patch.object(StreamMonitor, "is_generation_complete", side_effect=[False, False, True]),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 1, 2, 3, 4]
+            mock_time.sleep = MagicMock()
+
+            result = StreamMonitor().wait_for_response(
+                page,
+                timeout_sec=1,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=1,
+            )
+
+        assert result == response
 
     def test_emits_streaming_event_once_for_multiple_response_updates(self):
         page = MagicMock()
@@ -268,7 +351,8 @@ class TestResponseExtractionContract:
         assert ".response-message-content" in JS_GET_RESPONSE_TEXT
         assert ".qwen-markdown-text" in JS_GET_RESPONSE_TEXT
         assert "document.querySelectorAll('div, p, pre, section, article, main')" not in JS_GET_RESPONSE_TEXT
-        assert "qwen-chat-message-assistant" not in JS_GET_RESPONSE_TEXT
+        assert "qwen-chat-message-assistant" in JS_GET_RESPONSE_TEXT
+        assert "chat-message-assistant" in JS_GET_RESPONSE_TEXT
 
 
 class TestPreSendBaseline:

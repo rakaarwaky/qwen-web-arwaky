@@ -13,6 +13,7 @@ from playwright.sync_api import Page
 from modules.core.src.utility_core_config_factory import build_app_config
 from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.core.src.utility_core_error_mapping import to_error_response
+from modules.core.src.utility_core_io_writer import save_orchestrator_output
 from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
@@ -24,14 +25,13 @@ from modules.shared.src.contract_core_protocol import (
     IUploadProtocol,
 )
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
+from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
-    FilePath,
     HeadlessFlag,
-    OutputChars,
     OutputPath,
     PromptPath,
     ResponseText,
@@ -91,31 +91,31 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 headless=headless,
             )
             ctx = RunContext()
+            emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
                 page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                text = self._execute_attachment_on_page(page, p_path, att_path, cfg.request_timeout, cfg)
+                text = self._execute_attachment_on_page(
+                    page, p_path, att_path, cfg.request_timeout, cfg, emitter, state
+                )
             dur = time.time() - t0
-            prompt_len = p_path.stat().st_size if p_path.exists() else 0
-            self._saver.write_output(
-                out_path,
-                ResponseText(text),
-                ctx,
-                FilePath(p_path),
-                dur,
-                prompt_len,
-                OutputChars(len(text)),
-            )
+            save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
 
     def _execute_attachment_on_page(
-        self, page: Page, filepath: Path, att_path: Path, timeout_sec: int, active_cfg: AppConfig
+        self,
+        page: Page,
+        filepath: Path,
+        att_path: Path,
+        timeout_sec: int,
+        active_cfg: AppConfig,
+        emitter: LifecycleEmitter,
+        state: LifecycleState,
     ) -> str:
         logger = self._observability.get_logger()
-        emitter, state = setup_lifecycle_state(logger, PIPELINE_EVENT_SEQUENCE)
 
         prompt = filepath.read_text(encoding="utf-8").strip()
 

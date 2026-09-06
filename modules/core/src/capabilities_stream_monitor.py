@@ -18,7 +18,11 @@ from modules.shared.src.taxonomy_core_constant import (
     STOP_BUTTON_SELECTORS,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import AuthRequiredError, NetworkTimeoutError, OutputValidationError
+from modules.shared.src.taxonomy_core_error import (
+    AuthRequiredError,
+    OutputValidationError,
+    ResponseDetectionTimeoutError,
+)
 from modules.shared.src.taxonomy_core_event import (
     EVENT_GENERATION_FINISHED,
     EVENT_STREAMING_GENERATION,
@@ -35,6 +39,7 @@ from modules.shared.src.utility_core_events import is_stability_satisfied, shoul
 from modules.shared.src.utility_core_validation import validate_response_content
 
 log = get_logger("capabilities_stream_monitor")
+DEFAULT_SAFETY_TIMEOUT_SEC = 4 * 60 * 60
 
 
 # Block 1: Class Definition & Constructor
@@ -46,7 +51,12 @@ class StreamMonitor(IStreamProtocol):
     def __init__(
         self,
         config: StreamerConfig | None = None,
+        *,
+        safety_timeout_sec: int = DEFAULT_SAFETY_TIMEOUT_SEC,
     ) -> None:
+        if safety_timeout_sec <= 0:
+            raise ValueError("safety_timeout_sec must be greater than zero")
+        self.safety_timeout_sec = int(safety_timeout_sec)
         if config is not None:
             self.polling_interval_sec = PollIntervalSec(config.polling_interval_sec)
             self.stability_checks = StabilityChecks(config.stability_checks)
@@ -105,12 +115,12 @@ class StreamMonitor(IStreamProtocol):
         dispatch_acknowledged: bool = True,
         baseline_text: ResponseText | None = None,
     ) -> ResponseText | None:
-        """Wait for new assistant response with stability checks in 4 sequential steps:
+        """Wait for a terminal assistant response using event-driven DOM signals.
 
-        Step 1: Check dispatch acknowledgment gate
-        Step 2: Capture baseline message state before generation
-        Step 3: Poll DOM for thinking/streaming status and content stability
-        Step 4: Validate response content & emit EVENT_GENERATION_FINISHED
+        ``timeout_sec`` is retained for API compatibility and observability only;
+        it is not a response cutoff. The loop exits on a terminal generation event
+        (stable response plus a completed generation state), or raises when an
+        explicit browser/auth error cannot be recovered.
         """
         # Step 1: Check dispatch acknowledgment gate
         if not dispatch_acknowledged:
@@ -125,32 +135,30 @@ class StreamMonitor(IStreamProtocol):
         has_streaming = False
 
         # Step 2: Capture baseline message state
-        log.info("Waiting for AI response (timeout: %ds)", timeout_sec)
+        log.info(
+            "Waiting for AI response until terminal event (timeout hint: %ss; safety circuit breaker: %ss)",
+            timeout_sec,
+            self.safety_timeout_sec,
+        )
         previous_text: str | None = str(baseline_text) if baseline_text is not None else _dom_latest(page)
 
         start = time.time()
         last_text: str | None = None
         stable_count = 0
-
         last_reload_time = start
-        max_duration = max(900, int(timeout_sec * 6.0))
 
-        # Step 3: Poll DOM for thinking/streaming status & content stability
+        # Poll DOM for event signals and content stability until a terminal event.
         while True:
             now = time.time()
             elapsed = now - start
+            if elapsed >= self.safety_timeout_sec:
+                raise ResponseDetectionTimeoutError(
+                    "Response safety circuit breaker tripped after "
+                    f"{self.safety_timeout_sec}s without a terminal generation event"
+                )
 
-            # Active thinking & generation detection
             is_thinking = self.is_thinking_active(page)
             is_complete = self.is_generation_complete(page)
-            is_active_generating = is_thinking or not is_complete
-
-            if elapsed >= max_duration:
-                if last_text is not None and len(last_text.strip()) > 0:
-                    validate_response_content(last_text)
-                    emitter.emit(EVENT_GENERATION_FINISHED, {"text_length": len(last_text), "fallback": True})
-                    return ResponseText(last_text)
-                break
 
             try:
                 # Active thinking detection
@@ -185,8 +193,10 @@ class StreamMonitor(IStreamProtocol):
                         stable_count = 0
                         last_text = text
 
-                # Periodic 30s cloud reload sync trigger — ONLY when Qwen is still actively generating!
-                if (now - last_reload_time) >= 30.0 and elapsed < max_duration and is_active_generating:
+                # Periodic cloud sync is recovery, not a response timeout. It runs
+                # while waiting so a long-running Qwen generation can continue past
+                # any configured hint without being cut off.
+                if (now - last_reload_time) >= 30.0:
                     log.info(
                         "Periodic 30s cloud reload sync: refreshing page to pull Qwen Cloud state (elapsed: %ds)...",
                         int(elapsed),
@@ -199,7 +209,9 @@ class StreamMonitor(IStreamProtocol):
 
                 time.sleep(active_poll)
             except TimeoutError as e:
-                raise NetworkTimeoutError(f"Browser network timeout during streaming poll: {e}") from e
+                log.warning("Browser operation timed out while waiting; keeping event-driven monitor alive: %s", e)
+                last_reload_time = time.time()
+                continue
             except Error as e:
                 log.warning(
                     "Browser error or connection reset during polling (%s). Attempting page reload recovery...", e
@@ -214,14 +226,6 @@ class StreamMonitor(IStreamProtocol):
             except Exception as e:
                 log.error("Unexpected error during polling: %s", e)
                 raise
-
-        if last_text is not None:
-            validate_response_content(last_text)
-            emitter.emit(EVENT_GENERATION_FINISHED, {"text_length": len(last_text), "fallback": True})
-            return ResponseText(last_text)
-
-        log.warning("Timeout after %ds — no response detected", timeout_sec)
-        return None
 
     def __repr__(self) -> str:
         """Return string representation of StreamMonitor."""

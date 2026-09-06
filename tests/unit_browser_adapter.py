@@ -81,6 +81,18 @@ def test_reset_page_emits_reconnecting():
     mock_page.goto.assert_called_once()
 
 
+def test_goto_chat_uses_commit_when_domcontentloaded_is_slow():
+    from playwright.sync_api import Error as PwError
+
+    mock_page = MagicMock()
+    mock_page.wait_for_load_state.side_effect = PwError("third-party asset stalled")
+
+    BrowserAdapter()._goto_chat(mock_page, navigation_timeout_ms=1000, load_timeout_ms=100)
+
+    assert mock_page.goto.call_args.kwargs["wait_until"] == "commit"
+    assert mock_page.goto.call_args.kwargs["timeout"] == 1000
+
+
 def test_navigate_to_chat_emits_web_loaded():
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -173,6 +185,24 @@ def test_ensure_default_model_swallows_error():
     # Best-effort: must never raise and must report failure, so the prompt
     # pipeline can fall back to a single verification pass.
     assert BrowserAdapter().ensure_default_model(mock_page) is False
+
+
+def test_verify_default_model_retries_transient_picker_read_failure():
+    from playwright.sync_api import Error as PwError
+
+    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+
+    mock_page = MagicMock()
+    picker = mock_page.get_by_role.return_value
+    picker.inner_text.side_effect = [PwError("picker not hydrated"), f"Select Model {DEFAULT_MODEL}"]
+    adapter = BrowserAdapter()
+    adapter.ensure_default_model = MagicMock(return_value=False)
+
+    adapter._verify_default_model(mock_page)
+
+    assert picker.inner_text.call_count == 2
+    mock_page.keyboard.press.assert_called_once_with("Escape")
+    adapter.ensure_default_model.assert_called_once_with(mock_page)
 
 
 def test_verify_default_model_ok():

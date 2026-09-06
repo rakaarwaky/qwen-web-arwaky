@@ -25,6 +25,7 @@ from modules.shared.src.contract_core_protocol import (
     ISendProtocol,
     IStreamProtocol,
 )
+from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
@@ -80,12 +81,13 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                     headless=headless,
                 )
                 ctx = RunContext()
+                emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                    text = self._execute_direct_on_page(page, p_path, prompt_str, int(timeout_sec), cfg)
+                    text = self._execute_direct_on_page(page, p_path, prompt_str, int(timeout_sec), cfg, emitter, state)
                 dur = time.time() - t0
-                save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx)
+                save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
                 return ResponseText(text)
             finally:
                 p = Path(tmp_path)
@@ -95,10 +97,15 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
             return to_error_response(exc)
 
     def _execute_direct_on_page(
-        self, page: Page, filepath: Path, prompt: str, timeout_sec: int, active_cfg: AppConfig
+        self,
+        page: Page,
+        filepath: Path,
+        prompt: str,
+        timeout_sec: int,
+        active_cfg: AppConfig,
+        emitter: LifecycleEmitter,
+        state: LifecycleState,
     ) -> str:
-        emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
-
         self._browser.navigate_to_chat(page, emitter)
         self._browser.check_auth(page)
         msg_count_before = self._sender.count_messages(page)

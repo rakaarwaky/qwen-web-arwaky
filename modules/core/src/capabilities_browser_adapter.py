@@ -137,25 +137,34 @@ class BrowserAdapter(IBrowserProtocol):
         navigation_timeout_ms: int,
         load_timeout_ms: int,
     ) -> None:
-        """Navigate to chat.qwen.ai and wait for the DOM to load."""
-        try:
-            page.goto(
-                CHAT_URL,
-                wait_until="domcontentloaded",
-                timeout=navigation_timeout_ms,
-            )
-        except Error as err:
-            log.warning("Initial page.goto failed (%s), retrying navigation...", err)
-            page.wait_for_timeout(1500)
-            page.goto(
-                CHAT_URL,
-                wait_until="domcontentloaded",
-                timeout=navigation_timeout_ms,
-            )
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
-        except Error as e:
-            log.warning("Load state wait failed, proceeding: %s", e)
+        """Navigate to chat.qwen.ai without waiting on third-party page assets.
+
+        ``domcontentloaded`` can remain pending when Qwen or an analytics asset
+        stalls. The application only needs the committed chat document before
+        its own DOM readiness checks, so navigation uses ``commit`` and treats
+        the later DOMContentLoaded wait as best-effort. A second commit attempt
+        remains available for transient connection failures.
+        """
+        last_error: Error | None = None
+        for attempt in range(2):
+            try:
+                page.goto(
+                    CHAT_URL,
+                    wait_until="commit",
+                    timeout=navigation_timeout_ms,
+                )
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+                except Error as err:
+                    log.warning("Load state wait failed, proceeding: %s", err)
+                return
+            except Error as err:
+                last_error = err
+                if attempt == 0:
+                    log.warning("Initial page.goto failed (%s), retrying commit navigation...", err)
+                    page.wait_for_timeout(1500)
+        if last_error is not None:
+            raise last_error
 
     def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Reset the page to a clean state by navigating back to chat.qwen.ai."""
@@ -181,8 +190,12 @@ class BrowserAdapter(IBrowserProtocol):
         # Step 2: Verify user authentication
         _assert_on_chat_page(page)
 
-        # Step 3: Start clean conversation state
+        # Step 3: Start clean conversation state. Qwen hydrates the model picker
+        # asynchronously after this reset; wait for its actual default option rather
+        # than sleeping for a fixed duration.
         self._start_new_chat(page)
+        with contextlib.suppress(Error):
+            self._wait_for_model_picker_ready(page)
 
         # Step 4: Emit lifecycle events
         emitter.emit(EVENT_WEB_LOADED, {"url": page.url})
@@ -202,16 +215,29 @@ class BrowserAdapter(IBrowserProtocol):
         the pipeline dispatch the prompt to the wrong model. Raises
         ``ModelSwitchError`` when the switch cannot be confirmed. When the
         best-effort switch reported failure (``require_switch=False``), the
-        verification is retried once before aborting so a slow picker cannot
-        hard-fail the pipeline.
+        verification is retried while the model picker hydrates so a slow picker
+        cannot hard-fail the pipeline prematurely.
         """
-        attempts = 1 if require_switch else 2
+        # Model picker options can arrive after the committed page document,
+        # especially when Qwen's static assets are slow. Keep this readiness gate
+        # bounded and retry selection instead of failing the whole pipeline on the
+        # first stale model label.
+        attempts = 5
         for attempt in range(attempts):
             try:
                 picker = self._get_model_trigger(page)
                 picker.wait_for(state="visible", timeout=5000)
                 current = (picker.inner_text() or "").replace("\n", " ").strip()
             except Error as exc:
+                if attempt + 1 < attempts:
+                    log.debug(
+                        "verify_default_model_read_retry",
+                        model=DEFAULT_MODEL,
+                        error=str(exc),
+                        attempt=attempt + 1,
+                    )
+                    self._retry_default_model_selection(page)
+                    continue
                 raise ModelSwitchError(
                     f"Cannot read active model from '{MODEL_SELECTOR_BUTTON}' button: {exc}"
                 ) from exc
@@ -219,11 +245,40 @@ class BrowserAdapter(IBrowserProtocol):
                 log.debug("verify_default_model_ok", model=DEFAULT_MODEL)
                 return
             if attempt + 1 < attempts:
-                log.debug("verify_default_model_retry", model=DEFAULT_MODEL, found=current)
-                self.ensure_default_model(page)
+                log.debug(
+                    "verify_default_model_retry",
+                    model=DEFAULT_MODEL,
+                    found=current,
+                    require_switch=require_switch,
+                    attempt=attempt + 1,
+                )
+                self._retry_default_model_selection(page)
                 continue
             raise ModelSwitchError(f"Default model not active: expected '{DEFAULT_MODEL}', found '{current}'")
         raise ModelSwitchError(f"Default model not active: expected '{DEFAULT_MODEL}'")
+
+    def _wait_for_model_picker_ready(self, page: Page, timeout_ms: int = 15_000) -> None:
+        """Wait until the hydrated picker exposes the configured default option."""
+        picker = self._get_model_trigger(page)
+        picker.wait_for(state="visible", timeout=timeout_ms)
+        picker.click(timeout=5000)
+        try:
+            option: Any = page.get_by_role("option", name=DEFAULT_MODEL)
+            with contextlib.suppress(Error):
+                loc = page.locator(".wms-list__item", has_text=DEFAULT_MODEL).first
+                if loc.is_visible(timeout=1000) is True:
+                    option = loc
+            option.wait_for(state="visible", timeout=timeout_ms)
+        finally:
+            with contextlib.suppress(Error):
+                page.keyboard.press("Escape")
+
+    def _retry_default_model_selection(self, page: Page) -> None:
+        """Close a stale picker, allow hydration, and retry default-model selection."""
+        with contextlib.suppress(Error):
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(2000)
+        self.ensure_default_model(page)
 
     def _get_model_trigger(self, page: Page) -> Any:
         """Return locator for active model selector trigger button/div."""
@@ -293,7 +348,7 @@ class BrowserAdapter(IBrowserProtocol):
         try:
             if "/c/" in page.url.lower():
                 log.info("Active chat thread detected (%s). Navigating to root chat URL...", page.url)
-                page.goto(CHAT_URL, wait_until="domcontentloaded", timeout=15_000)
+                self._goto_chat(page, 15_000, 15_000)
                 page.wait_for_timeout(1000)
 
             if click_first_visible_enabled(page, NEW_CHAT_SELECTORS, timeout_ms=3000):

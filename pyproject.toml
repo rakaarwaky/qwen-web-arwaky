@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qwen-web-cli"
-version = "5.0.0"
+version = "5.2.2"
 description = "Production-grade CLI automation and MCP server for chat.qwen.ai"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
+qwen-web-arwaky = "modules.root_cli_main_entry:main"
+qwa = "modules.root_cli_main_entry:main"
 qwen-web-cli = "modules.root_cli_main_entry:main"
 qwc = "modules.root_cli_main_entry:main"
 qwen-web-mcp = "modules.root_mcp_main_entry:main"

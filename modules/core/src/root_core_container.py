@@ -13,6 +13,9 @@ from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentProm
 # agent_direct_prompt_orchestrator
 from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
 
+# agent_job_orchestrator
+from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
+
 # agent_prompt_file_orchestrator
 from modules.core.src.agent_prompt_file_orchestrator import PromptFileOrchestrator
 
@@ -24,6 +27,7 @@ from modules.core.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
+from modules.core.src.capabilities_job_manager import JobManager
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
 from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
@@ -34,13 +38,14 @@ from modules.core.src.capabilities_workspace_provisioner import WorkspaceProvisi
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
+    IJobManagerAggregate,
     IPromptFileAggregate,
     IPromptFlowAggregate,
     ISessionAggregate,
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
@@ -112,6 +117,13 @@ class SharedContainer:
         self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
             browser=self.browser,
             observability=self.observability,
+        )
+        DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        self.job_manager = JobManager(storage_dir=DEFAULT_JOBS_DIR)
+        self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(
+            storage=self.job_manager,
+            file_only=self.agent_prompt_file_orchestrator,
+            attachment=self.agent_attachment_prompt_orchestrator,
         )
 
     def wire(self) -> None:

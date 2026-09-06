@@ -1,6 +1,6 @@
 [project]
 name = "qwen-web-mcp"
-version = "5.0.0"
+version = "5.2.0"
 description = "qwen-web MCP surface layer (tools)"
 requires-python = ">=3.10"
 license = {text = "MIT"}

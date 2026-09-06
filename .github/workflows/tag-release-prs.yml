@@ -83,6 +83,3 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --ref "v${RELEASE_VERSION}" \
             -f "tag=v${RELEASE_VERSION}"
-            --repo "$GITHUB_REPOSITORY" \
-            --ref "v${RELEASE_VERSION}" \
-            -f "tag=v${RELEASE_VERSION}"

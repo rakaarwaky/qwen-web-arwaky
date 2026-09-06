@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src import surface_cli_update_command
@@ -142,10 +144,71 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
                 {"QWEN_WEB_GITHUB_REPO": "evil.example.com/malicious"},
                 clear=False,
             ):
-                # upgrade_package only ever builds the URL from the default repo,
-                # but ensure the allowlist still rejects anything unexpected.
                 url = f"git+https://github.com/{DEFAULT_GITHUB_REPO}.git"
                 self.assertRegex(url, r"^git\+https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git$")
+
+    def test_perform_update_rejects_stale_post_update_version(self) -> None:
+        with (
+            patch.object(
+                self.manager,
+                "_resolve_installed_version",
+                side_effect=[VersionString("5.0.0"), VersionString("5.0.0")],
+            ),
+            patch.object(
+                self.manager,
+                "check_update",
+                return_value=UpdateCheckResult(
+                    package_name="qwen-web-cli",
+                    current_version="5.0.0",
+                    latest_version="5.2.0",
+                    update_available=True,
+                    source="github",
+                ),
+            ),
+            patch.object(
+                self.manager,
+                "upgrade_package",
+                return_value=UpdateStepResult("package_upgrade", True, True, "fallback reinstall"),
+            ) as mock_upgrade,
+            patch.object(
+                self.manager,
+                "sync_browser",
+                return_value=UpdateStepResult("browser_sync", True, True, "chromium ok"),
+            ),
+            patch.object(
+                self.manager,
+                "_postflight_health_checks",
+                return_value=(UpdateStepResult("health:check", True, True, "ok"),),
+            ),
+        ):
+            report = self.manager.perform_update(ForceFlag(False))
+
+        self.assertFalse(report.healthy)
+        mock_upgrade.assert_called_once_with(ForceFlag(False), target_version="5.2.0")
+        self.assertTrue(
+            any(check.name == "health:package_version_target" and not check.success for check in report.health_checks)
+        )
+        self.assertIn("behind latest 5.2.0", report.message)
+
+    def test_upgrade_package_falls_back_to_pinned_release_for_stale_editable_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            (source / ".git").mkdir()
+            (source / "pyproject.toml").write_text('version = "5.0.0"\n', encoding="utf-8")
+            with (
+                patch.object(self.manager, "_editable_source_dir", return_value=source),
+                patch.object(self.manager, "_run_subprocess", side_effect=[(0, "", ""), (0, "", "")]) as run,
+            ):
+                result = self.manager.upgrade_package(target_version="5.2.0")
+
+        self.assertTrue(result.success)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0], ["git", "-C", str(source), "pull", "--ff-only"])
+        self.assertIn(
+            "git+https://github.com/rakaarwaky/qwen-web-arwaky.git@v5.2.0",
+            commands[1],
+        )
+        self.assertIn("--force-reinstall", commands[1])
 
     @patch.object(UpdateManager, "upgrade_package")
     @patch.object(UpdateManager, "sync_browser")

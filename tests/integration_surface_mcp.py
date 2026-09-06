@@ -77,9 +77,42 @@ class TestMCPServerTools(unittest.TestCase):
             res = asyncio.run(delete_session(confirm=True))
             self.assertIn("deleted", res)
 
+    def test_process_prompt_file_only_async(self) -> None:
+        """Test process_prompt_file_only returns queued job in async mode."""
+        mock_tools = MagicMock()
+        mock_tools.process_prompt_file_only.return_value = (
+            '{"success": true, "latest_event": "EVENT_DISPATCH_ACKNOWLEDGED", "job_id": "file_123"}'
+        )
+        with patch("modules.root_mcp_main_entry._get_tools", return_value=mock_tools):
+            res = asyncio.run(process_prompt_file_only("/tmp/prompt.md", "/tmp/output.md", async_run=True))
+            self.assertIn("EVENT_DISPATCH_ACKNOWLEDGED", res)
+            self.assertIn("file_123", res)
+
+    def test_get_job_status(self) -> None:
+        """Test get_job_status tool execution."""
+        from modules.root_mcp_main_entry import get_job_status
+
+        mock_tools = MagicMock()
+        mock_tools.get_job_status.return_value = (
+            '{"success": true, "job_id": "file_123", "latest_event": "EVENT_GENERATION_FINISHED", "completed": true}'
+        )
+        with patch("modules.root_mcp_main_entry._get_tools", return_value=mock_tools):
+            res = asyncio.run(get_job_status("file_123"))
+            self.assertIn("EVENT_GENERATION_FINISHED", res)
+
+    def test_list_jobs(self) -> None:
+        """Test list_jobs tool execution."""
+        from modules.root_mcp_main_entry import list_jobs
+
+        mock_tools = MagicMock()
+        mock_tools.list_jobs.return_value = '{"success": true, "total": 1, "jobs": [{"job_id": "file_123"}]}'
+        with patch("modules.root_mcp_main_entry._get_tools", return_value=mock_tools):
+            res = asyncio.run(list_jobs(limit=5))
+            self.assertIn("file_123", res)
+
     def test_process_direct_prompt_empty_validation(self) -> None:
         """Test process_direct_prompt rejects empty prompt text."""
-        cmd = McpToolCommand(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        cmd = McpToolCommand(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
         res = cmd.process_direct_prompt("")
         self.assertIn("VALIDATION_ERROR", res)
 

@@ -16,19 +16,27 @@ from modules.shared.src import (
     EVENT_MODEL_VERIFIED,
     EVENT_SEND_CLICKED,
     EVENT_WEB_LOADED,
+    PIPELINE_EVENT_SEQUENCE,
     ResponseDetectionTimeoutError,
 )
 
 
 def _make_attachment_orchestrator() -> AttachmentPromptOrchestrator:
     """Build an AttachmentPromptOrchestrator with all dependencies mocked."""
+    saver = MagicMock()
+
+    def write_output(path, *_args, **_kwargs):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("saved output", encoding="utf-8")
+
+    saver.write_output.side_effect = write_output
     return AttachmentPromptOrchestrator(
         browser=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
         uploader=MagicMock(),
-        saver=MagicMock(),
+        saver=saver,
         observability=MagicMock(get_logger=MagicMock(return_value=MagicMock())),
         flow=MagicMock(),
     )
@@ -96,7 +104,12 @@ class TestSendFile:
         _configure_lifecycle_mocks(orch)
         orch._sender.count_messages.return_value = 2
         orch._uploader.upload_attachment.return_value = True
-        orch._flow.dispatch_and_wait_for_response.return_value = "the response"
+        def flow_stub(*, emitter, **_kwargs):
+            for event in PIPELINE_EVENT_SEQUENCE[5:-1]:
+                emitter.emit(event)
+            return "the response"
+
+        orch._flow.dispatch_and_wait_for_response.side_effect = flow_stub
 
         f = tmp_path / "task.md"
         f.write_text("hello")

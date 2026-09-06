@@ -12,6 +12,7 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_MODEL_VERIFIED,
     EVENT_SEND_CLICKED,
     EVENT_WEB_LOADED,
+    STANDARD_PROMPT_EVENTS,
 )
 
 
@@ -21,6 +22,11 @@ def _make_direct_orchestrator() -> tuple[DirectPromptOrchestrator, dict[str, Mag
     sender = MagicMock()
     streamer = MagicMock()
     saver = MagicMock()
+    def write_output(path, *_args, **_kwargs):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("saved output", encoding="utf-8")
+
+    saver.write_output.side_effect = write_output
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
 
@@ -54,7 +60,19 @@ def test_process_direct_prompt_happy_path() -> None:
     bctx.pages = [page]
     mocks["browser"].browser_session.return_value.__enter__.return_value = bctx
 
-    mocks["flow"].dispatch_and_wait_for_response.return_value = "Hello from Qwen AI!"
+    def navigate_stub(_page, emitter):
+        emitter.emit(EVENT_WEB_LOADED, {"url": "test"})
+        emitter.emit(EVENT_LOGIN_VERIFIED, {"url": "test"})
+        emitter.emit(EVENT_MODEL_VERIFIED, {"model": "Qwen3.8-Max"})
+
+    mocks["browser"].navigate_to_chat.side_effect = navigate_stub
+
+    def flow_stub(*, emitter, **_kwargs):
+        for event in STANDARD_PROMPT_EVENTS[3:-1]:
+            emitter.emit(event)
+        return "Hello from Qwen AI!"
+
+    mocks["flow"].dispatch_and_wait_for_response.side_effect = flow_stub
 
     response = orch.process_direct_prompt("What is Python?", timeout_sec=30, headless=True)
 

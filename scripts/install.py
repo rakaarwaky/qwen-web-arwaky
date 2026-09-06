@@ -21,7 +21,14 @@ def log(msg: str) -> None:
 
 
 def get_venv_dir() -> Path:
-    return PROJECT_ROOT / "venv"
+    if os.environ.get("XDG_DATA_HOME"):
+        return Path(os.environ["XDG_DATA_HOME"]) / "qwen-web" / "venv"
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(local_app_data) / "qwen-web" / "venv"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "qwen-web" / "venv"
+    return Path.home() / ".local/share/qwen-web/venv"
 
 
 def get_venv_python(venv_dir: Path) -> Path:
@@ -42,13 +49,47 @@ def ensure_venv() -> Path:
         log(f"⚡ [install] Using active virtual environment: {sys.prefix}")
         return Path(sys.executable)
 
-    if not venv_dir.exists():
+    python_bin = get_venv_python(venv_dir)
+    if not venv_dir.exists() or not python_bin.exists():
         log(f"🐍 [install] Creating virtual environment at {venv_dir}...")
+        if venv_dir.exists():
+            shutil.rmtree(venv_dir, ignore_errors=True)
         subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
 
     python_bin = get_venv_python(venv_dir)
     log(f"⚡ [install] Using virtual environment python: {python_bin}")
     return python_bin
+
+
+def get_local_bin_dir() -> Path:
+    if os.environ.get("XDG_BIN_HOME"):
+        return Path(os.environ["XDG_BIN_HOME"])
+    return Path.home() / ".local" / "bin"
+
+
+def setup_project_venv_symlink(venv_dir: Path) -> None:
+    """Create symlinks in PROJECT_ROOT (.venv and venv) pointing to XDG venv for IDE/editor support."""
+    if sys.platform == "win32":
+        return
+    for name in (".venv", "venv"):
+        target = PROJECT_ROOT / name
+        if target.is_symlink():
+            try:
+                if target.resolve() == venv_dir.resolve():
+                    continue
+                target.unlink()
+            except OSError:
+                target.unlink(missing_ok=True)
+        elif target.exists():
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+            else:
+                target.unlink(missing_ok=True)
+        try:
+            target.symlink_to(venv_dir)
+            log(f"🔗 [install] Created project venv symlink: {target} -> {venv_dir}")
+        except OSError as err:
+            log(f"⚠ [install] Could not create {target} symlink: {err}")
 
 
 def uninstall_previous(python_bin: Path) -> None:
@@ -59,10 +100,15 @@ def uninstall_previous(python_bin: Path) -> None:
     )
 
     if sys.platform != "win32":
-        local_bin = Path.home() / ".local" / "bin"
-        for name in ("qwen-web-cli", "qwc"):
+        local_bin = get_local_bin_dir()
+        for name in ("qwen-web-cli", "qwc", "qwen-web-mcp"):
             target = local_bin / name
             if target.is_symlink() or target.exists():
+                with contextlib.suppress(OSError):
+                    target.unlink()
+        for name in (".venv", "venv"):
+            target = PROJECT_ROOT / name
+            if target.is_symlink():
                 with contextlib.suppress(OSError):
                     target.unlink()
 
@@ -141,12 +187,12 @@ def setup_bin_links(python_bin: Path) -> None:
     if sys.platform == "win32":
         return
 
-    log("🔑 [install] Linking entry points into ~/.local/bin...")
-    local_bin = Path.home() / ".local" / "bin"
+    local_bin = get_local_bin_dir()
+    log(f"🔑 [install] Linking entry points into {local_bin}...")
     local_bin.mkdir(parents=True, exist_ok=True)
 
     venv_bin_dir = python_bin.parent
-    for name in ("qwen-web-cli", "qwc", "qwen-web-mcp"):
+    for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
         src = venv_bin_dir / name
         dst = local_bin / name
         if src.exists():
@@ -157,11 +203,11 @@ def setup_bin_links(python_bin: Path) -> None:
                 dst.symlink_to(src)
 
     bashrc = Path.home() / ".bashrc"
-    path_line = 'export PATH="${HOME}/.local/bin:${PATH}"'
+    path_line = f'export PATH="{local_bin}:${{PATH}}"'
     if bashrc.exists():
         content = bashrc.read_text(encoding="utf-8", errors="ignore")
-        if ".local/bin" not in content:
-            log("📝 [install] Adding ~/.local/bin to PATH in ~/.bashrc...")
+        if str(local_bin) not in content:
+            log(f"📝 [install] Adding {local_bin} to PATH in ~/.bashrc...")
             with bashrc.open("a", encoding="utf-8") as f:
                 f.write(f"\n# qwen-web-cli global CLI PATH\n{path_line}\n")
 
@@ -171,6 +217,7 @@ def main() -> None:
     os.chdir(PROJECT_ROOT)
 
     python_bin = ensure_venv()
+    setup_project_venv_symlink(get_venv_dir())
     uninstall_previous(python_bin)
     install_package(python_bin)
     install_playwright(python_bin)

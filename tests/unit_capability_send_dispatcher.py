@@ -30,17 +30,33 @@ class TestClickSendExtended:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         # No visible send button (first.count=0) → Enter fallback used.
-        # loc.count=1 simulates the post-send "disabled/sending" indicator so the
-        # dispatch-ack check acknowledges immediately.
+        # The dispatch ACK must come from a real new user turn (message count 2
+        # after the baseline count 1), not from a cleared composer/disabled UI.
         loc = MagicMock()
         loc.count.return_value = 1
         loc.first.count.return_value = 0
         loc.first.is_visible.return_value = False
         page.locator.return_value = loc
+        page.evaluate.side_effect = [1, "", 2]
         page.keyboard.press = MagicMock()
 
         _sender().click_send(page, emitter)
         page.keyboard.press.assert_called_once_with("Enter")
+        assert emitter.emit.call_count == 2
+
+    def test_changed_message_text_acknowledges_when_count_is_unchanged(self):
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+        loc = MagicMock()
+        loc.count.return_value = 1
+        loc.first.count.return_value = 1
+        loc.first.is_visible.return_value = True
+        loc.first.is_enabled.return_value = True
+        page.locator.return_value = loc
+        page.evaluate.side_effect = [1, "before", 1, "after"]
+
+        _sender().click_send(page, emitter)
+
         assert emitter.emit.call_count == 2
 
     def test_click_send_with_config_keyword_arg(self):
@@ -51,6 +67,7 @@ class TestClickSendExtended:
         loc.first.count.return_value = 0
         loc.first.is_visible.return_value = False
         page.locator.return_value = loc
+        page.evaluate.side_effect = [1, "", 2]
         page.keyboard.press = MagicMock()
 
         cfg = SenderConfig(click_timeout_ms=100, try_enter_key_fallback=True)
@@ -146,6 +163,23 @@ def _page_with_no_send_selector() -> MagicMock:
 
     page.locator.side_effect = locator_factory
     return page
+
+
+def test_composer_reset_alone_is_not_dispatch_ack():
+    page = MagicMock()
+    emitter = MagicMock(spec=LifecycleEmitter)
+    loc = MagicMock()
+    loc.count.return_value = 1
+    loc.first.count.return_value = 0
+    loc.first.is_visible.return_value = False
+    loc.first.is_enabled.return_value = False
+    loc.first.input_value.return_value = ""
+    page.locator.return_value = loc
+    page.evaluate.return_value = 1
+    page.keyboard.press = MagicMock()
+
+    with pytest.raises(SendDispatchError, match="did not acknowledge the user turn"):
+        _sender().click_send(page, emitter)
 
 
 def test_no_visible_selector_does_not_press_enter_when_instance_fallback_disabled():

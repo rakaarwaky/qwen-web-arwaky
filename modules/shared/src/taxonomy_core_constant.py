@@ -68,6 +68,8 @@ XDG_CONFIG_HOME = _XDG_CONFIG_HOME
 DEFAULT_OUTPUT = XDG_DATA_HOME / "output"
 DEFAULT_LOG = XDG_STATE_HOME / "log"
 DEFAULT_SESSION = XDG_DATA_HOME / "qwen_session"
+DEFAULT_VENV = XDG_DATA_HOME / "venv"
+DEFAULT_JOBS_DIR = XDG_STATE_HOME / "jobs"
 XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 
 CHAT_URL = "https://chat.qwen.ai/"
@@ -129,11 +131,23 @@ SEND_DISABLED_SELECTORS: str = (
     "button[aria-label*='Send' i][disabled], button[class*='send' i][disabled], "
     ".message-input-right-button-send button[disabled]"
 )
+TYPING_INDICATOR_SELECTORS: str = (
+    ".thinking:not([style*='display: none']):not([class*='completed']):not([class*='complete']), "
+    "[class*='qwen-chat-thinking-status-card']:not([class*='completed']):not([class*='complete'])"
+    ":not(:has-text('completed')), "
+    "[class*='thinking-status-card']:not([class*='completed']):not([class*='complete'])"
+    ":not(:has-text('completed')), "
+    "[class*='thinking-process'], [class*='thinking']:not([class*='completed']):not([class*='complete'])"
+    ":not(:has-text('completed')), "
+    "[class*='typing'], [class*='streaming']"
+)
 
 JS_GET_RESPONSE_TEXT: str = r"""
 () => {
     var responseNodes = document.querySelectorAll(
-        '.qwen-markdown, .chat-response-message, .response-message-content, .qwen-markdown-text'
+        '.qwen-markdown, .qwen-chat-message-assistant, .chat-response-message, .chat-message-assistant, '
+        + '[data-role="assistant"], .response-message-content, .qwen-markdown-text, [class*="message-content"], '
+        + '[class*="message-body"], [class*="response"]'
     );
     for (var ri = responseNodes.length - 1; ri >= 0; ri--) {
         var node = responseNodes[ri];
@@ -155,7 +169,10 @@ JS_GET_RESPONSE_TEXT: str = r"""
         }
 
         // Tier 2: Live DOM Tree Walker fallback
-        var outerContainer = node.closest('.qwen-markdown, .chat-response-message');
+        var outerContainer = node.closest(
+            '.qwen-markdown, .qwen-chat-message-assistant, .chat-response-message, .chat-message-assistant, '
+            + '[data-role="assistant"], [class*="message-content"], [class*="message-body"], [class*="response"]'
+        );
         var targetNode = outerContainer || node;
 
         var text = '';

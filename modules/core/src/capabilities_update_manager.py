@@ -122,34 +122,60 @@ class UpdateManager(IUpdateProtocol):
             source=source,
         )
 
-    def upgrade_package(self, force: ForceFlag = ForceFlag(False)) -> UpdateStepResult:
-        """Upgrade (or reinstall) the package directly from GitHub Releases / Git repo."""
+    def upgrade_package(
+        self,
+        force: ForceFlag = ForceFlag(False),
+        *,
+        target_version: str | None = None,
+    ) -> UpdateStepResult:
+        """Upgrade (or reinstall) the package and verify editable-source freshness."""
         editable_dir = self._editable_source_dir()
+        mode_desc: str
         if editable_dir is not None:
             git_dir = editable_dir / ".git"
+            git_ok = True
+            source_version = self._read_source_version(editable_dir)
             if git_dir.exists():
-                self._run_subprocess(["git", "-C", str(editable_dir), "pull"], timeout_sec=60.0)
-            cmd = [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--no-input",
-                "--disable-pip-version-check",
-                "-e",
-                str(editable_dir),
-            ]
-            mode_desc = f"git pull & editable reinstall from {editable_dir}"
-        else:
-            repo_url = f"git+https://github.com/{DEFAULT_GITHUB_REPO}.git"
-            if not re.fullmatch(r"git\+https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git", repo_url):
-                log.error("package_upgrade_rejected_insecure_repo url=%s", repo_url)
-                return UpdateStepResult(
-                    name="package_upgrade",
-                    executed=True,
-                    success=False,
-                    detail=f"Refusing insecure upgrade source: {repo_url}",
+                git_rc, git_out, git_err = self._run_subprocess(
+                    ["git", "-C", str(editable_dir), "pull", "--ff-only"],
+                    timeout_sec=60.0,
                 )
+                git_ok = git_rc == 0
+                if not git_ok:
+                    log.warning("editable_git_sync_failed detail=%s", _tail(git_err or git_out))
+                source_version = self._read_source_version(editable_dir)
+            source_is_stale = target_version is not None and (
+                source_version is None or compare_versions(source_version, target_version) < 0
+            )
+            if git_ok and not source_is_stale:
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-input",
+                    "--disable-pip-version-check",
+                    "-e",
+                    str(editable_dir),
+                ]
+                mode_desc = f"git pull & editable reinstall from {editable_dir}"
+            else:
+                repo_url = self._github_repo_url(target_version)
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-input",
+                    "--disable-pip-version-check",
+                    "--upgrade",
+                    "--force-reinstall",
+                    "--no-deps",
+                    repo_url,
+                ]
+                mode_desc = f"fallback pip reinstall from GitHub ({repo_url})"
+        else:
+            repo_url = self._github_repo_url(target_version)
             cmd = [
                 sys.executable,
                 "-m",
@@ -229,13 +255,30 @@ class UpdateManager(IUpdateProtocol):
                 message=message,
             )
         steps: list[UpdateStepResult] = []
-        pkg_step = self.upgrade_package(ForceFlag(forced))
+        pkg_step = self.upgrade_package(ForceFlag(forced), target_version=check.latest_version)
         steps.append(pkg_step)
         importlib.invalidate_caches()
         browser_step = self.sync_browser(ForceFlag(forced))
         steps.append(browser_step)
-        post_version = self._resolve_installed_version()
+        post_version = self._resolve_installed_version(prefer_metadata=True)
         health_checks = self._postflight_health_checks()
+        if check.latest_version is not None:
+            target_ok = (
+                str(post_version) != "unknown" and compare_versions(str(post_version), check.latest_version) >= 0
+            )
+            if not target_ok:
+                health_checks = (
+                    *health_checks,
+                    UpdateStepResult(
+                        name="health:package_version_target",
+                        executed=True,
+                        success=False,
+                        detail=(
+                            f"installed version {post_version} is behind latest {check.latest_version}; "
+                            "source synchronization did not reach the release target"
+                        ),
+                    ),
+                )
         steps_ok = pkg_step.success and browser_step.success
         checks_ok = all(c.success for c in health_checks)
         healthy = steps_ok and checks_ok
@@ -271,17 +314,41 @@ class UpdateManager(IUpdateProtocol):
         )
 
     # ─── Block 3: Private Helpers ──
-    def _resolve_installed_version(self) -> VersionString:
-        """Resolve installed version dynamically from pyproject.toml or importlib.metadata."""
+    def _resolve_installed_version(self, *, prefer_metadata: bool = False) -> VersionString:
+        """Resolve installed version from package metadata, source, or pip as a fallback."""
+        if prefer_metadata:
+            metadata_version = self._pip_show_version()
+            if metadata_version is not None:
+                return metadata_version
         v = get_package_version(self.package_name)
         if v and v != "0.0.0-dev":
             return VersionString(v)
+        metadata_version = self._pip_show_version()
+        return metadata_version or VersionString(v)
+
+    def _pip_show_version(self) -> VersionString | None:
+        """Read the installed distribution version using the active interpreter."""
         rc, out, _err = self._run_subprocess([sys.executable, "-m", "pip", "show", self.package_name], timeout_sec=60.0)
         if rc == 0:
             for line in out.splitlines():
                 if line.lower().startswith("version:"):
                     return VersionString(line.split(":", 1)[1].strip())
-        return VersionString(v)
+        return None
+
+    def _read_source_version(self, source_dir: Path) -> str | None:
+        """Read a checkout's root project version without importing its code."""
+        with contextlib.suppress(OSError):
+            content = (source_dir / "pyproject.toml").read_text(encoding="utf-8", errors="ignore")
+            match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+            if match:
+                return match.group(1).strip()
+        return None
+
+    def _github_repo_url(self, target_version: str | None = None) -> str:
+        """Build a GitHub source URL, pinning to the discovered release when known."""
+        repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
+        suffix = f"@v{target_version.lstrip('vV')}" if target_version else ""
+        return f"git+https://github.com/{repo}.git{suffix}"
 
     def _discover_latest(self) -> tuple[str | None, str, str | None]:
         """Return (latest_version, source, error) via GitHub releases exclusively."""
@@ -432,7 +499,7 @@ class UpdateManager(IUpdateProtocol):
                 ),
             )
         )
-        version = self._resolve_installed_version()
+        version = self._resolve_installed_version(prefer_metadata=True)
         version_ok = str(version) != "unknown"
         checks.append(
             UpdateStepResult(

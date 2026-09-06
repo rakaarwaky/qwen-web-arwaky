@@ -75,10 +75,10 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
         if not state.dispatch_acknowledged:
             raise RuntimeError("Cannot wait for response: prompt dispatch is incomplete")
 
-        stream_timeout_sec = min(timeout_sec, active_cfg.streaming_timeout)
+        response_timeout_hint = timeout_sec
         response = streamer.wait_for_response(
             page,
-            TimeoutSec(stream_timeout_sec),
+            TimeoutSec(response_timeout_hint),
             msg_count_before,
             emitter,
             polling_interval_sec=PollIntervalSec(active_cfg.poll_interval),
@@ -90,9 +90,7 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
             logger.info("Received response (%d chars)", len(response))
             return response.strip()
 
-        raise ResponseDetectionTimeoutError(
-            f"Response detection timeout after {stream_timeout_sec}s: no response detected"
-        )
+        raise ResponseDetectionTimeoutError("No terminal response event detected before the browser flow ended")
 
 
 __all__ = ["SharedFlowOrchestrator"]

@@ -25,8 +25,7 @@ def is_stability_satisfied(
 ) -> bool:
     """Decide whether the response has stabilized enough to accept it."""
     _ = (has_thinking, has_streaming)
-    # Force-complete backstop when the DOM never reports is_complete (e.g. a
-    # stale thinking status-card): accept after 2x the normal stability checks
-    # so the pipeline does not idle ~24s (6x) after generation already finished.
-    force_complete = stable_count >= (stability_checks * 2)
-    return bool(stable_count >= stability_checks and (is_complete or force_complete))
+    # Stability alone is not a terminal event. Require the UI's explicit
+    # generation-complete signal so an unfinished long-running response is never
+    # accepted merely because its DOM text has temporarily stopped changing.
+    return bool(stable_count >= stability_checks and is_complete)

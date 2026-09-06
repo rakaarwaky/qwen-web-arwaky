@@ -37,6 +37,7 @@ class TestSenderRemaining:
         loc.first.count.return_value = 0
         loc.first.is_visible.return_value = False
         page.locator.return_value = loc
+        page.evaluate.side_effect = [1, "", 2]
         click_send(page, emitter, config=cfg)
         emitter.emit.assert_called()
 

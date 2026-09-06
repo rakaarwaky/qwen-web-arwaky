@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import contextlib
 import time
-from typing import Any, cast
 
 from playwright.sync_api import Error, Page
 
@@ -15,7 +14,7 @@ from modules.core.src.utility_core_dom_helper import click_send as _dom_click_se
 from modules.core.src.utility_core_dom_query import count_messages, latest_message_text
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import ISendProtocol
-from modules.shared.src.taxonomy_core_constant import SEND_DISABLED_SELECTORS, TEXTAREA_SELECTOR
+from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import SendDispatchError
 from modules.shared.src.taxonomy_core_event import EVENT_DISPATCH_ACKNOWLEDGED, EVENT_SEND_CLICKED
@@ -147,6 +146,7 @@ class SendDispatcher(ISendProtocol):
             # Step 2: Wait for send button enabled & no active parse toast
             self._wait_for_send_enabled(page, timeout_ms=effective_config.click_timeout_ms)
             baseline_count = int(count_messages(page))
+            baseline_text = latest_message_text(page)
 
             # Step 3: Trigger DOM send click
             if not _dom_click_send(page, _config=effective_config):
@@ -162,7 +162,9 @@ class SendDispatcher(ISendProtocol):
             emitter.emit(EVENT_SEND_CLICKED, details)
 
             # Step 4: Verify dispatch acknowledgment (with Enter fallback if needed)
-            if not self._wait_for_dispatch_ack(page, baseline_count, timeout_ms=int(effective_config.click_timeout_ms)):
+            if not self._wait_for_dispatch_ack(
+                page, baseline_count, baseline_text, timeout_ms=int(effective_config.click_timeout_ms)
+            ):
                 if _is_parse_toast_visible(page):
                     page.wait_for_timeout(1000)
                     continue
@@ -173,7 +175,7 @@ class SendDispatcher(ISendProtocol):
                     with contextlib.suppress(Error, TimeoutError):
                         page.keyboard.press("Enter")
                 if not self._wait_for_dispatch_ack(
-                    page, baseline_count, timeout_ms=int(effective_config.click_timeout_ms)
+                    page, baseline_count, baseline_text, timeout_ms=int(effective_config.click_timeout_ms)
                 ):
                     if _is_parse_toast_visible(page):
                         page.wait_for_timeout(1000)
@@ -184,30 +186,30 @@ class SendDispatcher(ISendProtocol):
 
         raise SendDispatchError("Send control dispatch timed out waiting for document parsing or user turn ACK")
 
-    def _wait_for_dispatch_ack(self, page: Page, baseline_count: int, timeout_ms: int | None = None) -> bool:
-        """Verify that the click produced a new user turn or reset the composer."""
+    def _wait_for_dispatch_ack(
+        self,
+        page: Page,
+        baseline_count: int,
+        baseline_text: ResponseText | None,
+        timeout_ms: int | None = None,
+    ) -> bool:
+        """Verify that the click produced a real new user turn.
+
+        A cleared composer or disabled send button is not sufficient evidence:
+        Qwen can reset either control before the user turn is committed. The
+        acknowledgment must come from a new turn count or a changed message
+        surface so the response monitor cannot wait on a false dispatch.
+        """
         from modules.core.src.utility_core_dom_query import latest_message_text as _latest_message_text
 
         effective_timeout = timeout_ms if timeout_ms is not None else int(self.click_timeout_ms)
         deadline = time.monotonic() + (effective_timeout / 1000)
-        baseline_text = _latest_message_text(page)
         while time.monotonic() < deadline:
             try:
                 if int(count_messages(page)) > baseline_count:
                     return True
-                textarea = page.locator(TEXTAREA_SELECTOR).first
-                textarea_count = cast(Any, textarea.count())
-                if not isinstance(textarea_count, int):
-                    return True
-                if textarea_count > 0:
-                    value = textarea.input_value(timeout=100)
-                    if not value.strip():
-                        return True
-                disabled_count = cast(Any, page.locator(SEND_DISABLED_SELECTORS).count())
-                if isinstance(disabled_count, int) and disabled_count > 0:
-                    return True
                 current_text = _latest_message_text(page)
-                if current_text != baseline_text and current_text is not None:
+                if current_text is not None and str(current_text).strip() and current_text != baseline_text:
                     return True
             except (Error, TimeoutError):
                 pass
