@@ -64,11 +64,12 @@ def create_ephemeral_session(
     ephemeral temporary directory so multiple browser processes can run
     concurrently without Chromium SingletonLock conflicts.
     """
+    master_session.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        master_session.chmod(0o700)
+    clean_stale_locks(master_session)
+
     if mode == "login":
-        master_session.mkdir(parents=True, exist_ok=True)
-        with contextlib.suppress(OSError):
-            master_session.chmod(0o700)
-        clean_stale_locks(master_session)
         yield master_session
         return
 

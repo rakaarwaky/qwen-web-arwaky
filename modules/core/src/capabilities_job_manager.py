@@ -72,8 +72,16 @@ class JobManager(IJobStorageProtocol):
         """List recently recorded jobs sorted newest to oldest."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         records: list[JobRecord] = []
-        files = sorted(self.storage_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-        for path in files[:limit]:
+        candidate_files: list[tuple[float, Path]] = []
+        for path in self.storage_dir.glob("*.json"):
+            if ".tmp_" in path.name:
+                continue
+            try:
+                candidate_files.append((path.stat().st_mtime, path))
+            except OSError:
+                continue
+        candidate_files.sort(key=lambda t: t[0], reverse=True)
+        for _, path in candidate_files[:int(limit)]:
             job_id = path.stem
             rec = self.get_job(job_id)
             if rec is not None:
