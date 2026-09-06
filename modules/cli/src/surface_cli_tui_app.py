@@ -45,6 +45,7 @@ from modules.shared.src.contract_core_aggregate import (
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag
+from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
 from modules.shared.src.utility_core_version import get_package_version
 
@@ -495,7 +496,7 @@ class QwenTuiApp(App[None]):
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
-                                placeholder="path/to/prompt.md",
+                                placeholder="path/to/prompt.md or role (architect|backend|frontend|analyst)",
                                 id=f"input-prompt-{s}",
                                 classes="field-input",
                             )
@@ -647,10 +648,13 @@ class QwenTuiApp(App[None]):
             self._log_msg(f"[bold #EF4444]ERROR:[/] Prompt file is required for Slot {slot_id}.", slot_id)
             return
 
-        p_path = Path(prompt_val).resolve()
-        if not p_path.exists():
-            self._log_msg(f"[bold #EF4444]ERROR:[/] File not found: {prompt_val}", slot_id)
-            return
+        if is_prompt_role(prompt_val):
+            p_path = materialize_role_template(prompt_val)
+        else:
+            p_path = Path(prompt_val).resolve()
+            if not p_path.exists():
+                self._log_msg(f"[bold #EF4444]ERROR:[/] File not found: {prompt_val}", slot_id)
+                return
 
         file_val = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
         f_path = Path(file_val).resolve() if file_val else None

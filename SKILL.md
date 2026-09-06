@@ -69,6 +69,31 @@ Multiple prompt jobs can run concurrently against one authenticated browser sess
 QWEN_WEB_MAX_WORKERS=4 qwa process input/task_001.md input/task_002.md input/task_003.md input/task_004.md
 ```
 
+### Built-in Role Prompt Templates
+
+Instead of creating a Markdown prompt file manually, you can pass a built-in role template name wherever a prompt file path is accepted (`input_file`, `prompt_file`, or CLI `-i` / `--prompt-path`):
+- `architect`: Layer Boundaries, Naming, Orphan, Scalability, Data Flow
+- `backend`: Security, Performance, Error Handling, SOLID, Code Quality, Maintainability
+- `frontend`: Accessibility, Responsiveness, UX Patterns, Component Quality, Visual Consistency, Client Performance
+- `analyst`: Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability
+
+#### MCP Example (Attachment Review with Role Template)
+```json
+{
+  "prompt_file": "backend",
+  "attachment_file": "src/api/auth.py"
+}
+```
+
+#### CLI Example
+```bash
+# Code review with backend template and attachment
+qwen-web-cli prompt-with-attachment -i backend -a src/auth.py --headless --json
+
+# Architecture review
+qwen-web-cli prompt-with-attachment -i architect -a README.md --headless --json
+```
+
 ### Session Authentication (`setup_session`)
 
 If session cookies expire or CAPTCHA is detected, invoke `setup_session` to launch a visible browser window for manual user login.

@@ -283,3 +283,27 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
 DEFAULT_INCLUDE_HEADER: bool = True
 DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
+
+# ─── Prompt templates (role-based built-in templates) ─────────────────────
+# Each role is embedded in its own taxonomy constant module:
+#   taxonomy_architect_constant.py, taxonomy_backend_constant.py,
+#   taxonomy_frontend_constant.py, taxonomy_analyst_constant.py
+PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
+    "architect": {
+        "title": "Architect",
+        "dimensions": "Layer Boundaries, Naming, Orphan, Scalability, Data Flow",
+    },
+    "backend": {
+        "title": "Backend / Tech Lead",
+        "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
+    },
+    "frontend": {
+        "title": "Frontend / UI-UX",
+        "dimensions": "Accessibility, Responsiveness, UX Patterns, Component Quality, Visual Consistency, Client Performance",
+    },
+    "analyst": {
+        "title": "Business Analyst",
+        "dimensions": "Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability",
+    },
+}
+PROMPT_TEMPLATE_ROLES: tuple[str, ...] = tuple(PROMPT_TEMPLATE_MANIFEST.keys())
