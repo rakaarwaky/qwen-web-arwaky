@@ -31,6 +31,7 @@ import modules.cli.src.surface_cli_update_command as surface_cli_update_command
 from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 _ERROR_PREFIX = "[ERROR]"
 
@@ -86,7 +87,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     # ── prompt-only ───────────────────────────────────────────────────────────
     p_only = sub.add_parser("prompt-only", help="Process a prompt file (no attachment)", parents=[parent])
-    p_only.add_argument("-i", "-p", "--prompt-path", required=True, help="Path to prompt markdown/text file")
+    p_only.add_argument(
+        "-i", "-p", "--prompt-path", required=True,
+        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+    )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_only.add_argument("--headless", action="store_true", help="Run browser headlessly")
     p_only.add_argument("--json", action="store_true", help="Format output as JSON")
@@ -95,7 +99,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_attach = sub.add_parser(
         "prompt-with-attachment", help="Process a prompt file with a file attachment", parents=[parent]
     )
-    p_attach.add_argument("-i", "-p", "--prompt-path", required=True, help="Path to prompt markdown/text file")
+    p_attach.add_argument(
+        "-i", "-p", "--prompt-path", required=True,
+        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+    )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_attach.add_argument("--headless", action="store_true", help="Run browser headlessly")
@@ -123,10 +130,16 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     raw_attach = getattr(args, "attachment_path", None)
     raw_output = getattr(args, "output_path", None)
 
+    prompt_label: str = ""
+
     if raw_prompt:
-        prompt_p = Path(raw_prompt).resolve()
-        if not prompt_p.exists():
-            raise ValueError(f"Prompt file not found: {prompt_p}")
+        if is_prompt_role(raw_prompt):
+            prompt_p = materialize_role_template(raw_prompt)
+            prompt_label = raw_prompt.strip().lower()
+        else:
+            prompt_p = Path(raw_prompt).resolve()
+            if not prompt_p.exists():
+                raise ValueError(f"Prompt file not found: {prompt_p}")
 
     if raw_attach:
         file_p = Path(raw_attach).resolve()
@@ -139,7 +152,8 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         local_out = Path.cwd() / ".qwen-web" / "output"
         base_dir = local_out if local_out.exists() else DEFAULT_OUTPUT
         if prompt_p:
-            out_p = base_dir / f"{prompt_p.stem}_output.md"
+            out_name = prompt_label or prompt_p.stem
+            out_p = base_dir / f"{out_name}_output.md"
         elif text:
             out_p = base_dir / "direct_output.md"
         else:
