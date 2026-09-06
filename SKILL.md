@@ -56,6 +56,19 @@ Use when the prompt file must be sent together with a document attachment.
 }
 ```
 
+### Parallel Job Execution
+
+Multiple prompt jobs can run concurrently against one authenticated browser session. Each worker job launches its own dedicated Chromium browser instance using an isolated ephemeral clone of the master login session profile, enabling N jobs to run in parallel without tab collisions or SingletonLock conflicts.
+
+- **Concurrency limit**: controlled by `QWEN_WEB_MAX_WORKERS` (default 2). Set higher to increase throughput; all workers share the same authenticated login session.
+- **Isolated processes**: 1 browser process per job with clean ephemeral state; temporary profile clones are automatically purged on completion.
+- **Login mode**: `setup_session` operates directly on the master session profile so authenticated credentials persist across runs.
+
+```bash
+# Run 4 prompt files concurrently (2 at a time by default):
+QWEN_WEB_MAX_WORKERS=4 qwa process input/task_001.md input/task_002.md input/task_003.md input/task_004.md
+```
+
 ### Session Authentication (`setup_session`)
 
 If session cookies expire or CAPTCHA is detected, invoke `setup_session` to launch a visible browser window for manual user login.

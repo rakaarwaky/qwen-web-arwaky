@@ -1,13 +1,14 @@
-"""Modern-Brutalist TUI interactive controller matching Obsidian Nebula design system.
+"""Modern-Brutalist TUI interactive controller with Tab-per-Job-Slot architecture.
 
-Surface layer (surface_cli): Textual application for interactive prompt execution,
-attachment selection, live logging, and session setup.
+Surface layer (surface_cli): Textual application for parallel prompt execution,
+attachment selection, per-slot live logging, and session setup matching Obsidian Nebula design system.
 """
 
 from __future__ import annotations
 
 import contextlib
 import logging
+import threading
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +20,7 @@ from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
+    DataTable,
     DirectoryTree,
     Footer,
     Header,
@@ -27,21 +29,26 @@ from textual.widgets import (
     RichLog,
     Static,
     Switch,
+    TabbedContent,
+    TabPane,
 )
 
 from modules.core.src.utility_core_config_factory import build_app_config
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
+    IJobManagerAggregate,
     IPromptFileAggregate,
     ISessionAggregate,
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
+from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag
 from modules.shared.src.utility_core_response import detect_processing_failure
 from modules.shared.src.utility_core_version import get_package_version
+
+NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
 
 TUI_CSS = """
 /* ─── Obsidian Nebula Theme Colors ────────────────────────── */
@@ -66,19 +73,102 @@ Footer {
     dock: bottom;
 }
 
-#main-container {
+TabbedContent {
+    height: 1fr;
+    background: #051424;
+}
+
+Tabs {
+    background: #010f1f;
+    border-bottom: solid #464554;
+    height: 3;
+}
+
+Tab {
+    padding: 0 2;
+    color: #908fa0;
+}
+
+Tab.-active {
+    color: #c0c1ff;
+    text-style: bold;
+    background: #122031;
+    border-bottom: solid #8083ff;
+}
+
+/* ─── Overview Tab ────────────────────────────────────────── */
+.overview-container {
+    height: 1fr;
+    width: 100%;
+    padding: 1 2;
+    background: #051424;
+}
+
+.metrics-bar {
+    layout: horizontal;
+    height: 3;
+    background: #010f1f;
+    border: solid #464554;
+    padding: 0 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.metric-item {
+    margin-right: 3;
+    color: #d5e4fa;
+    text-style: bold;
+}
+
+#slots-table {
+    height: 8;
+    background: #010f1f;
+    border: solid #464554;
+    margin-bottom: 1;
+}
+
+.batch-row {
+    layout: horizontal;
+    height: 3;
+    margin-bottom: 1;
+}
+
+#input-batch {
+    width: 1fr;
+    background: #122031;
+    border: solid #464554;
+    color: #d5e4fa;
+}
+
+#btn-batch-run {
+    width: 28;
+    margin-left: 1;
+    background: #c0c1ff;
+    color: #1000a9;
+    border: solid #c0c1ff;
+    text-style: bold;
+}
+
+/* ─── Slot Pane Container ─────────────────────────────────── */
+.slot-container {
     height: 1fr;
     width: 100%;
     layout: horizontal;
     background: #051424;
 }
 
-/* ─── Left Pane: Execution Form ───────────────────────────── */
-#left-pane {
-    width: 50%;
+.left-pane {
+    width: 48%;
     height: 100%;
     background: #010f1f;
     border-right: solid #464554;
+    padding: 1 2;
+}
+
+.right-pane {
+    width: 52%;
+    height: 100%;
+    background: #0e1c2d;
     padding: 1 2;
 }
 
@@ -90,11 +180,6 @@ Footer {
     margin-bottom: 1;
     border-bottom: solid #464554;
     height: 3;
-}
-
-.field-block {
-    margin-bottom: 1;
-    height: auto;
 }
 
 .field-label {
@@ -160,7 +245,7 @@ Switch.-on {
     background: #8083ff;
 }
 
-#btn-run {
+.btn-slot-run {
     width: 100%;
     height: 3;
     background: #c0c1ff;
@@ -170,20 +255,27 @@ Switch.-on {
     margin-top: 1;
 }
 
-#btn-run:hover {
+.btn-slot-run:hover {
     background: #051424;
     color: #c0c1ff;
 }
 
-/* ─── Right Pane: Live Log & Monitor ──────────────────────── */
-#right-pane {
-    width: 50%;
-    height: 100%;
-    background: #0e1c2d;
-    padding: 1 2;
+.btn-slot-cancel {
+    width: 100%;
+    height: 3;
+    background: #EF4444;
+    color: #ffffff;
+    border: solid #EF4444;
+    text-style: bold;
+    margin-top: 1;
 }
 
-#log-view {
+.btn-slot-cancel:hover {
+    background: #051424;
+    color: #EF4444;
+}
+
+.slot-log-view {
     height: 1fr;
     background: #051424;
     border: solid #464554;
@@ -191,7 +283,7 @@ Switch.-on {
     padding: 1;
 }
 
-#status-badge {
+.status-badge {
     color: #10B981;
     text-style: bold;
 }
@@ -205,21 +297,6 @@ Switch.-on {
 
 #session-badge.invalid {
     color: #F59E0B;
-}
-
-#btn-cancel {
-    width: 100%;
-    height: 3;
-    background: #EF4444;
-    color: #ffffff;
-    border: solid #EF4444;
-    text-style: bold;
-    margin-top: 1;
-}
-
-#btn-cancel:hover {
-    background: #051424;
-    color: #EF4444;
 }
 
 /* ─── Modal File Picker ───────────────────────────────────── */
@@ -304,7 +381,7 @@ class FilePickerModal(ModalScreen[str | None]):
 
 
 class QwenTuiLogHandler(logging.Handler):
-    """Logging handler streaming stdlib and structlog records to Textual RichLog in real-time."""
+    """Logging handler streaming stdlib and structlog records to Textual RichLog per slot."""
 
     def __init__(self, app: QwenTuiApp) -> None:
         super().__init__()
@@ -329,35 +406,35 @@ class QwenTuiLogHandler(logging.Handler):
             else:
                 line = f"[#64748B][{name_esc}][/] [#908fa0]{msg_esc}[/]"
 
+            slot_id: int | None = None
+            if record.threadName and record.threadName.startswith("qwen_slot_worker_"):
+                with contextlib.suppress(Exception):
+                    slot_id = int(record.threadName.split("_")[-1])
+
             with contextlib.suppress(RuntimeError):
-                self._app.call_from_thread(self._app._log_msg, line)
+                self._app.call_from_thread(self._app._log_msg, line, slot_id)
         except Exception:
             self.handleError(record)
-
-
-def _default_prompt_value() -> str:
-    return ""
-
-
-def _default_file_value() -> str:
-    return ""
 
 
 _APP_VERSION = get_package_version()
 
 
 class QwenTuiApp(App[None]):
-    """Obsidian Nebula Terminal User Interface for Qwen Web Automation."""
+    """Obsidian Nebula Terminal User Interface for Qwen Web Automation with Tab-per-Job-Slot."""
 
     CSS = TUI_CSS
     TITLE = f"QWEN-CLI {_APP_VERSION} "
-    SUB_TITLE = "chat.qwen.ai automation engine"
+    SUB_TITLE = "chat.qwen.ai parallel automation engine"
 
     BINDINGS = [
-        Binding("enter", "run_action", "Run"),
+        Binding("alt+1", "switch_tab_overview", "Overview"),
+        Binding("alt+2", "switch_tab_slot_1", "Slot 1"),
+        Binding("alt+3", "switch_tab_slot_2", "Slot 2"),
+        Binding("enter", "run_active_slot", "Run Slot"),
+        Binding("ctrl+r", "run_active_slot", "Run"),
         Binding("ctrl+l", "login_action", "Login"),
         Binding("ctrl+i", "init_action", "Init"),
-        Binding("ctrl+r", "reset_action", "Reset"),
         Binding("ctrl+q", "request_quit", "Quit"),
         Binding("escape", "request_quit", "Exit"),
     ]
@@ -370,6 +447,7 @@ class QwenTuiApp(App[None]):
         attachment: IAttachmentPromptAggregate,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
+        jobs: IJobManagerAggregate | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -378,146 +456,209 @@ class QwenTuiApp(App[None]):
         self._attachment = attachment
         self._setup = setup
         self._session = session
+        self._jobs = jobs
         self._target_field_for_picker: str | None = None
-        self._run_worker: Any | None = None
+        self._slot_workers: dict[int, Any] = {}
+        self._slot_stats: dict[int, dict[str, Any]] = {
+            s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
+        }
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Horizontal(id="main-container"):
-            # ─── Left Pane: Config ──────────────────────────────
-            with ScrollableContainer(id="left-pane"):
-                yield Static("[ EXECUTION CONFIGURATION ]", classes="pane-title")
+        with TabbedContent(id="main-tabs"):
+            # ─── Tab 1: Overview ────────────────────────────────
+            with TabPane("Overview 📊", id="tab-overview"), Vertical(classes="overview-container"):
+                with Horizontal(classes="metrics-bar"):
+                    yield Label(f"SLOTS: {NUM_SLOTS}", id="metric-slots", classes="metric-item")
+                    yield Label("ACTIVE: 0", id="metric-active", classes="metric-item")
+                    yield Label("DONE: 0", id="metric-done", classes="metric-item")
+                    yield Label("SESSION: CHECKING...", id="session-badge", classes="metric-item")
 
-                default_prompt = _default_prompt_value()
-                default_file = _default_file_value()
+                yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
+                yield DataTable(id="slots-table")
 
-                # Prompt file
-                yield Label("Prompt File (Required) *", classes="field-label")
-                with Horizontal(classes="field-row"):
-                    yield Input(
-                        value=default_prompt,
-                        placeholder="path/to/prompt.md",
-                        id="input-prompt",
-                        classes="field-input",
-                    )
-                    yield Button("Browse", id="btn-browse-prompt", classes="btn-browse")
+                yield Label("Batch Directory Dispatch", classes="field-label")
+                with Horizontal(classes="batch-row"):
+                    yield Input(placeholder="Directory containing .md files (e.g. input/)", id="input-batch")
+                    yield Button("⚡ DISPATCH TO SLOTS", variant="primary", id="btn-batch-run")
 
-                # Attachment file
-                yield Label("Attachment File (Optional)", classes="field-label")
-                with Horizontal(classes="field-row"):
-                    yield Input(
-                        value=default_file,
-                        placeholder="path/to/attachment.file",
-                        id="input-file",
-                        classes="field-input",
-                    )
-                    yield Button("Browse", id="btn-browse-file", classes="btn-browse")
+                yield Label("System Event Log", classes="field-label")
+                yield RichLog(id="log-view-overview", highlight=True, markup=True)
 
-                # Output path
-                yield Label("Output Destination", classes="field-label")
-                with Horizontal(classes="field-row"):
-                    yield Input(
-                        value=str(DEFAULT_OUTPUT),
-                        placeholder="path/to/output.md",
-                        id="input-output",
-                        classes="field-input",
-                    )
-                    yield Button("Browse", id="btn-browse-output", classes="btn-browse")
+            # ─── Tabs 2..N: Job Slots ───────────────────────────
+            for s in range(1, NUM_SLOTS + 1):
+                with TabPane(f"Slot {s} 💤", id=f"tab-slot-{s}"), Horizontal(classes="slot-container"):
+                    with ScrollableContainer(classes="left-pane"):
+                        yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
-                # Toggles
-                with Horizontal(classes="toggle-row"):
-                    with Vertical(classes="toggle-label-box"):
-                        yield Label("Headless Browser", classes="field-label")
-                        yield Label("Run automation in background without browser UI", classes="toggle-subtext")
-                    yield Switch(value=True, id="switch-headless")
+                        yield Label("Prompt File (Required) *", classes="field-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value="",
+                                placeholder="path/to/prompt.md",
+                                id=f"input-prompt-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
 
-                yield Button("⚡ RUN AUTOMATION [Enter]", variant="primary", id="btn-run")
-                yield Button("✕ Cancel Run", id="btn-cancel")
+                        yield Label("Attachment File (Optional)", classes="field-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value="",
+                                placeholder="path/to/attachment.file",
+                                id=f"input-file-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
 
-            # ─── Right Pane: Log Monitor ────────────────────────
-            with Vertical(id="right-pane"):
-                with Horizontal(classes="pane-title"):
-                    yield Label("[ PREVIEW & LIVE LOG ]", classes="field-label")
-                    yield Label("SESSION: CHECKING", id="session-badge")
-                    yield Label("STATUS: READY", id="status-badge")
-                yield RichLog(id="log-view", highlight=True, markup=True)
+                        yield Label("Output Destination", classes="field-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value=str(DEFAULT_OUTPUT),
+                                placeholder="path/to/output.md",
+                                id=f"input-output-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
+
+                        with Horizontal(classes="toggle-row"):
+                            with Vertical(classes="toggle-label-box"):
+                                yield Label("Headless Browser", classes="field-label")
+                                yield Label("1 independent browser in background", classes="toggle-subtext")
+                            yield Switch(value=True, id=f"switch-headless-{s}")
+
+                        yield Button(
+                            f"⚡ RUN IN SLOT {s}", variant="primary", id=f"btn-run-{s}", classes="btn-slot-run"
+                        )
+                        yield Button(f"✕ Cancel Slot {s}", id=f"btn-cancel-{s}", classes="btn-slot-cancel")
+
+                    with Vertical(classes="right-pane"):
+                        with Horizontal(classes="pane-title"):
+                            yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
+                            yield Label("STATUS: READY", id=f"status-badge-{s}", classes="status-badge")
+                        yield RichLog(id=f"log-view-{s}", highlight=True, markup=True, classes="slot-log-view")
 
         yield Footer()
 
     def on_mount(self) -> None:
-        self._log_view = self.query_one("#log-view", RichLog)
-        self._log_view.write("[bold #c0c1ff]Qwen Web Automation CLI initialized.[/]")
-        self._log_view.write("[#908fa0]Ready for prompt dispatch. Fill fields on the left and hit Enter.[/]\n")
-
+        self._init_table()
         self._log_handler = QwenTuiLogHandler(self)
         self._log_handler.setLevel(logging.INFO)
         root = logging.getLogger()
         root.addHandler(self._log_handler)
 
+        self._log_msg("[bold #c0c1ff]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
+        self._log_msg("[#908fa0]Each slot runs an independent Chromium process sharing login state.[/]")
         self._refresh_session_badge()
 
     def on_unmount(self) -> None:
         if hasattr(self, "_log_handler"):
             logging.getLogger().removeHandler(self._log_handler)
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        button_id = event.button.id
-        if button_id == "btn-run":
-            self.action_run_action()
-        elif button_id == "btn-cancel":
-            self.action_cancel_run()
-        elif button_id == "btn-browse-prompt":
-            self._open_picker("input-prompt")
-        elif button_id == "btn-browse-file":
-            self._open_picker("input-file")
-        elif button_id == "btn-browse-output":
-            self._open_picker("input-output")
+    def _init_table(self) -> None:
+        with contextlib.suppress(Exception):
+            table = self.query_one("#slots-table", DataTable)
+            table.add_columns("Slot", "Status", "Prompt File", "Duration")
+            for s in range(1, NUM_SLOTS + 1):
+                table.add_row(f"Slot {s}", "IDLE 💤", "-", "0.0s", key=f"row-slot-{s}")
 
-    def action_cancel_run(self) -> None:
-        worker = getattr(self, "_run_worker", None)
-        if worker is None:
-            self._log_msg("[#908fa0]No automation run in progress.[/]")
+    def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
+        with contextlib.suppress(Exception):
+            table = self.query_one("#slots-table", DataTable)
+            table.update_cell(f"row-slot-{slot_id}", "Status", status)
+            table.update_cell(f"row-slot-{slot_id}", "Prompt File", filename)
+            table.update_cell(f"row-slot-{slot_id}", "Duration", duration)
+
+    def _refresh_metrics(self) -> None:
+        with contextlib.suppress(Exception):
+            active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
+            done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
+            self.query_one("#metric-active", Label).update(f"ACTIVE: {active}")
+            self.query_one("#metric-done", Label).update(f"DONE: {done}")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        button_id = event.button.id or ""
+        if button_id == "btn-batch-run":
+            self._dispatch_batch()
             return
-        worker.cancel()
-        self._run_worker = None
-        self._log_msg("[bold #F59E0B]CANCELLED:[/] Automation run stopped by user.")
-        self._update_status("STATUS: READY")
+        for s in range(1, NUM_SLOTS + 1):
+            if button_id == f"btn-run-{s}":
+                self._run_slot(s)
+                return
+            if button_id == f"btn-cancel-{s}":
+                self._cancel_slot(s)
+                return
+            if button_id == f"btn-browse-prompt-{s}":
+                self._open_picker(f"input-prompt-{s}")
+                return
+            if button_id == f"btn-browse-file-{s}":
+                self._open_picker(f"input-file-{s}")
+                return
+            if button_id == f"btn-browse-output-{s}":
+                self._open_picker(f"input-output-{s}")
+                return
 
     def _open_picker(self, target_input_id: str) -> None:
         self._target_field_for_picker = target_input_id
 
         def _on_picked(path: str | None) -> None:
             if path and self._target_field_for_picker:
-                field = self.query_one(f"#{self._target_field_for_picker}", Input)
-                field.value = path
+                with contextlib.suppress(Exception):
+                    field = self.query_one(f"#{self._target_field_for_picker}", Input)
+                    field.value = path
 
         self.push_screen(FilePickerModal(), _on_picked)
 
-    def action_run_action(self) -> None:
-        if getattr(self, "_run_worker", None) is not None:
-            self._log_msg("[bold #F59E0B]WARNING:[/] Automation already running. Cancel it first.")
+    def _get_active_slot_id(self) -> int:
+        with contextlib.suppress(Exception):
+            tabs = self.query_one(TabbedContent)
+            active_id = tabs.active or ""
+            if active_id.startswith("tab-slot-"):
+                return int(active_id.split("-")[-1])
+        return 1
+
+    def action_run_active_slot(self) -> None:
+        slot_id = self._get_active_slot_id()
+        self._run_slot(slot_id)
+
+    def action_switch_tab_overview(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-overview"
+
+    def action_switch_tab_slot_1(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-slot-1"
+
+    def action_switch_tab_slot_2(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-slot-2"
+
+    def _run_slot(self, slot_id: int) -> None:
+        if self._slot_workers.get(slot_id) is not None:
+            self._log_msg(f"[bold #F59E0B]WARNING:[/] Slot {slot_id} already running.", slot_id)
             return
 
-        prompt_val = self.query_one("#input-prompt", Input).value.strip()
+        try:
+            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value.strip()
+        except Exception:
+            return
+
         if not prompt_val:
-            self._log_msg("[bold #EF4444]ERROR:[/] Prompt file is required.")
+            self._log_msg(f"[bold #EF4444]ERROR:[/] Prompt file is required for Slot {slot_id}.", slot_id)
             return
 
         p_path = Path(prompt_val).resolve()
         if not p_path.exists():
-            self._log_msg(f"[bold #EF4444]ERROR:[/] Prompt file not found: {prompt_val}")
+            self._log_msg(f"[bold #EF4444]ERROR:[/] File not found: {prompt_val}", slot_id)
             return
 
-        file_val = self.query_one("#input-file", Input).value.strip()
+        file_val = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
         f_path = Path(file_val).resolve() if file_val else None
-        if f_path and not f_path.exists():
-            self._log_msg(f"[bold #EF4444]ERROR:[/] Attachment file not found: {file_val}")
-            return
 
-        out_val = self.query_one("#input-output", Input).value.strip()
+        out_val = self.query_one(f"#input-output-{slot_id}", Input).value.strip()
         out_path = Path(out_val).resolve() if out_val else DEFAULT_OUTPUT
 
-        headless_val = self.query_one("#switch-headless", Switch).value
+        headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
 
         cfg = build_app_config(
             mode="single",
@@ -530,18 +671,71 @@ class QwenTuiApp(App[None]):
             request_timeout=120,
         )
 
-        self._run_worker = self._execute_worker(cfg)
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {p_path.name[:12]} ⏳")
+        self._update_slot_status(slot_id, "STATUS: RUNNING")
+        self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_path.name, "duration": 0.0}
+        self._update_table_row(slot_id, "RUNNING ⏳", p_path.name, "running...")
+        self._refresh_metrics()
+
+        self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
+
+    def _cancel_slot(self, slot_id: int) -> None:
+        worker = self._slot_workers.get(slot_id)
+        if worker is None:
+            self._log_msg(f"[#908fa0]No run active in Slot {slot_id}.[/]", slot_id)
+            return
+        worker.cancel()
+        self._slot_workers[slot_id] = None
+        self._log_msg(f"[bold #F59E0B]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
+        self._update_slot_status(slot_id, "STATUS: CANCELLED")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")
+        self._slot_stats[slot_id]["status"] = "CANCELLED"
+        self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
+        self._refresh_metrics()
+
+    def _dispatch_batch(self) -> None:
+        try:
+            batch_val = self.query_one("#input-batch", Input).value.strip()
+        except Exception:
+            return
+        if not batch_val:
+            self._log_msg("[bold #F59E0B]BATCH:[/] Please specify a directory path.")
+            return
+        batch_path = Path(batch_val).expanduser().resolve()
+        if not batch_path.is_dir():
+            self._log_msg(f"[bold #EF4444]BATCH ERROR:[/] Directory not found: {batch_path}")
+            return
+
+        files = sorted(batch_path.glob("*.md"))
+        if not files:
+            self._log_msg(f"[bold #F59E0B]BATCH:[/] No .md files found in {batch_path}")
+            return
+
+        self._log_msg(f"[bold #c0c1ff]BATCH DISPATCH:[/] Found {len(files)} files to distribute to slots...")
+        assigned = 0
+        for f in files:
+            free_slot = next((s for s in range(1, NUM_SLOTS + 1) if self._slot_workers.get(s) is None), None)
+            if free_slot is None:
+                self._log_msg("[#908fa0]All slots busy. Remaining files will wait.[/]")
+                break
+            with contextlib.suppress(Exception):
+                self.query_one(f"#input-prompt-{free_slot}", Input).value = str(f)
+                self._run_slot(free_slot)
+                assigned += 1
+        self._log_msg(f"[bold #10B981]BATCH:[/] Dispatched {assigned} jobs concurrently to free slots!")
 
     @work(thread=True)
-    def _execute_worker(self, cfg: AppConfig) -> None:
+    def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
+        threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
         self._ensure_log_handler()
-        self.call_from_thread(self._update_status, "STATUS: RUNNING")
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
-        self.call_from_thread(self._log_msg, f"[bold #c0c1ff]>>> Starting automation for: {prompt_name}[/]")
-        if cfg.file_path:
-            self.call_from_thread(self._log_msg, f"[#b9c8dd]    Attaching: {cfg.file_path.name}[/]")
-        msg = f"[#908fa0]    Headless: {cfg.headless} | Timeout: {cfg.request_timeout}s[/]"
-        self.call_from_thread(self._log_msg, msg)
+        self.call_from_thread(
+            self._log_msg, f"[bold #c0c1ff]>>> [Slot {slot_id}] Starting browser for: {prompt_name}[/]", slot_id
+        )
+
+        import time
+
+        start_t = time.perf_counter()
 
         try:
             if cfg.file_path:
@@ -557,6 +751,7 @@ class QwenTuiApp(App[None]):
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
                 )
+            dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
             is_dict_err = isinstance(cast(Any, res), dict) and cast(dict[str, Any], res).get("status") in {
                 "error",
@@ -564,15 +759,45 @@ class QwenTuiApp(App[None]):
                 "failed",
             }
             fail_reason = detect_processing_failure(res_str)
+
             if is_dict_err or fail_reason:
-                self.call_from_thread(self._log_msg, f"[bold #EF4444]FAILED:[/] {res_str}")
+                self.call_from_thread(self._log_msg, f"[bold #EF4444][Slot {slot_id}] FAILED:[/] {res_str}", slot_id)
+                self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id}: {prompt_name[:12]} ❌")
+                self.call_from_thread(self._update_slot_status, slot_id, "STATUS: FAILED")
+                self._slot_stats[slot_id] = {"status": "FAILED", "file": prompt_name, "duration": dur}
+                self.call_from_thread(self._update_table_row, slot_id, "FAILED ❌", prompt_name, f"{dur}s")
             else:
-                self.call_from_thread(self._log_msg, f"[bold #10B981]SUCCESS:[/] {res_str}")
+                self.call_from_thread(self._log_msg, f"[bold #10B981][Slot {slot_id}] SUCCESS:[/] {res_str}", slot_id)
+                self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id}: {prompt_name[:12]} ✅")
+                self.call_from_thread(self._update_slot_status, slot_id, "STATUS: SUCCESS")
+                self._slot_stats[slot_id] = {"status": "SUCCESS", "file": prompt_name, "duration": dur}
+                self.call_from_thread(self._update_table_row, slot_id, "DONE ✅", prompt_name, f"{dur}s")
         except Exception as exc:
-            self.call_from_thread(self._log_msg, f"[bold #EF4444]FAILED:[/] {exc}")
+            dur = round(time.perf_counter() - start_t, 1)
+            self.call_from_thread(self._log_msg, f"[bold #EF4444][Slot {slot_id}] FAILED:[/] {exc}", slot_id)
+            self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id} ❌")
+            self.call_from_thread(self._update_slot_status, slot_id, "STATUS: FAILED")
+            self._slot_stats[slot_id] = {"status": "FAILED", "file": prompt_name, "duration": dur}
+            self.call_from_thread(self._update_table_row, slot_id, "FAILED ❌", prompt_name, f"{dur}s")
         finally:
-            self._run_worker = None
-            self.call_from_thread(self._update_status, "STATUS: READY")
+            self._slot_workers[slot_id] = None
+            self.call_from_thread(self._refresh_metrics)
+
+    def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
+        with contextlib.suppress(Exception):
+            tabs = self.query_one(TabbedContent)
+            tab = tabs.get_tab(f"tab-slot-{slot_id}")
+            tab.label = title
+
+    def _update_slot_status(self, slot_id: int, status_text: str) -> None:
+        with contextlib.suppress(Exception):
+            badge = self.query_one(f"#status-badge-{slot_id}", Label)
+            badge.update(status_text)
+
+    def _ensure_log_handler(self) -> None:
+        root = logging.getLogger()
+        if hasattr(self, "_log_handler") and not any(isinstance(h, QwenTuiLogHandler) for h in root.handlers):
+            root.addHandler(self._log_handler)
 
     def action_login_action(self) -> None:
         self._log_msg("[bold #c0c1ff]>>> Launching interactive session setup...[/]")
@@ -586,13 +811,9 @@ class QwenTuiApp(App[None]):
                 raise RuntimeError("Session setup orchestrator not available.")
             res = self._setup.setup_session()
             self.call_from_thread(self._log_msg, f"[bold #10B981]LOGIN RESULT:[/] {res}")
+            self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
             self.call_from_thread(self._log_msg, f"[bold #EF4444]LOGIN FAILED:[/] {exc}")
-
-    def _ensure_log_handler(self) -> None:
-        root = logging.getLogger()
-        if hasattr(self, "_log_handler") and not any(isinstance(h, QwenTuiLogHandler) for h in root.handlers):
-            root.addHandler(self._log_handler)
 
     def action_init_action(self) -> None:
         try:
@@ -601,21 +822,7 @@ class QwenTuiApp(App[None]):
         except Exception as exc:
             self._log_msg(f"[bold #EF4444]INIT ERROR:[/] {exc}")
 
-    def action_reset_action(self) -> None:
-        self.query_one("#input-prompt", Input).value = _default_prompt_value()
-        self.query_one("#input-file", Input).value = _default_file_value()
-        self.query_one("#input-output", Input).value = str(DEFAULT_OUTPUT)
-        self._log_msg("[#908fa0]Form reset to default test paths.[/]")
-
-    def _update_status(self, text: str) -> None:
-        try:
-            badge = self.query_one("#status-badge", Label)
-            badge.update(text)
-        except Exception:
-            pass
-
     def _refresh_session_badge(self) -> None:
-        """Check saved session validity asynchronously and update the badge."""
         try:
             badge = self.query_one("#session-badge", Label)
         except Exception:
@@ -628,7 +835,6 @@ class QwenTuiApp(App[None]):
 
     @work(thread=True)
     def _session_check_worker(self) -> None:
-        """Validate session in a worker thread so the UI never blocks."""
         if self._session is None:
             self.call_from_thread(self._apply_session_badge, False)
             return
@@ -646,20 +852,30 @@ class QwenTuiApp(App[None]):
         badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
         badge.set_classes("invalid" if not valid else "")
 
-    def _request_quit(self) -> None:
-        """Prompt for confirmation before quitting when a run is in progress."""
-        if getattr(self, "_run_worker", None) is None:
+    def action_request_quit(self) -> None:
+        active = sum(1 for w in self._slot_workers.values() if w is not None)
+        if active == 0:
             self.exit()
             return
-        self._log_msg("[bold #F59E0B]WARNING:[/] Automation run in progress. Quit? (y/N)")
-        self._log_msg("[#908fa0]Press Ctrl+Q again to force quit, Esc to cancel, or Cancel Run first.[/]")
+        self._log_msg(
+            f"[bold #F59E0B]WARNING:[/] {active} automation jobs in progress. Press Ctrl+Q again or cancel jobs."
+        )
 
-    def action_request_quit(self) -> None:
-        self._request_quit()
+    def _log_msg(self, msg: str, slot_id: int | None = None) -> None:
+        with contextlib.suppress(Exception):
+            if slot_id is not None:
+                log_view = self.query_one(f"#log-view-{slot_id}", RichLog)
+                log_view.write(msg)
+            else:
+                with contextlib.suppress(Exception):
+                    self.query_one("#log-view-overview", RichLog).write(msg)
+                with contextlib.suppress(Exception):
+                    active_slot = self._get_active_slot_id()
+                    self.query_one(f"#log-view-{active_slot}", RichLog).write(msg)
 
-    def _log_msg(self, msg: str) -> None:
-        try:
-            log = getattr(self, "_log_view", None) or self.query_one("#log-view", RichLog)
-            log.write(msg)
-        except Exception:
-            pass
+
+__all__ = [
+    "FilePickerModal",
+    "QwenTuiApp",
+    "QwenTuiLogHandler",
+]

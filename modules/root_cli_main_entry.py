@@ -229,6 +229,7 @@ def _dispatch(
             container.agent_attachment_prompt_orchestrator,
             container.agent_setup_orchestrator,
             container.agent_session_orchestrator,
+            container.agent_job_orchestrator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 

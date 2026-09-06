@@ -25,6 +25,7 @@ from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 from modules.core.src.utility_core_async_loop import isolate_thread_event_loop
 from modules.core.src.utility_core_browser_binary import find_chrome_binary
 from modules.core.src.utility_core_dom_helper import click_first_visible_enabled, is_any_visible
+from modules.core.src.utility_core_session_cloner import create_ephemeral_session
 from modules.shared.src.contract_core_protocol import IBrowserProtocol
 from modules.shared.src.taxonomy_core_constant import (
     AUTH_KEYWORDS,
@@ -431,61 +432,58 @@ class BrowserAdapter(IBrowserProtocol):
 
     @contextmanager
     def browser_session(self, cfg: Any) -> Iterator[BrowserContext]:
-        """Manage persistent Chromium browser context with session caching and asset optimization."""
-        cfg.session_path.mkdir(parents=True, exist_ok=True)
-        # Restore the execute bit on the profile dir: Chromium needs it to create
-        # its ProcessSingleton lock, and a pre-existing dir with a missing x bit
-        # would otherwise fail with "Permission denied" at launch. mkdir(exist_ok=True)
-        # never repairs an already-broken directory, so chmod explicitly.
-        # 0o700 is owner-only rwx — the most restrictive mode that still lets the
-        # browser traverse the profile dir; nothing is granted to group/other.
-        # Codacy's "insecure-file-permissions" finding here is a false positive.
-        try:
-            cfg.session_path.chmod(0o700)  # nosemgrep: insecure-file-permissions
-        except OSError as e:
-            log.debug("failed_setting_session_permissions", error=str(e))
+        """Manage persistent Chromium browser context with session caching and asset optimization.
 
-        chrome_bin = find_chrome_binary()
+        For login mode, connects directly to the master session profile so credentials
+        are saved permanently. For prompt jobs, runs in an isolated ephemeral copy of
+        the session directory so multiple jobs can execute concurrently in parallel
+        (1 browser process per job) without Chromium SingletonLock conflicts.
+        """
+        master_session = cfg.session_path
+        mode = getattr(cfg, "mode", "")
 
-        chrome_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--disable-session-crashed-bubble",
-            "--disable-infobars",
-        ]
-        if cfg.disable_sandbox:
-            chrome_args.append("--no-sandbox")
+        with create_ephemeral_session(master_session, mode=mode) as session_dir:
+            chrome_bin = find_chrome_binary()
 
-        if cfg.headless:
-            chrome_args.extend(
-                [
-                    "--disable-gpu",
-                    "--disable-software-compositing",
-                ]
-            )
+            chrome_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-session-crashed-bubble",
+                "--disable-infobars",
+            ]
+            if cfg.disable_sandbox:
+                chrome_args.append("--no-sandbox")
 
-        kwargs: dict[str, Any] = {
-            "user_data_dir": str(cfg.session_path),
-            "headless": cfg.headless,
-            "permissions": ["clipboard-read", "clipboard-write"],
-            "args": chrome_args,
-            "viewport": {"width": 1280, "height": 800},
-        }
+            if cfg.headless:
+                chrome_args.extend(
+                    [
+                        "--disable-gpu",
+                        "--disable-software-compositing",
+                    ]
+                )
 
-        if chrome_bin and Path(chrome_bin).exists():
-            kwargs["executable_path"] = chrome_bin
+            kwargs: dict[str, Any] = {
+                "user_data_dir": str(session_dir),
+                "headless": cfg.headless,
+                "permissions": ["clipboard-read", "clipboard-write"],
+                "args": chrome_args,
+                "viewport": {"width": 1280, "height": 800},
+            }
 
-        isolate_thread_event_loop()
+            if chrome_bin and Path(chrome_bin).exists():
+                kwargs["executable_path"] = chrome_bin
 
-        context_started = False
-        try:
-            with sync_playwright() as p:
-                ctx = self._launch_context(p, kwargs)
-                context_started = True
-                if cfg.mode != "login":
-                    ctx.route(
-                        "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
-                        lambda r: r.abort(),
-                    )
+            isolate_thread_event_loop()
+
+            context_started = False
+            try:
+                with sync_playwright() as p:
+                    ctx = self._launch_context(p, kwargs)
+                    context_started = True
+                    if mode != "login":
+                        ctx.route(
+                            "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
+                            lambda r: r.abort(),
+                        )
 
                 def _sanitize_url(url: str) -> str:
                     """Sanitize URL for logging to prevent credential/query token exfiltration."""
@@ -536,15 +534,15 @@ class BrowserAdapter(IBrowserProtocol):
                     except Exception as e:
                         # Teardown is best-effort and must never mask the domain failure.
                         log.warning("browser_context_cleanup_failed", error=str(e))
-        except AuthRequiredError:
-            raise
-        except BrowserLaunchError:
-            raise
-        except Exception as e:
-            if context_started:
+            except AuthRequiredError:
                 raise
-            log.critical("browser_launch_failed", error=str(e))
-            raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
+            except BrowserLaunchError:
+                raise
+            except Exception as e:
+                if context_started:
+                    raise
+                log.critical("browser_launch_failed", error=str(e))
+                raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
 
     # Block 3: Dunder Methods, Factories & Helpers
 
