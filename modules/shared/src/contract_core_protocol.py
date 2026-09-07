@@ -293,6 +293,20 @@ class IJobStorageProtocol(ABC):
         """List recently recorded jobs."""
 
 
+class ITuiSlotConfigProtocol(ABC):
+    """Contract for TUI slot-input resolution (surface → capability bridge)."""
+
+    @abstractmethod
+    def resolve_slot_run_plan(
+        self,
+        prompt_val: str,
+        file_val: str,
+        output_val: str,
+        headless: bool,
+    ) -> object:
+        """Resolve raw TUI slot widget values into an executable run plan."""
+
+
 __all__ = [
     "IUploadProtocol",
     "IInjectionProtocol",
@@ -306,4 +320,5 @@ __all__ = [
     "IStatusProtocol",
     "IMetricsProtocol",
     "IJobStorageProtocol",
+    "ITuiSlotConfigProtocol",
 ]

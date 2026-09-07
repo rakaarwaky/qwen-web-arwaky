@@ -34,7 +34,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from modules.core.src.utility_core_config_factory import build_app_config, resolve_pipeline_output_path
+from modules.core.src.capabilities_tui_slot_config import SlotInputError, TuiSlotConfigResolver
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -46,7 +46,6 @@ from modules.shared.src.contract_core_aggregate import (
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT, PROMPT_TEMPLATE_MANIFEST
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag
-from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
 from modules.shared.src.utility_core_version import get_package_version
 
@@ -487,6 +486,7 @@ class QwenTuiApp(App[None]):
         self._setup = setup
         self._session = session
         self._jobs = jobs
+        self._slot_config = TuiSlotConfigResolver()
         self._target_field_for_picker: str | None = None
         self._slot_workers: dict[int, Any] = {}
         self._slot_stats: dict[int, dict[str, Any]] = {
@@ -704,51 +704,25 @@ class QwenTuiApp(App[None]):
             return
 
         try:
-            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value.strip()
+            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value
+            file_val = self.query_one(f"#input-file-{slot_id}", Input).value
+            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
+            headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
         except Exception:
             return
 
-        if not prompt_val:
-            self._log_msg(f"[bold #EF4444]ERROR:[/] Prompt file is required for Slot {slot_id}.", slot_id)
+        plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
+        if isinstance(plan, SlotInputError):
+            self._log_msg(f"[bold #EF4444]ERROR:[/] {plan.message} (Slot {slot_id})", slot_id)
             return
 
-        if is_prompt_role(prompt_val):
-            p_path = materialize_role_template(prompt_val)
-        else:
-            p_path = Path(prompt_val).resolve()
-            if not p_path.exists():
-                self._log_msg(f"[bold #EF4444]ERROR:[/] File not found: {prompt_val}", slot_id)
-                return
+        cfg = plan.config
+        p_name = plan.prompt_path.name
 
-        file_val = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
-        f_path = Path(file_val).resolve() if file_val else None
-
-        out_val = self.query_one(f"#input-output-{slot_id}", Input).value.strip()
-        # Use the shared path resolver so timestamp suffix and attachment-stem
-        # preference are applied consistently (single source of truth).
-        _, out_path = resolve_pipeline_output_path(
-            p_path,
-            output_file=Path(out_val).resolve() if out_val else None,
-            attachment_path=f_path,
-        )
-
-        headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
-
-        cfg = build_app_config(
-            mode="single",
-            input_path=p_path,
-            output_path=out_path,
-            prompt_file=p_path,
-            prompt_path=p_path,
-            file_path=f_path,
-            headless=headless_val,
-            request_timeout=120,
-        )
-
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {p_path.name[:12]} ⏳")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {p_name[:12]} ⏳")
         self._update_slot_status(slot_id, "STATUS: RUNNING")
-        self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_path.name, "duration": 0.0}
-        self._update_table_row(slot_id, "RUNNING ⏳", p_path.name, "running...")
+        self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_name, "duration": 0.0}
+        self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")
         self._refresh_metrics()
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
@@ -769,25 +743,17 @@ class QwenTuiApp(App[None]):
 
     def _dispatch_batch(self) -> None:
         try:
-            batch_val = self.query_one("#input-batch", Input).value.strip()
+            batch_val = self.query_one("#input-batch", Input).value
         except Exception:
             return
-        if not batch_val:
-            self._log_msg("[bold #F59E0B]BATCH:[/] Please specify a directory path.")
-            return
-        batch_path = Path(batch_val).expanduser().resolve()
-        if not batch_path.is_dir():
-            self._log_msg(f"[bold #EF4444]BATCH ERROR:[/] Directory not found: {batch_path}")
+        found = self._slot_config.discover_batch_prompts(batch_val)
+        if isinstance(found, SlotInputError):
+            self._log_msg(f"[bold #F59E0B]BATCH:[/] {found.message}")
             return
 
-        files = sorted(batch_path.glob("*.md"))
-        if not files:
-            self._log_msg(f"[bold #F59E0B]BATCH:[/] No .md files found in {batch_path}")
-            return
-
-        self._log_msg(f"[bold #c0c1ff]BATCH DISPATCH:[/] Found {len(files)} files to distribute to slots...")
+        self._log_msg(f"[bold #c0c1ff]BATCH DISPATCH:[/] Found {len(found)} files to distribute to slots...")
         assigned = 0
-        for f in files:
+        for f in found:
             free_slot = next((s for s in range(1, NUM_SLOTS + 1) if self._slot_workers.get(s) is None), None)
             if free_slot is None:
                 self._log_msg("[#908fa0]All slots busy. Remaining files will wait.[/]")
