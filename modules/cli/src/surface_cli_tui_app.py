@@ -17,6 +17,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.content import Content
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -50,6 +51,10 @@ from modules.shared.src.utility_core_response import detect_processing_failure
 from modules.shared.src.utility_core_version import get_package_version
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
+
+# Textual alt-chords only support a single digit (alt+0..9). Slots beyond 9
+# fall back to ctrl+alt chords. alt+0 is reserved for the Overview tab.
+_EXTRA_SLOT_KEYS: dict[int, str] = {s: f"ctrl+alt+{s - 10}" for s in range(10, 20)}
 
 TUI_CSS = """
 /* ─── Obsidian Nebula Theme Colors ────────────────────────── */
@@ -457,15 +462,12 @@ class QwenTuiApp(App[None]):
     TITLE = f"QWEN-CLI {_APP_VERSION} "
     SUB_TITLE = "chat.qwen.ai parallel automation engine"
 
-    # Textual alt-chords only support 0-9; ctrl+alt covers slots 10+.
     # alt+0 → Overview, alt+1..9 → Slot 1..9, ctrl+alt+0 → Slot 10.
-    _extra_slot_keys = [f"ctrl+alt+{i}" for i in range(10)]
-
     BINDINGS = [
         Binding("alt+0", "switch_tab_overview", "Overview"),
         *[
             Binding(
-                f"alt+{s}" if s <= 9 else _extra_slot_keys[s - 10],
+                f"alt+{s}" if s <= 9 else _EXTRA_SLOT_KEYS[s],
                 f"switch_tab_slot({s})",
                 f"Slot {s}",
             )
@@ -826,7 +828,7 @@ class QwenTuiApp(App[None]):
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
-            tab.label = title
+            tab.label = Content.from_text(title)
 
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(Exception):

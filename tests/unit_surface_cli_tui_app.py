@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from textual.widgets import DataTable, Label, RichLog, TabbedContent
 
-from modules.cli.src.surface_cli_tui_app import QwenTuiApp, QwenTuiLogHandler
+from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp, QwenTuiLogHandler
 
 
 def test_tui_app_mounts_and_populates_tabs() -> None:
@@ -30,11 +30,14 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             assert table.row_count >= 2
 
             # Test tab switching actions
-            app.action_switch_tab_slot_1()
+            app.action_switch_tab_slot(1)
             assert tabs.active == "tab-slot-1"
 
-            app.action_switch_tab_slot_2()
+            app.action_switch_tab_slot(2)
             assert tabs.active == "tab-slot-2"
+
+            app.action_switch_tab_slot(NUM_SLOTS)
+            assert tabs.active == f"tab-slot-{NUM_SLOTS}"
 
             app.action_switch_tab_overview()
             assert tabs.active == "tab-overview"
