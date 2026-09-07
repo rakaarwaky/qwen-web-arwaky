@@ -6,10 +6,10 @@ IMAGE_NAME="qwen-web-arwaky"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-DATA_DIR="${REPO_ROOT}/.podman-data"
-mkdir -p "${DATA_DIR}/share" "${DATA_DIR}/state" "${DATA_DIR}/config"
+VOLUME_DIR="/home/raka/.local/share/containers/storage/volumes/qwen-web-arwaky/_data"
+mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config"
 
-VOLUMES="-v ${DATA_DIR}/share:/root/.local/share/qwen-web:Z -v ${DATA_DIR}/state:/root/.local/state/qwen-web:Z -v ${DATA_DIR}/config:/root/.config/qwen-web:Z"
+VOLUMES="-v ${VOLUME_DIR}/share:/root/.local/share/qwen-web:Z -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web:Z -v ${VOLUME_DIR}/config:/root/.config/qwen-web:Z"
 GUI_ENV="-e DISPLAY=${DISPLAY:-:0} -v /tmp/.X11-unix:/tmp/.X11-unix:ro --net=host"
 
 CONTAINER_NAME="qwen-web-arwaky"
@@ -49,7 +49,7 @@ Commands:
   start                 Start persistent container in background (visible in Podman Desktop)
   stop                  Stop the persistent container
   status                Show status of persistent container
-  login                 Open browser in container to login to Qwen (saves session to .podman-data)
+  login                 Open browser in container to login to Qwen (saves session to Podman volume)
   doctor                Run doctor diagnostics inside container
   prompt "text"         Run a direct prompt headlessly using saved login session
   run [args...]         Run any qwa command inside container (e.g. $0 run --help)

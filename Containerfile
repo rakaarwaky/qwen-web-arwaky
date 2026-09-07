@@ -15,9 +15,10 @@ COPY modules/shared/pyproject.toml /build/modules/shared/
 COPY modules/mcp/pyproject.toml /build/modules/mcp/
 COPY modules/cli/pyproject.toml /build/modules/cli/
 
-# Install base dependencies and testing toolchain
+# Install base dependencies, testing toolchain, and matching chromium browser
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir pytest pytest-mock ruff
+    pip install --no-cache-dir pytest pytest-mock ruff && \
+    python3 -m playwright install chromium
 
 # Copy full codebase, install pure standalone wheel, and clean build directory
 COPY . /build
