@@ -133,26 +133,10 @@ Tab.-active {
     margin-bottom: 1;
 }
 
-.batch-row {
+.template-row {
     layout: horizontal;
-    height: 3;
+    height: auto;
     margin-bottom: 1;
-}
-
-#input-batch {
-    width: 1fr;
-    background: #122031;
-    border: solid #464554;
-    color: #d5e4fa;
-}
-
-#btn-batch-run {
-    width: 28;
-    margin-left: 1;
-    background: #c0c1ff;
-    color: #1000a9;
-    border: solid #c0c1ff;
-    text-style: bold;
 }
 
 /* ─── Slot Pane Container ─────────────────────────────────── */
