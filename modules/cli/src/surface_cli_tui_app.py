@@ -457,9 +457,20 @@ class QwenTuiApp(App[None]):
     TITLE = f"QWEN-CLI {_APP_VERSION} "
     SUB_TITLE = "chat.qwen.ai parallel automation engine"
 
+    # Textual alt-chords only support 0-9; ctrl+alt covers slots 10+.
+    # alt+0 → Overview, alt+1..9 → Slot 1..9, ctrl+alt+0 → Slot 10.
+    _extra_slot_keys = [f"ctrl+alt+{i}" for i in range(10)]
+
     BINDINGS = [
-        Binding("alt+1", "switch_tab_overview", "Overview"),
-        *[Binding(f"alt+{s + 1}", f"switch_tab_slot_{s}", f"Slot {s}") for s in range(1, NUM_SLOTS + 1)],
+        Binding("alt+0", "switch_tab_overview", "Overview"),
+        *[
+            Binding(
+                f"alt+{s}" if s <= 9 else _extra_slot_keys[s - 10],
+                f"switch_tab_slot({s})",
+                f"Slot {s}",
+            )
+            for s in range(1, NUM_SLOTS + 1)
+        ],
         Binding("enter", "run_active_slot", "Run Slot"),
         Binding("ctrl+r", "run_active_slot", "Run"),
         Binding("ctrl+l", "login_action", "Login"),
@@ -679,24 +690,12 @@ class QwenTuiApp(App[None]):
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-overview"
 
-    def action_switch_tab_slot_1(self) -> None:
-        self._switch_to_slot(1)
-
-    def action_switch_tab_slot_2(self) -> None:
-        self._switch_to_slot(2)
-
-    def action_switch_tab_slot_3(self) -> None:
-        self._switch_to_slot(3)
-
-    def action_switch_tab_slot_4(self) -> None:
-        self._switch_to_slot(4)
-
-    def action_switch_tab_slot_5(self) -> None:
-        self._switch_to_slot(5)
-
     def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
+
+    def action_switch_tab_slot(self, slot_id: int) -> None:
+        self._switch_to_slot(int(slot_id))
 
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:

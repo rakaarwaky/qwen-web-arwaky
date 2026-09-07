@@ -75,7 +75,7 @@ XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 # ─── Parallel job execution ─────────────────────────────────────────────────
 # Number of prompt jobs allowed to run concurrently. Each worker launches its
 # own Chromium browser instance with an ephemeral clone of the login session.
-DEFAULT_MAX_WORKERS = 5
+DEFAULT_MAX_WORKERS = 10
 
 CHAT_URL = "https://chat.qwen.ai/"
 
@@ -304,6 +304,10 @@ PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
     "analyst": {
         "title": "Business Analyst",
         "dimensions": "Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability",
+    },
+    "devops": {
+        "title": "DevOps / SRE",
+        "dimensions": "Deployment, Observability, Reliability, Security Hardening, Configuration, Release CI",
     },
 }
 PROMPT_TEMPLATE_ROLES: tuple[str, ...] = tuple(PROMPT_TEMPLATE_MANIFEST.keys())

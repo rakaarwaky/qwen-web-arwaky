@@ -15,6 +15,7 @@ from modules.shared.src.taxonomy_analyst_constant import EMBEDDED_ANALYST_TEMPLA
 from modules.shared.src.taxonomy_architect_constant import EMBEDDED_ARCHITECT_TEMPLATE
 from modules.shared.src.taxonomy_backend_constant import EMBEDDED_BACKEND_TEMPLATE
 from modules.shared.src.taxonomy_core_constant import PROMPT_TEMPLATE_ROLES
+from modules.shared.src.taxonomy_devops_constant import EMBEDDED_DEVOPS_TEMPLATE
 from modules.shared.src.taxonomy_frontend_constant import EMBEDDED_FRONTEND_TEMPLATE
 
 _ROLE_TO_TEMPLATE: dict[str, str] = {
@@ -22,6 +23,7 @@ _ROLE_TO_TEMPLATE: dict[str, str] = {
     "backend": EMBEDDED_BACKEND_TEMPLATE,
     "frontend": EMBEDDED_FRONTEND_TEMPLATE,
     "analyst": EMBEDDED_ANALYST_TEMPLATE,
+    "devops": EMBEDDED_DEVOPS_TEMPLATE,
 }
 
 
@@ -34,7 +36,7 @@ def load_prompt_template(role: str) -> str:
     """Load a bundled role template as a raw markdown string.
 
     Args:
-        role: One of ``architect``, ``backend``, ``frontend``, ``analyst``.
+        role: One of ``architect``, ``backend``, ``frontend``, ``analyst``, ``devops``.
 
     Raises:
         ValueError: if role is not recognised.
