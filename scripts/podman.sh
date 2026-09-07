@@ -97,7 +97,7 @@ case "$cmd" in
         xhost +local:root 2>/dev/null || xhost +local: 2>/dev/null || true
         start_container
         echo "==> Opening headed browser in Podman for Qwen login..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" qwa login "${@:2}"
+        podman exec ${TTY_FLAGS} -e DISPLAY="${DISPLAY:-:0}" "${CONTAINER_NAME}" qwa login "${@:2}"
         ;;
     doctor)
         start_container

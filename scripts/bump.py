@@ -116,18 +116,18 @@ def main(argv: list[str] | None = None) -> None:
         help="Preview changes without modifying files",
     )
 
-    args = parser.parse_args(argv)
+    args = vars(parser.parse_args(argv))
     root_toml = TARGET_FILES[0]
     current = get_current_version(root_toml)
-    new_version = compute_new_version(current, args.target)
+    new_version = compute_new_version(current, args["target"])
 
-    print(f"🚀 Bumping version: {current} ──► {new_version}" + (" (DRY RUN)" if args.dry_run else ""))
+    print(f"🚀 Bumping version: {current} ──► {new_version}" + (" (DRY RUN)" if args["dry_run"] else ""))
     print("Files:")
 
     for path in TARGET_FILES:
-        update_file(path, current, new_version, dry_run=args.dry_run)
+        update_file(path, current, new_version, dry_run=args["dry_run"])
 
-    if args.git and not args.dry_run:
+    if args["git"] and not args["dry_run"]:
         run_git_release(new_version)
 
     print(f"\n✅ Successfully bumped version to {new_version}")

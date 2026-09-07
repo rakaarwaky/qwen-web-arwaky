@@ -485,55 +485,55 @@ class BrowserAdapter(IBrowserProtocol):
                             lambda r: r.abort(),
                         )
 
-                def _sanitize_url(url: str) -> str:
-                    """Sanitize URL for logging to prevent credential/query token exfiltration."""
+                    def _sanitize_url(url: str) -> str:
+                        """Sanitize URL for logging to prevent credential/query token exfiltration."""
+                        try:
+                            from urllib.parse import urlparse, urlunparse
+
+                            parsed = urlparse(url)
+                            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+                        except Exception:
+                            return url.split("?")[0]
+
+                    def attach_page_diagnostics(page: Page) -> None:
+                        def on_request_failed(request: Any) -> None:
+                            log.warning("browser_request_failed", url=_sanitize_url(request.url), error=request.failure)
+
+                        def on_console(message: Any) -> None:
+                            if message.type in {"error", "warning"}:
+                                log.warning("browser_console_message", type=message.type, text=message.text)
+
+                        def on_request(request: Any) -> None:
+                            if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
+                                log.info("browser_mutation_request", method=request.method, url=_sanitize_url(request.url))
+
+                        def on_response(response: Any) -> None:
+                            url = response.url.lower()
+                            if response.status >= 400 and any(
+                                token in url for token in ("chat", "completion", "generate", "conversation", "api")
+                            ):
+                                log.warning("browser_http_error", status=response.status, url=_sanitize_url(response.url))
+                            elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
+                                log.info(
+                                    "browser_mutation_response", status=response.status, url=_sanitize_url(response.url)
+                                )
+
+                        page.on("request", on_request)
+                        page.on("requestfailed", on_request_failed)
+                        page.on("console", on_console)
+                        page.on("response", on_response)
+
+                    for existing_page in ctx.pages:
+                        attach_page_diagnostics(existing_page)
+                    ctx.on("page", attach_page_diagnostics)
                     try:
-                        from urllib.parse import urlparse, urlunparse
-
-                        parsed = urlparse(url)
-                        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
-                    except Exception:
-                        return url.split("?")[0]
-
-                def attach_page_diagnostics(page: Page) -> None:
-                    def on_request_failed(request: Any) -> None:
-                        log.warning("browser_request_failed", url=_sanitize_url(request.url), error=request.failure)
-
-                    def on_console(message: Any) -> None:
-                        if message.type in {"error", "warning"}:
-                            log.warning("browser_console_message", type=message.type, text=message.text)
-
-                    def on_request(request: Any) -> None:
-                        if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
-                            log.info("browser_mutation_request", method=request.method, url=_sanitize_url(request.url))
-
-                    def on_response(response: Any) -> None:
-                        url = response.url.lower()
-                        if response.status >= 400 and any(
-                            token in url for token in ("chat", "completion", "generate", "conversation", "api")
-                        ):
-                            log.warning("browser_http_error", status=response.status, url=_sanitize_url(response.url))
-                        elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
-                            log.info(
-                                "browser_mutation_response", status=response.status, url=_sanitize_url(response.url)
-                            )
-
-                    page.on("request", on_request)
-                    page.on("requestfailed", on_request_failed)
-                    page.on("console", on_console)
-                    page.on("response", on_response)
-
-                for existing_page in ctx.pages:
-                    attach_page_diagnostics(existing_page)
-                ctx.on("page", attach_page_diagnostics)
-                try:
-                    yield ctx
-                finally:
-                    try:
-                        ctx.close()
-                    except Exception as e:
-                        # Teardown is best-effort and must never mask the domain failure.
-                        log.warning("browser_context_cleanup_failed", error=str(e))
+                        yield ctx
+                    finally:
+                        try:
+                            ctx.close()
+                        except Exception as e:
+                            # Teardown is best-effort and must never mask the domain failure.
+                            log.warning("browser_context_cleanup_failed", error=str(e))
             except AuthRequiredError:
                 raise
             except BrowserLaunchError:

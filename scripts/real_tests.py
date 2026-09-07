@@ -25,6 +25,7 @@ import argparse
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 # Repository root path
@@ -35,7 +36,17 @@ ATTACHMENT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_attachment_v5.md"
 SIMPLE_PROMPT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_simple_prompt.md"
 
 
-def parse_args() -> argparse.Namespace:
+@dataclass(frozen=True)
+class TestArgs:
+    headless: bool
+    run_p1: bool
+    run_p2: bool
+    run_p3: bool
+    output_dir: Path
+    cli_entry: Path
+
+
+def parse_args() -> TestArgs:
     parser = argparse.ArgumentParser(
         description="Run real end-to-end tests for qwen-web pipelines using test fixtures."
     )
@@ -85,7 +96,15 @@ def parse_args() -> argparse.Namespace:
         default=ROOT_DIR / "modules" / "root_cli_main_entry.py",
         help="Path to Python CLI entry script",
     )
-    return parser.parse_args()
+    ns = parser.parse_args()
+    return TestArgs(
+        headless=ns.headless,
+        run_p1=ns.run_p1,
+        run_p2=ns.run_p2,
+        run_p3=ns.run_p3,
+        output_dir=ns.output_dir,
+        cli_entry=ns.cli_entry,
+    )
 
 
 def run_pipeline_cmd(name: str, cmd: list[str]) -> bool:
