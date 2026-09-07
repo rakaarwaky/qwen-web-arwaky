@@ -27,6 +27,7 @@ from textual.widgets import (
     Input,
     Label,
     RichLog,
+    Select,
     Static,
     Switch,
     TabbedContent,
@@ -43,7 +44,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT
+from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT, PROMPT_TEMPLATE_MANIFEST
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
@@ -351,6 +352,35 @@ FilePickerModal {
     background: #EF4444;
     color: #ffffff;
 }
+/* ─── Prompt Template Select ──────────────────────────────── */
+Select {
+    width: 1fr;
+    background: #122031;
+    border: solid #464554;
+    color: #d5e4fa;
+    margin-bottom: 1;
+}
+
+Select:focus {
+    border: solid #c0c1ff;
+}
+
+SelectOverlay {
+    background: #010f1f;
+    border: solid #464554;
+    color: #d5e4fa;
+}
+
+SelectOverlay > OptionList > .option-list--option-highlighted {
+    background: #283647;
+    color: #c0c1ff;
+}
+
+.template-row {
+    layout: horizontal;
+    height: auto;
+    margin-bottom: 1;
+}
 """
 
 
@@ -430,8 +460,7 @@ class QwenTuiApp(App[None]):
 
     BINDINGS = [
         Binding("alt+1", "switch_tab_overview", "Overview"),
-        Binding("alt+2", "switch_tab_slot_1", "Slot 1"),
-        Binding("alt+3", "switch_tab_slot_2", "Slot 2"),
+        *[Binding(f"alt+{s + 1}", f"switch_tab_slot_{s}", f"Slot {s}") for s in range(1, NUM_SLOTS + 1)],
         Binding("enter", "run_active_slot", "Run Slot"),
         Binding("ctrl+r", "run_active_slot", "Run"),
         Binding("ctrl+l", "login_action", "Login"),
@@ -492,7 +521,19 @@ class QwenTuiApp(App[None]):
                     with ScrollableContainer(classes="left-pane"):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
-                        yield Label("Prompt File (Required) *", classes="field-label")
+                        yield Label("Prompt Template (Quick Select)", classes="field-label")
+                        template_options = [
+                            (f"{meta['title']} — {meta['dimensions']}", role)
+                            for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
+                        ]
+                        yield Select(
+                            template_options,
+                            prompt="Select a template or type file path below",
+                            allow_blank=True,
+                            id=f"select-template-{s}",
+                        )
+
+                        yield Label("Prompt File / Role (Required) *", classes="field-label")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
@@ -599,6 +640,19 @@ class QwenTuiApp(App[None]):
                 self._open_picker(f"input-output-{s}")
                 return
 
+    def on_select_changed(self, event: Select.Changed) -> None:
+        select_id = event.select.id or ""
+        if not select_id.startswith("select-template-"):
+            return
+        slot_id = int(select_id.split("-")[-1])
+        role = event.value
+        if role is None:
+            return
+        with contextlib.suppress(Exception):
+            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
+            prompt_input.value = str(role)
+            self._log_msg(f"[bold #4ADE80]TEMPLATE:[/] Slot {slot_id} ← role '{role}'", slot_id)
+
     def _open_picker(self, target_input_id: str) -> None:
         self._target_field_for_picker = target_input_id
 
@@ -627,12 +681,23 @@ class QwenTuiApp(App[None]):
             self.query_one(TabbedContent).active = "tab-overview"
 
     def action_switch_tab_slot_1(self) -> None:
-        with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = "tab-slot-1"
+        self._switch_to_slot(1)
 
     def action_switch_tab_slot_2(self) -> None:
+        self._switch_to_slot(2)
+
+    def action_switch_tab_slot_3(self) -> None:
+        self._switch_to_slot(3)
+
+    def action_switch_tab_slot_4(self) -> None:
+        self._switch_to_slot(4)
+
+    def action_switch_tab_slot_5(self) -> None:
+        self._switch_to_slot(5)
+
+    def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = "tab-slot-2"
+            self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
 
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:

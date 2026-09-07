@@ -94,3 +94,8 @@ module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", 
 ignore_missing_imports = true
 disallow_untyped_defs = false
 check_untyped_defs = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

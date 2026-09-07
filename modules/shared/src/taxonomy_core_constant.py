@@ -75,7 +75,7 @@ XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 # ─── Parallel job execution ─────────────────────────────────────────────────
 # Number of prompt jobs allowed to run concurrently. Each worker launches its
 # own Chromium browser instance with an ephemeral clone of the login session.
-DEFAULT_MAX_WORKERS = 2
+DEFAULT_MAX_WORKERS = 5
 
 CHAT_URL = "https://chat.qwen.ai/"
 

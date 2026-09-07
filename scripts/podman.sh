@@ -22,6 +22,14 @@ container_exists() {
     podman ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"
 }
 
+recreate_container() {
+    if container_exists; then
+        echo "==> Removing old container '${CONTAINER_NAME}' to use new image (volumes & login session are preserved)..."
+        podman rm -f "${CONTAINER_NAME}" >/dev/null
+    fi
+    start_container
+}
+
 start_container() {
     if is_running; then
         return 0
@@ -56,7 +64,7 @@ Commands:
   shell                 Open an interactive bash shell inside the container
   test                  Run full pytest unit/integration test suite inside container
   lint                  Run ruff lint check inside container
-  build                 Build or rebuild the Podman image (${IMAGE_NAME})
+  build                 Build/rebuild image AND recreate container with new image (${IMAGE_NAME})
   help                  Show this help message
 EOF
 }
@@ -91,6 +99,9 @@ case "$cmd" in
         echo "==> Building Podman image: ${IMAGE_NAME}..."
         podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile" "${REPO_ROOT}"
         echo "==> Image '${IMAGE_NAME}' successfully built!"
+        # Recreate the container so it runs the freshly built image.
+        # Without this, 'podman start' on the old container keeps using the OLD image.
+        recreate_container
         ;;
     login)
         echo "==> Authorizing local X11 display connection..."
