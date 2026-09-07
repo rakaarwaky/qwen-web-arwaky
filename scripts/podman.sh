@@ -7,9 +7,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VOLUME_DIR="/home/raka/.local/share/containers/storage/volumes/qwen-web-arwaky/_data"
-mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config"
+mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config" "${VOLUME_DIR}/finding"
 
-VOLUMES="-v ${VOLUME_DIR}/share:/root/.local/share/qwen-web:Z -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web:Z -v ${VOLUME_DIR}/config:/root/.config/qwen-web:Z"
+VOLUMES="-v ${VOLUME_DIR}/share:/root/.local/share/qwen-web:Z \
+         -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web:Z \
+         -v ${VOLUME_DIR}/config:/root/.config/qwen-web:Z \
+         -v "${REPO_ROOT}/.agents/finding:/root/.local/share/qwen-web/finding:Z""
 GUI_ENV="-e DISPLAY=${DISPLAY:-:0} -v /tmp/.X11-unix:/tmp/.X11-unix:ro --net=host"
 
 CONTAINER_NAME="qwen-web-arwaky"

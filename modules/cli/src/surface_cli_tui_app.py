@@ -725,9 +725,13 @@ class QwenTuiApp(App[None]):
         f_path = Path(file_val).resolve() if file_val else None
 
         out_val = self.query_one(f"#input-output-{slot_id}", Input).value.strip()
-        # Overwrite-protection (timestamp suffix) is handled centrally by
-        # resolve_pipeline_output_path() inside the orchestrator pipeline.
-        out_path = Path(out_val).resolve() if out_val else DEFAULT_OUTPUT
+        # Use the shared path resolver so timestamp suffix and attachment-stem
+        # preference are applied consistently (single source of truth).
+        _, out_path = resolve_pipeline_output_path(
+            p_path,
+            output_file=Path(out_val).resolve() if out_val else None,
+            attachment_path=f_path,
+        )
 
         headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
 
