@@ -74,11 +74,30 @@ def build_app_config(
 
 
 def resolve_pipeline_output_path(prompt_file: Path | str, output_file: Path | str | None = None) -> tuple[Path, Path]:
-    """Resolve prompt file and output file paths cleanly for prompt pipeline agents."""
+    """Resolve prompt file and output file paths cleanly for prompt pipeline agents.
+
+    When output_file is None the output name is derived from the prompt filename
+    with a timestamp prefix so repeated runs never silently overwrite each other.
+    """
+    from datetime import datetime
+
     p_path = Path(prompt_file).resolve()
     if not p_path.is_file():
         raise FileNotFoundError(f"Input file not found or is a directory: {p_path}")
-    out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
-    if out_path.is_dir():
-        out_path = out_path / f"{p_path.stem}_output.md"
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    if output_file:
+        out_path = Path(output_file).resolve()
+        if out_path.is_dir():
+            out_path = out_path / f"{p_path.stem}_{ts}.md"
+        elif out_path.exists():
+            # User gave a path that already exists — never overwrite; add timestamp.
+            out_path = out_path.parent / f"{out_path.stem}_{ts}{out_path.suffix}"
+        else:
+            # File doesn't exist yet — still add timestamp per user policy.
+            out_path = out_path.parent / f"{out_path.stem}_{ts}{out_path.suffix}"
+    else:
+        out_path = DEFAULT_OUTPUT / f"{p_path.stem}_{ts}.md"
+
     return p_path, out_path

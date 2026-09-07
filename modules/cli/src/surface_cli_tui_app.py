@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,7 +35,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from modules.core.src.utility_core_config_factory import build_app_config
+from modules.core.src.utility_core_config_factory import build_app_config, resolve_pipeline_output_path
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -523,8 +524,7 @@ class QwenTuiApp(App[None]):
 
                         yield Label("Prompt Template (Quick Select)", classes="field-label")
                         template_options = [
-                            (f"{meta['title']} — {meta['dimensions']}", role)
-                            for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
+                            (meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
                         ]
                         yield Select(
                             template_options,
@@ -725,6 +725,8 @@ class QwenTuiApp(App[None]):
         f_path = Path(file_val).resolve() if file_val else None
 
         out_val = self.query_one(f"#input-output-{slot_id}", Input).value.strip()
+        # Overwrite-protection (timestamp suffix) is handled centrally by
+        # resolve_pipeline_output_path() inside the orchestrator pipeline.
         out_path = Path(out_val).resolve() if out_val else DEFAULT_OUTPUT
 
         headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value

@@ -294,11 +294,11 @@ PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
         "dimensions": "Layer Boundaries, Naming, Orphan, Scalability, Data Flow",
     },
     "backend": {
-        "title": "Backend / Tech Lead",
+        "title": "Backend",
         "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
     },
     "frontend": {
-        "title": "Frontend / UI-UX",
+        "title": "Frontend",
         "dimensions": "Accessibility, Responsiveness, UX Patterns, Component Quality, Visual Consistency, Client Performance",
     },
     "analyst": {
