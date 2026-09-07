@@ -504,11 +504,6 @@ class QwenTuiApp(App[None]):
                 yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
                 yield DataTable(id="slots-table")
 
-                yield Label("Batch Directory Dispatch", classes="field-label")
-                with Horizontal(classes="batch-row"):
-                    yield Input(placeholder="Directory containing .md files (e.g. input/)", id="input-batch")
-                    yield Button("⚡ DISPATCH TO SLOTS", variant="primary", id="btn-batch-run")
-
                 yield Label("System Event Log", classes="field-label")
                 yield RichLog(id="log-view-overview", highlight=True, markup=True)
 
@@ -616,9 +611,6 @@ class QwenTuiApp(App[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
-        if button_id == "btn-batch-run":
-            self._dispatch_batch()
-            return
         for s in range(1, NUM_SLOTS + 1):
             if button_id == f"btn-run-{s}":
                 self._run_slot(s)
@@ -725,29 +717,6 @@ class QwenTuiApp(App[None]):
         self._slot_stats[slot_id]["status"] = "CANCELLED"
         self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
         self._refresh_metrics()
-
-    def _dispatch_batch(self) -> None:
-        try:
-            batch_val = self.query_one("#input-batch", Input).value
-        except Exception:
-            return
-        found = self._slot_config.discover_batch_prompts(batch_val)
-        if isinstance(found, SlotInputError):
-            self._log_msg(f"[bold #F59E0B]BATCH:[/] {found.message}")
-            return
-
-        self._log_msg(f"[bold #c0c1ff]BATCH DISPATCH:[/] Found {len(found)} files to distribute to slots...")
-        assigned = 0
-        for f in found:
-            free_slot = next((s for s in range(1, NUM_SLOTS + 1) if self._slot_workers.get(s) is None), None)
-            if free_slot is None:
-                self._log_msg("[#908fa0]All slots busy. Remaining files will wait.[/]")
-                break
-            with contextlib.suppress(Exception):
-                self.query_one(f"#input-prompt-{free_slot}", Input).value = str(f)
-                self._run_slot(free_slot)
-                assigned += 1
-        self._log_msg(f"[bold #10B981]BATCH:[/] Dispatched {assigned} jobs concurrently to free slots!")
 
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
