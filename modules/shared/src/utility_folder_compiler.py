@@ -24,9 +24,7 @@ def _is_text_file(filepath: Path) -> bool:
     try:
         with open(filepath, "rb") as f:
             chunk = f.read(8192)
-            if b"\x00" in chunk:
-                return False
-            return True
+            return b"\x00" not in chunk
     except (OSError, PermissionError):
         return False
 
@@ -203,8 +201,7 @@ def validate_folder_for_compile(folder_path: Path, max_depth: int = MAX_FOLDER_D
     files = collect_folder_files(folder_path, max_depth=max_depth)
     if not files:
         raise FolderEmptyError(
-            f"No compilable files found in {folder_path}. "
-            f"Supported extensions: {', '.join(sorted(CODE_EXTENSIONS))}"
+            f"No compilable files found in {folder_path}. Supported extensions: {', '.join(sorted(CODE_EXTENSIONS))}"
         )
     return files
 

@@ -35,6 +35,7 @@ from modules.shared.src.taxonomy_core_vo import (
     PromptText,
     ResponseText,
     RunContext,
+    RunId,
     TimeoutSec,
 )
 
@@ -82,8 +83,8 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                     output_path=out_path,
                     headless=headless,
                 )
-                self._observability.bind_run_context(str(ctx.run_id), job_name=JobName("direct"))
-                self._observability.attach_run_log(job_name=JobName("direct"), run_id=str(ctx.run_id))
+                self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName("direct"))
+                self._observability.attach_run_log(job_name=JobName("direct"), run_id=RunId(ctx.run_id))
                 emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:
@@ -99,7 +100,7 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
         except Exception as exc:
             return to_error_response(exc)
         finally:
-            self._observability.detach_run_log(str(ctx.run_id))
+            self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 
     def _execute_direct_on_page(

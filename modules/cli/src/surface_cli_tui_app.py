@@ -385,7 +385,9 @@ class FilePickerModal(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         title = "SELECT FOLDER" if self._select_directories else "SELECT FILE"
-        hint = "Navigate then click 'Select This Folder'" if self._select_directories else "press Enter on file to select"
+        hint = (
+            "Navigate then click 'Select This Folder'" if self._select_directories else "press Enter on file to select"
+        )
         with Vertical(id="modal-container"):
             yield Label(f"[ {title} — {hint} ]", id="modal-title")
             yield DirectoryTree(str(self._start_path), id="modal-tree")
@@ -406,9 +408,6 @@ class FilePickerModal(ModalScreen[str | None]):
             self.dismiss(None)
         elif event.button.id == "btn-select-folder":
             self.dismiss(str(self._current_path))
-
-    def action_dismiss_modal(self) -> None:
-        self.dismiss(None)
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
