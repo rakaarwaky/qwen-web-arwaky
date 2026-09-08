@@ -8,30 +8,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.core.src.capabilities_folder_compiler import FolderCompiler
 from modules.core.src.utility_core_logger_factory import get_logger
-from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
+from modules.shared.src.contract_core_protocol import IFolderCompileProtocol, IFolderToAttachmentProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
-from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderValidationError
+from modules.shared.src.taxonomy_core_error import FolderValidationError
 
 log = get_logger("capabilities_folder_to_attachment")
 
 
 # ─── Block 1: Class Definition & Constructor ────────────
-class FolderToAttachmentAdapter:
+class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
     """Adapter that resolves path to attachment-ready file.
 
     If path is a folder, compile to markdown first.
     If path is a file, return as-is.
     """
 
-    def __init__(self, folder_compiler: IFolderCompileProtocol | None = None) -> None:
+    def __init__(self, folder_compiler: IFolderCompileProtocol) -> None:
         """Initialize adapter.
 
         Args:
-            folder_compiler: Optional folder compiler instance. Created if None.
+            folder_compiler: Folder compiler instance (injected via DI).
         """
-        self._compiler = folder_compiler or FolderCompiler()
+        self._compiler = folder_compiler
 
     # ─── Block 2: Public Methods ──
     def resolve_to_attachment(

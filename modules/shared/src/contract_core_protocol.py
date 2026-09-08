@@ -23,6 +23,7 @@ from modules.shared.src.taxonomy_core_vo import (
     InjectorConfig,
     JobId,
     JobLimit,
+    JobName,
     JobRecord,
     LoggerName,
     MaxFileSizeMb,
@@ -83,6 +84,22 @@ class IFolderCompileProtocol(ABC):
         Returns:
             Path to the compiled markdown file.
         """
+
+    @abstractmethod
+    def is_folder(self, path: Path) -> bool:
+        """Check if path is a directory (not a file)."""
+
+
+class IFolderToAttachmentProtocol(ABC):
+    """Folder-to-attachment resolution capability contract."""
+
+    @abstractmethod
+    def resolve_to_attachment(
+        self,
+        path: Path,
+        max_depth: int = 5,
+    ) -> Path:
+        """Resolve a path to an attachment-ready file (compile folders to markdown)."""
 
     @abstractmethod
     def is_folder(self, path: Path) -> bool:
@@ -216,7 +233,7 @@ class IObservabilityProtocol(ABC):
         """Clear run-scoped contextvars."""
 
     @abstractmethod
-    def attach_run_log(self, job_name: str, run_id: RunId) -> Path:
+    def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
         """Attach a per-run JSONL log file under the jobs directory.
 
         Parameters

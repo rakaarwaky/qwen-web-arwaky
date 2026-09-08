@@ -30,6 +30,7 @@ from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     HeadlessFlag,
+    JobName,
     OutputPath,
     PromptText,
     ResponseText,
@@ -81,8 +82,8 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                     output_path=out_path,
                     headless=headless,
                 )
-                self._observability.bind_run_context(str(ctx.run_id), job_name="direct")
-                self._observability.attach_run_log(job_name="direct", run_id=str(ctx.run_id))
+                self._observability.bind_run_context(str(ctx.run_id), job_name=JobName("direct"))
+                self._observability.attach_run_log(job_name=JobName("direct"), run_id=str(ctx.run_id))
                 emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:

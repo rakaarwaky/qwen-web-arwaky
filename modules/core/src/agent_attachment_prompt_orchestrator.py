@@ -11,7 +11,6 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.core.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.core.src.utility_core_config_factory import build_app_config
 from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.core.src.utility_core_error_mapping import to_error_response
@@ -20,6 +19,7 @@ from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregat
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IFolderCompileProtocol,
+    IFolderToAttachmentProtocol,
     IInjectionProtocol,
     IObservabilityProtocol,
     ISaverProtocol,
@@ -35,6 +35,7 @@ from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
     HeadlessFlag,
+    JobName,
     OutputPath,
     PromptPath,
     ResponseText,
@@ -56,7 +57,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
         flow: IPromptFlowAggregate,
-        folder_adapter: FolderToAttachmentAdapter | None = None,
+        folder_adapter: IFolderToAttachmentProtocol,
     ) -> None:
         self._browser = browser
         self._injector = injector
@@ -66,7 +67,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._saver = saver
         self._observability = observability
         self._flow = flow
-        self._folder_adapter = folder_adapter or FolderToAttachmentAdapter()
+        self._folder_adapter = folder_adapter
 
     def process_prompt_with_attachment(
         self,
@@ -98,8 +99,8 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            self._observability.bind_run_context(str(ctx.run_id), job_name=p_path.stem)
-            self._observability.attach_run_log(job_name=p_path.stem, run_id=str(ctx.run_id))
+            self._observability.bind_run_context(str(ctx.run_id), job_name=JobName(p_path.stem))
+            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=str(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
 
             t0 = time.time()

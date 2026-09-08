@@ -13,7 +13,6 @@ from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
 from modules.shared.src.utility_folder_compiler import (
-    collect_folder_files,
     compile_files_to_markdown,
     validate_folder_for_compile,
 )

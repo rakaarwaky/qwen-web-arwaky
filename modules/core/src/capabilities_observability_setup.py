@@ -40,7 +40,7 @@ from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
-from modules.shared.src.taxonomy_core_vo import ExitCode, MessageCount, RunId, ServiceName, StatusRecordVO
+from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, MessageCount, RunId, ServiceName, StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
 
 # Block 1: Class Definition & Constructor
@@ -266,7 +266,7 @@ class ObservabilitySetup(IObservabilityProtocol):
     def clear_run_context(self) -> None:
         _clear_run_context()
 
-    def attach_run_log(self, job_name: str, run_id: RunId) -> Path:
+    def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
         """Attach a per-run JSONL log file under the jobs directory.
 
         Every log record emitted while this handler is attached is written to
