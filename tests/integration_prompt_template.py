@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 from modules.root_cli_main_entry import _build_config, _parse_args
 
@@ -61,7 +63,8 @@ class TestMcpPromptTemplateIntegration:
         called_prompt = mock_file_only.process_prompt_file_only.call_args[0][0]
         assert str(called_prompt).endswith("frontend.md")
 
-    def test_mcp_attachment_with_role(self, tmp_path: Path) -> None:
+    def test_mcp_attachment_with_role(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
         dummy_att = tmp_path / "code.py"
         dummy_att.write_text("print('hello')")
 

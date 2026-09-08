@@ -14,9 +14,18 @@ from modules.shared.src.taxonomy_core_constant import CODE_EXTENSIONS, EXCLUDED_
 from modules.shared.src.taxonomy_core_error import FolderEmptyError, FolderValidationError
 
 
-def _is_excluded(path: Path) -> bool:
-    """Return True if the path is inside an excluded directory."""
-    return any(part in EXCLUDED_DIR_NAMES for part in path.parts)
+def _is_excluded(path: Path, root: Path) -> bool:
+    """Return True if the path is inside an excluded directory below ``root``.
+
+    Only components below the scan root are inspected so that a project under
+    an ancestor directory named ``build``/``dist``/``venv`` etc. is not
+    rejected wholesale.
+    """
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return True
+    return any(part in EXCLUDED_DIR_NAMES for part in relative.parts)
 
 
 def _is_text_file(filepath: Path) -> bool:
@@ -74,7 +83,7 @@ def collect_folder_files(
             return
 
         for entry in entries:
-            if _is_excluded(entry):
+            if _is_excluded(entry, folder_path):
                 continue
 
             if entry.is_file():

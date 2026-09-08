@@ -179,8 +179,8 @@ Use `--json` in pipelines for machine-readable envelopes.
    VERBATIM inside fenced code blocks. Never use ellipses (`...`), placeholder
    comments (`// rest unchanged`), or references to omitted code."*
 3. **Reason first, produce second.** Ask for a compact analysis section *before* the
-   deliverable. This spends the model's deep-reasoning budget on understanding, and
-   the 900s watchdog covers the cost.
+   deliverable. This spends the model's deep-reasoning budget on understanding; the
+   event-driven monitor waits for the full response (no fixed watchdog cutoff).
 4. **Move bulk into attachments.** Prompt files should carry *instructions*; large
    code, specs, and diffs belong in attachments (PDF/MD/TXT ≤ 100 MB). Use one
    consolidated attachment per run (exactly one attachment is supported per execution).
@@ -368,13 +368,14 @@ Task returned an error / suspicious output
 │      → fix cause → resume slowly (1 task, verify, continue)
 │
 ├─ NetworkTimeoutError / 5xx challenge text?
-│  └─► back off 10–30s → RETRY with timeout_sec × 2 (max 900)
+│  └─► back off 10–30s → RETRY (completion is event-driven; no timeout cap)
 │      → still failing? run `qwen-web-cli doctor`, verify connectivity
 │
 ├─ ResponseDetectionTimeoutError?
 │  └─► Check last lifecycle event in logs:
 │      • stopped before SEND_CLICKED → injection/send problem → retry, then `update`
-│      • stopped after DISPATCH_ACKNOWLEDGED → model side slow → retry with 900s
+│      • stopped after DISPATCH_ACKNOWLEDGED → model side slow → keep waiting;
+│        only the 4-hour no-terminal-event circuit breaker stops the run
 │
 ├─ Upload/File errors?
 │  └─► verify: exists · regular file · readable · ≤ 100 MB · .pdf/.md/.txt
@@ -478,7 +479,8 @@ MCP client registration (Claude Desktop / Cursor style):
   stops right after `DISPATCH_ACKNOWLEDGED`; a second Chromium process lingers after
   the CLI already exited; `TargetClosedError: Page.wait_for_timeout`.
 - **Safe cleanup order:**
-  1. Prefer letting the run finish (watchdog gives it 900s+).
+  1. Prefer letting the run finish — completion is event-driven; the only
+     automatic stop is the 4-hour no-terminal-event safety circuit breaker.
   2. Prefer in-app cancellation (TUI **Cancel Run**; MCP has no cancel — wait).
   3. Only as a last resort, kill the **exact PID** of the CLI process
      (`kill <pid>`, not `pkill -9 -f`), then verify with
