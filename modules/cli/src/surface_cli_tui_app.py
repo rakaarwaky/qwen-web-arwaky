@@ -384,9 +384,11 @@ class FilePickerModal(ModalScreen[str | None]):
         self._current_path: Path = self._start_path
 
     def compose(self) -> ComposeResult:
-        title = "SELECT FOLDER" if self._select_directories else "SELECT FILE"
+        title = "SELECT FILE OR FOLDER" if self._select_directories else "SELECT FILE"
         hint = (
-            "Navigate then click 'Select This Folder'" if self._select_directories else "press Enter on file to select"
+            "press Enter on a file, or click 'Select This Folder'"
+            if self._select_directories
+            else "press Enter on file to select"
         )
         with Vertical(id="modal-container"):
             yield Label(f"[ {title} — {hint} ]", id="modal-title")
@@ -397,8 +399,8 @@ class FilePickerModal(ModalScreen[str | None]):
                 yield Button("Cancel (Esc)", id="btn-cancel-modal")
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        if not self._select_directories:
-            self.dismiss(str(event.path))
+        # Accept regular files in both modes; folders are picked via the button.
+        self.dismiss(str(event.path))
 
     def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
         self._current_path = Path(event.path)

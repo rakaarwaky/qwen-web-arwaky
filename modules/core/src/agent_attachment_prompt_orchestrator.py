@@ -87,6 +87,9 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
             if not p_path.exists():
                 raise FileNotFoundError(f"Input file not found: {p_path}")
 
+            self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
+            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
+
             att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
 
             out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
@@ -99,8 +102,6 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
-            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
 
             t0 = time.time()

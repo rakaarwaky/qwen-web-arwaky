@@ -12,6 +12,7 @@ from typing import Any
 
 from playwright.sync_api import ElementHandle, Page
 
+from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_event import EventMessage
 from modules.shared.src.taxonomy_core_vo import (
@@ -72,7 +73,7 @@ class IFolderCompileProtocol(ABC):
         self,
         folder_path: Path,
         output_path: Path | None = None,
-        max_depth: int = 5,
+        max_depth: int = MAX_FOLDER_DEPTH,
     ) -> Path:
         """Compile folder contents to a single markdown file.
 
@@ -97,7 +98,7 @@ class IFolderToAttachmentProtocol(ABC):
     def resolve_to_attachment(
         self,
         path: Path,
-        max_depth: int = 5,
+        max_depth: int = MAX_FOLDER_DEPTH,
     ) -> Path:
         """Resolve a path to an attachment-ready file (compile folders to markdown)."""
 
