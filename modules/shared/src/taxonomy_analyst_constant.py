@@ -36,7 +36,7 @@ EMBEDDED_ANALYST_TEMPLATE: str = r"""# Plan: {feature} — Business Analyst
 ### Traceability (FRD to Code)
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: FRD section to code mapping, requirement orphan detection, change impact coverage, documentation synchronization, audit trail -->
+<!-- Check: Requirement section to code mapping, requirement orphan detection, change impact coverage, documentation synchronization, audit trail -->
 
 ## Violations
 
@@ -54,9 +54,9 @@ EMBEDDED_ANALYST_TEMPLATE: str = r"""# Plan: {feature} — Business Analyst
 
 | Level | Meaning |
 | ------- | ------------------------------------------------------------------------------------------ |
-| 🔴 CRITICAL | Missing core requirement, wrong logic, data integrity risk. Immediate fix. |
-| 🟡 WARNING | Ambiguous requirement, missing edge case, incomplete criteria. Fix this cycle. |
-| 🟢 INFO | Suggestion or optimization. Deferrable. |
+| CRITICAL | Missing core requirement, wrong logic, data integrity risk. Immediate fix. |
+| WARNING | Ambiguous requirement, missing edge case, incomplete criteria. Fix this cycle. |
+| INFO | Suggestion or optimization. Deferrable. |
 """
 
 __all__ = ["EMBEDDED_ANALYST_TEMPLATE"]

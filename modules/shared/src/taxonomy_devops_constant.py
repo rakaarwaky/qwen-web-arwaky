@@ -71,9 +71,9 @@ automation, changelog generation, branch protection -->
 
 | Level | Meaning |
 | ------- | ------------------------------------------------------------------------------ |
-| 🔴 CRITICAL | Outage risk, security vuln, data leak, observability blind spot. Immediate fix. |
-| 🟡 WARNING | Resilience gap, config fragility, CI gap, missing instrumentation. Fix this cycle. |
-| 🟢 INFO | Hardening suggestion, cost optimization, DX improvement. Deferrable. |
+| CRITICAL | Outage risk, security vuln, data leak, observability blind spot. Immediate fix. |
+| WARNING | Resilience gap, config fragility, CI gap, missing instrumentation. Fix this cycle. |
+| INFO | Hardening suggestion, cost optimization, DX improvement. Deferrable. |
 """
 
 __all__ = ["EMBEDDED_DEVOPS_TEMPLATE"]
