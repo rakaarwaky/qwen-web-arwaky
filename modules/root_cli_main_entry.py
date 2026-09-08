@@ -242,6 +242,12 @@ def _dispatch(
             )
             return 1
 
+        # Ensure observability (structlog + app.jsonl file handler) is wired up
+        # even in interactive TUI mode, so logs are persisted to DEFAULT_LOG
+        # instead of being dropped. (FileHandler is otherwise only attached in
+        # the non-interactive CLI subcommand path below.)
+        container.observability.setup_observability(log_path=DEFAULT_LOG)
+
         result = surface_cli_interactive_controller.InteractiveController(
             container.workspace,
             container.agent_direct_prompt_orchestrator,

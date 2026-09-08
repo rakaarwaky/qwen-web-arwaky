@@ -115,3 +115,4 @@ worktrees/
 !**/.repowise/health-rules.json
 tests/fixtures/.last_run_ts
 .podman-data/
+build/

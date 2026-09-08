@@ -377,23 +377,38 @@ class FilePickerModal(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
 
-    def __init__(self, start_path: Path | None = None) -> None:
+    def __init__(self, start_path: Path | None = None, select_directories: bool = False) -> None:
         super().__init__()
         self._start_path = start_path or Path.cwd()
+        self._select_directories = select_directories
+        self._current_path: Path = self._start_path
 
     def compose(self) -> ComposeResult:
+        title = "SELECT FOLDER" if self._select_directories else "SELECT FILE"
+        hint = "Navigate then click 'Select This Folder'" if self._select_directories else "press Enter on file to select"
         with Vertical(id="modal-container"):
-            yield Label("[ SELECT FILE — Navigate with arrows, press Enter on file to select ]", id="modal-title")
+            yield Label(f"[ {title} — {hint} ]", id="modal-title")
             yield DirectoryTree(str(self._start_path), id="modal-tree")
             with Horizontal(id="modal-btn-row"):
+                if self._select_directories:
+                    yield Button("Select This Folder", variant="primary", id="btn-select-folder")
                 yield Button("Cancel (Esc)", id="btn-cancel-modal")
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        self.dismiss(str(event.path))
+        if not self._select_directories:
+            self.dismiss(str(event.path))
+
+    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        self._current_path = Path(event.path)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-cancel-modal":
             self.dismiss(None)
+        elif event.button.id == "btn-select-folder":
+            self.dismiss(str(self._current_path))
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(None)
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
@@ -532,11 +547,11 @@ class QwenTuiApp(App[None]):
                             )
                             yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
 
-                        yield Label("Attachment File (Optional)", classes="field-label")
+                        yield Label("Attachment File or Folder (Optional)", classes="field-label")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
-                                placeholder="path/to/attachment.file",
+                                placeholder="path/to/file or folder",
                                 id=f"input-file-{s}",
                                 classes="field-input",
                             )
@@ -620,7 +635,7 @@ class QwenTuiApp(App[None]):
                 self._open_picker(f"input-prompt-{s}")
                 return
             if button_id == f"btn-browse-file-{s}":
-                self._open_picker(f"input-file-{s}")
+                self._open_picker(f"input-file-{s}", select_directories=True)
                 return
             if button_id == f"btn-browse-output-{s}":
                 self._open_picker(f"input-output-{s}")
@@ -639,7 +654,7 @@ class QwenTuiApp(App[None]):
             prompt_input.value = str(role)
             self._log_msg(f"[bold #4ADE80]TEMPLATE:[/] Slot {slot_id} ← role '{role}'", slot_id)
 
-    def _open_picker(self, target_input_id: str) -> None:
+    def _open_picker(self, target_input_id: str, select_directories: bool = False) -> None:
         self._target_field_for_picker = target_input_id
 
         def _on_picked(path: str | None) -> None:
@@ -648,7 +663,7 @@ class QwenTuiApp(App[None]):
                     field = self.query_one(f"#{self._target_field_for_picker}", Input)
                     field.value = path
 
-        self.push_screen(FilePickerModal(), _on_picked)
+        self.push_screen(FilePickerModal(select_directories=select_directories), _on_picked)
 
     def _get_active_slot_id(self) -> int:
         with contextlib.suppress(Exception):
