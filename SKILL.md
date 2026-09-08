@@ -74,7 +74,7 @@ QWEN_WEB_MAX_WORKERS=4 qwa process input/task_001.md input/task_002.md input/tas
 Instead of creating a Markdown prompt file manually, you can pass a built-in role template name wherever a prompt file path is accepted (`input_file`, `prompt_file`, or CLI `-i` / `--prompt-path`):
 - `architect`: Layer Boundaries, Naming, Orphan, Scalability, Data Flow
 - `backend`: Security, Performance, Error Handling, SOLID, Code Quality, Maintainability
-- `frontend`: Accessibility, Responsiveness, UX Patterns, Component Quality, Visual Consistency, Client Performance
+- `frontend`: Accessibility & Usability, Layout & Responsiveness, UX Patterns & User Flow, Component / Module Quality, Visual Consistency & Design Tokens, Performance
 - `analyst`: Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability
 
 #### MCP Example (Attachment Review with Role Template)

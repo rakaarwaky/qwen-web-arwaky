@@ -298,8 +298,8 @@ PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
         "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
     },
     "frontend": {
-        "title": "Frontend",
-        "dimensions": "Accessibility, Responsiveness, UX Patterns, Component Quality, Visual Consistency, Client Performance",
+        "title": "UI/UX",
+        "dimensions": "Accessibility & Usability, Layout & Responsiveness, UX Patterns & User Flow, Component / Module Quality, Visual Consistency & Design Tokens, Performance",
     },
     "analyst": {
         "title": "Business Analyst",
