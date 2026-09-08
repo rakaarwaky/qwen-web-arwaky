@@ -1,54 +1,55 @@
-"""Taxonomy: frontend/UI-UX role prompt template constant.
+"""Taxonomy: UI/UX role prompt template constant.
 
-Domain taxonomy constant layer for the built-in Frontend/UI-UX prompt template.
-Consumer-oriented: every dimension maps to end-user experience impact.
+Domain taxonomy constant layer for the built-in UI/UX prompt template.
+Consumer-oriented: every dimension maps to end-user experience impact
+across any interactive surface (GUI, web, TUI, CLI, mobile, etc.).
 """
 
 from __future__ import annotations
 
-EMBEDDED_FRONTEND_TEMPLATE: str = r"""# Plan: {feature} — Frontend / UI-UX
+EMBEDDED_UI_UX_TEMPLATE: str = r"""# Plan: {feature} — UI/UX
 
 ## Summary
 
-{One paragraph describing the UI/UX context, user flow impacted, and scope of the review.}
+{One paragraph describing the interface context, user flow impacted, and scope of the review.}
 
 ## Findings
 
-### Accessibility (a11y)
+### Accessibility & Usability
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: ARIA labels, keyboard navigation, screen reader support, color contrast (WCAG 2.1 AA), focus management, semantic HTML -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Input methods, keyboard/voice/screen-reader support, color contrast (WCAG 2.1 AA), focus management, semantic structure, discoverability -->
 
-### Responsiveness & Layout
+### Layout & Responsiveness
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Mobile-first, breakpoint consistency, overflow handling, viewport meta, touch targets (min 44x44px) -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Multi-size adaptation, overflow handling, density/breathing room, input target sizing, orientation changes -->
 
 ### UX Patterns & User Flow
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Loading states, empty states, error states, optimistic updates, undo capability, confirmation dialogs -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Loading/empty/error states, optimistic updates, undo capability, confirmation dialogs, platform conventions -->
 
-### Component Quality
+### Component / Module Quality
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Reusability, prop interface clarity, composition over inheritance, controlled vs uncontrolled, memoization -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Reusability, interface clarity, composition over inheritance, controlled state, caching/memoization -->
 
 ### Visual Consistency & Design Tokens
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Design system adherence, spacing scale, color palette, typography scale, icon usage, animations -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Design system adherence, spacing scale, color palette, typography scale, iconography, motion/animation -->
 
-### Performance (Client-Side)
+### Performance
 
 | # | Severity | Issue | Location | Recommendation |
-| --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Bundle size, lazy loading, code splitting, image optimization, CLS, FCP/LCP/TBT, SSR/SSG hydration -->
+| --- | ---------- | ------- | --------- | ---------------- |
+<!-- Check: Startup time, render latency, memory footprint, input responsiveness, resource efficiency -->
 
 ## User Flow Diagram
 
@@ -66,9 +67,9 @@ EMBEDDED_FRONTEND_TEMPLATE: str = r"""# Plan: {feature} — Frontend / UI-UX
 
 | Level | Meaning |
 | ------- | --------------------------------------------------------------------------------------- |
-| 🔴 CRITICAL | A11y blocker, broken user flow, data loss risk, render crash. Immediate fix. |
+| 🔴 CRITICAL | A11y/usability blocker, broken user flow, data loss risk, render crash. Immediate fix. |
 | 🟡 WARNING | UX friction, missing state, performance regression, inconsistent design. Fix this cycle. |
 | 🟢 INFO | Polish, micro-interaction, nice-to-have. Deferrable. |
 """
 
-__all__ = ["EMBEDDED_FRONTEND_TEMPLATE"]
+__all__ = ["EMBEDDED_UI_UX_TEMPLATE"]

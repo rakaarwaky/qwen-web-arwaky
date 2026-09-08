@@ -16,12 +16,12 @@ from modules.shared.src.taxonomy_architect_constant import EMBEDDED_ARCHITECT_TE
 from modules.shared.src.taxonomy_backend_constant import EMBEDDED_BACKEND_TEMPLATE
 from modules.shared.src.taxonomy_core_constant import PROMPT_TEMPLATE_ROLES
 from modules.shared.src.taxonomy_devops_constant import EMBEDDED_DEVOPS_TEMPLATE
-from modules.shared.src.taxonomy_frontend_constant import EMBEDDED_FRONTEND_TEMPLATE
+from modules.shared.src.taxonomy_frontend_constant import EMBEDDED_UI_UX_TEMPLATE
 
 _ROLE_TO_TEMPLATE: dict[str, str] = {
     "architect": EMBEDDED_ARCHITECT_TEMPLATE,
     "backend": EMBEDDED_BACKEND_TEMPLATE,
-    "frontend": EMBEDDED_FRONTEND_TEMPLATE,
+    "frontend": EMBEDDED_UI_UX_TEMPLATE,
     "analyst": EMBEDDED_ANALYST_TEMPLATE,
     "devops": EMBEDDED_DEVOPS_TEMPLATE,
 }
