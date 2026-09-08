@@ -83,6 +83,22 @@ class OutputWriteError(QwenCliError):
     """Raised when writing output or metadata sidecar fails."""
 
 
+class FolderCompileError(QwenCliError):
+    """Raised when folder-to-markdown compilation fails."""
+
+
+class FolderValidationError(FolderCompileError):
+    """Raised when folder path validation fails."""
+
+
+class FolderDepthExceededError(FolderCompileError):
+    """Raised when folder recursion depth exceeds limit."""
+
+
+class FolderEmptyError(FolderCompileError):
+    """Raised when folder contains no compilable files."""
+
+
 _ERROR_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("auth", "login", "captcha", "signin"), "auth"),
     (("model", "switch", "default model"), "model"),
@@ -133,5 +149,9 @@ __all__ = [
     "QuarantineError",
     "SendDispatchError",
     "OutputWriteError",
+    "FolderCompileError",
+    "FolderValidationError",
+    "FolderDepthExceededError",
+    "FolderEmptyError",
     "ErrorCategory",
 ]

@@ -1,6 +1,7 @@
 """Agent: attachment prompt orchestrator (AES405).
 
 Orchestrates prompt execution with mandatory document file attachment (.pdf, .md, .txt).
+Supports folder-to-attachment compilation (folder -> single markdown file).
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
+from modules.core.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.core.src.utility_core_config_factory import build_app_config
 from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.core.src.utility_core_error_mapping import to_error_response
@@ -17,6 +19,7 @@ from modules.core.src.utility_core_io_writer import save_orchestrator_output
 from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
+    IFolderCompileProtocol,
     IInjectionProtocol,
     IObservabilityProtocol,
     ISaverProtocol,
@@ -53,6 +56,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
         flow: IPromptFlowAggregate,
+        folder_adapter: FolderToAttachmentAdapter | None = None,
     ) -> None:
         self._browser = browser
         self._injector = injector
@@ -62,6 +66,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._saver = saver
         self._observability = observability
         self._flow = flow
+        self._folder_adapter = folder_adapter or FolderToAttachmentAdapter()
 
     def process_prompt_with_attachment(
         self,
@@ -70,15 +75,17 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
     ) -> ResponseText:
-        """Pipeline 3: Process a prompt file from disk with document attachment."""
+        """Pipeline 3: Process a prompt file from disk with document attachment.
+
+        Supports folder paths: if attachment_file is a folder, it will be
+        compiled to a single markdown file before upload.
+        """
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
                 raise FileNotFoundError(f"Input file not found: {p_path}")
 
-            att_path = Path(attachment_file).resolve()
-            if not att_path.exists():
-                raise FileNotFoundError(f"Attachment file not found: {att_path}")
+            att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
 
             out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
             if out_path.is_dir():

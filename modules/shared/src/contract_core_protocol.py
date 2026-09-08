@@ -63,6 +63,32 @@ class IUploadProtocol(ABC):
         """Pre-flight validation; returns file size in bytes."""
 
 
+class IFolderCompileProtocol(ABC):
+    """Folder-to-markdown compilation capability contract."""
+
+    @abstractmethod
+    def compile_folder(
+        self,
+        folder_path: Path,
+        output_path: Path | None = None,
+        max_depth: int = 5,
+    ) -> Path:
+        """Compile folder contents to a single markdown file.
+
+        Args:
+            folder_path: Directory to compile.
+            output_path: Optional output file path. Auto-generated if None.
+            max_depth: Maximum recursion depth.
+
+        Returns:
+            Path to the compiled markdown file.
+        """
+
+    @abstractmethod
+    def is_folder(self, path: Path) -> bool:
+        """Check if path is a directory (not a file)."""
+
+
 class IInjectionProtocol(ABC):
     """Prompt text injection capability contract."""
 
@@ -309,6 +335,7 @@ class ITuiSlotConfigProtocol(ABC):
 
 __all__ = [
     "IUploadProtocol",
+    "IFolderCompileProtocol",
     "IInjectionProtocol",
     "ISendProtocol",
     "IStreamProtocol",
