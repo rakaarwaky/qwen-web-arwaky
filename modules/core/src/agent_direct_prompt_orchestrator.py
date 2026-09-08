@@ -67,6 +67,7 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
         headless: HeadlessFlag | bool = True,
     ) -> ResponseText:
         """Pipeline 1: Process a direct text prompt string and return AI response."""
+        ctx = RunContext()
         try:
             prompt_str = str(prompt)
             fd, tmp_path = tempfile.mkstemp(suffix=".txt")
@@ -80,7 +81,8 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                     output_path=out_path,
                     headless=headless,
                 )
-                ctx = RunContext()
+                self._observability.bind_run_context(str(ctx.run_id), job_name="direct")
+                self._observability.attach_run_log(job_name="direct", run_id=str(ctx.run_id))
                 emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:
@@ -95,6 +97,9 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                     p.unlink()
         except Exception as exc:
             return to_error_response(exc)
+        finally:
+            self._observability.detach_run_log(str(ctx.run_id))
+            self._observability.clear_run_context()
 
     def _execute_direct_on_page(
         self,

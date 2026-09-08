@@ -80,6 +80,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         Supports folder paths: if attachment_file is a folder, it will be
         compiled to a single markdown file before upload.
         """
+        ctx = RunContext()
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
@@ -97,7 +98,8 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            ctx = RunContext()
+            self._observability.bind_run_context(str(ctx.run_id), job_name=p_path.stem)
+            self._observability.attach_run_log(job_name=p_path.stem, run_id=str(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
 
             t0 = time.time()
@@ -111,6 +113,9 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
+        finally:
+            self._observability.detach_run_log(str(ctx.run_id))
+            self._observability.clear_run_context()
 
     def _execute_attachment_on_page(
         self,

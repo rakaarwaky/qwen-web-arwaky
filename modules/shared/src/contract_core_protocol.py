@@ -216,6 +216,27 @@ class IObservabilityProtocol(ABC):
         """Clear run-scoped contextvars."""
 
     @abstractmethod
+    def attach_run_log(self, job_name: str, run_id: RunId) -> Path:
+        """Attach a per-run JSONL log file under the jobs directory.
+
+        Parameters
+        ----------
+        job_name : str
+            Logical job/run name (e.g. prompt file stem).
+        run_id : RunId
+            Unique run identifier used as file suffix and correlation key.
+
+        Returns
+        -------
+        Path
+            Path of the created per-run log file.
+        """
+
+    @abstractmethod
+    def detach_run_log(self, run_id: RunId) -> None:
+        """Detach and close the per-run log handler for the given run id."""
+
+    @abstractmethod
     def exit_code_for(self, exc: BaseException) -> ExitCode:
         """Map an unhandled exception to a process exit code."""
 
