@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
@@ -301,7 +301,7 @@ class McpToolCommand:
         a_path, a_err = _validate_attachment_path(attachment_file)
         if a_err is not None:
             return a_err
-        assert a_path is not None
+        a_path = cast(Path, a_path)
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 
