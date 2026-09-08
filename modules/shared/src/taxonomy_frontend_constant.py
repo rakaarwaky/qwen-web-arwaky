@@ -51,6 +51,10 @@ EMBEDDED_UI_UX_TEMPLATE: str = r"""# Plan: {feature} — UI/UX
 | --- | ---------- | ------- | --------- | ---------------- |
 <!-- Check: Startup time, render latency, memory footprint, input responsiveness, resource efficiency -->
 
+## Violations
+
+{List or "None"}
+
 ## User Flow Diagram
 
 {Describe or diagram the affected user flow}
@@ -67,9 +71,9 @@ EMBEDDED_UI_UX_TEMPLATE: str = r"""# Plan: {feature} — UI/UX
 
 | Level | Meaning |
 | ------- | --------------------------------------------------------------------------------------- |
-| 🔴 CRITICAL | A11y/usability blocker, broken user flow, data loss risk, render crash. Immediate fix. |
-| 🟡 WARNING | UX friction, missing state, performance regression, inconsistent design. Fix this cycle. |
-| 🟢 INFO | Polish, micro-interaction, nice-to-have. Deferrable. |
+| CRITICAL | A11y/usability blocker, broken user flow, data loss risk, render crash. Immediate fix. |
+| WARNING | UX friction, missing state, performance regression, inconsistent design. Fix this cycle. |
+| INFO | Polish, micro-interaction, nice-to-have. Deferrable. |
 """
 
 __all__ = ["EMBEDDED_UI_UX_TEMPLATE"]
