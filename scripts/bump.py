@@ -35,7 +35,7 @@ def get_current_version(root_toml: Path) -> str:
     content = root_toml.read_text(encoding="utf-8")
     match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
     if not match:
-        sys.exit("Error: Could not find `version = \"...\"` in root pyproject.toml")
+        sys.exit('Error: Could not find `version = "..."` in root pyproject.toml')
     return match.group(1).strip()
 
 
@@ -59,9 +59,7 @@ def compute_new_version(current: str, target: str) -> str:
     if rule == "major":
         return f"{major + 1}.0.0"
 
-    sys.exit(
-        f"Error: Invalid version rule or semver '{target}'. Use 'patch', 'minor', 'major', or 'X.Y.Z'."
-    )
+    sys.exit(f"Error: Invalid version rule or semver '{target}'. Use 'patch', 'minor', 'major', or 'X.Y.Z'.")
 
 
 def update_file(path: Path, current: str, new_version: str, dry_run: bool = False) -> bool:
@@ -116,18 +114,18 @@ def main(argv: list[str] | None = None) -> None:
         help="Preview changes without modifying files",
     )
 
-    args = parser.parse_args(argv)
+    args = vars(parser.parse_args(argv))
     root_toml = TARGET_FILES[0]
     current = get_current_version(root_toml)
-    new_version = compute_new_version(current, args.target)
+    new_version = compute_new_version(current, args["target"])
 
-    print(f"🚀 Bumping version: {current} ──► {new_version}" + (" (DRY RUN)" if args.dry_run else ""))
+    print(f"🚀 Bumping version: {current} ──► {new_version}" + (" (DRY RUN)" if args["dry_run"] else ""))
     print("Files:")
 
     for path in TARGET_FILES:
-        update_file(path, current, new_version, dry_run=args.dry_run)
+        update_file(path, current, new_version, dry_run=args["dry_run"])
 
-    if args.git and not args.dry_run:
+    if args["git"] and not args["dry_run"]:
         run_git_release(new_version)
 
     print(f"\n✅ Successfully bumped version to {new_version}")

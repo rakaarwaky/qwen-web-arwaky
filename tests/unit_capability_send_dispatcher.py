@@ -200,7 +200,7 @@ def test_per_call_sender_config_overrides_instance_fallback():
 
     with pytest.raises(SendDispatchError, match="send button and Enter fallback"):
         SendDispatcher(try_enter_key_fallback=True, click_timeout_ms=ClickTimeoutMs(100)).click_send(
-            page, emitter, _config=config
+            page, emitter, config=config
         )
 
     page.keyboard.press.assert_not_called()

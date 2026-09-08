@@ -14,7 +14,7 @@ from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IObservabilityProtocol,
 )
-from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
+from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
@@ -59,9 +59,16 @@ class SessionOrchestrator(ISessionAggregate):
         if not target.exists():
             return ResponseText("No session found to delete.")
 
-        # Safety assertion: target path must contain 'session' or be under XDG_DATA_HOME/DEFAULT_SESSION
-        if target.name in {"", "/", "home", "usr", "etc", "var", "tmp"}:
-            raise QwenCliError(f"Refusing to delete unsafe system path: {target}")
+        # Safety assertion: only delete a path that is (a) the default session dir
+        # under the XDG data home, or (b) an explicitly-passed path whose final
+        # component is 'qwen_session'/'session'-like and sits under the user's
+        # home directory. Never accept arbitrary system paths.
+        default_session = DEFAULT_SESSION.resolve()
+        inside_default = target == default_session or default_session in target.parents
+        safe_name = target.name in {"qwen_session", "session"}
+        under_home = Path.home() in target.parents or target == Path.home()
+        if not (inside_default or (safe_name and under_home)):
+            raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
 
         try:
             shutil.rmtree(target)

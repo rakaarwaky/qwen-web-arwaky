@@ -39,6 +39,8 @@ class TestValidateFile:
             FileUploader().validate_file(tmp_path)
 
     def test_unreadable_file(self, tmp_path):
+        if os.getuid() == 0:
+            pytest.skip("root bypasses filesystem permission checks")
         f = tmp_path / "locked.md"
         f.write_text("locked")
         os.chmod(f, 0o000)

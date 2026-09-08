@@ -28,6 +28,7 @@ from modules.shared.src.taxonomy_core_vo import (
     PromptText,
     TimeoutSec,
 )
+from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
 
 
@@ -152,7 +153,8 @@ class McpToolCommand:
         """Process a single Markdown prompt file from disk without attachment.
 
         Args:
-            input_file: Path to Markdown prompt file.
+            input_file: Path to Markdown prompt file OR a built-in role template
+                name (architect|backend|frontend|analyst).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
@@ -160,7 +162,10 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result preview (or job_id if async).
         """
-        p_path = Path(input_file).expanduser().resolve()
+        if is_prompt_role(input_file):
+            p_path = materialize_role_template(input_file)
+        else:
+            p_path = Path(input_file).expanduser().resolve()
         if not p_path.exists():
             return _format_error_payload(
                 code="FILE_NOT_FOUND",
@@ -228,7 +233,8 @@ class McpToolCommand:
         """Process a Markdown prompt file with a document attachment.
 
         Args:
-            prompt_file: Path to Markdown prompt file.
+            prompt_file: Path to Markdown prompt file OR a built-in role template
+                name (architect|backend|frontend|analyst).
             attachment_file: Path to document attachment file (PDF, TXT, MD).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
@@ -237,7 +243,10 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result (or job_id if async).
         """
-        p_path = Path(prompt_file).expanduser().resolve()
+        if is_prompt_role(prompt_file):
+            p_path = materialize_role_template(prompt_file)
+        else:
+            p_path = Path(prompt_file).expanduser().resolve()
         if not p_path.exists():
             return _format_error_payload(
                 code="FILE_NOT_FOUND",

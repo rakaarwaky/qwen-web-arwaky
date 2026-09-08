@@ -72,6 +72,11 @@ DEFAULT_VENV = XDG_DATA_HOME / "venv"
 DEFAULT_JOBS_DIR = XDG_STATE_HOME / "jobs"
 XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 
+# ─── Parallel job execution ─────────────────────────────────────────────────
+# Number of prompt jobs allowed to run concurrently. Each worker launches its
+# own Chromium browser instance with an ephemeral clone of the login session.
+DEFAULT_MAX_WORKERS = 10
+
 CHAT_URL = "https://chat.qwen.ai/"
 
 # Hardcoded default model. Pipeline forces this on every chat session so the
@@ -278,3 +283,31 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
 DEFAULT_INCLUDE_HEADER: bool = True
 DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
+
+# ─── Prompt templates (role-based built-in templates) ─────────────────────
+# Each role is embedded in its own taxonomy constant module:
+#   taxonomy_architect_constant.py, taxonomy_backend_constant.py,
+#   taxonomy_frontend_constant.py, taxonomy_analyst_constant.py
+PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
+    "architect": {
+        "title": "Architect",
+        "dimensions": "Layer Boundaries, Naming, Orphan, Scalability, Data Flow",
+    },
+    "backend": {
+        "title": "Backend",
+        "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
+    },
+    "frontend": {
+        "title": "UI/UX",
+        "dimensions": "Accessibility & Usability, Layout & Responsiveness, UX Patterns & User Flow, Component / Module Quality, Visual Consistency & Design Tokens, Performance",
+    },
+    "analyst": {
+        "title": "Business Analyst",
+        "dimensions": "Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability",
+    },
+    "devops": {
+        "title": "DevOps / SRE",
+        "dimensions": "Deployment, Observability, Reliability, Security Hardening, Configuration, Release CI",
+    },
+}
+PROMPT_TEMPLATE_ROLES: tuple[str, ...] = tuple(PROMPT_TEMPLATE_MANIFEST.keys())

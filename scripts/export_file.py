@@ -499,17 +499,20 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # Capture via getattr: Pylance false-positives on synthesized Namespace.__getattr__ for plain attribute access.
+    file_arg: str | None = getattr(args, "file", None)
+    output_arg: str | None = getattr(args, "output", None)
 
-    if args.file:
+    if file_arg:
         # Non-interactive CLI mode
         project_root = resolve_project_root()
         skills_dir = project_root / ".agents" / "skills"
 
-        selected_file = Path(args.file)
+        selected_file = Path(file_arg)
         if not selected_file.is_absolute():
             selected_file = project_root / selected_file
         if not selected_file.is_file():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
+            print(f"Error: File not found: {file_arg}", file=sys.stderr)
             sys.exit(1)
 
         rel = selected_file.relative_to(project_root)
@@ -547,8 +550,8 @@ def main() -> None:
         related_docs.update(skills)
         print(f"Related docs: {len(frds)} FRD(s), {len(skills)} skill(s).")
 
-        if args.output:
-            output_path = Path(args.output)
+        if output_arg:
+            output_path = Path(output_arg)
         else:
             output_filename = f"{selected_file.stem}_export.md"
             output_path = project_root / ".agents" / "finding" / output_filename

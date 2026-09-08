@@ -5,6 +5,7 @@ Wires the 5 specialized agent orchestrators with capability implementations.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # agent_attachment_prompt_orchestrator
@@ -45,7 +46,11 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
+from modules.shared.src.taxonomy_core_constant import (
+    DEFAULT_JOBS_DIR,
+    DEFAULT_LOG,
+    DEFAULT_MAX_WORKERS,
+)
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
@@ -59,8 +64,11 @@ class SharedContainer:
         circuit_breaker_threshold: int = 5,
         circuit_breaker_window: int = 30,
         rate_limit_per_minute: int = 60,
+        max_workers: int | None = None,
     ) -> None:
         log = Path(log_path) if log_path else DEFAULT_LOG
+        if max_workers is None:
+            max_workers = int(os.environ.get("QWEN_WEB_MAX_WORKERS", str(DEFAULT_MAX_WORKERS)))
 
         self.cb = CircuitBreaker(
             FailureThreshold(circuit_breaker_threshold),
@@ -124,6 +132,7 @@ class SharedContainer:
             storage=self.job_manager,
             file_only=self.agent_prompt_file_orchestrator,
             attachment=self.agent_attachment_prompt_orchestrator,
+            max_workers=max_workers,
         )
 
     def wire(self) -> None:

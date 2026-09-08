@@ -364,6 +364,8 @@ class UpdateManager(IUpdateProtocol):
                 url,
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             )
+            if not req.full_url.startswith("https://"):
+                raise ValueError(f"Forbidden URL scheme: {req.full_url}")
             with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             return payload if isinstance(payload, dict) else None
@@ -415,8 +417,30 @@ class UpdateManager(IUpdateProtocol):
                     return cwd
         return None
 
+    _SUBPROCESS_FORBIDDEN_CHARS = set(";&|$`><\n\r")
+
     def _run_subprocess(self, cmd: list[str], timeout_sec: float) -> tuple[int, str, str]:
-        """Run a subprocess capturing transcripts."""
+        """Run a subprocess capturing transcripts.
+
+        Defensive validation: every argument must be free of shell metacharacters,
+        and any absolute path argument must live under the project root, the
+        user home directory, or a standard system toolchain location — preventing
+        injection via manipulated package metadata or environment variables.
+        """
+        for arg in cmd:
+            if any(ch in arg for ch in self._SUBPROCESS_FORBIDDEN_CHARS):
+                log.error("subprocess_rejected_argument arg=%r", arg)
+                return 1, "", f"Refusing subprocess argument with shell metacharacters: {arg}"
+            if arg.startswith("/"):
+                p = Path(arg)
+                allowed_roots = (
+                    Path(__file__).resolve().parents[3],
+                    Path.home(),
+                    Path(sys.base_prefix),
+                )
+                if not any(root == p or root in p.parents for root in allowed_roots):
+                    log.error("subprocess_rejected_path arg=%r", arg)
+                    return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec, check=False)
             return proc.returncode, proc.stdout or "", proc.stderr or ""

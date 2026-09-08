@@ -25,7 +25,7 @@ trigger_keywords:
   - deep reasoning
   - document analysis
   - no api key
-entry_points: [qwen-web-cli, qwc, qwen-web-mcp]
+entry_points: [qwen-web-arwaky, qwa, qwen-web-mcp]
 ---
 
 # Qwen Web Automation — Master-Class Agent Harness
@@ -156,13 +156,14 @@ Response completion is **event-driven**, not duration-driven. The historical `ti
 ### 2.4 CLI reference (equivalent surface for scripting & CI)
 
 ```bash
-qwen-web-cli doctor [--json]                        # environment health checks
-qwen-web-cli init [--dir TARGET]                    # workspace provisioning (.qwen-web/ in cwd)
-qwen-web-cli login                                  # headed manual login / CAPTCHA
-qwen-web-cli update [--check] [--force]             # self-update + Chromium sync
-qwen-web-cli prompt-direct -t "..." [-o OUT] [--headless] [--json]
-qwen-web-cli prompt-only   -i .qwen-web/input/PROMPT.md [-o OUT] [--headless] [--json]
-qwen-web-cli prompt-with-attachment -i .qwen-web/input/PROMPT.md -a FILE [-o OUT] [--headless] [--json]
+# Primary command: qwa (or qwen-web-arwaky / qwc / qwen-web-cli)
+qwa doctor [--json]                        # environment health checks
+qwa init [--dir TARGET]                    # workspace provisioning (.qwen-web/ in cwd)
+qwa login                                  # headed manual login / CAPTCHA
+qwa update [--check] [--force]             # self-update + Chromium sync
+qwa prompt-direct -t "..." [-o OUT] [--headless] [--json]
+qwa prompt-only   -i .qwen-web/input/PROMPT.md [-o OUT] [--headless] [--json]
+qwa prompt-with-attachment -i .qwen-web/input/PROMPT.md -a FILE [-o OUT] [--headless] [--json]
 qwen-web-cli mcp                                    # run MCP server over stdio
 ```
 

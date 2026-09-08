@@ -44,7 +44,7 @@ def write_output(
 
 def click_send(page, emitter=None, config=None) -> None:
     """Standalone wrapper for SendDispatcher.click_send."""
-    SendDispatcher().click_send(page, emitter, _config=config)
+    SendDispatcher().click_send(page, emitter, config=config)
 
 
 def _configure_sentry() -> None:
