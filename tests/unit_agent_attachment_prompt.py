@@ -104,6 +104,7 @@ class TestSendFile:
         _configure_lifecycle_mocks(orch)
         orch._sender.count_messages.return_value = 2
         orch._uploader.upload_attachment.return_value = True
+
         def flow_stub(*, emitter, **_kwargs):
             for event in PIPELINE_EVENT_SEQUENCE[5:-1]:
                 emitter.emit(event)

@@ -140,8 +140,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
         / "qwen-web"
     )
     xdg_config = (
-        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config")))
-        / "qwen-web"
+        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config"))) / "qwen-web"
     )
 
     roles = ["role-architect", "role-business-analyst", "role-tech-lead"]

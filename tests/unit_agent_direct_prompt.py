@@ -22,6 +22,7 @@ def _make_direct_orchestrator() -> tuple[DirectPromptOrchestrator, dict[str, Mag
     sender = MagicMock()
     streamer = MagicMock()
     saver = MagicMock()
+
     def write_output(path, *_args, **_kwargs):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("saved output", encoding="utf-8")

@@ -122,4 +122,3 @@ class TestTuiPromptTemplateIntegration:
         assert cfg.prompt_path is not None
         assert cfg.prompt_path.name == "architect.md"
         assert cfg.prompt_path.exists()
-

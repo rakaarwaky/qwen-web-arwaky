@@ -81,7 +81,7 @@ class JobManager(IJobStorageProtocol):
             except OSError:
                 continue
         candidate_files.sort(key=lambda t: t[0], reverse=True)
-        for _, path in candidate_files[:int(limit)]:
+        for _, path in candidate_files[: int(limit)]:
             job_id = path.stem
             rec = self.get_job(job_id)
             if rec is not None:

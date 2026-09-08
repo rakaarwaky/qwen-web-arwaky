@@ -88,7 +88,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── prompt-only ───────────────────────────────────────────────────────────
     p_only = sub.add_parser("prompt-only", help="Process a prompt file (no attachment)", parents=[parent])
     p_only.add_argument(
-        "-i", "-p", "--prompt-path", required=True,
+        "-i",
+        "-p",
+        "--prompt-path",
+        required=True,
         help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
     )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
@@ -100,7 +103,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "prompt-with-attachment", help="Process a prompt file with a file attachment", parents=[parent]
     )
     p_attach.add_argument(
-        "-i", "-p", "--prompt-path", required=True,
+        "-i",
+        "-p",
+        "--prompt-path",
+        required=True,
         help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")

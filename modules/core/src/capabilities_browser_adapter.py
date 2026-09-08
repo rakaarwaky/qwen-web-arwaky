@@ -505,14 +505,18 @@ class BrowserAdapter(IBrowserProtocol):
 
                         def on_request(request: Any) -> None:
                             if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
-                                log.info("browser_mutation_request", method=request.method, url=_sanitize_url(request.url))
+                                log.info(
+                                    "browser_mutation_request", method=request.method, url=_sanitize_url(request.url)
+                                )
 
                         def on_response(response: Any) -> None:
                             url = response.url.lower()
                             if response.status >= 400 and any(
                                 token in url for token in ("chat", "completion", "generate", "conversation", "api")
                             ):
-                                log.warning("browser_http_error", status=response.status, url=_sanitize_url(response.url))
+                                log.warning(
+                                    "browser_http_error", status=response.status, url=_sanitize_url(response.url)
+                                )
                             elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
                                 log.info(
                                     "browser_mutation_response", status=response.status, url=_sanitize_url(response.url)

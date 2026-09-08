@@ -514,9 +514,7 @@ class QwenTuiApp(App[None]):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
                         yield Label("Prompt Template (Quick Select)", classes="field-label")
-                        template_options = [
-                            (meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
-                        ]
+                        template_options = [(meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()]
                         yield Select(
                             template_options,
                             prompt="Select a template or type file path below",

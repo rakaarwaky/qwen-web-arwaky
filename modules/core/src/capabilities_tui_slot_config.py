@@ -24,12 +24,14 @@ from modules.shared.src.utility_core_prompt_template import is_prompt_role, mate
 @dataclass(frozen=True)
 class SlotInputError:
     """Returned (not raised) when slot inputs are invalid."""
+
     message: str
 
 
 @dataclass(frozen=True)
 class SlotRunPlan:
     """Validated slot configuration ready to execute."""
+
     prompt_path: Path
     attachment_path: Path | None
     config: AppConfig
