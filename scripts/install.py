@@ -101,7 +101,7 @@ def uninstall_previous(python_bin: Path) -> None:
 
     if sys.platform != "win32":
         local_bin = get_local_bin_dir()
-        for name in ("qwen-web-cli", "qwc", "qwen-web-mcp"):
+        for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
             target = local_bin / name
             if target.is_symlink() or target.exists():
                 with contextlib.suppress(OSError):
