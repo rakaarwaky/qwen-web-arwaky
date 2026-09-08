@@ -279,6 +279,64 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
     "something went wrong",
 )
 
+# ─── Folder compiler defaults ───────────────────────────────────────────────
+MAX_FOLDER_DEPTH: int = 5
+
+CODE_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".py",
+        ".rs",
+        ".ts",
+        ".js",
+        ".jsx",
+        ".tsx",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".cfg",
+        ".md",
+        ".txt",
+        ".css",
+        ".scss",
+        ".html",
+        ".go",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".kts",
+    }
+)
+
+EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        ".hg",
+        ".svn",
+        ".venv",
+        "venv",
+        "env",
+        "node_modules",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        "build",
+        "dist",
+        ".eggs",
+        ".qwen-web",
+        "target",
+        ".cache",
+    }
+)
+
 # ─── Saver defaults ─────────────────────────────────────────
 DEFAULT_INCLUDE_HEADER: bool = True
 DEFAULT_GENERATE_SIDECAR: bool = True

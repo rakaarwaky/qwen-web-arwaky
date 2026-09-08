@@ -114,8 +114,12 @@ def uninstall_previous(python_bin: Path) -> None:
 
 
 def install_package(python_bin: Path) -> None:
-    log("📦 [install] Installing Python package in editable mode (qwen-web-cli / qwc)...")
-    subprocess.run([str(python_bin), "-m", "pip", "install", "-e", str(PROJECT_ROOT)], check=True)
+    log("📦 [install] Installing Python package (immutable mode)...")
+    subprocess.run([str(python_bin), "-m", "pip", "install", str(PROJECT_ROOT)], check=True)
+    # Cleanup build artifacts
+    build_dir = PROJECT_ROOT / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir, ignore_errors=True)
 
 
 def install_playwright(python_bin: Path) -> None:

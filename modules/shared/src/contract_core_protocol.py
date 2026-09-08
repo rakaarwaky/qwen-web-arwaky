@@ -23,6 +23,7 @@ from modules.shared.src.taxonomy_core_vo import (
     InjectorConfig,
     JobId,
     JobLimit,
+    JobName,
     JobRecord,
     LoggerName,
     MaxFileSizeMb,
@@ -61,6 +62,48 @@ class IUploadProtocol(ABC):
     @abstractmethod
     def validate_file(self, filepath: Path, max_size_mb: MaxFileSizeMb = MaxFileSizeMb(100.0)) -> FileSizeBytes:
         """Pre-flight validation; returns file size in bytes."""
+
+
+class IFolderCompileProtocol(ABC):
+    """Folder-to-markdown compilation capability contract."""
+
+    @abstractmethod
+    def compile_folder(
+        self,
+        folder_path: Path,
+        output_path: Path | None = None,
+        max_depth: int = 5,
+    ) -> Path:
+        """Compile folder contents to a single markdown file.
+
+        Args:
+            folder_path: Directory to compile.
+            output_path: Optional output file path. Auto-generated if None.
+            max_depth: Maximum recursion depth.
+
+        Returns:
+            Path to the compiled markdown file.
+        """
+
+    @abstractmethod
+    def is_folder(self, path: Path) -> bool:
+        """Check if path is a directory (not a file)."""
+
+
+class IFolderToAttachmentProtocol(ABC):
+    """Folder-to-attachment resolution capability contract."""
+
+    @abstractmethod
+    def resolve_to_attachment(
+        self,
+        path: Path,
+        max_depth: int = 5,
+    ) -> Path:
+        """Resolve a path to an attachment-ready file (compile folders to markdown)."""
+
+    @abstractmethod
+    def is_folder(self, path: Path) -> bool:
+        """Check if path is a directory (not a file)."""
 
 
 class IInjectionProtocol(ABC):
@@ -190,6 +233,27 @@ class IObservabilityProtocol(ABC):
         """Clear run-scoped contextvars."""
 
     @abstractmethod
+    def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
+        """Attach a per-run JSONL log file under the jobs directory.
+
+        Parameters
+        ----------
+        job_name : str
+            Logical job/run name (e.g. prompt file stem).
+        run_id : RunId
+            Unique run identifier used as file suffix and correlation key.
+
+        Returns
+        -------
+        Path
+            Path of the created per-run log file.
+        """
+
+    @abstractmethod
+    def detach_run_log(self, run_id: RunId) -> None:
+        """Detach and close the per-run log handler for the given run id."""
+
+    @abstractmethod
     def exit_code_for(self, exc: BaseException) -> ExitCode:
         """Map an unhandled exception to a process exit code."""
 
@@ -309,6 +373,7 @@ class ITuiSlotConfigProtocol(ABC):
 
 __all__ = [
     "IUploadProtocol",
+    "IFolderCompileProtocol",
     "IInjectionProtocol",
     "ISendProtocol",
     "IStreamProtocol",

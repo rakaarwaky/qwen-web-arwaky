@@ -31,10 +31,12 @@ from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     HeadlessFlag,
+    JobName,
     OutputPath,
     PromptPath,
     ResponseText,
     RunContext,
+    RunId,
 )
 
 
@@ -66,6 +68,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         headless: HeadlessFlag | bool = True,
     ) -> ResponseText:
         """Pipeline 2: Process a prompt file from disk without attachment."""
+        ctx = RunContext()
         try:
             p_path, out_path = resolve_pipeline_output_path(prompt_file, output_file)
             cfg = build_app_config(
@@ -73,7 +76,8 @@ class PromptFileOrchestrator(IPromptFileAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            ctx = RunContext()
+            self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
+            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
 
             t0 = time.time()
@@ -85,6 +89,9 @@ class PromptFileOrchestrator(IPromptFileAggregate):
             return ResponseText(f"Successfully processed {p_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
+        finally:
+            self._observability.detach_run_log(RunId(ctx.run_id))
+            self._observability.clear_run_context()
 
     def _execute_file_on_page(
         self,

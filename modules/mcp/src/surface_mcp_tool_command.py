@@ -235,7 +235,8 @@ class McpToolCommand:
         Args:
             prompt_file: Path to Markdown prompt file OR a built-in role template
                 name (architect|backend|frontend|analyst).
-            attachment_file: Path to document attachment file (PDF, TXT, MD).
+            attachment_file: Path to document attachment file (PDF, TXT, MD) or directory
+                (will be compiled to single markdown file).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
@@ -256,11 +257,11 @@ class McpToolCommand:
             )
 
         a_path = Path(attachment_file).expanduser().resolve()
-        if not a_path.exists():
+        if not a_path.exists() and not a_path.is_dir():
             return _format_error_payload(
                 code="FILE_NOT_FOUND",
-                message=f"Attachment file not found: {a_path}",
-                hint="Check attachment_file path.",
+                message=f"Attachment file or folder not found: {a_path}",
+                hint="Check attachment_file path. Can be a file or directory.",
                 field="attachment_file",
             )
 

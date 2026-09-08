@@ -8,7 +8,7 @@ description: >
   analyze documents (PDF/MD/TXT attachments); run long deep-reasoning software
   engineering tasks (up to 15 minutes); or manage Qwen login sessions — via the
   qwen-web-arwaky CLI or MCP tools.
-version: 5.0.0
+version: 5.2.0
 trigger_keywords:
   - qwen
   - chat.qwen.ai
@@ -18,7 +18,7 @@ trigger_keywords:
   - deep reasoning
   - document analysis
   - no api key
-entry_points: [qwen-web-arwaky, qwa, qwen-web-cli, qwc, qwen-web-mcp]
+entry_points: [qwen-web-arwaky, qwa, qwen-web-mcp]
 ---
 
 # Qwen Web Automation — Master-Class Agent Harness
@@ -44,9 +44,9 @@ entry_points: [qwen-web-arwaky, qwa, qwen-web-cli, qwc, qwen-web-mcp]
 | **Zero API key** | Authentication is a real Chromium browser session (persistent cookies in `qwen_session/`). No tokens, no billing, no quota. |
 | **Zero-truncation extraction (Tier-1 React Fiber)** | Response capture walks the React Fiber tree (`__reactFiber` → `memoizedProps.content`, up to 30 levels) to recover **100% of raw Markdown**, including code blocks that Monaco Editor virtualization would clip in the visible DOM. |
 | **Tier-2 DOM Tree Walker fallback** | A block-aware tree walker (preserves `PRE`/code formatting, strips UI chrome, buttons, copy widgets) guarantees extraction even when Fiber props are absent. |
-| **30s cloud reload sync** | During active generation, the page is reloaded every 30 seconds to re-sync Qwen Cloud streaming state — long generations survive network drops and tab throttling. |
-| **Uninterrupted long-run watchdog** | The stream monitor guarantees a **minimum 900-second polling budget** (`max(900, timeout_sec × 6)`), so deep-reasoning tasks are never cut short by the watchdog. |
-| **Stability-based completion** | A response is accepted after 4 consecutive stable polls (1s interval) with generation complete — or force-accepted after 8 stable polls, so stale "thinking" cards can never hang the pipeline. |
+| **30s cloud reload sync** | While waiting for a terminal event, the page is reloaded every 30 seconds to re-sync Qwen Cloud streaming state — long generations survive network drops and tab throttling. |
+| **Event-driven long-run monitor** | The stream monitor has no elapsed-time response cutoff. It waits for terminal generation state and keeps recovery polling alive for long-running jobs. |
+| **Terminal-event completion** | A response is accepted only after stable text and an explicit generation-complete signal; stability alone can never terminate an unfinished response. |
 | **Self-healing browser sessions** | Automatic stale `SingletonLock` cleanup, session directory permission repair (`0700`), 3-attempt launch retry with backoff. |
 | **Multi-strategy input injection** | Playwright `fill` → React native value-setter (with `_valueTracker` reset) → `type()` keystroke fallback. |
 | **Parse-gated dispatch** | The send button is held until document parsing is positively verified (network `files/parse` 200 + DOM spinner/toast clearance). Prompts are never dispatched onto half-parsed attachments. |
@@ -110,46 +110,58 @@ All tools speak stdio MCP and return structured JSON envelopes:
 
 ### 2.2 Exact invocation payloads
 
+> **📁 Workspace rule: put ALL prompt/attachment/output files under `.qwen-web/`**
+> (`qwen-web-cli init` creates it in the cwd — already `.gitignore`d). Use
+> `.qwen-web/input/...` and `.qwen-web/output/...`; NEVER create a bare `input/`
+> or `output/` folder in the repo root. `output/` inside `.qwen-web/` is a symlink
+> to the XDG output dir, so results persist outside the repo.
+
 ```json
-// Fast factual query (30–60s band)
+// Fast factual query (completion is event-driven; duration is not a cutoff)
 { "prompt": "List the 5 SOLID principles in one line each.",
   "timeout_sec": 60, "headless": true }
 
-// Standard engineering task (120s default band)
-{ "input_file": "input/role-fullstack-developer/todo/task_042.md",
-  "output_file": "output/role-fullstack-developer/task_042.md",
+// Standard engineering task (timeout_sec remains an optional compatibility hint)
+{ "input_file": ".qwen-web/input/role-fullstack-developer/todo/task_042.md",
+  "output_file": ".qwen-web/output/role-fullstack-developer/task_042.md",
   "headless": true }
 
-// Deep reasoning with document context (600–900s band)
-{ "prompt_file": "input/role-architect/todo/review_spec.md",
-  "attachment_file": "input/role-architect/docs/system_spec.pdf",
-  "output_file": "output/role-architect/review_spec.md",
+// Deep reasoning with document context (no response-duration cutoff)
+{ "prompt_file": ".qwen-web/input/role-architect/todo/review_spec.md",
+  "attachment_file": ".qwen-web/input/role-architect/docs/system_spec.pdf",
+  "output_file": ".qwen-web/output/role-architect/review_spec.md",
   "headless": true }
 ```
 
-### 2.3 Uninterrupted Long-Running Watchdog & Auto-Timeout
+### 2.3 Event-Driven Long-Running Lifecycle
 
-Timeout management is **hardcoded and handled internally** by `qwen-web-arwaky`. AI agents do not need to pass or configure timeout flags — the internal engine automatically adapts to Qwen's deep-reasoning needs:
+Response completion is **event-driven**, not duration-driven. The historical `timeout_sec` input remains an observability hint for API compatibility, but it is not used to cut off a Qwen response.
 
-- **Uninterrupted Watchdog Budget**: The internal stream monitor guarantees a minimum **900-second (15 minutes)** budget (`max(900, timeout_sec × 6)`), ensuring Qwen3.8-Max deep-thinking tasks are never killed prematurely.
-- **Proactive 30s Cloud Reload Sync**: During long-running reasoning generations, the engine reloads every 30 seconds to keep the Qwen Cloud streaming session alive across network drops.
-- **Instant Early-Exit**: The moment Qwen finishes typing and text stabilizes for 4 consecutive polls, the engine exits immediately (~2s completion exit) without wasting execution time.
-- **Parse-Gated Dispatch**: Document parsing is held automatically for up to **120s** until backend `/files/parse` 200 OK is confirmed before sending.
+- **Terminal event as source of truth**: The monitor waits for stable response text plus an explicit generation-complete state.
+- **Long-running recovery**: Every 30 seconds the browser can reload to resynchronize cloud state. Browser operation timeouts trigger recovery and continue waiting instead of reporting success or truncating the response.
+- **Output-written success gate**: The pipeline emits `EVENT_OUTPUT_COPIED` only after the saver returns and the target output file is verified as readable and non-empty. CLI success/exit code `0` is downstream of that event.
+- **24-hour operation target**: A persistent host can keep the process alive for 24 hours or longer. Normal completion remains event-driven; a separate **4-hour safety circuit breaker** only stops a run that has produced no terminal event at all, preventing infinite hangs and resource exhaustion.
+- **Parse-Gated Dispatch**: Document parsing is held automatically until backend `/files/parse` 200 OK is confirmed before sending.
 - **Maximum Attachment Size**: **100 MB** (pre-flight validated).
+
+> **⚠️ NEVER wrap runs in an external timeout** (`timeout N`, shell alarm, CI job timeout, agent-loop kill). The engine owns its own timing: killing a run from outside with `timeout`/`pkill` leaves the Chromium process and page orphaned, corrupts the shared browser profile, and causes the NEXT run to fail with `TargetClosedError` or silent hang. If a run looks stuck, verify it is actually still generating (see §5.6) before considering any intervention — and the only safe interventions are letting it finish or cleanly cancelling via the TUI **Cancel Run** button.
 
 ### 2.4 CLI reference (equivalent surface for scripting & CI)
 
 ```bash
 # Primary command: qwa (or qwen-web-arwaky / qwc / qwen-web-cli)
 qwa doctor [--json]                        # environment health checks
-qwa init [--dir TARGET]                    # workspace provisioning
+qwa init [--dir TARGET]                    # workspace provisioning (.qwen-web/ in cwd)
 qwa login                                  # headed manual login / CAPTCHA
 qwa update [--check] [--force]             # self-update + Chromium sync
 qwa prompt-direct -t "..." [-o OUT] [--headless] [--json]
-qwa prompt-only   -i PROMPT.md [-o OUT] [--headless] [--json]
-qwa prompt-with-attachment -i PROMPT.md -a FILE [-o OUT] [--headless] [--json]
-qwa mcp                                    # run MCP server over stdio
+qwa prompt-only   -i .qwen-web/input/PROMPT.md [-o OUT] [--headless] [--json]
+qwa prompt-with-attachment -i .qwen-web/input/PROMPT.md -a FILE [-o OUT] [--headless] [--json]
+qwen-web-cli mcp                                    # run MCP server over stdio
 ```
+
+Paths: always use `.qwen-web/input/...` for prompts/attachments and
+`.qwen-web/output/...` for results — never bare `input/`/`output/` in the repo root.
 
 Exit codes: `0` success · `1` generic error · `2` `AuthRequiredError` · `130` interrupted.
 Use `--json` in pipelines for machine-readable envelopes.
@@ -455,7 +467,29 @@ MCP client registration (Claude Desktop / Cursor style):
 7. **Headless discipline:** keep `headless: true` for all production tasks; headed
    browsers are exclusively for `login` / `setup_session` / CAPTCHA resolution.
 
-### 5.5 Quick troubleshooting table
+### 5.5 Orphan processes & safe cleanup (read before killing anything)
+
+- **Never `pkill -9`/`kill -9` a qwen run as a first resort.** Hard-killing the CLI
+  does **not** close the Playwright Chromium it spawned — the browser keeps running
+  as an orphan, holds the shared `qwen_session` profile lock, and breaks every
+  subsequent run (`TargetClosedError`, hung dispatch, silent no-op). This is the
+  single most common cause of "it worked before, now it hangs".
+- **Symptoms of an orphan:** a new run starts but the page never acts; `EVENT_*`
+  stops right after `DISPATCH_ACKNOWLEDGED`; a second Chromium process lingers after
+  the CLI already exited; `TargetClosedError: Page.wait_for_timeout`.
+- **Safe cleanup order:**
+  1. Prefer letting the run finish (watchdog gives it 900s+).
+  2. Prefer in-app cancellation (TUI **Cancel Run**; MCP has no cancel — wait).
+  3. Only as a last resort, kill the **exact PID** of the CLI process
+     (`kill <pid>`, not `pkill -9 -f`), then verify with
+     `ps aux | grep -E "chrome.*qwen_session"` that no orphan Chromium remains;
+     kill remaining orphan Chromium PIDs individually.
+  4. After any hard kill, **wait 2–3s** and confirm zero lingering
+     `chrome.*qwen_session` processes before starting the next run.
+- **Always run one pipeline at a time** on the shared profile; concurrent launches
+  collide and look identical to orphan-related hangs.
+
+### 5.6 Quick troubleshooting table
 
 | Symptom | Likely cause | Fix |
 | :--- | :--- | :--- |
@@ -469,5 +503,4 @@ MCP client registration (Claude Desktop / Cursor style):
 ---
 
 *End of skill guide. Emit complete requests, verify every envelope, and let the
-900-second watchdog do the heavy thinking.*
-
+terminal lifecycle event—not elapsed time—decide when output is complete.*
