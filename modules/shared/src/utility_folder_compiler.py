@@ -6,8 +6,10 @@ Collects code/md files from a folder and compiles them into a single markdown fi
 
 from __future__ import annotations
 
+import json
 import os
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from modules.shared.src.taxonomy_core_constant import CODE_EXTENSIONS, EXCLUDED_DIR_NAMES, MAX_FOLDER_DEPTH
@@ -331,16 +333,85 @@ def _py_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]:
     return cands
 
 
-def _ts_candidates(base_dir: Path, spec: str) -> list[Path]:
-    """JS/TS candidates: relative specs only; bare names resolve to node_modules."""
-    if not (spec.startswith("./") or spec.startswith("../")):
-        return []
-    base = (base_dir / spec).resolve()
-    if base.suffix:
-        return [base]
-    cands: list[Path] = [base.with_suffix(ext) for ext in _TS_EXTS]
-    cands.extend(base / f"index{ext}" for ext in _TS_INDEX_EXTS)
-    return cands
+def _find_tsconfig(start: Path) -> Path | None:
+    """Return the nearest ``tsconfig.json`` walking up from ``start``."""
+    for cand in (start, *start.parents):
+        candidate = cand / "tsconfig.json"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+@lru_cache(maxsize=8)
+def _load_tsconfig_paths(tsconfig_path: Path) -> tuple[Path, dict[str, list[str]]]:
+    """Load ``(baseUrl_dir, paths)`` from a tsconfig, resolving one ``extends`` level."""
+    base_dir = tsconfig_path.parent
+    try:
+        data = json.loads(tsconfig_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return base_dir, {}
+    compiler = data.get("compilerOptions") or {}
+    extends = data.get("extends")
+    if isinstance(extends, str):
+        ext_path = (base_dir / extends).resolve()
+        if not ext_path.suffix:
+            ext_path = ext_path.with_suffix(".json")
+        if ext_path.is_file():
+            ext_base, ext_paths = _load_tsconfig_paths(ext_path)
+            merged = dict(ext_paths)
+            merged.update(compiler.get("paths") or {})
+            base_url = compiler.get("baseUrl") or "."
+            return (ext_base / base_url).resolve(), merged
+    paths = compiler.get("paths") or {}
+    base_url = compiler.get("baseUrl") or "."
+    return (base_dir / base_url).resolve(), paths
+
+
+def _ts_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]:
+    """JS/TS candidates: relative specs plus tsconfig ``paths`` aliases.
+
+    Bare specifiers that match no alias resolve to node_modules and are skipped.
+    """
+    if spec.startswith("./") or spec.startswith("../"):
+        base = (base_dir / spec).resolve()
+        if base.suffix:
+            return [base]
+        cands: list[Path] = [base.with_suffix(ext) for ext in _TS_EXTS]
+        cands.extend(base / f"index{ext}" for ext in _TS_INDEX_EXTS)
+        return cands
+
+    # Path aliases from tsconfig.json (e.g. "@/*": ["src/*"], "@lib/x": ["lib/x.ts"])
+    for root in {base_dir, folder_path}:
+        tsconfig = _find_tsconfig(root)
+        if tsconfig is None:
+            continue
+        base_url, paths = _load_tsconfig_paths(tsconfig)
+        for pattern, targets in paths.items():
+            if "*" in pattern:
+                prefix, suffix = pattern.split("*", 1)
+                if not spec.startswith(prefix):
+                    continue
+                if suffix and not spec.endswith(suffix):
+                    continue
+                wildcard = spec[len(prefix) : len(spec) - len(suffix)]
+            else:
+                if spec != pattern:
+                    continue
+                wildcard = ""
+            alias_cands: list[Path] = []
+            for target in targets:
+                filled = target.replace("*", wildcard)
+                base = Path(filled)
+                if not base.is_absolute():
+                    base = (base_url / base).resolve()
+                if base.suffix:
+                    alias_cands.append(base)
+                else:
+                    alias_cands.extend(base.with_suffix(ext) for ext in _TS_EXTS)
+                    alias_cands.extend(base / f"index{ext}" for ext in _TS_INDEX_EXTS)
+            if alias_cands:
+                return alias_cands
+    return []
 
 
 def _c_candidates(base_dir: Path, spec: str) -> list[Path]:
@@ -423,7 +494,7 @@ def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None
     if suffix == ".py":
         cands = _py_candidates(base_dir, folder_path, spec)
     elif suffix in (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"):
-        cands = _ts_candidates(base_dir, spec)
+        cands = _ts_candidates(base_dir, folder_path, spec)
     elif suffix in (".c", ".h", ".cpp", ".hpp", ".cc", ".cxx", ".hxx", ".hh"):
         cands = _c_candidates(base_dir, spec)
     elif suffix == ".go":
