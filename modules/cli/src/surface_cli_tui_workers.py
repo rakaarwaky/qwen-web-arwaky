@@ -120,8 +120,8 @@ class _TuiWorkersMixin:
         self._slot_workers[slot_id] = None
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
-        self._update_slot_status(slot_id, self._format_status(status, "badge"))  # type: ignore[arg-type]
-        self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")  # type: ignore[arg-type]
+        self._update_slot_status(slot_id, self._format_status(status, "badge"))
+        self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -229,8 +229,7 @@ class _TuiWorkersMixin:
             badge.update("SESSION: TIMEOUT")
             badge.set_classes("invalid")
         self._log_msg(
-            f"[bold {THEME['warn']}]WARNING:[/] Session check timed out — "
-            "run 'qwen-web-arwaky doctor' for diagnostics."
+            f"[bold {THEME['warn']}]WARNING:[/] Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
         )
 
     @work(thread=True)

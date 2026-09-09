@@ -84,8 +84,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_direct.add_argument(
         "--headless",
-        action=argparse.BooleanOptionalAction,   # U3: accepts --headless / --no-headless
-        default=True,                            # matches TUI Switch and MCP default
+        action=argparse.BooleanOptionalAction,  # U3: accepts --headless / --no-headless
+        default=True,  # matches TUI Switch and MCP default
         help="Run browser headlessly (default: true; use --no-headless to watch)",
     )
     p_direct.add_argument("--json", action="store_true", help="Format output as JSON")
