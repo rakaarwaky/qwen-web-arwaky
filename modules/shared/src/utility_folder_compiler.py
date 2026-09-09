@@ -360,8 +360,17 @@ def _go_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]:
     return [base] if base.suffix else [base.with_suffix(".go"), base / "main.go"]
 
 
+def _find_crate_root(path: Path) -> Path:
+    """Return the nearest ancestor directory containing ``Cargo.toml``."""
+    for cand in (path, *path.parents):
+        if (cand / "Cargo.toml").is_file():
+            return cand
+    return path
+
+
 def _rust_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]:
-    """Rust candidates: ``mod x`` and ``use crate::a::b`` relative to crate root."""
+    """Rust candidates: ``mod x`` beside the file; ``use crate::a::b`` relative to
+    the crate root (located by walking up to ``Cargo.toml``)."""
     if spec.startswith("mod:"):
         name = spec[4:]
         return [
@@ -371,11 +380,17 @@ def _rust_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]
             folder_path / name / "mod.rs",
         ]
     parts = spec[4:].split("::")  # strip "use:"
+    roots = {
+        _find_crate_root(base_dir),
+        _find_crate_root(folder_path),
+        folder_path,
+    }
     cands: list[Path] = []
-    for i in range(1, len(parts) + 1):
-        rel = Path(*parts[:i])
-        cands.append(folder_path / rel.with_suffix(".rs"))
-        cands.append(folder_path / rel / "mod.rs")
+    for root in roots:
+        for i in range(1, len(parts) + 1):
+            rel = Path(*parts[:i])
+            cands.append(root / rel.with_suffix(".rs"))
+            cands.append(root / rel / "mod.rs")
     return cands
 
 
