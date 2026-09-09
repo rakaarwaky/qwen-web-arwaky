@@ -1,6 +1,6 @@
 [project]
 name = "qwen-web-shared"
-version = "5.2.0"
+version = "6.0.0"
 description = "qwen-web shared taxonomy, contracts, and utilities (domain layer)"
 requires-python = ">=3.10"
 license = {text = "MIT"}

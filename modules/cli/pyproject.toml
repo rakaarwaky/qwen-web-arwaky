@@ -1,6 +1,6 @@
 [project]
 name = "qwen-web-arwaky"
-version = "4.0.0"
+version = "6.0.0"
 description = "qwen-web CLI surface layer"
 requires-python = ">=3.10"
 license = {text = "MIT"}

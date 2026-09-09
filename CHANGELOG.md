@@ -4,11 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [6.0.0] - 2026-09-09
+
+### Added
+
+- feat(cli): add `qwen-web-arwaky` and `qwa` as the canonical CLI entry point aliases
+- feat(folder): implement **import-aware multi-language folder compilation** — compile an entire folder of prompt files into a single Markdown document (`utility_folder_compiler`, `capabilities_folder_compiler`)
+- feat(folder): resolve TypeScript/JavaScript **tsconfig path aliases** during folder compilation
+- feat(folder): resolve Rust **`crate::` imports** from the true crate root during folder compilation
+- feat(core): add folder-to-attachment capability (`capabilities_folder_to_attachment`) so compiled folder output can be attached to prompts
+- feat(mcp): add **async job dispatch and status tracking** (`agent_job_orchestrator`, `capabilities_job_manager`) using `QwenEventType` — background runs avoid MCP timeouts
+- feat(mcp): add `get_job_status` and `list_jobs` tools; `process_*` tools gain an `async_run` option returning a `job_id`
+- feat(obs): add **per-job JSONL logging** and TUI observability for parallel/long-running jobs
+- feat(core): add session cloner (`utility_core_session_cloner`) for parallel session handling
+- feat(taxonomy): standardize prompt templates across all roles (analyst, architect, backend, devops, frontend) in dedicated constant modules plus `utility_core_prompt_template`
+- feat(tui): add dedicated TUI components module (`surface_cli_tui_components`) and slot config; major TUI observability upgrade (run-in-progress guard, job status, quit confirmation)
+- feat(install): add XDG-compliant `scripts/uninstall.sh` that removes the venv and all launchers; clean all launchers on reinstall
+- feat(container): add `Containerfile`, `.containerignore`/`.dockerignore` and `scripts/podman.sh` for containerized execution
+- feat(docs): add root `SKILL.md`; remove obsolete role-specific skill files (5× role SKILL.md and `LEAN-CTX.md`)
+
+### Fixed
+
+- fix(cli): UI/UX hardening from dual AI review (P0–P3) across `doctor`, interactive controller, run command, session setup and TUI app
+- fix(mcp): replace `assert` with `cast` for mypy narrowing (Codacy B101)
+- fix(review): address CodeRabbit feedback on PR #166 (observability setup, MCP tool command, folder compiler, skill constants)
+- fix(install): enforce XDG base directory for venv, root symlinks and bin paths
+- fix(install): migrate venv location to standard XDG data directory
 
 ### Changed
 
-- Rename primary CLI command from `qwen-web-cli` (alias `qwc`) to `qwen-web-arwaky` (alias `qwa`); legacy `qwen-web-cli` / `qwc` entry points and references removed.
+- **BREAKING**: refactor(cli): remove legacy `qwen-web-cli` / `qwc` command — the CLI is now exclusively `qwen-web-arwaky` / `qwa`
+- refactor(taxonomy): standardize prompt templates across all roles
+- refactor: generalize frontend template to surface-agnostic UI/UX
+- refactor: standardize `uninstall.sh` to XDG Base Directory spec
+- chore(deps): bump `mcp` from 2.0.0 to 2.1.1
+- chore(deps): bump `sentry-sdk` from 2.68.0 to 2.68.1
+- chore(deps-ci): bump `softprops/action-gh-release` from 3.0.2 to 3.0.3
 
 ## [5.2.2] - 2026-08-20
 

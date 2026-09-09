@@ -36,6 +36,18 @@
 
 ---
 
+## What's New in v6.0.0
+
+- **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS) and `crate::` (Rust) resolution.
+- **Async MCP job dispatch** — background prompt jobs (`async_run` → `job_id`) with `get_job_status` / `list_jobs` tools; no more MCP stdio timeouts on long runs.
+- **Per-job JSONL logging + TUI observability** — track parallel and long-running jobs with run-in-progress guards and live status.
+- **Standardized role prompt templates** — consistent analyst / architect / backend / devops / frontend templates.
+- **Container support** — official `Containerfile` + `scripts/podman.sh` for containerized execution.
+- **XDG-compliant uninstall** — `scripts/uninstall.sh` removes the venv and all launchers cleanly.
+- ⚠️ **Breaking**: legacy `qwen-web-cli` / `qwc` commands removed — use `qwen-web-arwaky` / `qwa` only.
+
+---
+
 ## Quick Start in 60 Seconds
 
 ### 1. Installation (Cross-Platform)
@@ -156,6 +168,9 @@ qwen-web-mcp
 - `process_prompt_file_only`: Process input Markdown prompt files and output results locally.
 - `process_prompt_with_attachment`: Send prompt files together with document attachments.
 - `setup_session`: Trigger an interactive browser session for manual re-authentication if session tokens expire.
+- `get_job_status` / `list_jobs`: Poll and list asynchronous background jobs (v6.0.0+).
+
+> **Async mode (v6.0.0+)**: all `process_*` tools accept `async_run: true` and return a `job_id` immediately; poll with `get_job_status` — ideal for long generations that would otherwise exceed MCP stdio timeouts.
 
 ---
 
