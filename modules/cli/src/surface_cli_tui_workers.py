@@ -14,6 +14,7 @@ from typing import Any, cast
 
 from rich.markup import escape
 from textual import work
+from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.widgets import Input, Label, LoadingIndicator, Switch
 
@@ -21,6 +22,19 @@ from modules.cli.src.surface_cli_tui_css import THEME
 from modules.core.src.capabilities_tui_slot_config import SlotInputError
 from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
 from modules.shared.src.utility_core_response import detect_processing_failure
+
+# A badge write can land while the app is tearing down: the worker thread's
+# ``call_from_thread`` is queued on the event loop and keeps running after the
+# screen is popped (``ScreenStackError``) or the badge is unmounted
+# (``NoMatches``). Neither is a subclass of ``LookupError``/``AttributeError``,
+# so catching only those let the exception escape as an app crash. There is
+# nothing left to display in that window — return quietly instead.
+_BADGE_UNAVAILABLE: tuple[type[BaseException], ...] = (
+    NoMatches,
+    ScreenStackError,
+    LookupError,
+    AttributeError,
+)
 
 
 class _TuiWorkersMixin:
@@ -267,7 +281,7 @@ class _TuiWorkersMixin:
         try:
             badge = self.query_one("#session-badge", Label)
             badge.update("SESSION: LOGGING IN…")
-        except (LookupError, AttributeError):
+        except _BADGE_UNAVAILABLE:
             pass
         try:
             if self._setup is None:
@@ -291,7 +305,7 @@ class _TuiWorkersMixin:
     def _refresh_session_badge(self) -> None:
         try:
             badge = self.query_one("#session-badge", Label)
-        except (LookupError, AttributeError):
+        except _BADGE_UNAVAILABLE:
             return
         if self._session is None:
             badge.update("SESSION: N/A")
@@ -308,9 +322,9 @@ class _TuiWorkersMixin:
         if self._session_check_timed_out:
             return
         self._session_check_timed_out = True
-        with contextlib.suppress(NoMatches):
+        with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-            badge_text = str(badge.renderable) if badge.renderable else ""
+            badge_text = str(badge.render() or "")
             # Only show TIMEOUT if the badge is still in CHECKING state.
             # If the worker already completed and set VALID/EXPIRED, do not overwrite.
             if "CHECKING" not in badge_text:
@@ -336,7 +350,7 @@ class _TuiWorkersMixin:
     def _apply_session_badge(self, valid: bool) -> None:
         try:
             badge = self.query_one("#session-badge", Label)
-        except (LookupError, AttributeError):
+        except _BADGE_UNAVAILABLE:
             return
         badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
         badge.set_classes("invalid" if not valid else "")
