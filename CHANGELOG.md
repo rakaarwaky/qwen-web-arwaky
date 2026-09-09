@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.1.0] - 2026-09-10
+
+### Fixed
+
+- fix(cli): session badge race condition — VALID status was overwritten by stale 15s timeout timer after validation completed successfully
+- fix(cli): comprehensive UI/UX overhaul — 19 findings from merged review plan (A1, A3, A4, A6, A8, C3, C4, L1–L4, P4, U1–U8, V1–V3)
+- fix(cli): WCAG contrast — raise `$status-muted` from `#64748B` (3.8:1) to `#8B9BB4` (5.9:1) in CSS and `QwenTuiLogHandler`
+- fix(cli): WCAG contrast — lighten status badge colors for text-on-dark (ok `#34D399`, info `#60A5FA`)
+- fix(cli): session timeout no longer silently overwrites VALID badge; toast notification added for discoverability
+- fix(cli): cooperative cancellation — `CANCELLING…` intermediate status + generation token guard against stale worker writes
+- fix(cli): cancel confirmation for long-running slots (>30s) via `ConfirmModal`
+- fix(cli): live elapsed-time progress updates in Overview table during slot execution
+- fix(cli): login progress indicator — session badge shows `LOGGING IN…` during login flow
+- fix(cli): init workspace moved to background worker to avoid blocking TUI event loop
+- fix(response): skip pagination indicators in DOM extraction
+
+### Changed
+
+- refactor(tui): split `surface_cli_tui_app` into 5 focused mixin modules (compose, handlers, workers, utils, css)
+- refactor(cli): unified `THEME` dict and CSS tokens via `_COLORS` single source of truth (eliminates palette drift)
+- refactor(cli): `$danger-bg`/`$danger-fg` CSS tokens replace hardcoded `#991B1B` literals
+- refactor(cli): picker target captured in closure instead of instance state (fixes race condition)
+- refactor(cli): `_login_in_flight` initialized eagerly in `QwenTuiApp.__init__`
+
+### Added
+
+- feat(cli): `ctrl+x` keyboard binding to cancel active slot
+- feat(cli): `alt+left`/`alt+right` sequential tab cycling for all slots (including slots ≥ 10)
+- feat(cli): help discoverability hint in Overview pane (`Press ? for keyboard shortcuts`)
+- feat(cli): quit-guard uses `notify()` toast for visibility regardless of active tab
+- feat(cli): session-check timer cancellation to prevent stacking
+
 ## [6.0.0] - 2026-09-09
 
 ### Added
