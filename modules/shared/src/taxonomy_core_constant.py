@@ -154,9 +154,14 @@ JS_GET_RESPONSE_TEXT: str = r"""
         + '[data-role="assistant"], .response-message-content, .qwen-markdown-text, [class*="message-content"], '
         + '[class*="message-body"], [class*="response"]'
     );
+    var paginationRe = /^\s*\d+\s*\/\s*\d+\s*$/;
     for (var ri = responseNodes.length - 1; ri >= 0; ri--) {
         var node = responseNodes[ri];
         if (node.closest('.qwen-chat-message-user') || node.closest('.user-message-content')) continue;
+
+        // Skip pagination indicator nodes (e.g. "1/2", "2/3")
+        var nodeText = (node.innerText || '').trim();
+        if (paginationRe.test(nodeText)) continue;
 
         // Tier 1: React Fiber extraction (preserves 100% of raw markdown & code without virtualization truncation)
         var fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
@@ -165,7 +170,7 @@ JS_GET_RESPONSE_TEXT: str = r"""
             for (var depth = 0; depth < 30 && curr; depth++) {
                 if (curr.memoizedProps && typeof curr.memoizedProps === 'object') {
                     var content = curr.memoizedProps.content;
-                    if (typeof content === 'string' && content.length > 0) {
+                    if (typeof content === 'string' && content.length > 0 && !paginationRe.test(content.trim())) {
                         return content.trim();
                     }
                 }
@@ -182,7 +187,7 @@ JS_GET_RESPONSE_TEXT: str = r"""
 
         var text = '';
         var blockTags = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TR', 'TD', 'TH', 'PRE', 'BLOCKQUOTE', 'BR', 'TABLE', 'UL', 'OL', 'SECTION', 'ARTICLE']);
-        var ignoreSelectors = '.margin, .line-numbers, .monaco-editor-margin, [class*="line-numbers"], [class*="margin-view"], [class*="thinking"], [class*="status-card"], [class*="status"], [class*="thinking-tool"], button, svg, [class*="copy"], .copy-code-btn, [class*="code-header"]';
+        var ignoreSelectors = '.margin, .line-numbers, .monaco-editor-margin, [class*="line-numbers"], [class*="margin-view"], [class*="thinking"], [class*="status-card"], [class*="status"], [class*="thinking-tool"], button, svg, [class*="copy"], .copy-code-btn, [class*="code-header"], [class*="pagination"], [class*="pager"]';
 
         function walk(n, isPre) {
             if (n.nodeType === Node.ELEMENT_NODE) {
@@ -225,6 +230,10 @@ JS_GET_RESPONSE_TEXT: str = r"""
             responseText = responseText.replace(/\s*Skip$/, '').trim();
         }
         if (responseText === "Skip") {
+            continue;
+        }
+        // Skip if text is only a pagination indicator
+        if (paginationRe.test(responseText)) {
             continue;
         }
         if (responseText.length > 0) return responseText;

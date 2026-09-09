@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from playwright.sync_api import Error
@@ -36,6 +36,8 @@ class TestClickSendExtended:
         loc.count.return_value = 1
         loc.first.count.return_value = 0
         loc.first.is_visible.return_value = False
+        loc.nth.return_value.evaluate.return_value = False
+        loc.nth.return_value.text_content.return_value = None
         page.locator.return_value = loc
         page.evaluate.side_effect = [1, "", 2]
         page.keyboard.press = MagicMock()
@@ -52,6 +54,8 @@ class TestClickSendExtended:
         loc.first.count.return_value = 1
         loc.first.is_visible.return_value = True
         loc.first.is_enabled.return_value = True
+        loc.nth.return_value.evaluate.return_value = False
+        loc.nth.return_value.text_content.return_value = None
         page.locator.return_value = loc
         page.evaluate.side_effect = [1, "before", 1, "after"]
 
@@ -66,6 +70,8 @@ class TestClickSendExtended:
         loc.count.return_value = 1
         loc.first.count.return_value = 0
         loc.first.is_visible.return_value = False
+        loc.nth.return_value.evaluate.return_value = False
+        loc.nth.return_value.text_content.return_value = None
         page.locator.return_value = loc
         page.evaluate.side_effect = [1, "", 2]
         page.keyboard.press = MagicMock()
@@ -89,10 +95,29 @@ class TestClickSendExtended:
             loc.first.count.return_value = 1
             loc.first.is_visible.return_value = True
             loc.first.is_enabled.return_value = True
+            loc.nth.return_value.evaluate.return_value = False
+            loc.nth.return_value.text_content.return_value = None
             return loc
 
         page.locator.side_effect = locator_factory
-        _sender().click_send(page, emitter)
+
+        evaluate_count = [0]
+
+        def evaluate_factory(script, *args, **kwargs):
+            evaluate_count[0] += 1
+            if "turns" in script:
+                return 1
+            if evaluate_count[0] <= 2:
+                return ""
+            return "new response"
+
+        page.evaluate.side_effect = evaluate_factory
+
+        with (
+            patch("modules.core.src.capabilities_send_dispatcher._is_file_card_parsing", return_value=False),
+            patch("modules.core.src.capabilities_send_dispatcher._is_parse_toast_visible", return_value=False),
+        ):
+            _sender().click_send(page, emitter)
         assert emitter.emit.call_count == 2
 
 
@@ -151,20 +176,6 @@ class TestLatestMessageTextExtended:
         assert result is None
 
 
-def _page_with_no_send_selector() -> MagicMock:
-    page = MagicMock()
-
-    def locator_factory(_selector):
-        loc = MagicMock()
-        loc.count.return_value = 0
-        loc.first.count.return_value = 0
-        loc.first.is_visible.return_value = False
-        return loc
-
-    page.locator.side_effect = locator_factory
-    return page
-
-
 def test_composer_reset_alone_is_not_dispatch_ack():
     page = MagicMock()
     emitter = MagicMock(spec=LifecycleEmitter)
@@ -174,12 +185,30 @@ def test_composer_reset_alone_is_not_dispatch_ack():
     loc.first.is_visible.return_value = False
     loc.first.is_enabled.return_value = False
     loc.first.input_value.return_value = ""
+    loc.nth.return_value.evaluate.return_value = False
+    loc.nth.return_value.text_content.return_value = None
     page.locator.return_value = loc
     page.evaluate.return_value = 1
     page.keyboard.press = MagicMock()
 
     with pytest.raises(SendDispatchError, match="did not acknowledge the user turn"):
         _sender().click_send(page, emitter)
+
+
+def _page_with_no_send_selector() -> MagicMock:
+    page = MagicMock()
+
+    def locator_factory(_selector):
+        loc = MagicMock()
+        loc.count.return_value = 0
+        loc.first.count.return_value = 0
+        loc.first.is_visible.return_value = False
+        loc.nth.return_value.evaluate.return_value = False
+        loc.nth.return_value.text_content.return_value = None
+        return loc
+
+    page.locator.side_effect = locator_factory
+    return page
 
 
 def test_no_visible_selector_does_not_press_enter_when_instance_fallback_disabled():

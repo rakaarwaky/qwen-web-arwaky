@@ -7,6 +7,8 @@ Taxonomy constants + Playwright Page only.
 
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Error, Page
 
 from modules.shared.src.taxonomy_core_constant import (
@@ -16,6 +18,8 @@ from modules.shared.src.taxonomy_core_constant import (
     RESPONSE_CONTENT_SELECTOR,
 )
 from modules.shared.src.taxonomy_core_vo import MessageCount, ResponseText
+
+_PAGINATION_RE = re.compile(r"^\s*\d+\s*/\s*\d+\s*$")
 
 
 def count_messages(page: Page) -> MessageCount:
@@ -48,6 +52,7 @@ def latest_message_text(page: Page) -> ResponseText | None:
 
     Tier 1: injected JS (JS_GET_RESPONSE_TEXT) when it yields non-empty text.
     Tier 2: combined message-selector locator's last text content.
+    Tier 3: paginated-response fallback — concatenates all page segments.
     Fallback: None.
 
     Returns
@@ -59,15 +64,40 @@ def latest_message_text(page: Page) -> ResponseText | None:
     try:
         text = page.evaluate(JS_GET_RESPONSE_TEXT)
         if text and isinstance(text, str) and len(text.strip()) > 0:
-            return ResponseText(str(text.strip()))
+            stripped = text.strip()
+            if not _PAGINATION_RE.match(stripped):
+                return ResponseText(stripped)
     except Error:
         pass
     try:
         locator = page.locator(RESPONSE_CONTENT_SELECTOR)
         if locator.count() > 0:
             text = locator.last.text_content()
-            if text is not None:
-                return ResponseText(str(text.strip()))
+            if text is not None and isinstance(text, str):
+                stripped = text.strip()
+                if not _PAGINATION_RE.match(stripped):
+                    return ResponseText(stripped)
+    except Error:
+        pass
+
+    # Tier 3: Pagination fallback — collect text from all response segments
+    try:
+        segments: list[str] = []
+        selector = (
+            ".qwen-markdown, .qwen-chat-message-assistant, .chat-response-message, "
+            ".chat-message-assistant, [data-role='assistant'], .response-message-content"
+        )
+        nodes = page.locator(selector)
+        count = nodes.count()
+        for i in range(count):
+            node = nodes.nth(i)
+            if node.evaluate("el => !!el.closest('.qwen-chat-message-user')"):
+                continue
+            txt = node.text_content()
+            if txt and not _PAGINATION_RE.match(txt.strip()):
+                segments.append(txt.strip())
+        if segments:
+            return ResponseText("\n\n".join(segments))
     except Error:
         pass
     return None
