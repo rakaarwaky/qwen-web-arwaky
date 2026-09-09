@@ -44,6 +44,11 @@ class _TuiUtilsMixin:
     _metric_done: Any
     _log_handler: logging.Handler
 
+    # Stubs for methods/attrs provided by other mixins / App at runtime.
+    query_one: Any
+    set_timer: Any
+    _get_active_slot_id: Any
+
     # ── Overview table ───────────────────────────────────────────────────
 
     def _init_table(self) -> None:

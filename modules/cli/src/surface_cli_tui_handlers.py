@@ -29,6 +29,17 @@ class _TuiHandlersMixin:
     _template_roles: set[str]
     _slot_workers: dict[int, Any]
 
+    # Stubs for methods/attrs provided by other mixins / App at runtime.
+    _run_slot: Any
+    _cancel_slot: Any
+    query_one: Any
+    _log_msg: Any
+    push_screen: Any
+    _login_worker: Any
+    _workspace: Any
+    exit: Any
+    _login_in_flight: bool
+
     # ── Widget event callbacks ───────────────────────────────────────────
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

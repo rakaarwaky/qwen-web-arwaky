@@ -49,6 +49,13 @@ class _TuiComposeMixin:
     # Declared here to match _TuiUtilsMixin and avoid incompatible-definition error.
     _log_handler: logging.Handler
 
+    # Stubs for methods provided by other mixins / App at runtime.
+    _init_table: Any
+    query_one: Any
+    set_timer: Any
+    _log_msg: Any
+    _refresh_session_badge: Any
+
     # ── Lifecycle ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 from rich.style import Style
 from rich.text import Text
@@ -19,9 +19,6 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Label, Static
-
-if TYPE_CHECKING:
-    from modules.cli.src.surface_cli_tui_app import QwenTuiApp
 
 
 class FilePickerModal(ModalScreen[str | None]):
@@ -143,7 +140,7 @@ class QwenTuiLogHandler(logging.Handler):
         "surface",
     )
 
-    def __init__(self, app: QwenTuiApp) -> None:
+    def __init__(self, app: Any) -> None:
         super().__init__()
         self._app = app
 

@@ -37,6 +37,19 @@ class _TuiWorkersMixin:
     _session_check_timed_out: bool
     _login_in_flight: bool
 
+    # Stubs for methods/attrs provided by other mixins / App at runtime.
+    _log_msg: Any
+    query_one: Any
+    notify: Any
+    _set_slot_tab_title: Any
+    _truncate_name: Any
+    _update_slot_status: Any
+    _update_table_row: Any
+    _refresh_metrics: Any
+    call_from_thread: Any
+    set_timer: Any
+    _ensure_log_handler: Any
+
     # ── Slot run / cancel ────────────────────────────────────────────────
 
     def _run_slot(self, slot_id: int) -> None:
