@@ -84,7 +84,7 @@ def run_doctor(json_output: bool = False) -> int:
             "passed": ws_ok,
             "detail": f"Workspace found at {dot_qwen}"
             if ws_ok
-            else "Workspace not initialized (run: qwen-web-cli init)",
+            else "Workspace not initialized (run: qwen-web-arwaky init)",
         }
     )
 
@@ -98,7 +98,7 @@ def run_doctor(json_output: bool = False) -> int:
             "passed": sess_ok,
             "detail": f"Saved session found at {session_dir}"
             if sess_ok
-            else f"No active session found in {session_dir} (run: qwen-web-cli login)",
+            else f"No active session found in {session_dir} (run: qwen-web-arwaky login)",
         }
     )
 

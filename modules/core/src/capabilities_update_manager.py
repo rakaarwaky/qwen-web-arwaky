@@ -38,11 +38,11 @@ from modules.shared.src.utility_core_version import get_package_version
 
 log = get_logger("capabilities_update_manager")
 
-DEFAULT_PACKAGE_NAME = "qwen-web-cli"
+DEFAULT_PACKAGE_NAME = "qwen-web-arwaky"
 DEFAULT_GITHUB_REPO = "rakaarwaky/qwen-web-arwaky"
 GITHUB_RELEASE_URL = "https://api.github.com/repos/{repo}/releases/latest"
 GITHUB_REPO_ENV = "QWEN_WEB_GITHUB_REPO"
-USER_AGENT = "qwen-web-cli-updater/1.0"
+USER_AGENT = "qwen-web-arwaky-updater/1.0"
 
 
 # ─── Module-level pure helpers ──────────────────────────────────────────────

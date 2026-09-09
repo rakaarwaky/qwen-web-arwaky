@@ -111,7 +111,7 @@ All tools speak stdio MCP and return structured JSON envelopes:
 ### 2.2 Exact invocation payloads
 
 > **📁 Workspace rule: put ALL prompt/attachment/output files under `.qwen-web/`**
-> (`qwen-web-cli init` creates it in the cwd — already `.gitignore`d). Use
+> (`qwen-web-arwaky init` creates it in the cwd — already `.gitignore`d). Use
 > `.qwen-web/input/...` and `.qwen-web/output/...`; NEVER create a bare `input/`
 > or `output/` folder in the repo root. `output/` inside `.qwen-web/` is a symlink
 > to the XDG output dir, so results persist outside the repo.
@@ -149,7 +149,7 @@ Response completion is **event-driven**, not duration-driven. The historical `ti
 ### 2.4 CLI reference (equivalent surface for scripting & CI)
 
 ```bash
-# Primary command: qwa (or qwen-web-arwaky / qwc / qwen-web-cli)
+# Primary command: qwa (or qwen-web-arwaky)
 qwa doctor [--json]                        # environment health checks
 qwa init [--dir TARGET]                    # workspace provisioning (.qwen-web/ in cwd)
 qwa login                                  # headed manual login / CAPTCHA
@@ -157,7 +157,7 @@ qwa update [--check] [--force]             # self-update + Chromium sync
 qwa prompt-direct -t "..." [-o OUT] [--headless] [--json]
 qwa prompt-only   -i .qwen-web/input/PROMPT.md [-o OUT] [--headless] [--json]
 qwa prompt-with-attachment -i .qwen-web/input/PROMPT.md -a FILE [-o OUT] [--headless] [--json]
-qwen-web-cli mcp                                    # run MCP server over stdio
+qwen-web-arwaky mcp                                    # run MCP server over stdio
 ```
 
 Paths: always use `.qwen-web/input/...` for prompts/attachments and
@@ -334,18 +334,18 @@ Attached: the full diff (or consolidated changed files).
 
 | Exception / MCP code | Meaning | Agent action | Retryable? |
 | :--- | :--- | :--- | :--- |
-| `AuthRequiredError` (exit 2, `AUTH_REQUIRED`) | Session expired / login page detected | Call `setup_session` (or `qwen-web-cli login`), then retry the original task | ✅ after login |
+| `AuthRequiredError` (exit 2, `AUTH_REQUIRED`) | Session expired / login page detected | Call `setup_session` (or `qwen-web-arwaky login`), then retry the original task | ✅ after login |
 | `OutputValidationError` w/ "verify you are human" | CAPTCHA / bot challenge | `setup_session` headed; human solves CAPTCHA; retry | ✅ after human |
 | `OutputValidationError` (502/504/service unavailable) | Transient server error | Back off 10–30s, retry once | ✅ |
 | `NetworkTimeoutError` | Browser network timeout | Retry with `timeout_sec × 2`; if repeated → `doctor` | ✅ |
 | `ResponseDetectionTimeoutError` | Dispatch succeeded but no answer detected | Retry with larger timeout; simplify prompt; check logs for last lifecycle event | ✅ |
 | `CircuitBreakerOpenError` | ≥5 failures within 30s window | **Stop.** Back off ≥30s, diagnose root cause, then resume | ⏸ after backoff |
-| `PromptInjectionError` | All 3 injection strategies failed | Qwen UI likely changed → run `qwen-web-cli update`, retry | ⚠️ |
+| `PromptInjectionError` | All 3 injection strategies failed | Qwen UI likely changed → run `qwen-web-arwaky update`, retry | ⚠️ |
 | `FileValidationError` | Attachment missing / unreadable / >100 MB | Fix path/permissions/size; retry | ✅ after fix |
 | `UploadFailureError` | Attachment could not be verified as uploaded | Retry once; if repeated, convert attachment to `.md`/`.txt` | ✅ |
 | `SendDispatchError` | Send click + Enter fallback both failed | Check parse-toast state; retry; `doctor` if repeated | ✅ |
 | `ModelSwitchError` | Default model `Qwen3.8-Max` could not be verified | Retry once; check account model access | ⚠️ |
-| `BrowserLaunchError` | Chromium cannot start | `python3 -m playwright install chromium` or `qwen-web-cli update` | ✅ after fix |
+| `BrowserLaunchError` | Chromium cannot start | `python3 -m playwright install chromium` or `qwen-web-arwaky update` | ✅ after fix |
 | `FILE_NOT_FOUND` / `VALIDATION_ERROR` (MCP) | Bad tool arguments | Fix the flagged `field` from the error envelope; never blind-retry | ❌ fix first |
 
 Built-in guardrails you inherit automatically: client-side rate limiter (60 req/min),
@@ -369,7 +369,7 @@ Task returned an error / suspicious output
 │
 ├─ NetworkTimeoutError / 5xx challenge text?
 │  └─► back off 10–30s → RETRY (completion is event-driven; no timeout cap)
-│      → still failing? run `qwen-web-cli doctor`, verify connectivity
+│      → still failing? run `qwen-web-arwaky doctor`, verify connectivity
 │
 ├─ ResponseDetectionTimeoutError?
 │  └─► Check last lifecycle event in logs:
@@ -382,7 +382,7 @@ Task returned an error / suspicious output
 │      → RETRY once → if still failing, convert content to consolidated .md
 │
 ├─ BrowserLaunchError / PromptInjectionError / ModelSwitchError?
-│  └─► `qwen-web-cli doctor` → `qwen-web-cli update` (package + Chromium sync) → RETRY
+│  └─► `qwen-web-arwaky doctor` → `qwen-web-arwaky update` (package + Chromium sync) → RETRY
 │
 └─ MCP VALIDATION_ERROR / FILE_NOT_FOUND?
    └─► read `error.field` + `error.hint`; correct arguments; do NOT retry unchanged
@@ -426,7 +426,7 @@ MCP client registration (Claude Desktop / Cursor style):
 {
   "mcpServers": {
     "qwen-web": {
-      "command": "qwen-web-cli",
+      "command": "qwen-web-arwaky",
       "args": ["mcp"]
     }
   }
@@ -436,11 +436,11 @@ MCP client registration (Claude Desktop / Cursor style):
 ### 5.2 Combining CLI + MCP in one workflow
 
 1. **Bootstrap (once per machine, human-supervised):**
-   `qwen-web-cli doctor` → `qwen-web-cli login` → `qwen-web-cli init`
+   `qwen-web-arwaky doctor` → `qwen-web-arwaky login` → `qwen-web-arwaky init`
 2. **Autonomous steady state (agent via MCP):**
    `check_session` → `process_*` tools → verify `.meta.json` → chain next task.
 3. **Recovery (agent escalates to CLI/human):**
-   `setup_session` for CAPTCHA; `qwen-web-cli update` for UI drift; `doctor --json` for diagnostics.
+   `setup_session` for CAPTCHA; `qwen-web-arwaky update` for UI drift; `doctor --json` for diagnostics.
 
 ### 5.3 File attachment strategy
 
@@ -464,7 +464,7 @@ MCP client registration (Claude Desktop / Cursor style):
    to the user instead of looping.
 5. **Log forensics:** `app.jsonl` (JSONL events) + `status.json` (machine-readable run
    state) live in the OS state dir (`~/.local/state/qwen-web/log` on Linux).
-6. **Keep the engine current:** `qwen-web-cli update --check` regularly; run
+6. **Keep the engine current:** `qwen-web-arwaky update --check` regularly; run
 7. **Headless discipline:** keep `headless: true` for all production tasks; headed
    browsers are exclusively for `login` / `setup_session` / CAPTCHA resolution.
 

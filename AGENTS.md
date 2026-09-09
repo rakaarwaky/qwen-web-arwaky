@@ -41,11 +41,11 @@ lint_arwaky.config.yaml, pyproject.toml, requirements.txt
 pip install -r requirements.txt
 python3 -m playwright install chromium
 
-qwen-web-cli                                                    # interactive TUI
-qwen-web-cli prompt-direct -t "Hello" -o output.md --headless # direct inline
-qwen-web-cli prompt-only -i prompt.md -o output.md --headless # single prompt file
-qwen-web-cli prompt-with-attachment -i p.md -a att.file --headless # prompt with attachment
-qwen-web-cli login                                             # login session
+qwen-web-arwaky                                                    # interactive TUI
+qwen-web-arwaky prompt-direct -t "Hello" -o output.md --headless # direct inline
+qwen-web-arwaky prompt-only -i prompt.md -o output.md --headless # single prompt file
+qwen-web-arwaky prompt-with-attachment -i p.md -a att.file --headless # prompt with attachment
+qwen-web-arwaky login                                             # login session
 qwen-web-mcp                                                   # MCP server
 ```
 

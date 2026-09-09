@@ -55,10 +55,10 @@ class InteractiveController:
                     "Interactive mode requires a TTY, but stdin is not interactive (pipe/cron detected).\n"
                     "Why: the Obsidian Nebula TUI needs a real terminal to render.\n"
                     "How to fix: use a non-interactive subcommand instead, e.g.:\n"
-                    '  qwen-web-cli prompt-direct -t "Summarize this" [--json]\n'
-                    "  qwen-web-cli prompt-only -i prompt.md [--json]\n"
-                    "  qwen-web-cli prompt-with-attachment -i prompt.md -a report.pdf [--json]\n"
-                    "Then verify your environment with: qwen-web-cli doctor"
+                    '  qwen-web-arwaky prompt-direct -t "Summarize this" [--json]\n'
+                    "  qwen-web-arwaky prompt-only -i prompt.md [--json]\n"
+                    "  qwen-web-arwaky prompt-with-attachment -i prompt.md -a report.pdf [--json]\n"
+                    "Then verify your environment with: qwen-web-arwaky doctor"
                 ),
                 "validation_error",
                 "cli-400",
@@ -83,9 +83,8 @@ class InteractiveController:
             return success_response("Exited.")
 
         # C4: single shared dispatcher with the run subcommand.
+        # dispatch_run already returns the standard success/error envelope
+        # (result lives in `message`), so pass it through unchanged.
         from modules.cli.src.surface_cli_run_command import dispatch_run
 
-        envelope = dispatch_run(cfg, self._direct, self._file_only, self._attachment)
-        if not envelope.get("success", False):
-            return envelope
-        return success_response(envelope.get("result"))
+        return dispatch_run(cfg, self._direct, self._file_only, self._attachment)

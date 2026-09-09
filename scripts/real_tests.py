@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Standalone real-world pipeline execution test runner for qwen-web-arwaky v5.0.0.
 
-Invokes the real CLI binary/entry point (`modules/root_cli_main_entry.py` or `qwen-web-cli`)
+Invokes the real CLI binary/entry point (`modules/root_cli_main_entry.py` or `qwen-web-arwaky`)
 to execute 3 end-to-end pipelines using v5.0.0 release fixtures from `tests/fixtures/`:
 
 1. Pipeline 1: prompt-direct (direct inline string prompt)

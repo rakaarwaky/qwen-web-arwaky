@@ -74,7 +74,7 @@ python3 -m playwright install chromium
 Initialize standard XDG directory structures and local symlinks with one command:
 
 ```bash
-qwen-web-cli init
+qwen-web-arwaky init
 ```
 
 ### 3. One-Time Login Setup
@@ -82,7 +82,7 @@ qwen-web-cli init
 Authenticate your session once. Persistent session tokens are saved securely under `~/.local/share/qwen-web/qwen_session` with `0o700` restricted permissions:
 
 ```bash
-qwen-web-cli login
+qwen-web-arwaky login
 ```
 
 ---
@@ -91,10 +91,10 @@ qwen-web-cli login
 
 ### Interactive Terminal UI (TUI)
 
-Run `qwen-web-cli` without arguments to launch the Textual TUI dashboard:
+Run `qwen-web-arwaky` without arguments to launch the Textual TUI dashboard:
 
 ```bash
-qwen-web-cli
+qwen-web-arwaky
 ```
 
 ![Qwen Web TUI Dashboard](design/tui_dashboard.svg)
@@ -106,7 +106,7 @@ qwen-web-cli
 Send a quick prompt string directly from your terminal or shell script:
 
 ```bash
-qwen-web-cli prompt-direct -t "Explain quantum computing in 3 bullet points" -o output/result.md --headless
+qwen-web-arwaky prompt-direct -t "Explain quantum computing in 3 bullet points" -o output/result.md --headless
 ```
 
 ### Single Prompt File Processing
@@ -114,7 +114,7 @@ qwen-web-cli prompt-direct -t "Explain quantum computing in 3 bullet points" -o 
 Process a Markdown prompt file:
 
 ```bash
-qwen-web-cli prompt-only -i input/prompt.md -o output/audit_report.md --headless
+qwen-web-arwaky prompt-only -i input/prompt.md -o output/audit_report.md --headless
 ```
 
 ### Prompt File Processing with Document Attachment
@@ -122,7 +122,7 @@ qwen-web-cli prompt-only -i input/prompt.md -o output/audit_report.md --headless
 Send a prompt file along with a local PDF, Markdown, or text attachment:
 
 ```bash
-qwen-web-cli prompt-with-attachment -i input/review_prompt.md -a input/spec.pdf -o output/review_result.md --headless
+qwen-web-arwaky prompt-with-attachment -i input/review_prompt.md -a input/spec.pdf -o output/review_result.md --headless
 ```
 
 ---
@@ -188,7 +188,7 @@ Enforced automatically by `lint-arwaky-cli` with **0 architectural layer violati
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'secondaryColor': '#f4f4f4', 'tertiaryColor': '#ffffff', 'clusterBkg': '#ffffff', 'clusterBorder': '#000000', 'titleColor': '#000000', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart TD
     subgraph Client ["Client Interfaces"]
-        CLI["qwen-web-cli (TUI / Subcommands)"]
+        CLI["qwen-web-arwaky (TUI / Subcommands)"]
         MCP["qwen-web-mcp (Stdio Server)"]
     end
 

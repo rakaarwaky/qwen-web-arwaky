@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform installation & environment setup script for qwen-web-cli & MCP server.
+"""Cross-platform installation & environment setup script for qwen-web-arwaky & MCP server.
 
 Supports Windows, macOS, and Linux without external shell dependencies.
 """
@@ -95,13 +95,13 @@ def setup_project_venv_symlink(venv_dir: Path) -> None:
 def uninstall_previous(python_bin: Path) -> None:
     log("🧹 [install] Removing any previous qwen-web installation...")
     subprocess.run(
-        [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli"],
+        [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli", "qwen-web-arwaky"],
         capture_output=True,
     )
 
     if sys.platform != "win32":
         local_bin = get_local_bin_dir()
-        for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
+        for name in ("qwen-web-arwaky", "qwa", "qwen-web-mcp"):
             target = local_bin / name
             if target.is_symlink() or target.exists():
                 with contextlib.suppress(OSError):
@@ -195,7 +195,7 @@ def setup_bin_links(python_bin: Path) -> None:
     local_bin.mkdir(parents=True, exist_ok=True)
 
     venv_bin_dir = python_bin.parent
-    for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
+    for name in ("qwen-web-arwaky", "qwa", "qwen-web-mcp"):
         src = venv_bin_dir / name
         dst = local_bin / name
         if src.exists():
@@ -212,11 +212,11 @@ def setup_bin_links(python_bin: Path) -> None:
         if str(local_bin) not in content:
             log(f"📝 [install] Adding {local_bin} to PATH in ~/.bashrc...")
             with bashrc.open("a", encoding="utf-8") as f:
-                f.write(f"\n# qwen-web-cli global CLI PATH\n{path_line}\n")
+                f.write(f"\n# qwen-web-arwaky global CLI PATH\n{path_line}\n")
 
 
 def main() -> None:
-    log("🚀 [install] Setting up qwen-web-cli environment (Cross-Platform)...")
+    log("🚀 [install] Setting up qwen-web-arwaky environment (Cross-Platform)...")
     os.chdir(PROJECT_ROOT)
 
     python_bin = ensure_venv()
@@ -231,11 +231,11 @@ def main() -> None:
     if sys.platform == "win32":
         venv_scripts = get_venv_dir() / "Scripts"
         log(f"👉 To run CLI on Windows, activate venv: {venv_scripts}\\Activate.ps1")
-        log("👉 Then run: qwc --login  atau  qwc --mcp")
+        log("👉 Then run: qwa --login  atau  qwa --mcp")
     else:
-        log("👉 You can now run 'qwc' or 'qwen-web-cli' from anywhere in your terminal!")
-        log("👉 To perform initial session login: qwc --login")
-        log("👉 To start MCP server: qwc --mcp")
+        log("👉 You can now run 'qwa' or 'qwen-web-arwaky' from anywhere in your terminal!")
+        log("👉 To perform initial session login: qwa --login")
+        log("👉 To start MCP server: qwa --mcp")
 
 
 if __name__ == "__main__":
