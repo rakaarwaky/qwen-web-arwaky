@@ -19,7 +19,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
+from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.utility_core_response import error_response, safe_handle, success_response
 
 
@@ -49,8 +49,17 @@ class InteractiveController:
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
         """Present the Textual Obsidian Nebula TUI and execute interactions."""
         if prompt and not sys.stdin.isatty():
+            # A1: actionable, example-driven non-TTY rejection (FR-002.5 + NFR).
             return error_response(
-                RuntimeError("Interactive mode requires a TTY. Please provide CLI arguments."),
+                RuntimeError(
+                    "Interactive mode requires a TTY, but stdin is not interactive (pipe/cron detected).\n"
+                    "Why: the Obsidian Nebula TUI needs a real terminal to render.\n"
+                    "How to fix: use a non-interactive subcommand instead, e.g.:\n"
+                    "  qwen-web-cli prompt-direct -t \"Summarize this\" [--json]\n"
+                    "  qwen-web-cli prompt-only -i prompt.md [--json]\n"
+                    "  qwen-web-cli prompt-with-attachment -i prompt.md -a report.pdf [--json]\n"
+                    "Then verify your environment with: qwen-web-cli doctor"
+                ),
                 "validation_error",
                 "cli-400",
             )
@@ -73,37 +82,10 @@ class InteractiveController:
         if cfg is None:
             return success_response("Exited.")
 
-        mode = cfg.mode
-        if mode == "direct":
-            prompt_text = cfg.inline_prompt_text
-            if not prompt_text:
-                return error_response(
-                    RuntimeError("Missing inline prompt text for direct mode."), "validation_error", "cli-400"
-                )
-            result = self._direct.process_direct_prompt(
-                prompt=prompt_text,
-                output_file=cfg.output_path,
-                headless=HeadlessFlag(cfg.headless),
-            )
-        elif mode == "single":
-            prompt_file = cfg.prompt_path or cfg.input_path
-            if cfg.file_path:
-                result = self._attachment.process_prompt_with_attachment(
-                    prompt_file=prompt_file,
-                    attachment_file=cfg.file_path,
-                    output_file=cfg.output_path,
-                    headless=HeadlessFlag(cfg.headless),
-                )
-            else:
-                result = self._file_only.process_prompt_file_only(
-                    prompt_file=prompt_file,
-                    output_file=cfg.output_path,
-                    headless=HeadlessFlag(cfg.headless),
-                )
-        else:
-            return error_response(RuntimeError(f"Unsupported CLI mode: {mode}"), "validation_error", "cli-400")
+        # C4: single shared dispatcher with the run subcommand.
+        from modules.cli.src.surface_cli_run_command import dispatch_run
 
-        res_str = str(result)
-        if res_str.startswith("Execution failed") or res_str.startswith("Error:"):
-            return error_response(RuntimeError(res_str), "execution_error", "cli-500")
-        return success_response(result)
+        envelope = dispatch_run(cfg, self._direct, self._file_only, self._attachment)
+        if not envelope.get("success", False):
+            return envelope
+        return success_response(envelope.get("result"))

@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,6 +28,7 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    LoadingIndicator,
     RichLog,
     Select,
     Static,
@@ -35,6 +37,7 @@ from textual.widgets import (
     TabPane,
 )
 
+from modules.cli.src.surface_cli_session_setup import ConfirmModal
 from modules.core.src.capabilities_tui_slot_config import SlotInputError, TuiSlotConfigResolver
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
@@ -56,65 +59,100 @@ NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
 # fall back to ctrl+alt chords. alt+0 is reserved for the Overview tab.
 _EXTRA_SLOT_KEYS: dict[int, str] = {s: f"ctrl+alt+{s - 10}" for s in range(10, 20)}
 
+# V1: single source of truth for Rich-markup colors (CSS tokens live in TUI_CSS).
+_THEME: dict[str, str] = {
+    "accent": "#c0c1ff",
+    "primary": "#d5e4fa",
+    "muted": "#908fa0",
+    "ok": "#10B981",
+    "warn": "#F59E0B",
+    "err": "#EF4444",
+    "info": "#3B82F6",
+    "bright": "#4ADE80",
+}
+
 TUI_CSS = """
-/* ─── Obsidian Nebula Theme Colors ────────────────────────── */
+/* ═══ Obsidian Nebula Design Tokens (V1) ══════════════════════════════ */
+$bg-base:      #051424;
+$bg-surface:   #010f1f;
+$bg-raised:    #122031;
+$bg-overlay:   #0e1c2d;
+$bg-hover:     #1d2b3c;
+$bg-active:    #283647;
+
+$fg-primary:   #d5e4fa;
+$fg-accent:    #c0c1ff;
+$fg-muted:     #908fa0;
+$fg-on-accent: #1000a9;
+
+$border:       #464554;
+$accent:       #8083ff;
+
+$status-ok:    #10B981;
+$status-warn:  #F59E0B;
+$status-err:   #EF4444;
+$status-info:  #3B82F6;
+$status-muted: #64748B;
+
+/* ─── Base ──────────────────────────────────────────────────────────── */
 Screen {
-    background: #051424;
-    color: #d5e4fa;
+    background: $bg-base;
+    color: $fg-primary;
     layers: base modal;
 }
 
 Header {
-    background: #051424;
-    color: #c0c1ff;
-    border-bottom: solid #464554;
+    background: $bg-base;
+    color: $fg-accent;
+    border-bottom: solid $border;
     height: 3;
     dock: top;
 }
 
 Footer {
-    background: #c0c1ff;
-    color: #1000a9;
+    background: $fg-accent;
+    color: $fg-on-accent;
     height: 1;
     dock: bottom;
 }
 
 TabbedContent {
     height: 1fr;
-    background: #051424;
+    background: $bg-base;
 }
 
 Tabs {
-    background: #010f1f;
-    border-bottom: solid #464554;
+    background: $bg-surface;
+    border-bottom: solid $border;
     height: 3;
 }
 
 Tab {
     padding: 0 2;
-    color: #908fa0;
+    color: $fg-muted;
 }
 
 Tab.-active {
-    color: #c0c1ff;
+    color: $fg-accent;
     text-style: bold;
-    background: #122031;
-    border-bottom: solid #8083ff;
+    background: $bg-raised;
+    border-bottom: solid $accent;
 }
 
-/* ─── Overview Tab ────────────────────────────────────────── */
+/* ─── Overview Tab ──────────────────────────────────────────────────────────── */
 .overview-container {
     height: 1fr;
     width: 100%;
     padding: 1 2;
-    background: #051424;
+    background: $bg-base;
 }
 
 .metrics-bar {
     layout: horizontal;
-    height: 3;
-    background: #010f1f;
-    border: solid #464554;
+    height: auto;
+    min-height: 3;
+    background: $bg-surface;
+    border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
     align: left middle;
@@ -122,14 +160,15 @@ Tab.-active {
 
 .metric-item {
     margin-right: 3;
-    color: #d5e4fa;
+    color: $fg-primary;
     text-style: bold;
 }
 
 #slots-table {
-    height: 8;
-    background: #010f1f;
-    border: solid #464554;
+    height: auto;
+    max-height: 16;
+    background: $bg-surface;
+    border: solid $border;
     margin-bottom: 1;
 }
 
@@ -139,41 +178,46 @@ Tab.-active {
     margin-bottom: 1;
 }
 
-/* ─── Slot Pane Container ─────────────────────────────────── */
+/* ─── Slot Pane Container ──────────────────────────────────────────────────────────── */
 .slot-container {
     height: 1fr;
     width: 100%;
     layout: horizontal;
-    background: #051424;
+    background: $bg-base;
 }
 
 .left-pane {
     width: 48%;
+    min-width: 40;
     height: 100%;
-    background: #010f1f;
-    border-right: solid #464554;
+    background: $bg-surface;
+    border-right: solid $border;
     padding: 1 2;
 }
 
 .right-pane {
     width: 52%;
+    min-width: 40;
     height: 100%;
-    background: #0e1c2d;
+    background: $bg-overlay;
     padding: 1 2;
 }
 
+/* L1: min-width guards keep panes usable on narrow terminals
+   (Textual 8 has no @media support; min-width is the reflow guard). */
+
 .pane-title {
-    background: #051424;
-    color: #c0c1ff;
+    background: $bg-base;
+    color: $fg-accent;
     text-style: bold;
     padding: 0 1;
     margin-bottom: 1;
-    border-bottom: solid #464554;
+    border-bottom: solid $border;
     height: 3;
 }
 
 .field-label {
-    color: #d5e4fa;
+    color: $fg-primary;
     text-style: bold;
     margin-bottom: 0;
 }
@@ -186,34 +230,34 @@ Tab.-active {
 
 .field-input {
     width: 1fr;
-    background: #122031;
-    border: solid #464554;
-    color: #d5e4fa;
+    background: $bg-raised;
+    border: solid $border;
+    color: $fg-primary;
 }
 
 .field-input:focus {
-    border: solid #c0c1ff;
+    border: solid $fg-accent;
 }
 
 .btn-browse {
     width: 10;
     min-width: 10;
     margin-left: 1;
-    background: #1d2b3c;
-    color: #c0c1ff;
-    border: solid #464554;
+    background: $bg-hover;
+    color: $fg-accent;
+    border: solid $border;
 }
 
 .btn-browse:hover {
-    background: #283647;
-    border: solid #c0c1ff;
+    background: $bg-active;
+    border: solid $fg-accent;
 }
 
 .toggle-row {
     layout: horizontal;
     height: 3;
-    background: #122031;
-    border: solid #464554;
+    background: $bg-raised;
+    border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
     align: left middle;
@@ -224,72 +268,79 @@ Tab.-active {
 }
 
 .toggle-subtext {
-    color: #908fa0;
+    color: $fg-muted;
 }
 
 Switch {
-    background: #283647;
+    background: $bg-active;
 }
 
 Switch.-on {
-    background: #8083ff;
+    background: $accent;
 }
 
 .btn-slot-run {
     width: 100%;
     height: 3;
-    background: #c0c1ff;
-    color: #1000a9;
-    border: solid #c0c1ff;
+    background: $fg-accent;
+    color: $fg-on-accent;
+    border: solid $fg-accent;
     text-style: bold;
     margin-top: 1;
 }
 
 .btn-slot-run:hover {
-    background: #051424;
-    color: #c0c1ff;
+    background: $bg-base;
+    color: $fg-accent;
 }
 
 .btn-slot-cancel {
     width: 100%;
     height: 3;
-    background: #EF4444;
+    background: $status-err;
     color: #ffffff;
-    border: solid #EF4444;
+    border: solid $status-err;
     text-style: bold;
     margin-top: 1;
 }
 
 .btn-slot-cancel:hover {
-    background: #051424;
-    color: #EF4444;
+    background: $bg-base;
+    color: $status-err;
 }
 
 .slot-log-view {
     height: 1fr;
-    background: #051424;
-    border: solid #464554;
-    color: #d5e4fa;
+    background: $bg-base;
+    border: solid $border;
+    color: $fg-primary;
     padding: 1;
 }
 
+/* U3: indeterminate loading indicator, hidden until a slot runs */
+.slot-loading {
+    display: none;
+    height: 1;
+    margin-bottom: 1;
+}
+
 .status-badge {
-    color: #10B981;
+    color: $status-ok;
     text-style: bold;
 }
 
 #session-badge {
-    color: #10B981;
+    color: $status-ok;
     text-style: bold;
-    background: #122031;
+    background: $bg-raised;
     padding: 0 1;
 }
 
 #session-badge.invalid {
-    color: #F59E0B;
+    color: $status-warn;
 }
 
-/* ─── Modal File Picker ───────────────────────────────────── */
+/* ─── Modal File Picker ──────────────────────────────────────────────────────────── */
 FilePickerModal {
     align: center middle;
     background: rgba(5, 20, 36, 0.85);
@@ -298,17 +349,17 @@ FilePickerModal {
 #modal-container {
     width: 80%;
     height: 80%;
-    background: #010f1f;
-    border: double #c0c1ff;
+    background: $bg-surface;
+    border: double $fg-accent;
     padding: 1 2;
 }
 
 #modal-title {
-    background: #051424;
-    color: #c0c1ff;
+    background: $bg-base;
+    color: $fg-accent;
     text-style: bold;
     padding: 0 1;
-    border-bottom: solid #464554;
+    border-bottom: solid $border;
     height: 3;
     width: 100%;
 }
@@ -316,10 +367,10 @@ FilePickerModal {
 #modal-tree {
     width: 100%;
     height: 1fr;
-    background: #051424;
-    border: solid #464554;
+    background: $bg-base;
+    border: solid $border;
     margin: 1 0;
-    color: #d5e4fa;
+    color: $fg-primary;
 }
 
 #modal-btn-row {
@@ -331,37 +382,38 @@ FilePickerModal {
 
 #btn-cancel-modal {
     width: 16;
-    background: #1d2b3c;
-    color: #c0c1ff;
-    border: solid #464554;
+    background: $bg-hover;
+    color: $fg-accent;
+    border: solid $border;
 }
 
 #btn-cancel-modal:hover {
-    background: #EF4444;
+    background: $status-err;
     color: #ffffff;
 }
-/* ─── Prompt Template Select ──────────────────────────────── */
+
+/* ─── Prompt Template Select ──────────────────────────────────────────────────────────── */
 Select {
     width: 1fr;
-    background: #122031;
-    border: solid #464554;
-    color: #d5e4fa;
+    background: $bg-raised;
+    border: solid $border;
+    color: $fg-primary;
     margin-bottom: 1;
 }
 
 Select:focus {
-    border: solid #c0c1ff;
+    border: solid $fg-accent;
 }
 
 SelectOverlay {
-    background: #010f1f;
-    border: solid #464554;
-    color: #d5e4fa;
+    background: $bg-surface;
+    border: solid $border;
+    color: $fg-primary;
 }
 
 SelectOverlay > OptionList > .option-list--option-highlighted {
-    background: #283647;
-    color: #c0c1ff;
+    background: $bg-active;
+    color: $fg-accent;
 }
 
 .template-row {
@@ -369,7 +421,47 @@ SelectOverlay > OptionList > .option-list--option-highlighted {
     height: auto;
     margin-bottom: 1;
 }
+
+/* ─── Help Screen (A4) ──────────────────────────────────────────────────────────── */
+HelpScreen {
+    align: center middle;
+    background: rgba(5, 20, 36, 0.9);
+}
+
+#help-container {
+    width: 72;
+    max-width: 90%;
+    height: auto;
+    max-height: 90%;
+    background: $bg-surface;
+    border: double $fg-accent;
+    padding: 1 2;
+}
+
+#help-title {
+    background: $bg-base;
+    color: $fg-accent;
+    text-style: bold;
+    padding: 0 1;
+    border-bottom: solid $border;
+    height: 3;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#help-body {
+    color: $fg-primary;
+}
+
+#help-close {
+    width: 16;
+    margin-top: 1;
+    background: $bg-hover;
+    color: $fg-accent;
+    border: solid $border;
+}
 """
+
 
 
 class FilePickerModal(ModalScreen[str | None]):
@@ -377,11 +469,17 @@ class FilePickerModal(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
 
-    def __init__(self, start_path: Path | None = None, select_directories: bool = False) -> None:
+    def __init__(
+        self,
+        start_path: Path | None = None,
+        select_directories: bool = False,
+        return_focus_id: str | None = None,  # A2: restore focus after dismiss
+    ) -> None:
         super().__init__()
         self._start_path = start_path or Path.cwd()
         self._select_directories = select_directories
         self._current_path: Path = self._start_path
+        self._return_focus_id = return_focus_id
 
     def compose(self) -> ComposeResult:
         title = "SELECT FILE OR FOLDER" if self._select_directories else "SELECT FILE"
@@ -414,13 +512,77 @@ class FilePickerModal(ModalScreen[str | None]):
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
 
+    # A2: return focus to the invoking widget after dismissal.
+    def on_dismiss(self) -> None:
+        if self._return_focus_id:
+            with contextlib.suppress(Exception):
+                target = self.app.query_one(f"#{self._return_focus_id}")
+                target.focus()
+
+
+class HelpScreen(ModalScreen[None]):
+    """A4: keyboard-shortcut reference overlay."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss_modal", "Close"),
+        Binding("q", "dismiss_modal", "Close"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="help-container"):
+            yield Label("[ KEYBOARD SHORTCUTS ]", id="help-title")
+            yield Static(
+                "alt+0            Overview tab\n"
+                "alt+1 .. alt+9   Slots 1-9\n"
+                "ctrl+alt+0..9    Slots 10-19 (A3)\n"
+                "enter / ctrl+r   Run active slot\n"
+                "ctrl+l           Login / session setup\n"
+                "ctrl+i           Init workspace\n"
+                "ctrl+q           Quit (confirm when jobs running)\n"
+                "escape           Dismiss modal / quit when idle\n"
+                "?                This help screen\n\n"
+                "Note: Textual alt-chords accept a single digit, so slots\n"
+                "beyond 19 are reachable by mouse or the Overview table only.",
+                id="help-body",
+            )
+            yield Button("Close", id="help-close")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "help-close":
+            self.dismiss(None)
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(None)
+
 
 class QwenTuiLogHandler(logging.Handler):
     """Logging handler streaming stdlib and structlog records to Textual RichLog per slot."""
 
+    # P2: only surface records from the qwen-web stack. Third-party libraries
+    # (urllib3, PIL, playwright, httpx, asyncio, ...) also emit through the
+    # root logger and must not flood the TUI log views. Records on the root
+    # logger itself (empty name) are kept.
+    _APP_PREFIXES: tuple[str, ...] = (
+        "qwen",
+        "browser",
+        "modules",
+        "capabilities",
+        "agent",
+        "lifecycle",
+        "utility",
+        "shared",
+        "core",
+        "cli",
+        "surface",
+    )
+
     def __init__(self, app: QwenTuiApp) -> None:
         super().__init__()
         self._app = app
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        name = record.name or ""
+        return not name or name.startswith(self._APP_PREFIXES)
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -479,6 +641,7 @@ class QwenTuiApp(App[None]):
         Binding("ctrl+i", "init_action", "Init"),
         Binding("ctrl+q", "request_quit", "Quit"),
         Binding("escape", "request_quit", "Exit"),
+        Binding("question_mark", "show_help", "Help"),  # A4
     ]
 
     def __init__(
@@ -505,6 +668,16 @@ class QwenTuiApp(App[None]):
         self._slot_stats: dict[int, dict[str, Any]] = {
             s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
         }
+        # C5: build template options / roles once instead of per-compose.
+        self._template_options: list[tuple[str, str]] = [
+            (meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
+        ]
+        self._template_roles: set[str] = set(PROMPT_TEMPLATE_MANIFEST)
+        # P3: widget refs cached at mount time.
+        self._metric_active: Label | None = None
+        self._metric_done: Label | None = None
+        # U4: session-check timeout flag.
+        self._session_check_timed_out = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -521,7 +694,7 @@ class QwenTuiApp(App[None]):
                 yield DataTable(id="slots-table")
 
                 yield Label("System Event Log", classes="field-label")
-                yield RichLog(id="log-view-overview", highlight=True, markup=True)
+                yield RichLog(id="log-view-overview", highlight=True, markup=True, max_lines=2000)  # P1
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
             for s in range(1, NUM_SLOTS + 1):
@@ -530,9 +703,8 @@ class QwenTuiApp(App[None]):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
                         yield Label("Prompt Template (Quick Select)", classes="field-label")
-                        template_options = [(meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()]
                         yield Select(
-                            template_options,
+                            self._template_options,
                             prompt="Select a template or type file path below",
                             allow_blank=True,
                             id=f"select-template-{s}",
@@ -583,7 +755,14 @@ class QwenTuiApp(App[None]):
                         with Horizontal(classes="pane-title"):
                             yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
                             yield Label("STATUS: READY", id=f"status-badge-{s}", classes="status-badge")
-                        yield RichLog(id=f"log-view-{s}", highlight=True, markup=True, classes="slot-log-view")
+                        yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")  # U3
+                        yield RichLog(  # P1: bounded log buffer
+                            id=f"log-view-{s}",
+                            highlight=True,
+                            markup=True,
+                            classes="slot-log-view",
+                            max_lines=2000,
+                        )
 
         yield Footer()
 
@@ -594,13 +773,30 @@ class QwenTuiApp(App[None]):
         root = logging.getLogger()
         root.addHandler(self._log_handler)
 
-        self._log_msg("[bold #c0c1ff]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
-        self._log_msg("[#908fa0]Each slot runs an independent Chromium process sharing login state.[/]")
+        # P3: cache metric widget refs once; no per-call DOM lookups.
+        self._metric_active = self.query_one("#metric-active", Label)
+        self._metric_done = self.query_one("#metric-done", Label)
+
+        self._log_msg(f"[bold {_THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
+        self._log_msg(f"[{_THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
+
+        # U5: seed per-slot log views with an empty-state hint.
+        for s in range(1, NUM_SLOTS + 1):
+            with contextlib.suppress(Exception):
+                log_view = self.query_one(f"#log-view-{s}", RichLog)
+                log_view.write(f"[{_THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
+
         self._refresh_session_badge()
 
     def on_unmount(self) -> None:
         if hasattr(self, "_log_handler"):
             logging.getLogger().removeHandler(self._log_handler)
+        # U2: best-effort cancellation of any still-running slot workers so
+        # their Chromium child processes are not left orphaned on exit.
+        for worker in list(self._slot_workers.values()):
+            if worker is not None:
+                with contextlib.suppress(Exception):
+                    worker.cancel()
 
     def _init_table(self) -> None:
         with contextlib.suppress(Exception):
@@ -620,8 +816,11 @@ class QwenTuiApp(App[None]):
         with contextlib.suppress(Exception):
             active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
             done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
-            self.query_one("#metric-active", Label).update(f"ACTIVE: {active}")
-            self.query_one("#metric-done", Label).update(f"DONE: {done}")
+            # P3: cached widget refs (set in on_mount) — no DOM lookups here.
+            if self._metric_active is not None:
+                self._metric_active.update(f"ACTIVE: {active}")
+            if self._metric_done is not None:
+                self._metric_done.update(f"DONE: {done}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
@@ -653,10 +852,32 @@ class QwenTuiApp(App[None]):
         with contextlib.suppress(Exception):
             prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
             prompt_input.value = str(role)
-            self._log_msg(f"[bold #4ADE80]TEMPLATE:[/] Slot {slot_id} ← role '{role}'", slot_id)
+            self._log_msg(f"[bold {_THEME['bright']}]TEMPLATE:[/] Slot {slot_id} ← role '{escape(str(role))}'", slot_id)
+            # U8: optimistic existence hint when the picked value is a file path.
+            if str(role) not in self._template_roles and not Path(str(role)).exists():
+                self._log_msg(
+                    f"[{_THEME['warn']}]WARNING:[/] '{escape(str(role))}' is not a known role and the file does not exist.",
+                    slot_id,
+                )
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """U6: keep the template Select in sync with manual path/role entry."""
+        input_id = event.input.id or ""
+        if not input_id.startswith("input-prompt-"):
+            return
+        slot_id = int(input_id.split("-")[-1])
+        value = event.value.strip()
+        with contextlib.suppress(Exception):
+            select = self.query_one(f"#select-template-{slot_id}", Select)
+            if value in self._template_roles:
+                select.value = value
+            elif select.value not in (None, Select.BLANK) and select.value != value:
+                select.value = Select.BLANK
 
     def _open_picker(self, target_input_id: str, select_directories: bool = False) -> None:
         self._target_field_for_picker = target_input_id
+        # A2: return focus to the Browse button that opened the picker.
+        return_focus_id = f"btn-browse-{target_input_id.removeprefix('input-')}"
 
         def _on_picked(path: str | None) -> None:
             if path and self._target_field_for_picker:
@@ -664,7 +885,13 @@ class QwenTuiApp(App[None]):
                     field = self.query_one(f"#{self._target_field_for_picker}", Input)
                     field.value = path
 
-        self.push_screen(FilePickerModal(select_directories=select_directories), _on_picked)
+        self.push_screen(
+            FilePickerModal(
+                select_directories=select_directories,
+                return_focus_id=return_focus_id,
+            ),
+            _on_picked,
+        )
 
     def _get_active_slot_id(self) -> int:
         with contextlib.suppress(Exception):
@@ -691,7 +918,7 @@ class QwenTuiApp(App[None]):
 
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:
-            self._log_msg(f"[bold #F59E0B]WARNING:[/] Slot {slot_id} already running.", slot_id)
+            self._log_msg(f"[bold {_THEME['warn']}]WARNING:[/] Slot {slot_id} already running.", slot_id)
             return
 
         try:
@@ -704,33 +931,60 @@ class QwenTuiApp(App[None]):
 
         plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
         if isinstance(plan, SlotInputError):
-            self._log_msg(f"[bold #EF4444]ERROR:[/] {plan.message} (Slot {slot_id})", slot_id)
+            # C1: escape the runtime message; A2: mirror to Overview + toast.
+            msg = f"[bold {_THEME['err']}]ERROR:[/] {escape(str(plan.message))} (Slot {slot_id})"
+            self._log_msg(msg, slot_id)
+            self._log_msg(msg)
+            with contextlib.suppress(Exception):
+                self.notify(str(plan.message), severity="error", title=f"Slot {slot_id}")
             return
 
         cfg = plan.config
         p_name = plan.prompt_path.name
 
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {p_name[:12]} ⏳")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
         self._update_slot_status(slot_id, "STATUS: RUNNING")
         self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_name, "duration": 0.0}
         self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")
         self._refresh_metrics()
+        # U3: show indeterminate loading indicator while the job runs.
+        with contextlib.suppress(Exception):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
 
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
         if worker is None:
-            self._log_msg(f"[#908fa0]No run active in Slot {slot_id}.[/]", slot_id)
+            self._log_msg(f"[{_THEME['muted']}]No run active in Slot {slot_id}.[/]", slot_id)
             return
         worker.cancel()
         self._slot_workers[slot_id] = None
-        self._log_msg(f"[bold #F59E0B]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
+        self._log_msg(f"[bold {_THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
         self._update_slot_status(slot_id, "STATUS: CANCELLED")
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
         self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
         self._refresh_metrics()
+        with contextlib.suppress(Exception):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
+
+    def _finalize_slot(self, slot_id: int, status: str, filename: str, duration: float, ok: bool) -> None:
+        """C2: UI-thread-only finalizer — mutate slot state and update all surfaces atomically.
+
+        Called via ``call_from_thread`` from the worker so ``_slot_stats`` /
+        ``_slot_workers`` are never written from a background thread.
+        """
+        icon = "✅" if ok else "❌"
+        self._slot_workers[slot_id] = None
+        self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
+        self._update_slot_status(slot_id, f"STATUS: {status}")
+        self._update_table_row(slot_id, f"{'DONE' if ok else 'FAILED'} {icon}", filename, f"{duration}s")
+        self._refresh_metrics()
+        # U3: hide the indeterminate loading indicator once the slot finishes.
+        with contextlib.suppress(Exception):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
@@ -738,10 +992,10 @@ class QwenTuiApp(App[None]):
         self._ensure_log_handler()
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
         self.call_from_thread(
-            self._log_msg, f"[bold #c0c1ff]>>> [Slot {slot_id}] Starting browser for: {prompt_name}[/]", slot_id
+            self._log_msg,
+            f"[bold {_THEME['accent']}]>>> [Slot {slot_id}] Starting browser for: {escape(prompt_name)}[/]",
+            slot_id,
         )
-
-        import time
 
         start_t = time.perf_counter()
 
@@ -769,27 +1023,27 @@ class QwenTuiApp(App[None]):
             fail_reason = detect_processing_failure(res_str)
 
             if is_dict_err or fail_reason:
-                self.call_from_thread(self._log_msg, f"[bold #EF4444][Slot {slot_id}] FAILED:[/] {res_str}", slot_id)
-                self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id}: {prompt_name[:12]} ❌")
-                self.call_from_thread(self._update_slot_status, slot_id, "STATUS: FAILED")
-                self._slot_stats[slot_id] = {"status": "FAILED", "file": prompt_name, "duration": dur}
-                self.call_from_thread(self._update_table_row, slot_id, "FAILED ❌", prompt_name, f"{dur}s")
+                self.call_from_thread(
+                    self._log_msg,
+                    f"[bold {_THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(res_str)}",
+                    slot_id,
+                )
+                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)
             else:
-                self.call_from_thread(self._log_msg, f"[bold #10B981][Slot {slot_id}] SUCCESS:[/] {res_str}", slot_id)
-                self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id}: {prompt_name[:12]} ✅")
-                self.call_from_thread(self._update_slot_status, slot_id, "STATUS: SUCCESS")
-                self._slot_stats[slot_id] = {"status": "SUCCESS", "file": prompt_name, "duration": dur}
-                self.call_from_thread(self._update_table_row, slot_id, "DONE ✅", prompt_name, f"{dur}s")
+                self.call_from_thread(
+                    self._log_msg,
+                    f"[bold {_THEME['ok']}][Slot {slot_id}] SUCCESS:[/] {escape(res_str)}",
+                    slot_id,
+                )
+                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
-            self.call_from_thread(self._log_msg, f"[bold #EF4444][Slot {slot_id}] FAILED:[/] {exc}", slot_id)
-            self.call_from_thread(self._set_slot_tab_title, slot_id, f"Slot {slot_id} ❌")
-            self.call_from_thread(self._update_slot_status, slot_id, "STATUS: FAILED")
-            self._slot_stats[slot_id] = {"status": "FAILED", "file": prompt_name, "duration": dur}
-            self.call_from_thread(self._update_table_row, slot_id, "FAILED ❌", prompt_name, f"{dur}s")
-        finally:
-            self._slot_workers[slot_id] = None
-            self.call_from_thread(self._refresh_metrics)
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {_THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(str(exc))}",
+                slot_id,
+            )
+            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)
 
     def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
         with contextlib.suppress(Exception):
@@ -797,18 +1051,42 @@ class QwenTuiApp(App[None]):
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
             tab.label = Content.from_text(title)
 
+    # A1: every status carries a text+glyph prefix so meaning never relies on
+    # color alone (WCAG 1.4.1). Glyphs are ASCII-safe for older terminals.
+    _STATUS_ICONS: dict[str, str] = {
+        "STATUS: READY": "● READY",
+        "STATUS: RUNNING": "▶ RUNNING",
+        "STATUS: SUCCESS": "✓ SUCCESS",
+        "STATUS: FAILED": "✕ FAILED",
+        "STATUS: CANCELLED": "■ CANCELLED",
+    }
+
+    @staticmethod
+    def _truncate_name(name: str, limit: int = 12) -> str:
+        """L3: truncate with an ellipsis instead of a hard cut."""
+        return name if len(name) <= limit else name[: limit - 1] + "…"
+
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(Exception):
             badge = self.query_one(f"#status-badge-{slot_id}", Label)
-            badge.update(status_text)
+            badge.update(self._STATUS_ICONS.get(status_text, status_text))
 
     def _ensure_log_handler(self) -> None:
         root = logging.getLogger()
         if hasattr(self, "_log_handler") and not any(isinstance(h, QwenTuiLogHandler) for h in root.handlers):
             root.addHandler(self._log_handler)
 
+    def action_show_help(self) -> None:
+        """A4: push the keyboard-shortcut reference overlay."""
+        self.push_screen(HelpScreen())
+
     def action_login_action(self) -> None:
-        self._log_msg("[bold #c0c1ff]>>> Launching interactive session setup...[/]")
+        # U3: re-entrancy guard — one login flow at a time.
+        if getattr(self, "_login_in_flight", False):
+            self._log_msg(f"[bold {_THEME['warn']}]WARNING:[/] Login already in progress.")
+            return
+        self._login_in_flight = True
+        self._log_msg(f"[bold {_THEME['accent']}]>>> Launching interactive session setup...[/]")
         self._login_worker()
 
     @work(thread=True)
@@ -818,17 +1096,20 @@ class QwenTuiApp(App[None]):
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
             res = self._setup.setup_session()
-            self.call_from_thread(self._log_msg, f"[bold #10B981]LOGIN RESULT:[/] {res}")
+            self.call_from_thread(self._log_msg, f"[bold {_THEME['ok']}]LOGIN RESULT:[/] {escape(str(res))}")
             self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
-            self.call_from_thread(self._log_msg, f"[bold #EF4444]LOGIN FAILED:[/] {exc}")
+            self.call_from_thread(self._log_msg, f"[bold {_THEME['err']}]LOGIN FAILED:[/] {escape(str(exc))}")
+        finally:
+            self._login_in_flight = False
 
     def action_init_action(self) -> None:
         try:
             self._workspace.init_workspace(FilePath(Path(str(Path.cwd()))))
-            self._log_msg(f"[bold #10B981]INIT:[/] Workspace initialized in {Path.cwd()}")
+            cwd = Path.cwd()
+            self._log_msg(f"[bold {_THEME['ok']}]INIT:[/] Workspace initialized in {escape(str(cwd))}")
         except Exception as exc:
-            self._log_msg(f"[bold #EF4444]INIT ERROR:[/] {exc}")
+            self._log_msg(f"[bold {_THEME['err']}]INIT ERROR:[/] {escape(str(exc))}")
 
     def _refresh_session_badge(self) -> None:
         try:
@@ -839,7 +1120,20 @@ class QwenTuiApp(App[None]):
             badge.update("SESSION: N/A")
             return
         badge.update("SESSION: CHECKING...")
+        # U4: if validation hangs (stale browser lock etc.), fall back to a
+        # TIMEOUT state instead of showing CHECKING... forever.
+        self._session_check_timed_out = False
+        self.set_timer(15.0, self._session_check_timeout)
         self._session_check_worker()
+
+    def _session_check_timeout(self) -> None:
+        if self._session_check_timed_out:
+            return
+        self._session_check_timed_out = True
+        with contextlib.suppress(Exception):
+            badge = self.query_one("#session-badge", Label)
+            badge.update("SESSION: TIMEOUT — run 'qwen-web-cli doctor'")
+            badge.set_classes("invalid")
 
     @work(thread=True)
     def _session_check_worker(self) -> None:
@@ -861,12 +1155,26 @@ class QwenTuiApp(App[None]):
         badge.set_classes("invalid" if not valid else "")
 
     def action_request_quit(self) -> None:
-        active = sum(1 for w in self._slot_workers.values() if w is not None)
-        if active == 0:
+        active = [s for s, w in self._slot_workers.items() if w is not None]
+        if not active:
             self.exit()
             return
-        self._log_msg(
-            f"[bold #F59E0B]WARNING:[/] {active} automation jobs in progress. Press Ctrl+Q again or cancel jobs."
+
+        # U2: never quit silently while jobs are running — confirm first and
+        # cancel the workers so Chromium processes are not left orphaned.
+        def _confirmed(confirmed: bool | None) -> None:
+            if confirmed:
+                for s in active:
+                    self._cancel_slot(s)
+                self.exit()
+
+        self.push_screen(
+            ConfirmModal(
+                "Confirm Quit",
+                f"{len(active)} automation job(s) are still running.\n"
+                "Quitting will cancel them. Browser processes will be stopped.",
+            ),
+            _confirmed,
         )
 
     def _log_msg(self, msg: str, slot_id: int | None = None) -> None:
