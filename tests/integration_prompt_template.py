@@ -106,18 +106,20 @@ class TestTuiPromptTemplateIntegration:
         mock_switch = MagicMock(value=True)
 
         def fake_query_one(selector: str, *args: object, **kwargs: object) -> MagicMock:
-            if selector.startswith("#input-prompt"):
+            sel = str(selector)
+            if sel.startswith("#input-prompt"):
                 return mock_input_prompt
-            if selector.startswith("#input-file"):
+            if sel.startswith("#input-file"):
                 return mock_input_file
-            if selector.startswith("#input-output"):
+            if sel.startswith("#input-output"):
                 return mock_input_output
-            if selector.startswith("#switch-headless"):
+            if sel.startswith("#switch-headless"):
                 return mock_switch
             return MagicMock()
 
         app.query_one = fake_query_one  # type: ignore[assignment]
         app._execute_slot_worker = MagicMock()  # type: ignore[assignment]
+        app.set_timer = MagicMock()  # type: ignore[assignment]
         app._run_slot(1)
 
         app._execute_slot_worker.assert_called_once()

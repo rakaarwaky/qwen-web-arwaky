@@ -88,9 +88,10 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*"]
+module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*", "rich.*", "textual.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
+disallow_subclassing_any = false
 check_untyped_defs = false
 
 [dependency-groups]
