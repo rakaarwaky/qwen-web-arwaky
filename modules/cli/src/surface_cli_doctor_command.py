@@ -63,10 +63,7 @@ def run_doctor(json_output: bool = False) -> int:
                 pw_detail = f"Chromium binary missing (run: python3 -m playwright install chromium): {ex}"
         else:
             playwright_ok = False
-            pw_detail = (
-                "Chromium binary not found in cache or PATH "
-                "(set QWEN_DOCTOR_DEEP=1 for a full probe)"
-            )
+            pw_detail = "Chromium binary not found in cache or PATH (set QWEN_DOCTOR_DEEP=1 for a full probe)"
     except Exception as e:
         pw_detail = f"Playwright check failed: {e}"
 
