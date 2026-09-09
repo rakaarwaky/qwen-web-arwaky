@@ -101,6 +101,30 @@ class TestCollectFolderFilesWithImports:
         files, _ = collect_folder_files_with_imports(target)
         assert any(f.name == "format.ts" for f in files)
 
+    def test_tsconfig_path_alias_from_outside(self, tmp_path: Path) -> None:
+        # tsconfig: "@lib/*" -> "lib/*" (baseUrl = project root)
+        project = tmp_path / "ts_project"
+        _write(project / "tsconfig.json", '{"compilerOptions": {"baseUrl": ".", "paths": {"@lib/*": ["lib/*"]}}}')
+        _write(project / "src" / "main.ts", "import { helper } from '@lib/helper';\nhelper();\n")
+        _write(project / "lib" / "helper.ts", "export function helper() { return 1; }\n")
+
+        files, origins = collect_folder_files_with_imports(project / "src")
+        names = {f.name for f in files}
+        assert "main.ts" in names
+        assert "helper.ts" in names
+        helper = next(f for f in files if f.name == "helper.ts")
+        assert origins[helper] == ("main.ts",)
+
+    def test_tsconfig_exact_alias(self, tmp_path: Path) -> None:
+        # alias tanpa wildcard: "utils" -> "lib/utils.ts"
+        project = tmp_path / "ts_project"
+        _write(project / "tsconfig.json", '{"compilerOptions": {"baseUrl": ".", "paths": {"utils": ["lib/utils.ts"]}}}')
+        _write(project / "src" / "main.ts", "import { x } from 'utils';\n")
+        _write(project / "lib" / "utils.ts", "export const x = 1;\n")
+
+        files, _ = collect_folder_files_with_imports(project / "src")
+        assert any(f.name == "utils.ts" for f in files)
+
     def test_external_stdlib_not_included(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         _write(target / "a.py", "import os\nimport json\n")
