@@ -13,6 +13,7 @@ from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
 from modules.shared.src.utility_folder_compiler import (
+    collect_folder_files_with_imports,
     compile_files_to_markdown,
     validate_folder_for_compile,
 )
@@ -41,13 +42,21 @@ class FolderCompiler(IFolderCompileProtocol):
         folder_path: Path,
         output_path: Path | None = None,
         max_depth: int = MAX_FOLDER_DEPTH,
+        include_imports: bool = True,
     ) -> Path:
         """Compile folder contents to a single markdown file.
+
+        When ``include_imports`` is enabled (default), files inside the folder
+        are scanned for import/reference statements (Python, JS/TS, C/C++,
+        Go, Rust, PHP, Ruby, shell) and files imported from outside the folder
+        are resolved and included recursively, marked as ``(imported by ...)``.
 
         Args:
             folder_path: Directory to compile.
             output_path: Optional output file path. Auto-generated if None.
             max_depth: Maximum recursion depth.
+            include_imports: Follow imports of folder files and include
+                external dependencies (cycle-safe, bounded hops).
 
         Returns:
             Path to the compiled markdown file.
@@ -58,11 +67,16 @@ class FolderCompiler(IFolderCompileProtocol):
             FolderCompileError: If compilation fails.
         """
         folder_path = Path(folder_path).resolve()
-        log.info("Compiling folder: %s (max_depth=%d)", folder_path, max_depth)
+        log.info("Compiling folder: %s (max_depth=%d, include_imports=%s)", folder_path, max_depth, include_imports)
 
         try:
-            files = validate_folder_for_compile(folder_path, max_depth=max_depth)
-            log.info("Found %d compilable files", len(files))
+            if include_imports:
+                files, origins = collect_folder_files_with_imports(folder_path, max_depth=max_depth)
+                log.info("Found %d files (%d imported)", len(files), sum(1 for o in origins.values() if o))
+            else:
+                files = validate_folder_for_compile(folder_path, max_depth=max_depth)
+                origins = None
+                log.info("Found %d compilable files", len(files))
         except (FolderValidationError, FolderEmptyError) as e:
             log.error("Folder validation failed: %s", e)
             raise
@@ -74,7 +88,7 @@ class FolderCompiler(IFolderCompileProtocol):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            markdown_content = compile_files_to_markdown(files, folder_path)
+            markdown_content = compile_files_to_markdown(files, folder_path, origins=origins)
             output_path.write_text(markdown_content, encoding="utf-8")
             log.info("Compiled markdown written to: %s", output_path)
             return output_path
