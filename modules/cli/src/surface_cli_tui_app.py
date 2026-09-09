@@ -71,11 +71,15 @@ class QwenTuiApp(
         ],
         Binding("enter", "run_active_slot", "Run Slot"),
         Binding("ctrl+r", "run_active_slot", "Run"),
+        Binding("ctrl+x", "cancel_active_slot", "Cancel Slot"),  # A8
         Binding("ctrl+l", "login_action", "Login"),
         Binding("ctrl+i", "init_action", "Init"),
         Binding("ctrl+q", "request_quit", "Quit"),
         Binding("escape", "request_quit", "Exit"),
-        Binding("question_mark", "show_help", "Help"),  # A4
+        Binding("question_mark", "show_help", "Help"),  # A3
+        # A4: sequential tab cycling for slots >= 10 or keyboard convenience
+        Binding("alt+left", "prev_slot", "Prev Slot"),
+        Binding("alt+right", "next_slot", "Next Slot"),
     ]
 
     # Consumed by _TuiComposeMixin and _TuiUtilsMixin.
@@ -119,6 +123,10 @@ class QwenTuiApp(
         self._metrics_pending: bool = False
         # A4: timestamp of last Escape press for double-escape quit guard.
         self._last_esc_time: float = 0.0
+        # C4: initialize login guard flag eagerly (was only set in worker finally block).
+        self._login_in_flight: bool = False
+        # U7: generation token per-slot to guard _finalize_slot against stale workers.
+        self._slot_generation: dict[int, int] = {s: 0 for s in range(1, NUM_SLOTS + 1)}
 
 
 __all__ = [

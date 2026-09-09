@@ -179,7 +179,8 @@ class QwenTuiLogHandler(logging.Handler):
                 text.append(" ")
                 text.append(msg, style="#d5e4fa")
             else:
-                text.append(f"[{name}]", style="#64748B")
+                # A1: #8B9BB4 ≈ 5.9:1 on $bg-base (AA pass; was #64748B ≈ 3.8:1)
+                text.append(f"[{name}]", style="#8B9BB4")
                 text.append(" ")
                 text.append(msg, style="#908fa0")
 
