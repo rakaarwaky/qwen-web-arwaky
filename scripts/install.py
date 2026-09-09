@@ -45,9 +45,15 @@ def get_venv_pip(venv_dir: Path) -> Path:
 
 def ensure_venv() -> Path:
     venv_dir = get_venv_dir()
-    if sys.prefix != sys.base_prefix:
-        log(f"⚡ [install] Using active virtual environment: {sys.prefix}")
-        return Path(sys.executable)
+
+    # If the current executable is already inside the target XDG venv, use it directly.
+    try:
+        resolved = Path(sys.executable).resolve()
+        if resolved.is_relative_to(venv_dir.resolve()):
+            log(f"⚡ [install] Using active virtual environment: {resolved}")
+            return resolved
+    except (ValueError, OSError):
+        pass
 
     python_bin = get_venv_python(venv_dir)
     if not venv_dir.exists() or not python_bin.exists():
