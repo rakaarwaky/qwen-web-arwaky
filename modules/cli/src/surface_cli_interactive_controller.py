@@ -83,9 +83,8 @@ class InteractiveController:
             return success_response("Exited.")
 
         # C4: single shared dispatcher with the run subcommand.
+        # dispatch_run already returns the standard success/error envelope
+        # (result lives in `message`), so pass it through unchanged.
         from modules.cli.src.surface_cli_run_command import dispatch_run
 
-        envelope = dispatch_run(cfg, self._direct, self._file_only, self._attachment)
-        if not envelope.get("success", False):
-            return envelope
-        return success_response(envelope.get("result"))
+        return dispatch_run(cfg, self._direct, self._file_only, self._attachment)
