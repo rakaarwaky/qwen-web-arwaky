@@ -302,12 +302,15 @@ class _TuiWorkersMixin:
         self._session_check_timed_out = True
         with contextlib.suppress(NoMatches):
             badge = self.query_one("#session-badge", Label)
-            # L2: keep the badge ≤ 20 chars; remediation goes to the overview log.
+            badge_text = str(badge.renderable) if badge.renderable else ""
+            # Only show TIMEOUT if the badge is still in CHECKING state.
+            # If the worker already completed and set VALID/EXPIRED, do not overwrite.
+            if "CHECKING" not in badge_text:
+                return
             badge.update("⚠ SESSION: TIMEOUT")
             badge.set_classes("invalid")
         msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
         self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] {msg}")
-        # U3: add toast for discoverability regardless of active tab
         with contextlib.suppress(Exception):
             self.notify(msg, severity="warning", title="Session")
 
@@ -329,6 +332,12 @@ class _TuiWorkersMixin:
             return
         badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
         badge.set_classes("invalid" if not valid else "")
+        # BUG FIX: cancel the timeout timer when the worker completes.
+        # Without this, a 15s timer can fire AFTER the badge is already
+        # set to VALID, overwriting it with "TIMEOUT".
+        if hasattr(self, "_session_check_timer") and self._session_check_timer is not None:
+            self._session_check_timer.stop()
+            self._session_check_timer = None
 
 
 __all__ = ["_TuiWorkersMixin"]
