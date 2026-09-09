@@ -117,6 +117,8 @@ class QwenTuiApp(
         self._session_check_timed_out: bool = False
         # P4: debounce metrics refresh — at most 4 updates/sec.
         self._metrics_pending: bool = False
+        # A4: timestamp of last Escape press for double-escape quit guard.
+        self._last_esc_time: float = 0.0
 
 
 __all__ = [

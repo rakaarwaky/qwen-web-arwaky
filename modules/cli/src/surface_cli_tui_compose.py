@@ -67,7 +67,7 @@ class _TuiComposeMixin:
                     yield Label(f"SLOTS: {self._NUM_SLOTS}", id="metric-slots", classes="metric-item")
                     yield Label("ACTIVE: 0", id="metric-active", classes="metric-item")
                     yield Label("DONE: 0", id="metric-done", classes="metric-item")
-                    yield Label("SESSION: CHECKING...", id="session-badge", classes="metric-item")
+                    yield Label("SESSION: CHECKING…", id="session-badge", classes="metric-item")
 
                 yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
                 yield DataTable(id="slots-table")
@@ -157,6 +157,14 @@ class _TuiComposeMixin:
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)
         self._metric_done = self.query_one("#metric-done", Label)
+
+        # P1: cache RichLog widget refs at mount time — hot render path.
+        self._log_views: dict[int, RichLog] = {}
+        with contextlib.suppress(NoMatches):
+            self._log_views[0] = self.query_one("#log-view-overview", RichLog)
+        for s in range(1, self._NUM_SLOTS + 1):
+            with contextlib.suppress(NoMatches):
+                self._log_views[s] = self.query_one(f"#log-view-{s}", RichLog)
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
         self.set_timer(0.4, self._deferred_startup)

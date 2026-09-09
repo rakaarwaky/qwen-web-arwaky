@@ -92,7 +92,7 @@ Tab.-active {
     width: 100%;
     padding: 1 2;
     background: $bg-base;
-    overflow: hidden;
+    overflow-y: auto;   /* L3: was hidden — now scrolls on short terminals */
 }
 
 #log-view-overview {
@@ -143,7 +143,7 @@ Tab.-active {
 
 .left-pane {
     width: 48%;
-    min-width: 40;
+    min-width: 30;      /* L1: 40+40 overflowed < 85 cols; now 30+30 fits */
     height: 100%;
     background: $bg-surface;
     border-right: solid $border;
@@ -152,14 +152,13 @@ Tab.-active {
 
 .right-pane {
     width: 52%;
-    min-width: 40;
+    min-width: 30;
     height: 100%;
     background: $bg-overlay;
     padding: 1 2;
 }
 
-/* L1: min-width guards keep panes usable on narrow terminals
-   (Textual 8 has no @media support; min-width is the reflow guard). */
+/* L1: reduced min-width allows reflow on narrow terminals (< 85 cols). */
 
 .pane-title {
     background: $bg-base;
@@ -252,9 +251,9 @@ Switch.-on {
 .btn-slot-cancel {
     width: 100%;
     height: 3;
-    background: $status-err;
+    background: #991B1B;          /* A1: white on #991B1B ≈ 8.3:1 (AA+AAA) */
     color: #ffffff;
-    border: solid $status-err;
+    border: solid $status-err;    /* keep the bright red as outline, not fill */
     text-style: bold;
     margin-top: 1;
 }
@@ -346,7 +345,7 @@ FilePickerModal {
 }
 
 #btn-cancel-modal:hover {
-    background: $status-err;
+    background: #991B1B;          /* A1: was $status-err @ ≈ 3.8:1 */
     color: #ffffff;
 }
 
@@ -372,12 +371,6 @@ SelectOverlay {
 SelectOverlay > OptionList > .option-list--option-highlighted {
     background: $bg-active;
     color: $fg-accent;
-}
-
-.template-row {
-    layout: horizontal;
-    height: auto;
-    margin-bottom: 1;
 }
 
 /* ─── Help Screen (A4) ──────────────────────────────────────────────────────────── */

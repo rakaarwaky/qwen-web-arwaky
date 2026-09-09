@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from rich.text import Text
 from textual.content import Content
@@ -23,18 +23,27 @@ from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
 if TYPE_CHECKING:
     pass
 
+# C1/V1: single source of truth for slot status — one value, one formatter.
+SlotStatus = Literal["IDLE", "RUNNING", "SUCCESS", "FAILED", "CANCELLED"]
+
+_STATUS_BADGE: dict[str, str] = {
+    "IDLE": "● READY",
+    "RUNNING": "▶ RUNNING",
+    "SUCCESS": "✓ SUCCESS",
+    "FAILED": "✕ FAILED",
+    "CANCELLED": "■ CANCELLED",
+}
+_STATUS_TABLE: dict[str, str] = {
+    "IDLE": "IDLE 💤",
+    "RUNNING": "RUNNING ⏳",
+    "SUCCESS": "DONE ✅",
+    "FAILED": "FAILED ❌",
+    "CANCELLED": "CANCELLED ✕",
+}
+
 
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
-
-    # A1: status text+glyph so meaning never relies on color alone (WCAG 1.4.1).
-    _STATUS_ICONS: dict[str, str] = {
-        "STATUS: READY": "● READY",
-        "STATUS: RUNNING": "▶ RUNNING",
-        "STATUS: SUCCESS": "✓ SUCCESS",
-        "STATUS: FAILED": "✕ FAILED",
-        "STATUS: CANCELLED": "■ CANCELLED",
-    }
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
     _NUM_SLOTS: int
@@ -43,6 +52,7 @@ class _TuiUtilsMixin:
     _metric_active: Any
     _metric_done: Any
     _log_handler: logging.Handler
+    _log_views: dict[int, RichLog]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     query_one: Any
@@ -56,7 +66,7 @@ class _TuiUtilsMixin:
             table = self.query_one("#slots-table", DataTable)
             table.add_columns("Slot", "Status", "Prompt File", "Duration")
             for s in range(1, self._NUM_SLOTS + 1):
-                table.add_row(f"Slot {s}", "IDLE 💤", "-", "0.0s", key=f"row-slot-{s}")
+                table.add_row(f"Slot {s}", self._format_status("IDLE", "table"), "-", "0.0s", key=f"row-slot-{s}")
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
         with contextlib.suppress(NoMatches, CellDoesNotExist):
@@ -85,6 +95,11 @@ class _TuiUtilsMixin:
 
     # ── Slot status / tab title ──────────────────────────────────────────
 
+    def _format_status(self, status: SlotStatus, target: str) -> str:
+        """C1/V1: one status value, one formatter — badge/table never diverge."""
+        table = _STATUS_BADGE if target == "badge" else _STATUS_TABLE
+        return table.get(status, status)
+
     def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
         with contextlib.suppress(LookupError, NoMatches):
             tabs = self.query_one(TabbedContent)
@@ -94,7 +109,7 @@ class _TuiUtilsMixin:
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(NoMatches):
             badge = self.query_one(f"#status-badge-{slot_id}", Label)
-            badge.update(self._STATUS_ICONS.get(status_text, status_text))
+            badge.update(status_text)
 
     @staticmethod
     def _truncate_name(name: str, limit: int = 12) -> str:
@@ -111,17 +126,19 @@ class _TuiUtilsMixin:
     def _log_msg(self, msg: str | Text, slot_id: int | None = None) -> None:
         # Truncate plain strings to prevent RichLog horizontal overflow.
         if isinstance(msg, str) and len(msg) > 200:
-            msg = msg[:197] + "..."
-        with contextlib.suppress(NoMatches):
-            if slot_id is not None:
-                log_view = self.query_one(f"#log-view-{slot_id}", RichLog)
-                log_view.write(msg)
-            else:
-                with contextlib.suppress(NoMatches):
-                    self.query_one("#log-view-overview", RichLog).write(msg)
-                with contextlib.suppress(NoMatches):
-                    active_slot = self._get_active_slot_id()
-                    self.query_one(f"#log-view-{active_slot}", RichLog).write(msg)
+            msg = msg[:197] + "…"
+        views = getattr(self, "_log_views", {})
+        if slot_id is not None:
+            view = views.get(slot_id)
+            if view is not None:
+                view.write(msg)
+            return
+        overview = views.get(0)
+        if overview is not None:
+            overview.write(msg)
+        active = views.get(self._get_active_slot_id())
+        if active is not None and active is not overview:
+            active.write(msg)
 
 
 __all__ = ["_TuiUtilsMixin"]

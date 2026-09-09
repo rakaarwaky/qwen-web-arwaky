@@ -162,8 +162,17 @@ class _TuiHandlersMixin:
             self._log_msg(f"[bold {THEME['err']}]INIT ERROR:[/] {escape(str(exc))}")
 
     def action_request_quit(self) -> None:
+        import time
+
         active = [s for s, w in self._slot_workers.items() if w is not None]
         if not active:
+            # A4: double-escape guard — require two Esc presses within 1s.
+            now = time.monotonic()
+            last = getattr(self, "_last_esc_time", 0.0)
+            if now - last > 1.0:
+                self._last_esc_time = now
+                self._log_msg(f"[{THEME['muted']}]Press Escape again within 1s to quit.[/]")
+                return
             self.exit()
             return
 
