@@ -201,8 +201,14 @@ class _TuiWorkersMixin:
         start_t = time.perf_counter()
         # U7: capture the generation at worker start for finalize guard
         gen = self._slot_generation.get(slot_id, 0)
-        # U4: start periodic elapsed-time updater for the Overview table
-        elapsed_timer = self.set_timer(5.0, lambda: self._tick_elapsed(slot_id), repeat=True)
+        # U4: start periodic elapsed-time updater via call_from_thread
+        # (set_timer must be called from the main event loop thread)
+        timer_holder: list[Any] = []
+
+        def _create_timer() -> None:
+            timer_holder.append(self.set_timer(5.0, lambda: self._tick_elapsed(slot_id), repeat=True))
+
+        self.call_from_thread(_create_timer)
         try:
             if cfg.file_path:
                 res = self._attachment.process_prompt_with_attachment(
@@ -248,7 +254,8 @@ class _TuiWorkersMixin:
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
         finally:
-            elapsed_timer.stop()
+            if timer_holder:
+                timer_holder[0].stop()
 
     # ── Login worker ─────────────────────────────────────────────────────
 
