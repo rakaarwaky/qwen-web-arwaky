@@ -50,6 +50,7 @@ class _TuiWorkersMixin:
     _format_status: Any
     call_from_thread: Any
     set_timer: Any
+    set_interval: Any
     _ensure_log_handler: Any
     push_screen: Any
     _session_check_timer: Any
