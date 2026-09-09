@@ -61,19 +61,33 @@ class _TuiUtilsMixin:
 
     # ── Overview table ───────────────────────────────────────────────────
 
+    # T1: columns are addressed by stable KEYS, never by labels. Textual's
+    # add_columns("Status") auto-generates a ColumnKey, so update_cell(row,
+    # "Status") raises CellDoesNotExist and every write is a silent no-op.
+    COL_SLOT = "slot"
+    COL_STATUS = "status"
+    COL_FILE = "file"
+    COL_DURATION = "duration"
+
     def _init_table(self) -> None:
         with contextlib.suppress(NoMatches):
             table = self.query_one("#slots-table", DataTable)
-            table.add_columns("Slot", "Status", "Prompt File", "Duration")
+            table.add_columns(
+                ("Slot", self.COL_SLOT),
+                ("Status", self.COL_STATUS),
+                ("Prompt File", self.COL_FILE),
+                ("Duration", self.COL_DURATION),
+            )
             for s in range(1, self._NUM_SLOTS + 1):
                 table.add_row(f"Slot {s}", self._format_status("IDLE", "table"), "-", "0.0s", key=f"row-slot-{s}")
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
         with contextlib.suppress(NoMatches, CellDoesNotExist):
             table = self.query_one("#slots-table", DataTable)
-            table.update_cell(f"row-slot-{slot_id}", "Status", status)
-            table.update_cell(f"row-slot-{slot_id}", "Prompt File", filename)
-            table.update_cell(f"row-slot-{slot_id}", "Duration", duration)
+            row_key = f"row-slot-{slot_id}"
+            table.update_cell(row_key, self.COL_STATUS, status)
+            table.update_cell(row_key, self.COL_FILE, filename)
+            table.update_cell(row_key, self.COL_DURATION, duration)
 
     # ── Metrics bar ──────────────────────────────────────────────────────
 
