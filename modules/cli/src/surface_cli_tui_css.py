@@ -6,93 +6,111 @@ consumed by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 
 from __future__ import annotations
 
-# V1: single source of truth for Rich-markup colors (CSS tokens live in TUI_CSS).
-THEME: dict[str, str] = {
-    "accent": "#c0c1ff",
-    "primary": "#d5e4fa",
-    "muted": "#908fa0",
-    "ok": "#10B981",
-    "warn": "#F59E0B",
-    "err": "#EF4444",
-    "info": "#3B82F6",
+# V1/V4: single source of truth — derive THEME and CSS tokens from _COLORS.
+_COLORS: dict[str, str] = {
+    "fg_accent": "#c0c1ff",
+    "fg_primary": "#d5e4fa",
+    "fg_muted": "#908fa0",
+    "fg_on_accent": "#1000a9",
+    "accent": "#8083ff",
+    "bg_base": "#051424",
+    "bg_surface": "#010f1f",
+    "bg_raised": "#122031",
+    "bg_overlay": "#0e1c2d",
+    "bg_hover": "#1d2b3c",
+    "bg_active": "#283647",
+    "border": "#464554",
+    # V3: lighten status colors for text-on-dark (WCAG AA >= 4.5:1)
+    "status_ok": "#34D399",
+    "status_warn": "#FBBF24",
+    "status_err": "#EF4444",
+    "status_info": "#60A5FA",
+    "status_muted": "#8B9BB4",  # A1: was #64748B ~3.8:1, now ~5.9:1
     "bright": "#4ADE80",
+    # V2: danger tokens replacing hardcoded #991B1B
+    "danger_bg": "#991B1B",
+    "danger_fg": "#ffffff",
 }
 
-TUI_CSS = """
-/* ═══ Obsidian Nebula Design Tokens (V1) ══════════════════════════════ */
-$bg-base:      #051424;
-$bg-surface:   #010f1f;
-$bg-raised:    #122031;
-$bg-overlay:   #0e1c2d;
-$bg-hover:     #1d2b3c;
-$bg-active:    #283647;
+THEME: dict[str, str] = {
+    "accent": _COLORS["fg_accent"],
+    "primary": _COLORS["fg_primary"],
+    "muted": _COLORS["fg_muted"],
+    "ok": _COLORS["status_ok"],
+    "warn": _COLORS["status_warn"],
+    "err": _COLORS["status_err"],
+    "info": _COLORS["status_info"],
+    "bright": _COLORS["bright"],
+}
 
-$fg-primary:   #d5e4fa;
-$fg-accent:    #c0c1ff;
-$fg-muted:     #908fa0;
-$fg-on-accent: #1000a9;
 
-$border:       #464554;
-$accent:       #8083ff;
+def _css_vars() -> str:
+    """V1: generate CSS variable declarations from the canonical color map."""
+    return "\n".join(f" ${k}: {v};" for k, v in _COLORS.items())
 
-$status-ok:    #10B981;
-$status-warn:  #F59E0B;
-$status-err:   #EF4444;
-$status-info:  #3B82F6;
-$status-muted: #64748B;
 
-/* ─── Base ──────────────────────────────────────────────────────────── */
+# Build TUI_CSS via plain string concatenation (NOT f-string) to avoid ruff
+# F821 false positives — ruff parses f-string interpolation as Python and
+# flags CSS property names like ``background`` as undefined names.
+_CSS_HEADER = "/* ═══ Obsidian Nebula Design Tokens (V1 — auto-generated) ═══ */\n" + _css_vars()
+
+TUI_CSS = (
+    _CSS_HEADER
+    + """
+
+/* --- Base --------------------------------------------------------------- */
 Screen {
-    background: $bg-base;
-    color: $fg-primary;
+    background: $bg_base;
+    color: $fg_primary;
     layers: base modal;
 }
 
 Header {
-    background: $bg-base;
-    color: $fg-accent;
+    background: $bg_base;
+    color: $fg_accent;
     border-bottom: solid $border;
     height: 3;
     dock: top;
 }
 
 Footer {
-    background: $fg-accent;
-    color: $fg-on-accent;
+    background: $accent;
+    color: $bg_base;
     height: 1;
     dock: bottom;
 }
 
 TabbedContent {
     height: 1fr;
-    background: $bg-base;
+    background: $bg_base;
 }
 
 Tabs {
-    background: $bg-surface;
+    background: $bg_surface;
     border-bottom: solid $border;
     height: 3;
+    overflow-x: auto;
 }
 
 Tab {
     padding: 0 2;
-    color: $fg-muted;
+    color: $fg_muted;
 }
 
 Tab.-active {
-    color: $fg-primary;
+    color: $fg_primary;
     text-style: bold;
-    background: $bg-active;
+    background: $bg_active;
     border-bottom: solid $accent;
 }
 
-/* ─── Overview Tab ──────────────────────────────────────────────────────────── */
+/* --- Overview Tab ------------------------------------------------------- */
 .overview-container {
     height: 1fr;
     width: 100%;
     padding: 1 2;
-    background: $bg-base;
-    overflow-y: auto;   /* L3: was hidden — now scrolls on short terminals */
+    background: $bg_base;
+    overflow-y: auto;
 }
 
 #log-view-overview {
@@ -106,25 +124,27 @@ Tab.-active {
     layout: horizontal;
     height: auto;
     min-height: 3;
-    background: $bg-surface;
+    background: $bg_surface;
     border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
     align: left middle;
+    overflow-x: auto;
 }
 
 .metric-item {
     margin-right: 3;
-    color: $fg-primary;
+    color: $fg_primary;
     text-style: bold;
 }
 
 #slots-table {
     height: auto;
     max-height: 16;
-    background: $bg-surface;
+    background: $bg_surface;
     border: solid $border;
     margin-bottom: 1;
+    overflow-y: scroll;
 }
 
 .template-row {
@@ -133,19 +153,19 @@ Tab.-active {
     margin-bottom: 1;
 }
 
-/* ─── Slot Pane Container ──────────────────────────────────────────────────────────── */
+/* --- Slot Pane Container ------------------------------------------------ */
 .slot-container {
     height: 1fr;
     width: 100%;
     layout: horizontal;
-    background: $bg-base;
+    background: $bg_base;
 }
 
 .left-pane {
     width: 48%;
-    min-width: 30;      /* L1: 40+40 overflowed < 85 cols; now 30+30 fits */
+    min-width: 30;
     height: 100%;
-    background: $bg-surface;
+    background: $bg_surface;
     border-right: solid $border;
     padding: 1 2;
 }
@@ -154,15 +174,13 @@ Tab.-active {
     width: 52%;
     min-width: 30;
     height: 100%;
-    background: $bg-overlay;
+    background: $bg_overlay;
     padding: 1 2;
 }
 
-/* L1: reduced min-width allows reflow on narrow terminals (< 85 cols). */
-
 .pane-title {
-    background: $bg-base;
-    color: $fg-accent;
+    background: $bg_base;
+    color: $fg_accent;
     text-style: bold;
     padding: 0 1;
     margin-bottom: 1;
@@ -171,7 +189,7 @@ Tab.-active {
 }
 
 .field-label {
-    color: $fg-primary;
+    color: $fg_primary;
     text-style: bold;
     margin-bottom: 0;
 }
@@ -184,33 +202,32 @@ Tab.-active {
 
 .field-input {
     width: 1fr;
-    background: $bg-raised;
+    background: $bg_raised;
     border: solid $border;
-    color: $fg-primary;
+    color: $fg_primary;
 }
 
 .field-input:focus {
-    border: solid $fg-accent;
+    border: solid $fg_accent;
 }
 
 .btn-browse {
-    width: 10;
-    min-width: 10;
-    margin-left: 1;
-    background: $bg-hover;
-    color: $fg-accent;
+    width: 8;
+    min-width: 8;
+    background: $bg_hover;
+    color: $fg_accent;
     border: solid $border;
 }
 
 .btn-browse:hover {
-    background: $bg-active;
-    border: solid $fg-accent;
+    background: $bg_active;
+    border: solid $fg_accent;
 }
 
 .toggle-row {
     layout: horizontal;
     height: 3;
-    background: $bg-raised;
+    background: $bg_raised;
     border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
@@ -222,11 +239,11 @@ Tab.-active {
 }
 
 .toggle-subtext {
-    color: $fg-muted;
+    color: $fg_muted;
 }
 
 Switch {
-    background: $bg-active;
+    background: $bg_active;
 }
 
 Switch.-on {
@@ -236,45 +253,44 @@ Switch.-on {
 .btn-slot-run {
     width: 100%;
     height: 3;
-    background: $fg-accent;
-    color: $fg-on-accent;
-    border: solid $fg-accent;
+    background: $fg_accent;
+    color: $fg_on_accent;
+    border: solid $fg_accent;
     text-style: bold;
     margin-top: 1;
 }
 
 .btn-slot-run:hover {
-    background: $bg-base;
-    color: $fg-accent;
+    background: $bg_base;
+    color: $fg_accent;
 }
 
 .btn-slot-cancel {
     width: 100%;
     height: 3;
-    background: #991B1B;          /* A1: white on #991B1B ≈ 8.3:1 (AA+AAA) */
-    color: #ffffff;
-    border: solid $status-err;    /* keep the bright red as outline, not fill */
+    background: $danger_bg;
+    color: $danger_fg;
+    border: solid $status_err;
     text-style: bold;
     margin-top: 1;
 }
 
 .btn-slot-cancel:hover {
-    background: $bg-base;
-    color: $status-err;
+    background: $bg_base;
+    color: $status_err;
 }
 
 .slot-log-view {
     height: 1fr;
     max-width: 100%;
-    background: $bg-base;
+    background: $bg_base;
     border: solid $border;
-    color: $fg-primary;
+    color: $fg_primary;
     padding: 1;
     overflow-x: hidden;
     overflow-y: auto;
 }
 
-/* U3: indeterminate loading indicator, hidden until a slot runs */
 .slot-loading {
     display: none;
     height: 1;
@@ -282,22 +298,22 @@ Switch.-on {
 }
 
 .status-badge {
-    color: $status-ok;
+    color: $status_ok;
     text-style: bold;
 }
 
 #session-badge {
-    color: $status-ok;
+    color: $status_ok;
     text-style: bold;
-    background: $bg-raised;
+    background: $bg_raised;
     padding: 0 1;
 }
 
 #session-badge.invalid {
-    color: $status-warn;
+    color: $status_warn;
 }
 
-/* ─── Modal File Picker ──────────────────────────────────────────────────────────── */
+/* --- Modal File Picker -------------------------------------------------- */
 FilePickerModal {
     align: center middle;
     background: rgba(5, 20, 36, 0.85);
@@ -306,14 +322,14 @@ FilePickerModal {
 #modal-container {
     width: 80%;
     height: 80%;
-    background: $bg-surface;
-    border: double $fg-accent;
+    background: $bg_surface;
+    border: double $fg_accent;
     padding: 1 2;
 }
 
 #modal-title {
-    background: $bg-base;
-    color: $fg-accent;
+    background: $bg_base;
+    color: $fg_accent;
     text-style: bold;
     padding: 0 1;
     border-bottom: solid $border;
@@ -324,10 +340,10 @@ FilePickerModal {
 #modal-tree {
     width: 100%;
     height: 1fr;
-    background: $bg-base;
+    background: $bg_base;
     border: solid $border;
     margin: 1 0;
-    color: $fg-primary;
+    color: $fg_primary;
 }
 
 #modal-btn-row {
@@ -339,41 +355,41 @@ FilePickerModal {
 
 #btn-cancel-modal {
     width: 16;
-    background: $bg-hover;
-    color: $fg-accent;
+    background: $bg_hover;
+    color: $fg_accent;
     border: solid $border;
 }
 
 #btn-cancel-modal:hover {
-    background: #991B1B;          /* A1: was $status-err @ ≈ 3.8:1 */
-    color: #ffffff;
+    background: $danger_bg;
+    color: $danger_fg;
 }
 
-/* ─── Prompt Template Select ──────────────────────────────────────────────────────────── */
+/* --- Prompt Template Select --------------------------------------------- */
 Select {
     width: 1fr;
-    background: $bg-raised;
+    background: $bg_raised;
     border: solid $border;
-    color: $fg-primary;
+    color: $fg_primary;
     margin-bottom: 1;
 }
 
 Select:focus {
-    border: solid $fg-accent;
+    border: solid $fg_accent;
 }
 
 SelectOverlay {
-    background: $bg-surface;
+    background: $bg_surface;
     border: solid $border;
-    color: $fg-primary;
+    color: $fg_primary;
 }
 
 SelectOverlay > OptionList > .option-list--option-highlighted {
-    background: $bg-active;
-    color: $fg-accent;
+    background: $bg_active;
+    color: $fg_accent;
 }
 
-/* ─── Help Screen (A4) ──────────────────────────────────────────────────────────── */
+/* --- Help Screen -------------------------------------------------------- */
 HelpScreen {
     align: center middle;
     background: rgba(5, 20, 36, 0.9);
@@ -384,14 +400,14 @@ HelpScreen {
     max-width: 90%;
     height: auto;
     max-height: 90%;
-    background: $bg-surface;
-    border: double $fg-accent;
+    background: $bg_surface;
+    border: double $fg_accent;
     padding: 1 2;
 }
 
 #help-title {
-    background: $bg-base;
-    color: $fg-accent;
+    background: $bg_base;
+    color: $fg_accent;
     text-style: bold;
     padding: 0 1;
     border-bottom: solid $border;
@@ -401,16 +417,17 @@ HelpScreen {
 }
 
 #help-body {
-    color: $fg-primary;
+    color: $fg_primary;
 }
 
 #help-close {
     width: 16;
     margin-top: 1;
-    background: $bg-hover;
-    color: $fg-accent;
+    background: $bg_hover;
+    color: $fg_accent;
     border: solid $border;
 }
 """
+)
 
 __all__ = ["THEME", "TUI_CSS"]

@@ -80,6 +80,11 @@ class _TuiComposeMixin:
                     max_lines=2000,
                     auto_scroll=True,
                 )
+                # A3: help discoverability hint for first-time users
+                yield Static(
+                    "[dim]Press ? for keyboard shortcuts. Configure a slot tab, then press Enter to run.[/dim]",
+                    classes="metric-item",
+                )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
             for s in range(1, self._NUM_SLOTS + 1):
