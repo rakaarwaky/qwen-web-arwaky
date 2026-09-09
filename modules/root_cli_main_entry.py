@@ -82,7 +82,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
     p_direct.add_argument("-t", "--text", required=True, help="Prompt text to send directly")
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_direct.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_direct.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,   # U3: accepts --headless / --no-headless
+        default=True,                            # matches TUI Switch and MCP default
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_direct.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── prompt-only ───────────────────────────────────────────────────────────
@@ -95,7 +100,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
     )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_only.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_only.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_only.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── prompt-with-attachment ────────────────────────────────────────────────
@@ -111,7 +121,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_attach.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_attach.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_attach.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── mcp ───────────────────────────────────────────────────────────────────

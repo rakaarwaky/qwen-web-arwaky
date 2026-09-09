@@ -46,6 +46,7 @@ class _TuiWorkersMixin:
     _update_slot_status: Any
     _update_table_row: Any
     _refresh_metrics: Any
+    _format_status: Any
     call_from_thread: Any
     set_timer: Any
     _ensure_log_handler: Any
@@ -62,7 +63,12 @@ class _TuiWorkersMixin:
             file_val = self.query_one(f"#input-file-{slot_id}", Input).value
             out_val = self.query_one(f"#input-output-{slot_id}", Input).value
             headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
-        except Exception:
+        except Exception as exc:
+            # U1: a user-initiated action must never fail silently.
+            msg = f"Could not read Slot {slot_id} inputs: {exc}"
+            self._log_msg(f"[bold {THEME['err']}]ERROR:[/] {escape(msg)}", slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(msg, severity="error", title=f"Slot {slot_id}")
             return
 
         plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
@@ -78,9 +84,9 @@ class _TuiWorkersMixin:
         p_name = plan.prompt_path.name
 
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
-        self._update_slot_status(slot_id, "STATUS: RUNNING")
+        self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
         self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_name, "duration": 0.0}
-        self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")
+        self._update_table_row(slot_id, self._format_status("RUNNING", "table"), p_name, "running…")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
@@ -95,10 +101,11 @@ class _TuiWorkersMixin:
         worker.cancel()
         self._slot_workers[slot_id] = None
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
-        self._update_slot_status(slot_id, "STATUS: CANCELLED")
+        self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
-        self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
+        file_name = self._slot_stats[slot_id]["file"]
+        self._update_table_row(slot_id, self._format_status("CANCELLED", "table"), file_name, "stopped")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -113,8 +120,8 @@ class _TuiWorkersMixin:
         self._slot_workers[slot_id] = None
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
-        self._update_slot_status(slot_id, f"STATUS: {status}")
-        self._update_table_row(slot_id, f"{'DONE' if ok else 'FAILED'} {icon}", filename, f"{duration}s")
+        self._update_slot_status(slot_id, self._format_status(status, "badge"))  # type: ignore[arg-type]
+        self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")  # type: ignore[arg-type]
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -207,7 +214,7 @@ class _TuiWorkersMixin:
         if self._session is None:
             badge.update("SESSION: N/A")
             return
-        badge.update("SESSION: CHECKING...")
+        badge.update("SESSION: CHECKING…")
         self._session_check_timed_out = False
         self.set_timer(15.0, self._session_check_timeout)
         self._session_check_worker()
@@ -218,8 +225,13 @@ class _TuiWorkersMixin:
         self._session_check_timed_out = True
         with contextlib.suppress(NoMatches):
             badge = self.query_one("#session-badge", Label)
-            badge.update("SESSION: TIMEOUT — run 'qwen-web-arwaky doctor'")
+            # L2: keep the badge ≤ 20 chars; remediation goes to the overview log.
+            badge.update("SESSION: TIMEOUT")
             badge.set_classes("invalid")
+        self._log_msg(
+            f"[bold {THEME['warn']}]WARNING:[/] Session check timed out — "
+            "run 'qwen-web-arwaky doctor' for diagnostics."
+        )
 
     @work(thread=True)
     def _session_check_worker(self) -> None:
