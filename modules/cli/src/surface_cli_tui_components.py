@@ -12,7 +12,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.markup import escape
+from rich.style import Style
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -150,24 +151,40 @@ class QwenTuiLogHandler(logging.Handler):
         name = record.name or ""
         return not name or name.startswith(self._APP_PREFIXES)
 
+    @staticmethod
+    def _truncate(text: str, limit: int = 200) -> str:
+        """Truncate long log lines to prevent RichLog horizontal overflow."""
+        return text if len(text) <= limit else text[: limit - 3] + "..."
+
     def emit(self, record: logging.LogRecord) -> None:
         try:
-            msg = record.getMessage()
+            msg = self._truncate(record.getMessage())
             name = record.name
             lvl = record.levelname
 
-            msg_esc = escape(msg)
-            name_esc = escape(name)
-            lvl_esc = escape(lvl)
+            # Build a rich.text.Text object directly — bypasses the Rich
+            # markup parser entirely so dict reprs like {'status': 200} with
+            # curly braces never get misinterpreted as markup syntax.
+            text = Text()
 
             if record.levelno >= logging.ERROR:
-                line = f"[bold #EF4444][{lvl_esc}][{name_esc}][/] [#EF4444]{msg_esc}[/]"
+                text.append(f"[{lvl}]", style=Style(bold=True, color="#EF4444"))
+                text.append(f"[{name}]", style=Style(bold=True, color="#EF4444"))
+                text.append(" ")
+                text.append(msg, style="#EF4444")
             elif record.levelno >= logging.WARNING:
-                line = f"[bold #F59E0B][{lvl_esc}][{name_esc}][/] [#F59E0B]{msg_esc}[/]"
+                text.append(f"[{lvl}]", style=Style(bold=True, color="#F59E0B"))
+                text.append(f"[{name}]", style=Style(bold=True, color="#F59E0B"))
+                text.append(" ")
+                text.append(msg, style="#F59E0B")
             elif record.levelno >= logging.INFO:
-                line = f"[bold #3B82F6][{name_esc}][/] [#d5e4fa]{msg_esc}[/]"
+                text.append(f"[{name}]", style=Style(bold=True, color="#3B82F6"))
+                text.append(" ")
+                text.append(msg, style="#d5e4fa")
             else:
-                line = f"[#64748B][{name_esc}][/] [#908fa0]{msg_esc}[/]"
+                text.append(f"[{name}]", style="#64748B")
+                text.append(" ")
+                text.append(msg, style="#908fa0")
 
             slot_id: int | None = None
             if record.threadName and record.threadName.startswith("qwen_slot_worker_"):
@@ -175,6 +192,6 @@ class QwenTuiLogHandler(logging.Handler):
                     slot_id = int(record.threadName.split("_")[-1])
 
             with contextlib.suppress(RuntimeError):
-                self._app.call_from_thread(self._app._log_msg, line, slot_id)
+                self._app.call_from_thread(self._app._log_msg, text, slot_id)
         except Exception:
             self.handleError(record)

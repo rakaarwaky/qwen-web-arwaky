@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from rich.markup import escape
+from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -35,6 +36,7 @@ from textual.widgets import (
     TabbedContent,
     TabPane,
 )
+from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_session_setup import ConfirmModal
 from modules.cli.src.surface_cli_tui_components import (
@@ -137,9 +139,9 @@ Tab {
 }
 
 Tab.-active {
-    color: $fg-accent;
+    color: $fg-primary;
     text-style: bold;
-    background: $bg-raised;
+    background: $bg-active;
     border-bottom: solid $accent;
 }
 
@@ -149,10 +151,14 @@ Tab.-active {
     width: 100%;
     padding: 1 2;
     background: $bg-base;
+    overflow: hidden;
 }
 
 #log-view-overview {
     min-height: 5;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .metrics-bar {
@@ -319,10 +325,13 @@ Switch.-on {
 
 .slot-log-view {
     height: 1fr;
+    max-width: 100%;
     background: $bg-base;
     border: solid $border;
     color: $fg-primary;
     padding: 1;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* U3: indeterminate loading indicator, hidden until a slot runs */
@@ -633,24 +642,32 @@ class QwenTuiApp(App[None]):
 
     def on_mount(self) -> None:
         self._init_table()
-        self._log_handler = QwenTuiLogHandler(self)
-        self._log_handler.setLevel(logging.INFO)
-        root = logging.getLogger()
-        root.addHandler(self._log_handler)
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)
         self._metric_done = self.query_one("#metric-done", Label)
 
-        # P5: defer initial log writes until after layout is fully computed.
-        # Writing to RichLog during on_mount (before paint) causes garbled
-        # rendering that only resolves after a scroll/interaction reflow.
-        self.set_timer(0.15, self._post_mount_init)
+        # P5: defer EVERYTHING that writes to RichLog until after the first
+        # paint.  Writing before paint causes text to render at (0,0) instead
+        # of inside the widget — it overlaps the header and never recovers.
+        self.set_timer(0.4, self._deferred_startup)
 
-        self._refresh_session_badge()
+    def _deferred_startup(self) -> None:
+        """Attach log handler + write initial messages after first paint."""
+        root = logging.getLogger()
 
-    def _post_mount_init(self) -> None:
-        """Write initial log messages after the layout is stable."""
+        # Detach ALL non-TUI handlers (StreamHandler, FileHandler) so log
+        # output goes ONLY to our RichLog — not to stderr which would
+        # render above the TUI header and corrupt the display.
+        for handler in list(root.handlers):
+            if isinstance(handler, QwenTuiLogHandler):
+                continue
+            root.removeHandler(handler)
+
+        self._log_handler = QwenTuiLogHandler(self)
+        self._log_handler.setLevel(logging.INFO)
+        root.addHandler(self._log_handler)
+
         self._log_msg(f"[bold {_THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
         self._log_msg(f"[{_THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
 
@@ -659,6 +676,8 @@ class QwenTuiApp(App[None]):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", RichLog)
                 log_view.write(f"[{_THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
+
+        self._refresh_session_badge()
 
     def on_unmount(self) -> None:
         if hasattr(self, "_log_handler"):
@@ -678,7 +697,7 @@ class QwenTuiApp(App[None]):
                 table.add_row(f"Slot {s}", "IDLE 💤", "-", "0.0s", key=f"row-slot-{s}")
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
-        with contextlib.suppress(NoMatches):
+        with contextlib.suppress(NoMatches, CellDoesNotExist):
             table = self.query_one("#slots-table", DataTable)
             table.update_cell(f"row-slot-{slot_id}", "Status", status)
             table.update_cell(f"row-slot-{slot_id}", "Prompt File", filename)
@@ -1050,7 +1069,10 @@ class QwenTuiApp(App[None]):
             _confirmed,
         )
 
-    def _log_msg(self, msg: str, slot_id: int | None = None) -> None:
+    def _log_msg(self, msg: str | Text, slot_id: int | None = None) -> None:
+        # Truncate plain strings to prevent RichLog horizontal overflow.
+        if isinstance(msg, str) and len(msg) > 200:
+            msg = msg[:197] + "..."
         with contextlib.suppress(NoMatches):
             if slot_id is not None:
                 log_view = self.query_one(f"#log-view-{slot_id}", RichLog)
