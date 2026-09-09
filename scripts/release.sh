@@ -48,7 +48,10 @@ sed -i "s/^version = \"$CURRENT\"/version = \"$NEW\"/" "$PYPROJECT"
 
 # Commit and tag
 cd "$PROJECT_ROOT"
-git add pyproject.toml
+# The root [project] version in pyproject.toml is the single source of truth and
+# uv.lock must move with it — a stale lock breaks --locked/--frozen usage.
+uv lock
+git add pyproject.toml uv.lock
 git commit -m "release: v$NEW"
 git tag "v$NEW"
 git push && git push --tags

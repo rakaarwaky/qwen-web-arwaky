@@ -39,6 +39,9 @@ jobs:
         with:
           version: "latest"
 
+      - name: Lockfile drift check
+        run: uv lock --check
+
       - name: Install project
         run: uv sync --no-dev
 
