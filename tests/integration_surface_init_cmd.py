@@ -1,4 +1,4 @@
-"""Unit tests for qwc init command and workspace initialization logic."""
+"""Unit tests for qwa init command and workspace initialization logic."""
 
 import tempfile
 import unittest
@@ -8,8 +8,8 @@ from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src import DEFAULT_LOG, DEFAULT_OUTPUT
 
 
-class TestQwcInit(unittest.TestCase):
-    """Test suite for qwc init functionality."""
+class TestQwaInit(unittest.TestCase):
+    """Test suite for qwa init functionality."""
 
     def test_run_init_creates_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

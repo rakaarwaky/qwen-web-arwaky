@@ -979,7 +979,7 @@ class QwenTuiApp(App[None]):
         self._session_check_timed_out = True
         with contextlib.suppress(Exception):
             badge = self.query_one("#session-badge", Label)
-            badge.update("SESSION: TIMEOUT — run 'qwen-web-cli doctor'")
+            badge.update("SESSION: TIMEOUT — run 'qwen-web-arwaky doctor'")
             badge.set_classes("invalid")
 
     @work(thread=True)

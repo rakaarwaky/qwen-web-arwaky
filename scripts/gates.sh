@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/gates.sh — Local quality gates mirror CI for qwen-web-cli.
+# scripts/gates.sh — Local quality gates mirror CI for qwen-web-arwaky.
 # Usage: bash scripts/gates.sh
 #   Runs all 5 gates: Ruff (lint + format), Mypy, Bandit, AES self-lint, and Pytest.
 #   Mirrors .github/workflows/ci.yml (uv-based). Bandit is always enforced (not optional).

@@ -106,14 +106,14 @@ def _assert_on_chat_page(page: Page) -> None:
     if any(k in current_url for k in AUTH_KEYWORDS):
         raise AuthRequiredError(
             f"Not authenticated — browser is on login or guest page ({page.url}). "
-            "Please run 'qwen-web-cli --login' or click Login in TUI to authenticate first."
+            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
         )
 
     combined_login = ", ".join(LOGIN_FORM_SELECTORS)
     if is_any_visible(page, combined_login):
         raise AuthRequiredError(
             f"Not authenticated — login form/button detected on page ({page.url}). "
-            "Please run 'qwen-web-cli --login' or click Login in TUI to authenticate first."
+            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
         )
 
     if not page.query_selector(TEXTAREA_SELECTOR):

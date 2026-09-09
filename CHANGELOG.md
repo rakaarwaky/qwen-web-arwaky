@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Rename primary CLI command from `qwen-web-cli` (alias `qwc`) to `qwen-web-arwaky` (alias `qwa`); legacy `qwen-web-cli` / `qwc` entry points and references removed.
+
 ## [5.2.2] - 2026-08-20
 
 ### Fixed

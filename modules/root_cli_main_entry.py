@@ -64,7 +64,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── update ────────────────────────────────────────────────────────────────
     p_update = sub.add_parser(
         "update",
-        help="Self-update qwen-web-cli and synchronize Playwright Chromium binaries",
+        help="Self-update qwen-web-arwaky and synchronize Playwright Chromium binaries",
         parents=[parent],
     )
     p_update.add_argument(
@@ -234,10 +234,10 @@ def _dispatch(
             print(
                 f"{_ERROR_PREFIX} Interactive TUI mode requires a terminal (TTY).\n\n"
                 "If you are running in a non-interactive environment, use a subcommand instead:\n"
-                "  qwen-web-cli doctor\n"
-                '  qwen-web-cli prompt-direct -t "Your prompt"\n'
-                "  qwen-web-cli prompt-only -i input/prompt.md\n\n"
-                "Run `qwen-web-cli --help` to see all available commands.",
+                "  qwen-web-arwaky doctor\n"
+                '  qwen-web-arwaky prompt-direct -t "Your prompt"\n'
+                "  qwen-web-arwaky prompt-only -i input/prompt.md\n\n"
+                "Run `qwen-web-arwaky --help` to see all available commands.",
                 file=sys.stderr,
             )
             return 1

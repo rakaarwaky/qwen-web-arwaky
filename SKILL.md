@@ -88,10 +88,10 @@ Instead of creating a Markdown prompt file manually, you can pass a built-in rol
 #### CLI Example
 ```bash
 # Code review with backend template and attachment
-qwen-web-cli prompt-with-attachment -i backend -a src/auth.py --headless --json
+qwen-web-arwaky prompt-with-attachment -i backend -a src/auth.py --headless --json
 
 # Architecture review
-qwen-web-cli prompt-with-attachment -i architect -a README.md --headless --json
+qwen-web-arwaky prompt-with-attachment -i architect -a README.md --headless --json
 ```
 
 ### Session Authentication (`setup_session`)

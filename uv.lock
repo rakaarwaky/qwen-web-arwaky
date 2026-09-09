@@ -1065,7 +1065,7 @@ wheels = [
 ]
 
 [[package]]
-name = "qwen-web-cli"
+name = "qwen-web-arwaky"
 version = "5.2.2"
 source = { editable = "." }
 dependencies = [

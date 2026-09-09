@@ -13,7 +13,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "=== Uninstalling qwen-web-arwaky ==="
 
 # Remove bin launchers
-COMMANDS=("qwen-web-arwaky" "qwa" "qwen-web-cli" "qwc" "qwen-web-mcp")
+COMMANDS=("qwen-web-arwaky" "qwa" "qwen-web-mcp")
 for cmd in "${COMMANDS[@]}"; do
     if [ -L "$BIN_DIR/$cmd" ] || [ -f "$BIN_DIR/$cmd" ]; then
         rm -f "$BIN_DIR/$cmd"
