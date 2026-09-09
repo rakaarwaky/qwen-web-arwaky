@@ -7,6 +7,7 @@ session token directory, and output directory write permissions.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,9 @@ def run_doctor(json_output: bool = False) -> int:
         if has_ms_pw or chrome_in_path:
             playwright_ok = True
             pw_detail = "Chromium binary found in Playwright cache or system PATH"
-        else:
+        elif os.environ.get("QWEN_DOCTOR_DEEP") == "1":
+            # P4: the sync_playwright cold-start probe (5-15s) is opt-in via
+            # QWEN_DOCTOR_DEEP=1 so the common `doctor` path stays fast.
             try:
                 from playwright.sync_api import sync_playwright
 
@@ -58,6 +61,9 @@ def run_doctor(json_output: bool = False) -> int:
                 pw.stop()
             except Exception as ex:
                 pw_detail = f"Chromium binary missing (run: python3 -m playwright install chromium): {ex}"
+        else:
+            playwright_ok = False
+            pw_detail = "Chromium binary not found in cache or PATH (set QWEN_DOCTOR_DEEP=1 for a full probe)"
     except Exception as e:
         pw_detail = f"Playwright check failed: {e}"
 
@@ -84,7 +90,8 @@ def run_doctor(json_output: bool = False) -> int:
 
     # Check 4: Session token directory
     session_dir = DEFAULT_SESSION
-    sess_ok = session_dir.exists() and any(session_dir.iterdir()) if session_dir.exists() else False
+    # C6: single existence check (previously duplicated with confusing precedence).
+    sess_ok = session_dir.exists() and any(session_dir.iterdir())
     checks.append(
         {
             "name": "Session Authentication Token",
