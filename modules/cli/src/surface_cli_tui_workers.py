@@ -50,6 +50,7 @@ class _TuiWorkersMixin:
     _format_status: Any
     call_from_thread: Any
     set_timer: Any
+    set_interval: Any
     _ensure_log_handler: Any
     push_screen: Any
     _session_check_timer: Any
@@ -206,7 +207,7 @@ class _TuiWorkersMixin:
         timer_holder: list[Any] = []
 
         def _create_timer() -> None:
-            timer_holder.append(self.set_timer(5.0, lambda: self._tick_elapsed(slot_id), repeat=True))
+            timer_holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
 
         self.call_from_thread(_create_timer)
         try:
@@ -255,7 +256,7 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
         finally:
             if timer_holder:
-                timer_holder[0].stop()
+                self.call_from_thread(timer_holder[0].stop)
 
     # ── Login worker ─────────────────────────────────────────────────────
 
