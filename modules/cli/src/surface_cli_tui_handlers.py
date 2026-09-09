@@ -33,7 +33,7 @@ class _TuiHandlersMixin:
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
-        for prefix, handler in (("btn-run-", self._run_slot), ("btn-cancel-", self._cancel_slot)):  # type: ignore[attr-defined]
+        for prefix, handler in (("btn-run-", self._run_slot), ("btn-cancel-", self._cancel_slot)):
             if button_id.startswith(prefix):
                 handler(int(button_id.removeprefix(prefix)))
                 return
@@ -53,15 +53,15 @@ class _TuiHandlersMixin:
         if role is None:
             return
         with contextlib.suppress(NoMatches):
-            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)  # type: ignore[attr-defined]
+            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
             prompt_input.value = str(role)
-            self._log_msg(  # type: ignore[attr-defined]
+            self._log_msg(
                 f"[bold {THEME['bright']}]TEMPLATE:[/] Slot {slot_id} ← role '{escape(str(role))}'",
                 slot_id,
             )
             # U8: optimistic existence hint when the picked value is a file path.
             if str(role) not in self._template_roles and not Path(str(role)).exists():
-                self._log_msg(  # type: ignore[attr-defined]
+                self._log_msg(
                     f"[{THEME['warn']}]WARNING:[/] '{escape(str(role))}' is not a "
                     "known role and the file does not exist.",
                     slot_id,
@@ -75,7 +75,7 @@ class _TuiHandlersMixin:
         slot_id = int(input_id.split("-")[-1])
         value = event.value.strip()
         with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)  # type: ignore[attr-defined]
+            select = self.query_one(f"#select-template-{slot_id}", Select)
             if value in self._template_roles:
                 select.value = value
             elif select.value not in (None, Select.BLANK) and select.value != value:
@@ -90,10 +90,10 @@ class _TuiHandlersMixin:
         def _on_picked(path: str | None) -> None:
             if path and self._target_field_for_picker:
                 with contextlib.suppress(NoMatches):
-                    field = self.query_one(f"#{self._target_field_for_picker}", Input)  # type: ignore[attr-defined]
+                    field = self.query_one(f"#{self._target_field_for_picker}", Input)
                     field.value = path
 
-        self.push_screen(  # type: ignore[attr-defined]
+        self.push_screen(
             FilePickerModal(
                 select_directories=select_directories,
                 return_focus_id=return_focus_id,
@@ -105,7 +105,7 @@ class _TuiHandlersMixin:
 
     def _get_active_slot_id(self) -> int:
         with contextlib.suppress(Exception):
-            tabs = self.query_one(TabbedContent)  # type: ignore[attr-defined]
+            tabs = self.query_one(TabbedContent)
             active_id = tabs.active or ""
             if active_id.startswith("tab-slot-"):
                 return int(active_id.split("-")[-1])
@@ -114,56 +114,56 @@ class _TuiHandlersMixin:
     # ── Keyboard actions ─────────────────────────────────────────────────
 
     def action_run_active_slot(self) -> None:
-        self._run_slot(self._get_active_slot_id())  # type: ignore[attr-defined]
+        self._run_slot(self._get_active_slot_id())
 
     def action_switch_tab_overview(self) -> None:
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = "tab-overview"  # type: ignore[attr-defined]
+            self.query_one(TabbedContent).active = "tab-overview"
 
     def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"  # type: ignore[attr-defined]
+            self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         self._switch_to_slot(int(slot_id))
 
     def action_show_help(self) -> None:
         """A4: push the keyboard-shortcut reference overlay."""
-        self.push_screen(HelpScreen())  # type: ignore[attr-defined]
+        self.push_screen(HelpScreen())
 
     def action_login_action(self) -> None:
         # U3: re-entrancy guard — one login flow at a time.
         if getattr(self, "_login_in_flight", False):
-            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Login already in progress.")  # type: ignore[attr-defined]
+            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Login already in progress.")
             return
         self._login_in_flight = True
-        self._log_msg(f"[bold {THEME['accent']}]>>> Launching interactive session setup...[/]")  # type: ignore[attr-defined]
-        self._login_worker()  # type: ignore[attr-defined]
+        self._log_msg(f"[bold {THEME['accent']}]>>> Launching interactive session setup...[/]")
+        self._login_worker()
 
     def action_init_action(self) -> None:
         from modules.shared.src.taxonomy_core_vo import FilePath
 
         try:
-            self._workspace.init_workspace(FilePath(Path(str(Path.cwd()))))  # type: ignore[attr-defined]
+            self._workspace.init_workspace(FilePath(Path(str(Path.cwd()))))
             cwd = Path.cwd()
-            self._log_msg(f"[bold {THEME['ok']}]INIT:[/] Workspace initialized in {escape(str(cwd))}")  # type: ignore[attr-defined]
+            self._log_msg(f"[bold {THEME['ok']}]INIT:[/] Workspace initialized in {escape(str(cwd))}")
         except Exception as exc:
-            self._log_msg(f"[bold {THEME['err']}]INIT ERROR:[/] {escape(str(exc))}")  # type: ignore[attr-defined]
+            self._log_msg(f"[bold {THEME['err']}]INIT ERROR:[/] {escape(str(exc))}")
 
     def action_request_quit(self) -> None:
         active = [s for s, w in self._slot_workers.items() if w is not None]
         if not active:
-            self.exit()  # type: ignore[attr-defined]
+            self.exit()
             return
 
         # U2: never quit silently while jobs are running.
         def _confirmed(confirmed: bool | None) -> None:
             if confirmed:
                 for s in active:
-                    self._cancel_slot(s)  # type: ignore[attr-defined]
-                self.exit()  # type: ignore[attr-defined]
+                    self._cancel_slot(s)
+                self.exit()
 
-        self.push_screen(  # type: ignore[attr-defined]
+        self.push_screen(
             ConfirmModal(
                 "Confirm Quit",
                 f"{len(active)} automation job(s) are still running.\n"

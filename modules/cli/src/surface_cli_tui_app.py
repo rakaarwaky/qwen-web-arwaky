@@ -18,7 +18,6 @@ from typing import Any
 from textual.app import App
 from textual.binding import Binding
 
-from modules.cli.src.surface_cli_tui_components import FilePickerModal, QwenTuiLogHandler
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
 from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
@@ -51,7 +50,7 @@ class QwenTuiApp(
     _TuiHandlersMixin,
     _TuiWorkersMixin,
     _TuiUtilsMixin,
-    App[None],  # type: ignore[misc]
+    App[None],
 ):
     """Obsidian Nebula Terminal User Interface for Qwen Web Automation with Tab-per-Job-Slot."""
 
@@ -121,7 +120,5 @@ class QwenTuiApp(
 
 
 __all__ = [
-    "FilePickerModal",
     "QwenTuiApp",
-    "QwenTuiLogHandler",
 ]

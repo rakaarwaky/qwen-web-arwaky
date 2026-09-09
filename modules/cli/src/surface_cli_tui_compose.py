@@ -49,7 +49,6 @@ class _TuiComposeMixin:
     # Declared here to match _TuiUtilsMixin and avoid incompatible-definition error.
     _log_handler: logging.Handler
 
-
     # ── Lifecycle ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
@@ -146,14 +145,14 @@ class _TuiComposeMixin:
         yield Footer()
 
     def on_mount(self) -> None:
-        self._init_table()  # type: ignore[attr-defined]
+        self._init_table()
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
-        self._metric_active = self.query_one("#metric-active", Label)  # type: ignore[attr-defined]
-        self._metric_done = self.query_one("#metric-done", Label)  # type: ignore[attr-defined]
+        self._metric_active = self.query_one("#metric-active", Label)
+        self._metric_done = self.query_one("#metric-done", Label)
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
-        self.set_timer(0.4, self._deferred_startup)  # type: ignore[attr-defined]
+        self.set_timer(0.4, self._deferred_startup)
 
     def _deferred_startup(self) -> None:
         """Attach log handler and write initial messages after first paint."""
@@ -165,20 +164,20 @@ class _TuiComposeMixin:
                 continue
             root.removeHandler(handler)
 
-        self._log_handler = QwenTuiLogHandler(self)  # type: ignore[arg-type]
+        self._log_handler = QwenTuiLogHandler(self)
         self._log_handler.setLevel(logging.INFO)
         root.addHandler(self._log_handler)
 
-        self._log_msg(f"[bold {THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")  # type: ignore[attr-defined]
-        self._log_msg(f"[{THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")  # type: ignore[attr-defined]
+        self._log_msg(f"[bold {THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
+        self._log_msg(f"[{THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
 
         # U5: seed per-slot log views with an empty-state hint.
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
-                log_view = self.query_one(f"#log-view-{s}", RichLog)  # type: ignore[attr-defined]
+                log_view = self.query_one(f"#log-view-{s}", RichLog)
                 log_view.write(f"[{THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
 
-        self._refresh_session_badge()  # type: ignore[attr-defined]
+        self._refresh_session_badge()
 
     def on_unmount(self) -> None:
         if hasattr(self, "_log_handler"):
@@ -191,4 +190,3 @@ class _TuiComposeMixin:
 
 
 __all__ = ["_TuiComposeMixin"]
-

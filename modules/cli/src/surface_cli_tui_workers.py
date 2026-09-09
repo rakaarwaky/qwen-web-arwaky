@@ -41,54 +41,54 @@ class _TuiWorkersMixin:
 
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:
-            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Slot {slot_id} already running.", slot_id)  # type: ignore[attr-defined]
+            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Slot {slot_id} already running.", slot_id)
             return
 
         try:
-            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value  # type: ignore[attr-defined]
-            file_val = self.query_one(f"#input-file-{slot_id}", Input).value  # type: ignore[attr-defined]
-            out_val = self.query_one(f"#input-output-{slot_id}", Input).value  # type: ignore[attr-defined]
-            headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value  # type: ignore[attr-defined]
+            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value
+            file_val = self.query_one(f"#input-file-{slot_id}", Input).value
+            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
+            headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
         except Exception:
             return
 
         plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
         if isinstance(plan, SlotInputError):
             msg = f"[bold {THEME['err']}]ERROR:[/] {escape(str(plan.message))} (Slot {slot_id})"
-            self._log_msg(msg, slot_id)  # type: ignore[attr-defined]
-            self._log_msg(msg)  # type: ignore[attr-defined]
+            self._log_msg(msg, slot_id)
+            self._log_msg(msg)
             with contextlib.suppress(Exception):
-                self.notify(str(plan.message), severity="error", title=f"Slot {slot_id}")  # type: ignore[attr-defined]
+                self.notify(str(plan.message), severity="error", title=f"Slot {slot_id}")
             return
 
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
 
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")  # type: ignore[attr-defined]
-        self._update_slot_status(slot_id, "STATUS: RUNNING")  # type: ignore[attr-defined]
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
+        self._update_slot_status(slot_id, "STATUS: RUNNING")
         self._slot_stats[slot_id] = {"status": "RUNNING", "file": p_name, "duration": 0.0}
-        self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")  # type: ignore[attr-defined]
-        self._refresh_metrics()  # type: ignore[attr-defined]
+        self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")
+        self._refresh_metrics()
         with contextlib.suppress(NoMatches):
-            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True  # type: ignore[attr-defined]
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
 
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
         if worker is None:
-            self._log_msg(f"[{THEME['muted']}]No run active in Slot {slot_id}.[/]", slot_id)  # type: ignore[attr-defined]
+            self._log_msg(f"[{THEME['muted']}]No run active in Slot {slot_id}.[/]", slot_id)
             return
         worker.cancel()
         self._slot_workers[slot_id] = None
-        self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)  # type: ignore[attr-defined]
-        self._update_slot_status(slot_id, "STATUS: CANCELLED")  # type: ignore[attr-defined]
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")  # type: ignore[attr-defined]
+        self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
+        self._update_slot_status(slot_id, "STATUS: CANCELLED")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
-        self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")  # type: ignore[attr-defined]
-        self._refresh_metrics()  # type: ignore[attr-defined]
+        self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
+        self._refresh_metrics()
         with contextlib.suppress(NoMatches):
-            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False  # type: ignore[attr-defined]
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
     def _finalize_slot(self, slot_id: int, status: str, filename: str, duration: float, ok: bool) -> None:
         """C2: UI-thread-only finalizer — mutate slot state atomically.
@@ -99,20 +99,20 @@ class _TuiWorkersMixin:
         icon = "✅" if ok else "❌"
         self._slot_workers[slot_id] = None
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")  # type: ignore[attr-defined]
-        self._update_slot_status(slot_id, f"STATUS: {status}")  # type: ignore[attr-defined]
-        self._update_table_row(slot_id, f"{'DONE' if ok else 'FAILED'} {icon}", filename, f"{duration}s")  # type: ignore[attr-defined]
-        self._refresh_metrics()  # type: ignore[attr-defined]
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
+        self._update_slot_status(slot_id, f"STATUS: {status}")
+        self._update_table_row(slot_id, f"{'DONE' if ok else 'FAILED'} {icon}", filename, f"{duration}s")
+        self._refresh_metrics()
         with contextlib.suppress(NoMatches):
-            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False  # type: ignore[attr-defined]
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
-    @work(thread=True)  # type: ignore[misc]
+    @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
         threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
-        self._ensure_log_handler()  # type: ignore[attr-defined]
+        self._ensure_log_handler()
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
-        self.call_from_thread(  # type: ignore[attr-defined]
-            self._log_msg,  # type: ignore[attr-defined]
+        self.call_from_thread(
+            self._log_msg,
             f"[bold {THEME['accent']}]>>> [Slot {slot_id}] Starting browser for: {escape(prompt_name)}[/]",
             slot_id,
         )
@@ -134,49 +134,51 @@ class _TuiWorkersMixin:
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
             is_dict_err = isinstance(cast(Any, res), dict) and cast(dict[str, Any], res).get("status") in {
-                "error", "failure", "failed",
+                "error",
+                "failure",
+                "failed",
             }
             fail_reason = detect_processing_failure(res_str)
             if is_dict_err or fail_reason:
-                self.call_from_thread(  # type: ignore[attr-defined]
-                    self._log_msg,  # type: ignore[attr-defined]
+                self.call_from_thread(
+                    self._log_msg,
                     f"[bold {THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(res_str)}",
                     slot_id,
                 )
-                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)  # type: ignore[attr-defined]
+                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)
             else:
-                self.call_from_thread(  # type: ignore[attr-defined]
-                    self._log_msg,  # type: ignore[attr-defined]
+                self.call_from_thread(
+                    self._log_msg,
                     f"[bold {THEME['ok']}][Slot {slot_id}] SUCCESS:[/] {escape(res_str)}",
                     slot_id,
                 )
-                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True)  # type: ignore[attr-defined]
+                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
-            self.call_from_thread(  # type: ignore[attr-defined]
-                self._log_msg,  # type: ignore[attr-defined]
+            self.call_from_thread(
+                self._log_msg,
                 f"[bold {THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(str(exc))}",
                 slot_id,
             )
-            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)  # type: ignore[attr-defined]
+            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)
 
     # ── Login worker ─────────────────────────────────────────────────────
 
-    @work(thread=True)  # type: ignore[misc]
+    @work(thread=True)
     def _login_worker(self) -> None:
-        self._ensure_log_handler()  # type: ignore[attr-defined]
+        self._ensure_log_handler()
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
             res = self._setup.setup_session()
-            self.call_from_thread(  # type: ignore[attr-defined]
-                self._log_msg,  # type: ignore[attr-defined]
+            self.call_from_thread(
+                self._log_msg,
                 f"[bold {THEME['ok']}]LOGIN RESULT:[/] {escape(str(res))}",
             )
-            self.call_from_thread(self._refresh_session_badge)  # type: ignore[attr-defined]
+            self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
-            self.call_from_thread(  # type: ignore[attr-defined]
-                self._log_msg,  # type: ignore[attr-defined]
+            self.call_from_thread(
+                self._log_msg,
                 f"[bold {THEME['err']}]LOGIN FAILED:[/] {escape(str(exc))}",
             )
         finally:
@@ -186,7 +188,7 @@ class _TuiWorkersMixin:
 
     def _refresh_session_badge(self) -> None:
         try:
-            badge = self.query_one("#session-badge", Label)  # type: ignore[attr-defined]
+            badge = self.query_one("#session-badge", Label)
         except (LookupError, AttributeError):
             return
         if self._session is None:
@@ -194,7 +196,7 @@ class _TuiWorkersMixin:
             return
         badge.update("SESSION: CHECKING...")
         self._session_check_timed_out = False
-        self.set_timer(15.0, self._session_check_timeout)  # type: ignore[attr-defined]
+        self.set_timer(15.0, self._session_check_timeout)
         self._session_check_worker()
 
     def _session_check_timeout(self) -> None:
@@ -202,24 +204,24 @@ class _TuiWorkersMixin:
             return
         self._session_check_timed_out = True
         with contextlib.suppress(NoMatches):
-            badge = self.query_one("#session-badge", Label)  # type: ignore[attr-defined]
+            badge = self.query_one("#session-badge", Label)
             badge.update("SESSION: TIMEOUT — run 'qwen-web-arwaky doctor'")
             badge.set_classes("invalid")
 
-    @work(thread=True)  # type: ignore[misc]
+    @work(thread=True)
     def _session_check_worker(self) -> None:
         if self._session is None:
-            self.call_from_thread(self._apply_session_badge, False)  # type: ignore[attr-defined]
+            self.call_from_thread(self._apply_session_badge, False)
             return
         try:
             valid, _msg = self._session.validate_session()
         except Exception:
             valid = False
-        self.call_from_thread(self._apply_session_badge, valid)  # type: ignore[attr-defined]
+        self.call_from_thread(self._apply_session_badge, valid)
 
     def _apply_session_badge(self, valid: bool) -> None:
         try:
-            badge = self.query_one("#session-badge", Label)  # type: ignore[attr-defined]
+            badge = self.query_one("#session-badge", Label)
         except (LookupError, AttributeError):
             return
         badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")

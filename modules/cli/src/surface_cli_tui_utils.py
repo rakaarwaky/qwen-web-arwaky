@@ -48,14 +48,14 @@ class _TuiUtilsMixin:
 
     def _init_table(self) -> None:
         with contextlib.suppress(NoMatches):
-            table = self.query_one("#slots-table", DataTable)  # type: ignore[attr-defined]
+            table = self.query_one("#slots-table", DataTable)
             table.add_columns("Slot", "Status", "Prompt File", "Duration")
             for s in range(1, self._NUM_SLOTS + 1):
                 table.add_row(f"Slot {s}", "IDLE 💤", "-", "0.0s", key=f"row-slot-{s}")
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
         with contextlib.suppress(NoMatches, CellDoesNotExist):
-            table = self.query_one("#slots-table", DataTable)  # type: ignore[attr-defined]
+            table = self.query_one("#slots-table", DataTable)
             table.update_cell(f"row-slot-{slot_id}", "Status", status)
             table.update_cell(f"row-slot-{slot_id}", "Prompt File", filename)
             table.update_cell(f"row-slot-{slot_id}", "Duration", duration)
@@ -66,17 +66,13 @@ class _TuiUtilsMixin:
         if self._metrics_pending:
             return
         self._metrics_pending = True
-        self.set_timer(0.25, self._flush_metrics)  # type: ignore[attr-defined]
+        self.set_timer(0.25, self._flush_metrics)
 
     def _flush_metrics(self) -> None:
         self._metrics_pending = False
         with contextlib.suppress(NoMatches):
-            active = sum(
-                1 for s in self._slot_stats.values() if s.get("status") == "RUNNING"
-            )
-            done = sum(
-                1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"}
-            )
+            active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
+            done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
             if self._metric_active is not None:
                 self._metric_active.update(f"ACTIVE: {active}")
             if self._metric_done is not None:
@@ -86,13 +82,13 @@ class _TuiUtilsMixin:
 
     def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
         with contextlib.suppress(LookupError, NoMatches):
-            tabs = self.query_one(TabbedContent)  # type: ignore[attr-defined]
+            tabs = self.query_one(TabbedContent)
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
             tab.label = Content.from_text(title)
 
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(NoMatches):
-            badge = self.query_one(f"#status-badge-{slot_id}", Label)  # type: ignore[attr-defined]
+            badge = self.query_one(f"#status-badge-{slot_id}", Label)
             badge.update(self._STATUS_ICONS.get(status_text, status_text))
 
     @staticmethod
@@ -104,9 +100,7 @@ class _TuiUtilsMixin:
 
     def _ensure_log_handler(self) -> None:
         root = logging.getLogger()
-        if hasattr(self, "_log_handler") and not any(
-            isinstance(h, QwenTuiLogHandler) for h in root.handlers
-        ):
+        if hasattr(self, "_log_handler") and not any(isinstance(h, QwenTuiLogHandler) for h in root.handlers):
             root.addHandler(self._log_handler)
 
     def _log_msg(self, msg: str | Text, slot_id: int | None = None) -> None:
@@ -115,14 +109,14 @@ class _TuiUtilsMixin:
             msg = msg[:197] + "..."
         with contextlib.suppress(NoMatches):
             if slot_id is not None:
-                log_view = self.query_one(f"#log-view-{slot_id}", RichLog)  # type: ignore[attr-defined]
+                log_view = self.query_one(f"#log-view-{slot_id}", RichLog)
                 log_view.write(msg)
             else:
                 with contextlib.suppress(NoMatches):
-                    self.query_one("#log-view-overview", RichLog).write(msg)  # type: ignore[attr-defined]
+                    self.query_one("#log-view-overview", RichLog).write(msg)
                 with contextlib.suppress(NoMatches):
-                    active_slot = self._get_active_slot_id()  # type: ignore[attr-defined]
-                    self.query_one(f"#log-view-{active_slot}", RichLog).write(msg)  # type: ignore[attr-defined]
+                    active_slot = self._get_active_slot_id()
+                    self.query_one(f"#log-view-{active_slot}", RichLog).write(msg)
 
 
 __all__ = ["_TuiUtilsMixin"]
