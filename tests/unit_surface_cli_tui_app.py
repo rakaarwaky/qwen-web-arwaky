@@ -257,3 +257,45 @@ def test_active_tab_label_renders_on_screen() -> None:
             assert underline.styles.color == accent
 
     asyncio.run(_run())
+
+
+# ── Regression: session-badge writes during teardown must not crash the app ───
+#
+# The login/session workers call call_from_thread(self._refresh_session_badge)
+# (and _apply_session_badge) from background threads. When that callback lands
+# while the app is tearing down — badge already unmounted, or screen stack
+# popped — query_one raises NoMatches / ScreenStackError. Those are NOT
+# subclasses of (LookupError, AttributeError), so the old handlers let them
+# escape and run_test re-raised them as an app crash (~1 in 6-8 flaky runs of
+# this file). With the badge removed we can reproduce the teardown state
+# deterministically.
+
+
+def test_session_badge_survives_teardown_state() -> None:
+    """Badge writers no-op when #session-badge is gone instead of raising NoMatches."""
+    from textual.widgets import Label as _Label
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test() as pilot:
+            # Sanity: on the normal path the badge IS updated (the widened
+            # except-clause must not swallow real work).
+            app._session = None
+            app._refresh_session_badge()
+            assert str(app.query_one("#session-badge", _Label).render()) == "SESSION: N/A"
+            app._apply_session_badge(True)
+            assert str(app.query_one("#session-badge", _Label).render()) == "SESSION: VALID"
+
+            # Teardown state: badge unmounted while a queued callback still
+            # targets it. Before the fix each of these raised NoMatches.
+            app.query_one("#session-badge", _Label).remove()
+            for _ in range(3):
+                await pilot.pause()
+
+            app._session = MagicMock()  # non-None → refresh takes the CHECKING path
+            app._refresh_session_badge()  # must not raise
+            app._apply_session_badge(True)  # must not raise
+            app._session_check_timeout()  # must not raise (also covers the render() read)
+
+    asyncio.run(_run())
