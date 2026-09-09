@@ -26,7 +26,10 @@ if TYPE_CHECKING:
 class FilePickerModal(ModalScreen[str | None]):
     """Modal screen for visual file picking using DirectoryTree."""
 
-    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
+    BINDINGS = [
+        Binding("escape", "dismiss_modal", "Cancel"),
+        Binding("ctrl+s", "select_current_folder", "Select Folder", show=False),
+    ]
 
     def __init__(
         self,
@@ -71,10 +74,14 @@ class FilePickerModal(ModalScreen[str | None]):
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
 
+    def action_select_current_folder(self) -> None:
+        if self._select_directories:
+            self.dismiss(str(self._current_path))
+
     # A2: return focus to the invoking widget after dismissal.
     def on_dismiss(self) -> None:
         if self._return_focus_id:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(LookupError):
                 target = self.app.query_one(f"#{self._return_focus_id}")
                 target.focus()
 
@@ -164,7 +171,7 @@ class QwenTuiLogHandler(logging.Handler):
 
             slot_id: int | None = None
             if record.threadName and record.threadName.startswith("qwen_slot_worker_"):
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(ValueError):
                     slot_id = int(record.threadName.split("_")[-1])
 
             with contextlib.suppress(RuntimeError):

@@ -19,6 +19,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.content import Content
+from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
     DataTable,
@@ -148,6 +149,10 @@ Tab.-active {
     width: 100%;
     padding: 1 2;
     background: $bg-base;
+}
+
+#log-view-overview {
+    min-height: 5;
 }
 
 .metrics-bar {
@@ -530,6 +535,8 @@ class QwenTuiApp(App[None]):
         self._metric_done: Label | None = None
         # U4: session-check timeout flag.
         self._session_check_timed_out = False
+        # P4: debounce metrics refresh — at most 4 updates/sec.
+        self._metrics_pending = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -546,7 +553,13 @@ class QwenTuiApp(App[None]):
                 yield DataTable(id="slots-table")
 
                 yield Label("System Event Log", classes="field-label")
-                yield RichLog(id="log-view-overview", highlight=True, markup=True, max_lines=2000)  # P1
+                yield RichLog(  # P1: bounded, auto-scrolling log view
+                    id="log-view-overview",
+                    highlight=True,
+                    markup=True,
+                    max_lines=2000,
+                    auto_scroll=True,
+                )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
             for s in range(1, NUM_SLOTS + 1):
@@ -629,16 +642,23 @@ class QwenTuiApp(App[None]):
         self._metric_active = self.query_one("#metric-active", Label)
         self._metric_done = self.query_one("#metric-done", Label)
 
+        # P5: defer initial log writes until after layout is fully computed.
+        # Writing to RichLog during on_mount (before paint) causes garbled
+        # rendering that only resolves after a scroll/interaction reflow.
+        self.set_timer(0.15, self._post_mount_init)
+
+        self._refresh_session_badge()
+
+    def _post_mount_init(self) -> None:
+        """Write initial log messages after the layout is stable."""
         self._log_msg(f"[bold {_THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
         self._log_msg(f"[{_THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
 
         # U5: seed per-slot log views with an empty-state hint.
         for s in range(1, NUM_SLOTS + 1):
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", RichLog)
                 log_view.write(f"[{_THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
-
-        self._refresh_session_badge()
 
     def on_unmount(self) -> None:
         if hasattr(self, "_log_handler"):
@@ -651,24 +671,30 @@ class QwenTuiApp(App[None]):
                     worker.cancel()
 
     def _init_table(self) -> None:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             table = self.query_one("#slots-table", DataTable)
             table.add_columns("Slot", "Status", "Prompt File", "Duration")
             for s in range(1, NUM_SLOTS + 1):
                 table.add_row(f"Slot {s}", "IDLE 💤", "-", "0.0s", key=f"row-slot-{s}")
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             table = self.query_one("#slots-table", DataTable)
             table.update_cell(f"row-slot-{slot_id}", "Status", status)
             table.update_cell(f"row-slot-{slot_id}", "Prompt File", filename)
             table.update_cell(f"row-slot-{slot_id}", "Duration", duration)
 
     def _refresh_metrics(self) -> None:
-        with contextlib.suppress(Exception):
+        if self._metrics_pending:
+            return
+        self._metrics_pending = True
+        self.set_timer(0.25, self._flush_metrics)
+
+    def _flush_metrics(self) -> None:
+        self._metrics_pending = False
+        with contextlib.suppress(NoMatches):
             active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
             done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
-            # P3: cached widget refs (set in on_mount) — no DOM lookups here.
             if self._metric_active is not None:
                 self._metric_active.update(f"ACTIVE: {active}")
             if self._metric_done is not None:
@@ -695,7 +721,7 @@ class QwenTuiApp(App[None]):
         role = event.value
         if role is None:
             return
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
             prompt_input.value = str(role)
             self._log_msg(f"[bold {_THEME['bright']}]TEMPLATE:[/] Slot {slot_id} ← role '{escape(str(role))}'", slot_id)
@@ -714,7 +740,7 @@ class QwenTuiApp(App[None]):
             return
         slot_id = int(input_id.split("-")[-1])
         value = event.value.strip()
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             select = self.query_one(f"#select-template-{slot_id}", Select)
             if value in self._template_roles:
                 select.value = value
@@ -728,7 +754,7 @@ class QwenTuiApp(App[None]):
 
         def _on_picked(path: str | None) -> None:
             if path and self._target_field_for_picker:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(NoMatches):
                     field = self.query_one(f"#{self._target_field_for_picker}", Input)
                     field.value = path
 
@@ -795,7 +821,7 @@ class QwenTuiApp(App[None]):
         self._update_table_row(slot_id, "RUNNING ⏳", p_name, "running...")
         self._refresh_metrics()
         # U3: show indeterminate loading indicator while the job runs.
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
@@ -813,7 +839,7 @@ class QwenTuiApp(App[None]):
         self._slot_stats[slot_id]["status"] = "CANCELLED"
         self._update_table_row(slot_id, "CANCELLED ✕", self._slot_stats[slot_id]["file"], "stopped")
         self._refresh_metrics()
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
     def _finalize_slot(self, slot_id: int, status: str, filename: str, duration: float, ok: bool) -> None:
@@ -830,7 +856,7 @@ class QwenTuiApp(App[None]):
         self._update_table_row(slot_id, f"{'DONE' if ok else 'FAILED'} {icon}", filename, f"{duration}s")
         self._refresh_metrics()
         # U3: hide the indeterminate loading indicator once the slot finishes.
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
     @work(thread=True)
@@ -893,7 +919,7 @@ class QwenTuiApp(App[None]):
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False)
 
     def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(LookupError, NoMatches):
             tabs = self.query_one(TabbedContent)
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
             tab.label = Content.from_text(title)
@@ -914,7 +940,7 @@ class QwenTuiApp(App[None]):
         return name if len(name) <= limit else name[: limit - 1] + "…"
 
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             badge = self.query_one(f"#status-badge-{slot_id}", Label)
             badge.update(self._STATUS_ICONS.get(status_text, status_text))
 
@@ -977,7 +1003,7 @@ class QwenTuiApp(App[None]):
         if self._session_check_timed_out:
             return
         self._session_check_timed_out = True
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             badge = self.query_one("#session-badge", Label)
             badge.update("SESSION: TIMEOUT — run 'qwen-web-arwaky doctor'")
             badge.set_classes("invalid")
@@ -1025,14 +1051,14 @@ class QwenTuiApp(App[None]):
         )
 
     def _log_msg(self, msg: str, slot_id: int | None = None) -> None:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(NoMatches):
             if slot_id is not None:
                 log_view = self.query_one(f"#log-view-{slot_id}", RichLog)
                 log_view.write(msg)
             else:
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(NoMatches):
                     self.query_one("#log-view-overview", RichLog).write(msg)
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(NoMatches):
                     active_slot = self._get_active_slot_id()
                     self.query_one(f"#log-view-{active_slot}", RichLog).write(msg)
 

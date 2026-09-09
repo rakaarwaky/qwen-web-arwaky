@@ -14,7 +14,11 @@ from textual.widgets import Button, Footer, Static
 class ConfirmModal(ModalScreen[bool]):
     """Modal screen asking confirmation for destructive actions."""
 
-    BINDINGS = [Binding("escape", "dismiss_no", "Cancel")]
+    BINDINGS = [
+        Binding("escape", "dismiss_no", "Cancel"),
+        Binding("n", "dismiss_no", "Cancel", show=False),
+        Binding("y", "dismiss_yes", "Confirm", show=False),
+    ]
 
     def __init__(self, title: str, message: str) -> None:
         super().__init__()
@@ -27,6 +31,9 @@ class ConfirmModal(ModalScreen[bool]):
             yield Button("Cancel", id="btn-cancel", variant="default")
             yield Button("Delete Session & Login", id="btn-confirm", variant="error")
 
+    def on_mount(self) -> None:
+        self.query_one("#btn-cancel").focus()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-confirm":
             self.dismiss(True)
@@ -35,6 +42,9 @@ class ConfirmModal(ModalScreen[bool]):
 
     def action_dismiss_no(self) -> None:
         self.dismiss(False)
+
+    def action_dismiss_yes(self) -> None:
+        self.dismiss(True)
 
 
 class SessionSetupScreen(Screen["SessionSetupApp"]):
@@ -73,6 +83,8 @@ class SessionSetupApp(App[str]):
     """Textual app for session setup submenu."""
 
     CSS = """
+    $border: #464554;
+
     Screen {
         align: center middle;
     }
@@ -81,7 +93,7 @@ class SessionSetupApp(App[str]):
         min-width: 40;
         max-width: 70;
         height: auto;
-        border: solid #464554;   /* V2: Obsidian Nebula border token (was green) */
+        border: solid $border;
         padding: 1 2;
     }
     #session_status {
