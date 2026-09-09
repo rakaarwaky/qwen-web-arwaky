@@ -204,3 +204,56 @@ def test_slots_table_update_missing_row_stays_quiet() -> None:
                 table.get_cell("row-slot-999", "status")
 
     asyncio.run(_run())
+
+
+# ── Regression: the ACTIVE tab's label must actually render ────────────────────
+#
+# `Tab.-active { border-bottom: solid $accent }` on a Tab (Textual default
+# height:1) consumes the tab's only row — the active tab measured
+# content_region.height == 0 and its label vanished behind the highlight.
+# The old test asserted `str(tab.label)`, which passes even when nothing is
+# drawn. This asserts on composited screen text instead, and pins the
+# replacement accent indicator (Textual's Underline, styled via the bare
+# type selector — `Tabs > Underline` is a measured no-op on 8.2.8).
+
+
+def test_active_tab_label_renders_on_screen() -> None:
+    """The active tab's relabelled text must reach the rendered screen."""
+    from textual.color import Color
+    from textual.widgets import Tab
+    from textual.widgets._tabs import Underline
+
+    accent = Color.parse("#8083ff")  # _COLORS["accent"] in surface_cli_tui_css
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-slot-1"
+            await pilot.pause()
+            app._set_slot_tab_title(1, "Slot 1: deep-review ⏳")
+            await pilot.pause()
+
+            strips = list(app.screen._compositor.render_strips())
+            rendered = "".join(s.text for s in strips)
+            # Load-bearing: the label is drawn somewhere on screen.
+            assert "deep-review" in rendered
+
+            # …and specifically on the tab row (the strip holding "Overview").
+            tab_row = next(s.text for s in strips if "Overview" in s.text)
+            assert "deep-review" in tab_row
+
+            # Geometry: the active Tab keeps a full text row; inactive ones are
+            # unchanged.
+            active_tab = app.query_one("#--content-tab-tab-slot-1", Tab)
+            assert active_tab.content_region.height > 0
+            for w in app.query(Tab):
+                if w.id != "--content-tab-tab-slot-1":
+                    assert w.content_region.height == 1, w.id
+
+            # The accent active-indicator survives on Textual's Underline.
+            underline = tabs.query_one(Underline)
+            assert underline.styles.color == accent
+
+    asyncio.run(_run())
