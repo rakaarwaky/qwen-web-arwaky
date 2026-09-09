@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 
 from textual.widgets import DataTable, Label, RichLog, TabbedContent
 
-from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp, QwenTuiLogHandler
+from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
+from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
 
 
 def test_tui_app_mounts_and_populates_tabs() -> None:
@@ -54,7 +55,7 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
 
             # Test metrics update
             app._slot_stats[1]["status"] = "RUNNING"
-            app._refresh_metrics()
+            app._flush_metrics()
             metric_active = app.query_one("#metric-active", Label)
             assert "1" in str(metric_active.render())
 
