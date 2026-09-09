@@ -27,13 +27,16 @@ Naming: `{layer}_{concern}_{role}.{ext}`.
 
 ```
 modules/shared/src/   taxonomy_*, contract_*, utility_*
-modules/core/src/     agent_core_orchestrator, capabilities_* (10)
+modules/core/src/     agent_* orchestrators (7), capabilities_* (13)
 modules/cli/src/      surface_cli_*, root_cli_container
 modules/mcp/src/      surface_mcp_*, root_mcp_container
 root_cli_main_entry.py, root_mcp_main_entry.py
 tests/                unit/integration/e2e, fixtures/, conftest.py, smoke_qwen_auto.py
 lint_arwaky.config.yaml, pyproject.toml, requirements.txt
+Containerfile         containerized execution (scripts/podman.sh)
 ```
+
+Key v6.0.0 capabilities: `capabilities_folder_compiler` (import-aware multi-language folder → Markdown), `capabilities_folder_to_attachment`, `capabilities_job_manager` + `agent_job_orchestrator` (async MCP jobs), `capabilities_tui_slot_config` + `surface_cli_tui_components` (TUI observability), `utility_core_session_cloner` (parallel sessions).
 
 ## Build & Run
 
@@ -69,9 +72,10 @@ pytest tests/ -m slow -v
 
 ## Migration State
 
-- **Branch**: `aes-migration`.
-- **Goal**: Complete AES layer migration + compliance-driven auth middleware (legal: session token storage).
-- **Merge freeze**: since 2026-03-05 (mobile release cut).
+- **Status**: AES 7-layer architecture complete and enforced in CI (`lint-arwaky-cli`, **0 violations**).
+- **Current release**: **v6.0.0** (2026-09-09). Breaking change: legacy `qwen-web-cli` / `qwc` removed — CLI is exclusively `qwen-web-arwaky` / `qwa`.
+- **Branches**: `main` is the release line and is protected (PR + 1 approval + status checks). Releases flow via `release/vX.Y.Z` PRs; tags trigger the auto-build/`action-gh-release` pipeline.
+- **No merge freeze** currently active.
 
 ## Agent Guidelines
 

@@ -1,6 +1,6 @@
 [project]
 name = "qwen-web-core"
-version = "5.2.0"
+version = "6.0.0"
 description = "qwen-web core feature: capabilities, orchestrators, and DI container"
 requires-python = ">=3.10"
 license = {text = "MIT"}
