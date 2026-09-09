@@ -101,7 +101,10 @@ Tab.-active {
     color: $fg_primary;
     text-style: bold;
     background: $bg_active;
-    border-bottom: solid $accent;
+}
+
+Underline {
+    color: $accent;
 }
 
 /* --- Overview Tab ------------------------------------------------------- */
