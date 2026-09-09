@@ -77,6 +77,30 @@ class TestCollectFolderFilesWithImports:
         files2, _ = collect_folder_files_with_imports(target, import_depth=3)
         assert "m3.py" in {f.name for f in files2}
 
+    def test_rust_crate_import_from_outside(self, tmp_path: Path) -> None:
+        # crate root = rust_project/ (Cargo.toml); folder target = src/
+        # models.rs/user.rs di dalam folder; shared/util.rs DI LUAR folder
+        crate = tmp_path / "rust_project"
+        _write(crate / "Cargo.toml", '[package]\nname="demo"\n')
+        _write(crate / "src" / "main.rs", "mod models;\nuse crate::shared::util;\nfn main() { util::run(); }\n")
+        _write(crate / "src" / "models.rs", "pub mod user;\n")
+        _write(crate / "src" / "models" / "user.rs", "pub struct User;\n")
+        _write(crate / "shared" / "util.rs", "pub fn run() {}\n")
+
+        files, origins = collect_folder_files_with_imports(crate / "src")
+        names = {f.name for f in files}
+        assert {"main.rs", "models.rs", "user.rs", "util.rs"} <= names
+        util = next(f for f in files if f.name == "util.rs")
+        assert origins[util] == ("main.rs",)
+
+    def test_typescript_import_from_outside(self, tmp_path: Path) -> None:
+        target = tmp_path / "app"
+        shared = tmp_path / "shared"
+        _write(target / "main.ts", "import { format } from '../shared/format';\nformat(1);\n")
+        _write(shared / "format.ts", "export function format(n: number) { return n.toFixed(2); }\n")
+        files, _ = collect_folder_files_with_imports(target)
+        assert any(f.name == "format.ts" for f in files)
+
     def test_external_stdlib_not_included(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         _write(target / "a.py", "import os\nimport json\n")
