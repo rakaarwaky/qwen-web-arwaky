@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.1.1] - 2026-09-09
+
+### Fixed
+
+- fix(tui): survive teardown race in session-badge writers
+- fix(tui): stop border-bottom from clipping active tab label to zero rows
+- fix(tui): address slots-table columns by stable keys, not labels
+- fix(repo): refresh stale uv.lock and add CI lock-drift guard
+- fix(tui): use set_interval instead of set_timer(repeat)
+- fix(tui): schedule elapsed timer via call_from_thread
+
 ## [6.1.0] - 2026-09-10
 
 ### Fixed
