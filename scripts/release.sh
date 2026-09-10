@@ -54,6 +54,11 @@ uv lock
 git add pyproject.toml uv.lock
 git commit -m "release: v$NEW"
 git tag "v$NEW"
-git push && git push --tags
+# Push each ref explicitly and check the result. Under `set -e`, a failing
+# command on the LEFT of `&&` is exempt from the exit, so the old
+# `git push && git push --tags` printed "Released" even when the push was
+# rejected. Push branch + tag by name (no upstream assumption).
+git push origin "v$NEW" HEAD || { echo "Error: git push failed" >&2; exit 1; }
+git push --tags || { echo "Error: tag push failed" >&2; exit 1; }
 
 echo "Released v$NEW"
