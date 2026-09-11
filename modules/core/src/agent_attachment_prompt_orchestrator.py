@@ -80,8 +80,10 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         with self._bctx_lock:
             bctx = self._active_bctx
         if bctx is not None:
-            with contextlib.suppress(Exception):
-                bctx.close()
+            close_fn = getattr(bctx, "close", None)
+            if callable(close_fn):
+                with contextlib.suppress(Exception):
+                    close_fn()
 
     def process_prompt_with_attachment(
         self,
