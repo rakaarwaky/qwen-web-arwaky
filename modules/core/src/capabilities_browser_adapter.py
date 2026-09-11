@@ -147,7 +147,19 @@ class BrowserAdapter(IBrowserProtocol):
         its own DOM readiness checks, so navigation uses ``commit`` and treats
         the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
         exponential backoff (2s, 4s, 8s) handle transient network failures.
+
+        If the page is already on chat.qwen.ai (e.g. from eager navigation in
+        browser_session), the goto is skipped and only DOM readiness is awaited.
         """
+        # Fast path: eager navigation in browser_session already landed us here.
+        if "chat.qwen.ai" in (page.url or ""):
+            log.debug("browser_skip_goto_already_on_chat", url=page.url)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+            except Error as err:
+                log.warning("Load state wait failed, proceeding: %s", err)
+            return
+
         max_attempts = 4
         backoff_ms = [2000, 4000, 8000]
         last_error: Error | None = None
@@ -490,6 +502,21 @@ class BrowserAdapter(IBrowserProtocol):
                 with sync_playwright() as p:
                     ctx = self._launch_context(p, kwargs)
                     context_started = True
+
+                    # Eagerly navigate the initial about:blank page to CHAT_URL
+                    # so the browser starts loading while route/diagnostics setup
+                    # and orchestrator init happen in parallel.
+                    if ctx.pages:
+                        try:
+                            ctx.pages[0].goto(
+                                CHAT_URL,
+                                wait_until="commit",
+                                timeout=NAVIGATION_TIMEOUT_MS,
+                            )
+                            log.debug("browser_eager_navigate_ok", url=CHAT_URL)
+                        except Error as exc:
+                            log.warning("browser_eager_navigate_failed, will retry in navigate_to_chat: %s", exc)
+
                     if mode != "login":
                         ctx.route(
                             "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
