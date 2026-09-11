@@ -6,6 +6,8 @@ Supports folder-to-attachment compilation (folder -> single markdown file).
 
 from __future__ import annotations
 
+import contextlib
+import threading
 import time
 from pathlib import Path
 
@@ -68,6 +70,20 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._observability = observability
         self._flow = flow
         self._folder_adapter = folder_adapter
+        self._cancel_event = threading.Event()
+        self._active_bctx: object | None = None
+        self._bctx_lock = threading.Lock()
+
+    def request_cancel(self) -> None:
+        """Request cancellation of any active browser session."""
+        self._cancel_event.set()
+        with self._bctx_lock:
+            bctx = self._active_bctx
+        if bctx is not None:
+            close_fn = getattr(bctx, "close", None)
+            if callable(close_fn):
+                with contextlib.suppress(Exception):
+                    close_fn()
 
     def process_prompt_with_attachment(
         self,
@@ -82,6 +98,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         compiled to a single markdown file before upload.
         """
         ctx = RunContext()
+        self._cancel_event.clear()
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
@@ -106,10 +123,18 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                text = self._execute_attachment_on_page(
-                    page, p_path, att_path, cfg.request_timeout, cfg, emitter, state
-                )
+                with self._bctx_lock:
+                    self._active_bctx = bctx
+                try:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Cancelled by user")
+                    page = bctx.pages[0] if bctx.pages else bctx.new_page()
+                    text = self._execute_attachment_on_page(
+                        page, p_path, att_path, cfg.request_timeout, cfg, emitter, state
+                    )
+                finally:
+                    with self._bctx_lock:
+                        self._active_bctx = None
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
