@@ -152,6 +152,11 @@ class _TuiWorkersMixin:
         self._update_slot_status(slot_id, "⚠ CANCELLING…")
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ⚠")
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
+        # Close active browser contexts so Playwright operations unblock
+        with contextlib.suppress(Exception):
+            self._attachment.request_cancel()
+        with contextlib.suppress(Exception):
+            self._file_only.request_cancel()
         worker.cancel()
         self._slot_workers[slot_id] = None
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
