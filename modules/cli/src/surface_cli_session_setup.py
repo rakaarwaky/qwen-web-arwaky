@@ -20,16 +20,17 @@ class ConfirmModal(ModalScreen[bool]):
         Binding("y", "dismiss_yes", "Confirm", show=False),
     ]
 
-    def __init__(self, title: str, message: str) -> None:
+    def __init__(self, title: str, message: str, confirm_text: str = "Delete Session & Login") -> None:
         super().__init__()
         self._title = title
         self._message = message
+        self._confirm_text = confirm_text
 
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-modal-container"):
             yield Static(f"[bold red]{self._title.upper()}[/bold red]\n\n{self._message}\n")
             yield Button("Cancel", id="btn-cancel", variant="default")
-            yield Button("Delete Session & Login", id="btn-confirm", variant="error")
+            yield Button(self._confirm_text, id="btn-confirm", variant="error")
 
     def on_mount(self) -> None:
         self.query_one("#btn-cancel").focus()

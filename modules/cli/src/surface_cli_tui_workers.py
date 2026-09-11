@@ -137,6 +137,7 @@ class _TuiWorkersMixin:
                 ConfirmModal(
                     "Cancel Slot",
                     f"Slot {slot_id} has been running for {elapsed:.0f}s.\nCancelling will lose the current progress.",
+                    confirm_text="Yes, Cancel Slot",
                 ),
                 _on_confirm,
             )

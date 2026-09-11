@@ -227,6 +227,7 @@ class _TuiHandlersMixin:
                 "Confirm Quit",
                 f"{len(active)} automation job(s) are still running (Slots: {active_ids}).\n"
                 "Quitting will cancel them. Browser processes will be stopped.",
+                confirm_text="Quit Anyway",
             ),
             _confirmed,
         )
