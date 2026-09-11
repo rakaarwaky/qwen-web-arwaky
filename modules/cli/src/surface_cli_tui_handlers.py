@@ -50,8 +50,10 @@ class _TuiHandlersMixin:
         button_id = event.button.id or ""
         for prefix, handler in (("btn-run-", self._run_slot), ("btn-cancel-", self._cancel_slot)):
             if button_id.startswith(prefix):
-                handler(int(button_id.removeprefix(prefix)))
-                return
+                suffix = button_id.removeprefix(prefix)
+                if suffix.isdigit():
+                    handler(int(suffix))
+                    return
         for field, picker in (("prompt", False), ("file", True), ("output", False)):
             prefix = f"btn-browse-{field}-"
             if button_id.startswith(prefix):
