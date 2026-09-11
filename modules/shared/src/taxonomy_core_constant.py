@@ -79,6 +79,12 @@ DEFAULT_MAX_WORKERS = 10
 
 CHAT_URL = "https://chat.qwen.ai/"
 
+# Browser navigation timeouts (milliseconds). The primary goto uses 30s with
+# 4 retries + exponential backoff; shorter values are used for in-session
+# resets and thread cleanup where a stale connection is expected.
+NAVIGATION_TIMEOUT_MS = 30_000
+NAVIGATION_LOAD_TIMEOUT_MS = 15_000
+
 # Hardcoded default model. Pipeline forces this on every chat session so the
 # user never has to pick a model manually (idempotent per-session).
 DEFAULT_MODEL = "Qwen3.8-Max"

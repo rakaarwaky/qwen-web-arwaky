@@ -33,6 +33,8 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_MODEL,
     LOGIN_FORM_SELECTORS,
     MODEL_SELECTOR_BUTTON,
+    NAVIGATION_LOAD_TIMEOUT_MS,
+    NAVIGATION_TIMEOUT_MS,
     NEW_CHAT_SELECTORS,
     TEXTAREA_SELECTOR,
 )
@@ -143,11 +145,13 @@ class BrowserAdapter(IBrowserProtocol):
         ``domcontentloaded`` can remain pending when Qwen or an analytics asset
         stalls. The application only needs the committed chat document before
         its own DOM readiness checks, so navigation uses ``commit`` and treats
-        the later DOMContentLoaded wait as best-effort. A second commit attempt
-        remains available for transient connection failures.
+        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
+        exponential backoff (2s, 4s, 8s) handle transient network failures.
         """
+        max_attempts = 4
+        backoff_ms = [2000, 4000, 8000]
         last_error: Error | None = None
-        for attempt in range(2):
+        for attempt in range(max_attempts):
             try:
                 page.goto(
                     CHAT_URL,
@@ -161,9 +165,16 @@ class BrowserAdapter(IBrowserProtocol):
                 return
             except Error as err:
                 last_error = err
-                if attempt == 0:
-                    log.warning("Initial page.goto failed (%s), retrying commit navigation...", err)
-                    page.wait_for_timeout(1500)
+                if attempt < max_attempts - 1:
+                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
+                    log.warning(
+                        "page.goto attempt %d/%d failed (%s), retrying in %ds...",
+                        attempt + 1,
+                        max_attempts,
+                        err,
+                        wait // 1000,
+                    )
+                    page.wait_for_timeout(wait)
         if last_error is not None:
             raise last_error
 
@@ -171,7 +182,7 @@ class BrowserAdapter(IBrowserProtocol):
         """Reset the page to a clean state by navigating back to chat.qwen.ai."""
         try:
             emitter.emit(EVENT_NETWORK_RECONNECTING, {"url": CHAT_URL})
-            self._goto_chat(page, 10_000, 15_000)
+            self._goto_chat(page, 10_000, NAVIGATION_LOAD_TIMEOUT_MS)
         except Error as e:
             log.warning("Failed to reset page: %s", e)
 
@@ -186,7 +197,7 @@ class BrowserAdapter(IBrowserProtocol):
         Step 6: Verify the default model is active (abort pipeline if not)
         """
         # Step 1: Navigate to chat URL
-        self._goto_chat(page, 30_000, 15_000)
+        self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
 
         # Step 2: Verify user authentication
         _assert_on_chat_page(page)
@@ -349,7 +360,7 @@ class BrowserAdapter(IBrowserProtocol):
         try:
             if "/c/" in page.url.lower():
                 log.info("Active chat thread detected (%s). Navigating to root chat URL...", page.url)
-                self._goto_chat(page, 15_000, 15_000)
+                self._goto_chat(page, 15_000, NAVIGATION_LOAD_TIMEOUT_MS)
                 page.wait_for_timeout(1000)
 
             if click_first_visible_enabled(page, NEW_CHAT_SELECTORS, timeout_ms=3000):
