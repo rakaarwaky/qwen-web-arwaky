@@ -43,6 +43,10 @@ EMBEDDED_BACKEND_TEMPLATE: str = r"""# Plan: {feature} — Tech Lead
 | --- | ---------- | ------- | ---------- | ---------------- |
 <!-- Check: Module cohesion, coupling between layers, documentation accuracy, configurability, ease of onboarding, tech debt markers -->
 
+## Violations
+
+{List or "None"}
+
 ## Action Items
 
 - [ ]  {Priority} {Item}
@@ -55,9 +59,9 @@ EMBEDDED_BACKEND_TEMPLATE: str = r"""# Plan: {feature} — Tech Lead
 
 | Level | Meaning |
 | ------- | ------------------------------------------------------------------- |
-| 🔴 CRITICAL | Security vuln, data leak, crash risk. Immediate fix. |
-| 🟡 WARNING | Perf bottleneck, SOLID violation, bypass pattern. Fix this cycle. |
-| 🟢 INFO | Nice-to-have. Deferrable. |
+| CRITICAL | Security vuln, data leak, crash risk. Immediate fix. |
+| WARNING | Perf bottleneck, SOLID violation, bypass pattern. Fix this cycle. |
+| INFO | Nice-to-have. Deferrable. |
 """
 
 __all__ = ["EMBEDDED_BACKEND_TEMPLATE"]

@@ -79,6 +79,12 @@ DEFAULT_MAX_WORKERS = 10
 
 CHAT_URL = "https://chat.qwen.ai/"
 
+# Browser navigation timeouts (milliseconds). The primary goto uses 30s with
+# 4 retries + exponential backoff; shorter values are used for in-session
+# resets and thread cleanup where a stale connection is expected.
+NAVIGATION_TIMEOUT_MS = 30_000
+NAVIGATION_LOAD_TIMEOUT_MS = 15_000
+
 # Hardcoded default model. Pipeline forces this on every chat session so the
 # user never has to pick a model manually (idempotent per-session).
 DEFAULT_MODEL = "Qwen3.8-Max"
@@ -154,9 +160,14 @@ JS_GET_RESPONSE_TEXT: str = r"""
         + '[data-role="assistant"], .response-message-content, .qwen-markdown-text, [class*="message-content"], '
         + '[class*="message-body"], [class*="response"]'
     );
+    var paginationRe = /^\s*\d+\s*\/\s*\d+\s*$/;
     for (var ri = responseNodes.length - 1; ri >= 0; ri--) {
         var node = responseNodes[ri];
         if (node.closest('.qwen-chat-message-user') || node.closest('.user-message-content')) continue;
+
+        // Skip pagination indicator nodes (e.g. "1/2", "2/3")
+        var nodeText = (node.innerText || '').trim();
+        if (paginationRe.test(nodeText)) continue;
 
         // Tier 1: React Fiber extraction (preserves 100% of raw markdown & code without virtualization truncation)
         var fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
@@ -165,7 +176,7 @@ JS_GET_RESPONSE_TEXT: str = r"""
             for (var depth = 0; depth < 30 && curr; depth++) {
                 if (curr.memoizedProps && typeof curr.memoizedProps === 'object') {
                     var content = curr.memoizedProps.content;
-                    if (typeof content === 'string' && content.length > 0) {
+                    if (typeof content === 'string' && content.length > 0 && !paginationRe.test(content.trim())) {
                         return content.trim();
                     }
                 }
@@ -182,7 +193,7 @@ JS_GET_RESPONSE_TEXT: str = r"""
 
         var text = '';
         var blockTags = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TR', 'TD', 'TH', 'PRE', 'BLOCKQUOTE', 'BR', 'TABLE', 'UL', 'OL', 'SECTION', 'ARTICLE']);
-        var ignoreSelectors = '.margin, .line-numbers, .monaco-editor-margin, [class*="line-numbers"], [class*="margin-view"], [class*="thinking"], [class*="status-card"], [class*="status"], [class*="thinking-tool"], button, svg, [class*="copy"], .copy-code-btn, [class*="code-header"]';
+        var ignoreSelectors = '.margin, .line-numbers, .monaco-editor-margin, [class*="line-numbers"], [class*="margin-view"], [class*="thinking"], [class*="status-card"], [class*="status"], [class*="thinking-tool"], button, svg, [class*="copy"], .copy-code-btn, [class*="code-header"], [class*="pagination"], [class*="pager"]';
 
         function walk(n, isPre) {
             if (n.nodeType === Node.ELEMENT_NODE) {
@@ -225,6 +236,10 @@ JS_GET_RESPONSE_TEXT: str = r"""
             responseText = responseText.replace(/\s*Skip$/, '').trim();
         }
         if (responseText === "Skip") {
+            continue;
+        }
+        // Skip if text is only a pagination indicator
+        if (paginationRe.test(responseText)) {
             continue;
         }
         if (responseText.length > 0) return responseText;
@@ -277,6 +292,64 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
     "finished processing before sending",
     "failed to upload",
     "something went wrong",
+)
+
+# ─── Folder compiler defaults ───────────────────────────────────────────────
+MAX_FOLDER_DEPTH: int = 5
+
+CODE_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".py",
+        ".rs",
+        ".ts",
+        ".js",
+        ".jsx",
+        ".tsx",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".cfg",
+        ".md",
+        ".txt",
+        ".css",
+        ".scss",
+        ".html",
+        ".go",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".kts",
+    }
+)
+
+EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        ".hg",
+        ".svn",
+        ".venv",
+        "venv",
+        "env",
+        "node_modules",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        "build",
+        "dist",
+        ".eggs",
+        ".qwen-web",
+        "target",
+        ".cache",
+    }
 )
 
 # ─── Saver defaults ─────────────────────────────────────────

@@ -80,7 +80,7 @@ compose these FRs, not additional core FRs.
   *Accept*: stable response is returned instantly upon generation completion; long 15-minute streaming runs complete without network connection resets; challenge keywords raise `AuthRequiredError` / `OutputValidationError`.
 - [X]  **FR-007 Workspace Provisioner** — First-run XDG dirs,
   `.agents/skills/qwen-web/SKILL.md`, `.qwen-web` symlinks (automatically replaces stale local directories with XDG symlinks), `.gitignore`.
-  *Accept*: `qwen-web-cli init` is idempotent and maintains valid symlinks to XDG targets.
+  *Accept*: `qwen-web-arwaky init` is idempotent and maintains valid symlinks to XDG targets.
 - [X]  **FR-008 Observability Setup** — structlog + optional OTLP traces +
   optional Sentry + process excepthooks; missing telemetry must not block
   start.
@@ -92,7 +92,7 @@ compose these FRs, not additional core FRs.
 
 - [X]  **Multi-mode execution**: Batch (folder), Watcher (continuous poll),
   Single (one file), and raw `send_prompt` — all via `ICoreAggregate`.
-- [X]  **Persistent session login**: `qwen-web-cli login` validates a saved profile
+- [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
   first; only an invalid session opens a headed browser for CAPTCHA.
 - [X]  **Atomic file routing**: `input` → `.processing` → `done` / `failed`
   with circuit breaker and rate limiter in the agent.

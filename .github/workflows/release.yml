@@ -96,7 +96,7 @@ jobs:
           uv pip install --python .venv/bin/python dist/*.whl
 
       - name: Verify CLI entry point
-        run: .venv/bin/qwen-web-cli --help | grep -q "Automate chat.qwen.ai"
+        run: .venv/bin/qwen-web-arwaky --help | grep -q "Automate chat.qwen.ai"
 
       - name: Verify MCP entry point imports
         # The MCP server blocks on stdio, so verify import instead of running it.

@@ -366,7 +366,7 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 ## Test Scenarios / QA Checklist
 
 - [ ]  FR-001: expired cookies raise `AuthRequiredError` and point the user
-  at `qwen-web-cli login`.
+  at `qwen-web-arwaky login`.
 - [ ]  FR-002: attach card appears on fixture; oversized file never opens chooser.
 - [ ]  FR-003: killing the process during write leaves no half file (atomic).
 - [ ]  FR-004: 100k-char prompt injects via React setter on fixture.

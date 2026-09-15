@@ -11,7 +11,7 @@ import importlib.metadata
 import re
 from pathlib import Path
 
-PACKAGE_NAME = "qwen-web-cli"
+PACKAGE_NAME = "qwen-web-arwaky"
 _PYPROJECT_PATH = Path(__file__).resolve().parents[3] / "pyproject.toml"
 
 

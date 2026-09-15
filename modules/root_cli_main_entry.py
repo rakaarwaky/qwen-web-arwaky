@@ -64,7 +64,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── update ────────────────────────────────────────────────────────────────
     p_update = sub.add_parser(
         "update",
-        help="Self-update qwen-web-cli and synchronize Playwright Chromium binaries",
+        help="Self-update qwen-web-arwaky and synchronize Playwright Chromium binaries",
         parents=[parent],
     )
     p_update.add_argument(
@@ -82,17 +82,30 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
     p_direct.add_argument("-t", "--text", required=True, help="Prompt text to send directly")
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_direct.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_direct.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,  # U3: accepts --headless / --no-headless
+        default=True,  # matches TUI Switch and MCP default
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_direct.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── prompt-only ───────────────────────────────────────────────────────────
     p_only = sub.add_parser("prompt-only", help="Process a prompt file (no attachment)", parents=[parent])
     p_only.add_argument(
-        "-i", "-p", "--prompt-path", required=True,
+        "-i",
+        "-p",
+        "--prompt-path",
+        required=True,
         help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
     )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_only.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_only.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_only.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── prompt-with-attachment ────────────────────────────────────────────────
@@ -100,12 +113,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "prompt-with-attachment", help="Process a prompt file with a file attachment", parents=[parent]
     )
     p_attach.add_argument(
-        "-i", "-p", "--prompt-path", required=True,
+        "-i",
+        "-p",
+        "--prompt-path",
+        required=True,
         help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_attach.add_argument("--headless", action="store_true", help="Run browser headlessly")
+    p_attach.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
     p_attach.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── mcp ───────────────────────────────────────────────────────────────────
@@ -228,13 +249,19 @@ def _dispatch(
             print(
                 f"{_ERROR_PREFIX} Interactive TUI mode requires a terminal (TTY).\n\n"
                 "If you are running in a non-interactive environment, use a subcommand instead:\n"
-                "  qwen-web-cli doctor\n"
-                '  qwen-web-cli prompt-direct -t "Your prompt"\n'
-                "  qwen-web-cli prompt-only -i input/prompt.md\n\n"
-                "Run `qwen-web-cli --help` to see all available commands.",
+                "  qwen-web-arwaky doctor\n"
+                '  qwen-web-arwaky prompt-direct -t "Your prompt"\n'
+                "  qwen-web-arwaky prompt-only -i input/prompt.md\n\n"
+                "Run `qwen-web-arwaky --help` to see all available commands.",
                 file=sys.stderr,
             )
             return 1
+
+        # Ensure observability (structlog + app.jsonl file handler) is wired up
+        # even in interactive TUI mode, so logs are persisted to DEFAULT_LOG
+        # instead of being dropped. (FileHandler is otherwise only attached in
+        # the non-interactive CLI subcommand path below.)
+        container.observability.setup_observability(log_path=DEFAULT_LOG)
 
         result = surface_cli_interactive_controller.InteractiveController(
             container.workspace,

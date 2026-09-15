@@ -14,7 +14,11 @@ from textual.widgets import Button, Footer, Static
 class ConfirmModal(ModalScreen[bool]):
     """Modal screen asking confirmation for destructive actions."""
 
-    BINDINGS = [Binding("escape", "dismiss_no", "Cancel")]
+    BINDINGS = [
+        Binding("escape", "dismiss_no", "Cancel"),
+        Binding("n", "dismiss_no", "Cancel", show=False),
+        Binding("y", "dismiss_yes", "Confirm", show=False),
+    ]
 
     def __init__(self, title: str, message: str) -> None:
         super().__init__()
@@ -27,6 +31,9 @@ class ConfirmModal(ModalScreen[bool]):
             yield Button("Cancel", id="btn-cancel", variant="default")
             yield Button("Delete Session & Login", id="btn-confirm", variant="error")
 
+    def on_mount(self) -> None:
+        self.query_one("#btn-cancel").focus()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-confirm":
             self.dismiss(True)
@@ -35,6 +42,9 @@ class ConfirmModal(ModalScreen[bool]):
 
     def action_dismiss_no(self) -> None:
         self.dismiss(False)
+
+    def action_dismiss_yes(self) -> None:
+        self.dismiss(True)
 
 
 class SessionSetupScreen(Screen["SessionSetupApp"]):
@@ -73,13 +83,17 @@ class SessionSetupApp(App[str]):
     """Textual app for session setup submenu."""
 
     CSS = """
+    $border: #464554;
+
     Screen {
         align: center middle;
     }
     Vertical {
-        width: 70;
+        width: auto;
+        min-width: 40;
+        max-width: 70;
         height: auto;
-        border: solid green;
+        border: solid $border;
         padding: 1 2;
     }
     #session_status {
@@ -97,23 +111,22 @@ class SessionSetupApp(App[str]):
         self.status_text = status_text
         self.on_login = on_login
         self.on_back = on_back
-        self.result = "back"
 
     def on_mount(self) -> None:
         self.push_screen(SessionSetupScreen(self.status_text, self.on_login, self.on_back))
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "login":
-            self.on_login()
-            self.result = "login"
-        elif event.button.id == "back":
-            self.on_back()
-            self.result = "back"
-        self.exit()
+    # U1 (CRITICAL): the app-level on_button_pressed handler was REMOVED.
+    # Button.Pressed events bubble from the screen to the app, so the old
+    # duplicate handler fired alongside SessionSetupScreen's handler and
+    # invoked on_login() immediately — bypassing the ConfirmModal and
+    # deleting the session without confirmation (violated FR-002.4).
+    # The screen is now the single event handler; the modal is the only gate.
 
 
 def run_session_setup(status_text: str, on_login: Callable[[], None], on_back: Callable[[], None]) -> str:
     """Run the Textual session setup submenu and return the selected action."""
     app = SessionSetupApp(status_text, on_login, on_back)
-    app.run()
-    return app.result
+    # C3: screen-driven exits call self.app.exit("login"/"back"), which lands
+    # in app.run()'s return value — NOT app.result. Validate it here.
+    result = app.run()
+    return result if result in {"login", "back"} else "back"

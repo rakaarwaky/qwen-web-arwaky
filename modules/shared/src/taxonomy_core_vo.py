@@ -18,11 +18,13 @@ from typing import NewType, TypeAlias
 PromptText = NewType("PromptText", str)
 PromptPath = NewType("PromptPath", Path)
 AttachmentPath = NewType("AttachmentPath", Path)
+FolderPath = NewType("FolderPath", Path)
 InputPath = NewType("InputPath", Path)
 OutputPath = NewType("OutputPath", Path)
 FilePath = NewType("FilePath", Path)
 RunId = NewType("RunId", str)
 RunIdHex = NewType("RunIdHex", str)
+JobName = NewType("JobName", str)
 RunContextId = NewType("RunContextId", str)
 MessageCount = NewType("MessageCount", int)
 ResponseText = NewType("ResponseText", str)
@@ -517,6 +519,7 @@ class AppConfig:
 __all__ = [
     "PromptText",
     "InputPath",
+    "FolderPath",
     "OutputPath",
     "FilePath",
     "RunId",

@@ -28,6 +28,8 @@ from modules.core.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
+from modules.core.src.capabilities_folder_compiler import FolderCompiler
+from modules.core.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.core.src.capabilities_job_manager import JobManager
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
 from modules.core.src.capabilities_output_saver import Saver
@@ -85,6 +87,8 @@ class SharedContainer:
         self.observability = ObservabilitySetup(log)
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager()
+        self.folder_compiler = FolderCompiler()
+        self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
 
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
@@ -117,6 +121,7 @@ class SharedContainer:
             saver=self.saver,
             observability=self.observability,
             flow=self.agent_shared_flow_orchestrator,
+            folder_adapter=self.folder_adapter,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,

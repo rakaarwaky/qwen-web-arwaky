@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installation & environment setup script for qwen-web-cli & MCP server.
+# Installation & environment setup script for qwen-web-arwaky & MCP server.
 
 set -euo pipefail
 

@@ -25,16 +25,17 @@ def _processing_failure_message(result: object) -> str | None:
     return detect_processing_failure(result)
 
 
-@safe_handle
-def handle(
-    args: object,
+def dispatch_run(
     cfg: AppConfig,
     direct: IDirectPromptAggregate,
     file_only: IPromptFileAggregate,
     attachment: IAttachmentPromptAggregate,
 ) -> dict[str, object]:
-    """Dispatch single prompt processing to the matching pipeline orchestrator."""
-    _ = args
+    """C4: single shared dispatcher for direct/single modes.
+
+    Used by both ``handle`` (run subcommand) and ``InteractiveController.run``
+    so the dispatch semantics stay in exactly one place.
+    """
     mode = cfg.mode
 
     if mode == "direct":
@@ -70,3 +71,16 @@ def handle(
     if failure is not None:
         return error_response(RuntimeError(failure), "processing_failed", "cli-422")
     return success_response(result)
+
+
+@safe_handle
+def handle(
+    args: object,
+    cfg: AppConfig,
+    direct: IDirectPromptAggregate,
+    file_only: IPromptFileAggregate,
+    attachment: IAttachmentPromptAggregate,
+) -> dict[str, object]:
+    """Dispatch single prompt processing to the matching pipeline orchestrator."""
+    _ = args
+    return dispatch_run(cfg, direct, file_only, attachment)

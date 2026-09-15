@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import threading
+import types
 from contextlib import nullcontext, suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,8 +39,9 @@ from modules.core.src.utility_core_io_writer import atomic_write_json, ensure_di
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
-from modules.shared.src.taxonomy_core_vo import ExitCode, MessageCount, ServiceName, StatusRecordVO
+from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, MessageCount, RunId, ServiceName, StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
 
 # Block 1: Class Definition & Constructor
@@ -134,6 +137,8 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._status_path = status_path_for(log_path)
         self._status_writer = status_writer or StatusFileWriter(self._status_path)
         self._metrics = MetricsCounter()
+        self._run_handlers: dict[str, logging.FileHandler] = {}
+        self._formatter: Any = None
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
 
@@ -194,9 +199,22 @@ class ObservabilitySetup(IObservabilityProtocol):
 
     def _configure_logging(self, log_path: Path, verbose: bool = False) -> None:
         """Configure structlog/stdlib logging (private helper)."""
-        log_level = logging.DEBUG if verbose else logging.WARNING
+        log_level = logging.DEBUG if verbose else logging.INFO
         if structlog is None:
-            logging.basicConfig(level=log_level)
+            # Fallback: wire a stdlib JSON formatter + file handler so per-run
+            # logs still work when structlog is not installed.
+            self._formatter = _make_json_formatter()
+            root = logging.getLogger()
+            root.setLevel(log_level)
+            stderr_handler = logging.StreamHandler(sys.stderr)
+            stderr_handler.setFormatter(self._formatter)
+            root.addHandler(stderr_handler)
+            try:
+                file_handler = logging.FileHandler(log_path / "app.jsonl", encoding="utf-8")
+                file_handler.setFormatter(self._formatter)
+                root.addHandler(file_handler)
+            except OSError:
+                pass
             return
 
         shared_processors: list[Any] = [
@@ -229,6 +247,7 @@ class ObservabilitySetup(IObservabilityProtocol):
                 renderer,
             ],
         )
+        self._formatter = formatter
 
         root = logging.getLogger()
         root.setLevel(logging.DEBUG if verbose else logging.INFO)
@@ -260,6 +279,40 @@ class ObservabilitySetup(IObservabilityProtocol):
 
     def clear_run_context(self) -> None:
         _clear_run_context()
+
+    def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
+        """Attach a per-run JSONL log file under the jobs directory.
+
+        Every log record emitted while this handler is attached is written to
+        ``{DEFAULT_JOBS_DIR}/{job_name}_{timestamp}_{run_id}.jsonl`` in
+        addition to the aggregate ``app.jsonl``. Use ``detach_run_log`` to
+        close the handler once the run finishes.
+        """
+        jobs_dir = DEFAULT_JOBS_DIR
+        try:
+            jobs_dir.mkdir(parents=True, exist_ok=True)
+            safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", job_name).strip("._") or "run"
+            ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+            path = jobs_dir / f"{safe_name}_{ts}_{run_id}.jsonl"
+            if self._formatter is not None:
+                handler = logging.FileHandler(path, encoding="utf-8")
+                handler.setFormatter(self._formatter)
+                # Keep only records whose bound run_id matches this run so
+                # overlapping runs never leak records into each other's log.
+                handler.addFilter(_make_run_id_filter(str(run_id)))
+                logging.getLogger().addHandler(handler)
+                self._run_handlers[str(run_id)] = handler
+            return path
+        except OSError:
+            return jobs_dir / f"{run_id}.jsonl"
+
+    def detach_run_log(self, run_id: RunId) -> None:
+        """Detach and close the per-run log handler for the given run id."""
+        handler = self._run_handlers.pop(str(run_id), None)
+        if handler is not None:
+            logging.getLogger().removeHandler(handler)
+            with suppress(Exception):
+                handler.close()
 
     def exit_code_for(self, exc: BaseException) -> ExitCode:
         return ExitCode(utility_core_exit.exit_code_for(exc))
@@ -302,6 +355,43 @@ def _start_span(name: str) -> Any:
     if tracer is None:
         return nullcontext()
     return tracer.start_as_current_span(name)
+
+
+def _json_format(record: logging.LogRecord) -> str:
+    """Render a stdlib LogRecord as a single JSON line (structlog-free)."""
+    payload: dict[str, Any] = {
+        "event": record.getMessage(),
+        "level": record.levelname.lower(),
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "logger": record.name,
+    }
+    if record.exc_info:
+        payload["exc_info"] = logging.Formatter().formatException(record.exc_info)
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _make_json_formatter() -> Any:
+    """Return a JSON-lines formatter-compatible object (no class definitions)."""
+    return types.SimpleNamespace(format=_json_format)
+
+
+def _make_run_id_filter(run_id: str) -> Any:
+    """Return a filter that keeps only records bound to ``run_id``.
+
+    Reads the structlog contextvars in the emitting thread so that concurrent
+    runs (TUI slots, MCP background jobs) never cross-write per-run logs.
+    """
+
+    def _filter(_record: logging.LogRecord) -> bool:
+        if structlog is None:
+            return True
+        try:
+            ctx = structlog.contextvars.get_contextvars()
+        except Exception:
+            return False
+        return str(ctx.get("run_id", "")) == run_id
+
+    return types.SimpleNamespace(filter=_filter)
 
 
 def add_trace_context(_logger: Any, _method: str, event_dict: dict[str, Any]) -> dict[str, Any]:

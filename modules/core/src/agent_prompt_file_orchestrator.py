@@ -5,6 +5,8 @@ Orchestrates prompt execution from local prompt file (.md) without attachment.
 
 from __future__ import annotations
 
+import contextlib
+import threading
 import time
 from pathlib import Path
 
@@ -31,10 +33,12 @@ from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     HeadlessFlag,
+    JobName,
     OutputPath,
     PromptPath,
     ResponseText,
     RunContext,
+    RunId,
 )
 
 
@@ -58,6 +62,20 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         self._saver = saver
         self._observability = observability
         self._flow = flow
+        self._cancel_event = threading.Event()
+        self._active_bctx: object | None = None
+        self._bctx_lock = threading.Lock()
+
+    def request_cancel(self) -> None:
+        """Request cancellation of any active browser session."""
+        self._cancel_event.set()
+        with self._bctx_lock:
+            bctx = self._active_bctx
+        if bctx is not None:
+            close_fn = getattr(bctx, "close", None)
+            if callable(close_fn):
+                with contextlib.suppress(Exception):
+                    close_fn()
 
     def process_prompt_file_only(
         self,
@@ -66,6 +84,8 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         headless: HeadlessFlag | bool = True,
     ) -> ResponseText:
         """Pipeline 2: Process a prompt file from disk without attachment."""
+        ctx = RunContext()
+        self._cancel_event.clear()
         try:
             p_path, out_path = resolve_pipeline_output_path(prompt_file, output_file)
             cfg = build_app_config(
@@ -73,18 +93,30 @@ class PromptFileOrchestrator(IPromptFileAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            ctx = RunContext()
+            self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
+            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                text = self._execute_file_on_page(page, p_path, cfg.request_timeout, cfg, emitter, state)
+                with self._bctx_lock:
+                    self._active_bctx = bctx
+                try:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Cancelled by user")
+                    page = bctx.pages[0] if bctx.pages else bctx.new_page()
+                    text = self._execute_file_on_page(page, p_path, cfg.request_timeout, cfg, emitter, state)
+                finally:
+                    with self._bctx_lock:
+                        self._active_bctx = None
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
+        finally:
+            self._observability.detach_run_log(RunId(ctx.run_id))
+            self._observability.clear_run_context()
 
     def _execute_file_on_page(
         self,

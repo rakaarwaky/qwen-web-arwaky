@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 from modules.root_cli_main_entry import _build_config, _parse_args
 
@@ -61,7 +63,8 @@ class TestMcpPromptTemplateIntegration:
         called_prompt = mock_file_only.process_prompt_file_only.call_args[0][0]
         assert str(called_prompt).endswith("frontend.md")
 
-    def test_mcp_attachment_with_role(self, tmp_path: Path) -> None:
+    def test_mcp_attachment_with_role(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
         dummy_att = tmp_path / "code.py"
         dummy_att.write_text("print('hello')")
 
@@ -103,18 +106,20 @@ class TestTuiPromptTemplateIntegration:
         mock_switch = MagicMock(value=True)
 
         def fake_query_one(selector: str, *args: object, **kwargs: object) -> MagicMock:
-            if selector.startswith("#input-prompt"):
+            sel = str(selector)
+            if sel.startswith("#input-prompt"):
                 return mock_input_prompt
-            if selector.startswith("#input-file"):
+            if sel.startswith("#input-file"):
                 return mock_input_file
-            if selector.startswith("#input-output"):
+            if sel.startswith("#input-output"):
                 return mock_input_output
-            if selector.startswith("#switch-headless"):
+            if sel.startswith("#switch-headless"):
                 return mock_switch
             return MagicMock()
 
         app.query_one = fake_query_one  # type: ignore[assignment]
         app._execute_slot_worker = MagicMock()  # type: ignore[assignment]
+        app.set_timer = MagicMock()  # type: ignore[assignment]
         app._run_slot(1)
 
         app._execute_slot_worker.assert_called_once()
@@ -122,4 +127,3 @@ class TestTuiPromptTemplateIntegration:
         assert cfg.prompt_path is not None
         assert cfg.prompt_path.name == "architect.md"
         assert cfg.prompt_path.exists()
-

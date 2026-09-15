@@ -46,7 +46,7 @@ class TestSurfaceCliUpdateCommand(unittest.TestCase):
         args.force = False
 
         self.updater.check_update.return_value = UpdateCheckResult(
-            package_name="qwen-web-cli",
+            package_name="qwen-web-arwaky",
             current_version="4.5.1",
             latest_version="4.5.1",
             update_available=False,
@@ -63,7 +63,7 @@ class TestSurfaceCliUpdateCommand(unittest.TestCase):
         args.force = False
 
         self.updater.check_update.return_value = UpdateCheckResult(
-            package_name="qwen-web-cli",
+            package_name="qwen-web-arwaky",
             current_version="4.5.1",
             latest_version="4.5.2",
             update_available=True,
@@ -72,7 +72,7 @@ class TestSurfaceCliUpdateCommand(unittest.TestCase):
 
         res = surface_cli_update_command.handle(args, self.updater)
         self.assertTrue(res.get("success"))
-        self.assertIn("qwen-web-cli update", str(res.get("message")))
+        self.assertIn("qwen-web-arwaky update", str(res.get("message")))
 
     def test_handle_perform_update_success(self) -> None:
         args = MagicMock()
@@ -80,7 +80,7 @@ class TestSurfaceCliUpdateCommand(unittest.TestCase):
         args.force = False
 
         self.updater.perform_update.return_value = UpdateReport(
-            package_name="qwen-web-cli",
+            package_name="qwen-web-arwaky",
             previous_version="4.5.1",
             latest_version="4.5.2",
             source="github",
@@ -94,7 +94,7 @@ class TestSurfaceCliUpdateCommand(unittest.TestCase):
             health_checks=(UpdateStepResult("health:python_runtime", True, True, "Python 3.10+"),),
             post_update_version="4.5.2",
             healthy=True,
-            message="Successfully updated qwen-web-cli 4.5.1 -> 4.5.2",
+            message="Successfully updated qwen-web-arwaky 4.5.1 -> 4.5.2",
         )
 
         res = surface_cli_update_command.handle(args, self.updater)
@@ -158,7 +158,7 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
                 self.manager,
                 "check_update",
                 return_value=UpdateCheckResult(
-                    package_name="qwen-web-cli",
+                    package_name="qwen-web-arwaky",
                     current_version="5.0.0",
                     latest_version="5.2.0",
                     update_available=True,
@@ -225,7 +225,7 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
     ) -> None:
         mock_curr_ver.side_effect = [VersionString("4.5.1"), VersionString("4.5.2")]
         mock_check_update.return_value = UpdateCheckResult(
-            package_name="qwen-web-cli",
+            package_name="qwen-web-arwaky",
             current_version="4.5.1",
             latest_version="4.5.2",
             update_available=True,

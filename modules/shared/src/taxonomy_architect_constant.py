@@ -1,11 +1,11 @@
 """Taxonomy: architect role prompt template constant.
 
-Domain taxonomy constant layer for the built-in Architect prompt template.
+Generic architecture review prompt template — no framework coupling.
 """
 
 from __future__ import annotations
 
-EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architect
+EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architecture Review
 
 ## Summary
 
@@ -13,30 +13,35 @@ EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architect
 
 ## Findings
 
-### Layer Boundaries
+### Structural Boundaries
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Responsibility segregation, dependency direction, interface abstraction, layer skipping, circular dependencies -->
+<!-- Check: Module ownership, dependency direction, abstraction layers, circular dependencies, responsibility segregation -->
 
-### Naming
+### Naming & Conventions
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Domain terminology consistency, acronym expansion, meaningful abbreviations, naming patterns, context clarity -->
+<!-- Check: Domain terminology, naming consistency, meaningful abbreviations, pattern adherence, context clarity -->
 
-### Orphan
+### Dead Code & Orphans
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
 <!-- Check: Unused classes/interfaces, dead code paths, unreachable modules, orphaned configuration, disconnected components -->
 
-### Scalability
+### Scalability & Performance
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Horizontal scaling readiness, stateless design, bottleneck identification, resource contention, load distribution patterns -->
+<!-- Check: Stateless design, bottleneck identification, resource contention, load distribution, horizontal scaling readiness -->
 
-### Data Flow
+### Data Flow & Integrity
 | # | Severity | Issue | Location | Recommendation |
 | --- | ---------- | ------- | ---------- | ---------------- |
-<!-- Check: Synchronous/asynchronous boundaries, backpressure handling, data validation points, transformation consistency, pipeline integrity -->
+<!-- Check: Sync/async boundaries, backpressure handling, validation points, transformation consistency, pipeline integrity -->
+
+### Security
+| # | Severity | Issue | Location | Recommendation |
+| --- | ---------- | ------- | ---------- | ---------------- |
+<!-- Check: Input validation, auth boundaries, secrets handling, dependency supply chain, data exposure -->
 
 ## Violations
 
@@ -54,9 +59,9 @@ EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architect
 
 | Level | Meaning |
 | ------- | ------------------------------------------------------ |
-| 🔴 CRITICAL | Layering breach, security, data leak. Immediate fix. |
-| 🟡 WARNING | Convention/perf/maintainability. Fix this cycle. |
-| 🟢 INFO | Suggestion. Deferrable. |
+| CRITICAL | Layering breach, security risk, data leak. Immediate fix. |
+| WARNING | Convention/perf/maintainability. Fix this cycle. |
+| INFO | Suggestion. Deferrable. |
 """
 
 __all__ = ["EMBEDDED_ARCHITECT_TEMPLATE"]

@@ -8,8 +8,9 @@ and session management tools (check_session, delete_session).
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
@@ -68,6 +69,47 @@ def _format_success_payload(
     if extra:
         payload.update(extra)
     return json.dumps(payload, indent=2)
+
+
+def _get_workspace_root() -> Path:
+    """Workspace root bounding attachment paths (env override, else cwd)."""
+    root = os.environ.get("QWEN_WORKSPACE_ROOT")
+    return Path(root).expanduser().resolve() if root else Path.cwd().resolve()
+
+
+def _validate_attachment_path(raw: str) -> tuple[Path | None, str | None]:
+    """Resolve and validate an attachment path for MCP tool calls.
+
+    Returns ``(path, None)`` on success or ``(None, error_payload)`` on
+    failure. Rejects non-existent paths, special nodes (FIFO/socket/device),
+    and paths outside the configured workspace root.
+    """
+    a_path = Path(raw).expanduser().resolve()
+    if not a_path.exists():
+        return None, _format_error_payload(
+            code="FILE_NOT_FOUND",
+            message=f"Attachment file or folder not found: {a_path}",
+            hint="Check attachment_file path. Can be a file or directory.",
+            field="attachment_file",
+        )
+    if not (a_path.is_file() or a_path.is_dir()):
+        return None, _format_error_payload(
+            code="INVALID_PATH",
+            message=f"Attachment path is not a regular file or directory: {a_path}",
+            hint="FIFOs, sockets, and device nodes are not supported.",
+            field="attachment_file",
+        )
+    root = _get_workspace_root()
+    try:
+        a_path.relative_to(root)
+    except ValueError:
+        return None, _format_error_payload(
+            code="PATH_OUTSIDE_WORKSPACE",
+            message=f"Attachment path is outside the workspace root: {a_path}",
+            hint=f"Place files under {root} or set QWEN_WORKSPACE_ROOT.",
+            field="attachment_file",
+        )
+    return a_path, None
 
 
 def _format_error_payload(
@@ -235,7 +277,8 @@ class McpToolCommand:
         Args:
             prompt_file: Path to Markdown prompt file OR a built-in role template
                 name (architect|backend|frontend|analyst).
-            attachment_file: Path to document attachment file (PDF, TXT, MD).
+            attachment_file: Path to document attachment file (PDF, TXT, MD) or directory
+                (will be compiled to single markdown file).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
@@ -255,14 +298,10 @@ class McpToolCommand:
                 field="prompt_file",
             )
 
-        a_path = Path(attachment_file).expanduser().resolve()
-        if not a_path.exists():
-            return _format_error_payload(
-                code="FILE_NOT_FOUND",
-                message=f"Attachment file not found: {a_path}",
-                hint="Check attachment_file path.",
-                field="attachment_file",
-            )
+        a_path, a_err = _validate_attachment_path(attachment_file)
+        if a_err is not None:
+            return a_err
+        a_path = cast(Path, a_path)
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 

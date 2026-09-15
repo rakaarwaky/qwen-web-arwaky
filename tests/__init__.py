@@ -1,1 +1,1 @@
-"""Test suite for qwen-web-cli."""
+"""Test suite for qwen-web-arwaky."""

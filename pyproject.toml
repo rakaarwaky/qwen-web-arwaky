@@ -3,8 +3,8 @@ requires = ["setuptools>=84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "qwen-web-cli"
-version = "5.2.2"
+name = "qwen-web-arwaky"
+version = "6.1.1"
 description = "Production-grade CLI automation and MCP server for chat.qwen.ai"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,8 +25,6 @@ dependencies = [
 [project.scripts]
 qwen-web-arwaky = "modules.root_cli_main_entry:main"
 qwa = "modules.root_cli_main_entry:main"
-qwen-web-cli = "modules.root_cli_main_entry:main"
-qwc = "modules.root_cli_main_entry:main"
 qwen-web-mcp = "modules.root_mcp_main_entry:main"
 
 [tool.setuptools]
@@ -90,9 +88,10 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*"]
+module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*", "rich.*", "textual.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
+disallow_subclassing_any = false
 check_untyped_defs = false
 
 [dependency-groups]

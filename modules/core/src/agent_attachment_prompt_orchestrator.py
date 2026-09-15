@@ -1,10 +1,13 @@
 """Agent: attachment prompt orchestrator (AES405).
 
 Orchestrates prompt execution with mandatory document file attachment (.pdf, .md, .txt).
+Supports folder-to-attachment compilation (folder -> single markdown file).
 """
 
 from __future__ import annotations
 
+import contextlib
+import threading
 import time
 from pathlib import Path
 
@@ -17,6 +20,7 @@ from modules.core.src.utility_core_io_writer import save_orchestrator_output
 from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
+    IFolderToAttachmentProtocol,
     IInjectionProtocol,
     IObservabilityProtocol,
     ISaverProtocol,
@@ -32,10 +36,12 @@ from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
     HeadlessFlag,
+    JobName,
     OutputPath,
     PromptPath,
     ResponseText,
     RunContext,
+    RunId,
     SenderConfig,
 )
 
@@ -53,6 +59,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
         flow: IPromptFlowAggregate,
+        folder_adapter: IFolderToAttachmentProtocol,
     ) -> None:
         self._browser = browser
         self._injector = injector
@@ -62,6 +69,21 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._saver = saver
         self._observability = observability
         self._flow = flow
+        self._folder_adapter = folder_adapter
+        self._cancel_event = threading.Event()
+        self._active_bctx: object | None = None
+        self._bctx_lock = threading.Lock()
+
+    def request_cancel(self) -> None:
+        """Request cancellation of any active browser session."""
+        self._cancel_event.set()
+        with self._bctx_lock:
+            bctx = self._active_bctx
+        if bctx is not None:
+            close_fn = getattr(bctx, "close", None)
+            if callable(close_fn):
+                with contextlib.suppress(Exception):
+                    close_fn()
 
     def process_prompt_with_attachment(
         self,
@@ -70,15 +92,22 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
     ) -> ResponseText:
-        """Pipeline 3: Process a prompt file from disk with document attachment."""
+        """Pipeline 3: Process a prompt file from disk with document attachment.
+
+        Supports folder paths: if attachment_file is a folder, it will be
+        compiled to a single markdown file before upload.
+        """
+        ctx = RunContext()
+        self._cancel_event.clear()
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
                 raise FileNotFoundError(f"Input file not found: {p_path}")
 
-            att_path = Path(attachment_file).resolve()
-            if not att_path.exists():
-                raise FileNotFoundError(f"Attachment file not found: {att_path}")
+            self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
+            self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
+
+            att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
 
             out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
             if out_path.is_dir():
@@ -90,20 +119,30 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 output_path=out_path,
                 headless=headless,
             )
-            ctx = RunContext()
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                text = self._execute_attachment_on_page(
-                    page, p_path, att_path, cfg.request_timeout, cfg, emitter, state
-                )
+                with self._bctx_lock:
+                    self._active_bctx = bctx
+                try:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Cancelled by user")
+                    page = bctx.pages[0] if bctx.pages else bctx.new_page()
+                    text = self._execute_attachment_on_page(
+                        page, p_path, att_path, cfg.request_timeout, cfg, emitter, state
+                    )
+                finally:
+                    with self._bctx_lock:
+                        self._active_bctx = None
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
+        finally:
+            self._observability.detach_run_log(RunId(ctx.run_id))
+            self._observability.clear_run_context()
 
     def _execute_attachment_on_page(
         self,

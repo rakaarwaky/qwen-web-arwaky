@@ -56,7 +56,7 @@ def _format_check_result(res: UpdateCheckResult) -> str:
     if res.latest_version is None:
         lines.append("⚠️ Could not determine the latest published version. Check network access and retry.")
     elif res.update_available:
-        lines.append(f"⬆️ Run `qwen-web-cli update` to upgrade to {res.latest_version}.")
+        lines.append(f"⬆️ Run `qwen-web-arwaky update` to upgrade to {res.latest_version}.")
     else:
         lines.append("✅ You are already running the latest version.")
     lines.append("")

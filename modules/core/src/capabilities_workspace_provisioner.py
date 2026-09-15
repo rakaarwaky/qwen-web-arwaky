@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import FilePath
 from modules.shared.src.taxonomy_skill_constant import EMBEDDED_SKILL_MD
 
@@ -39,6 +39,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         target_path = Path(str(target_dir)).resolve()
 
         # Step 1: Ensure XDG directories exist
+        DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         DEFAULT_OUTPUT.mkdir(parents=True, exist_ok=True)
         DEFAULT_LOG.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +89,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
             )
 
         links: dict[str, Any] = {
+            "jobs": DEFAULT_JOBS_DIR,
             "log": DEFAULT_LOG,
             "output": DEFAULT_OUTPUT,
             "qwen_session": DEFAULT_SESSION,

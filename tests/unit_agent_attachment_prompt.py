@@ -39,6 +39,7 @@ def _make_attachment_orchestrator() -> AttachmentPromptOrchestrator:
         saver=saver,
         observability=MagicMock(get_logger=MagicMock(return_value=MagicMock())),
         flow=MagicMock(),
+        folder_adapter=MagicMock(),
     )
 
 

@@ -43,10 +43,7 @@ def load_prompt_template(role: str) -> str:
     """
     role_key = role.strip().lower()
     if role_key not in _ROLE_TO_TEMPLATE:
-        raise ValueError(
-            f"Unknown prompt template role: {role!r}. "
-            f"Supported: {', '.join(PROMPT_TEMPLATE_ROLES)}"
-        )
+        raise ValueError(f"Unknown prompt template role: {role!r}. Supported: {', '.join(PROMPT_TEMPLATE_ROLES)}")
     return _ROLE_TO_TEMPLATE[role_key]
 
 

@@ -33,6 +33,8 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_MODEL,
     LOGIN_FORM_SELECTORS,
     MODEL_SELECTOR_BUTTON,
+    NAVIGATION_LOAD_TIMEOUT_MS,
+    NAVIGATION_TIMEOUT_MS,
     NEW_CHAT_SELECTORS,
     TEXTAREA_SELECTOR,
 )
@@ -106,14 +108,14 @@ def _assert_on_chat_page(page: Page) -> None:
     if any(k in current_url for k in AUTH_KEYWORDS):
         raise AuthRequiredError(
             f"Not authenticated — browser is on login or guest page ({page.url}). "
-            "Please run 'qwen-web-cli --login' or click Login in TUI to authenticate first."
+            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
         )
 
     combined_login = ", ".join(LOGIN_FORM_SELECTORS)
     if is_any_visible(page, combined_login):
         raise AuthRequiredError(
             f"Not authenticated — login form/button detected on page ({page.url}). "
-            "Please run 'qwen-web-cli --login' or click Login in TUI to authenticate first."
+            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
         )
 
     if not page.query_selector(TEXTAREA_SELECTOR):
@@ -143,11 +145,25 @@ class BrowserAdapter(IBrowserProtocol):
         ``domcontentloaded`` can remain pending when Qwen or an analytics asset
         stalls. The application only needs the committed chat document before
         its own DOM readiness checks, so navigation uses ``commit`` and treats
-        the later DOMContentLoaded wait as best-effort. A second commit attempt
-        remains available for transient connection failures.
+        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
+        exponential backoff (2s, 4s, 8s) handle transient network failures.
+
+        If the page is already on chat.qwen.ai (e.g. from eager navigation in
+        browser_session), the goto is skipped and only DOM readiness is awaited.
         """
+        # Fast path: eager navigation in browser_session already landed us here.
+        if "chat.qwen.ai" in (page.url or ""):
+            log.debug("browser_skip_goto_already_on_chat", url=page.url)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+            except Error as err:
+                log.warning("Load state wait failed, proceeding: %s", err)
+            return
+
+        max_attempts = 4
+        backoff_ms = [2000, 4000, 8000]
         last_error: Error | None = None
-        for attempt in range(2):
+        for attempt in range(max_attempts):
             try:
                 page.goto(
                     CHAT_URL,
@@ -161,9 +177,16 @@ class BrowserAdapter(IBrowserProtocol):
                 return
             except Error as err:
                 last_error = err
-                if attempt == 0:
-                    log.warning("Initial page.goto failed (%s), retrying commit navigation...", err)
-                    page.wait_for_timeout(1500)
+                if attempt < max_attempts - 1:
+                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
+                    log.warning(
+                        "page.goto attempt %d/%d failed (%s), retrying in %ds...",
+                        attempt + 1,
+                        max_attempts,
+                        err,
+                        wait // 1000,
+                    )
+                    page.wait_for_timeout(wait)
         if last_error is not None:
             raise last_error
 
@@ -171,7 +194,7 @@ class BrowserAdapter(IBrowserProtocol):
         """Reset the page to a clean state by navigating back to chat.qwen.ai."""
         try:
             emitter.emit(EVENT_NETWORK_RECONNECTING, {"url": CHAT_URL})
-            self._goto_chat(page, 10_000, 15_000)
+            self._goto_chat(page, 10_000, NAVIGATION_LOAD_TIMEOUT_MS)
         except Error as e:
             log.warning("Failed to reset page: %s", e)
 
@@ -186,7 +209,7 @@ class BrowserAdapter(IBrowserProtocol):
         Step 6: Verify the default model is active (abort pipeline if not)
         """
         # Step 1: Navigate to chat URL
-        self._goto_chat(page, 30_000, 15_000)
+        self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
 
         # Step 2: Verify user authentication
         _assert_on_chat_page(page)
@@ -349,7 +372,7 @@ class BrowserAdapter(IBrowserProtocol):
         try:
             if "/c/" in page.url.lower():
                 log.info("Active chat thread detected (%s). Navigating to root chat URL...", page.url)
-                self._goto_chat(page, 15_000, 15_000)
+                self._goto_chat(page, 15_000, NAVIGATION_LOAD_TIMEOUT_MS)
                 page.wait_for_timeout(1000)
 
             if click_first_visible_enabled(page, NEW_CHAT_SELECTORS, timeout_ms=3000):
@@ -479,6 +502,21 @@ class BrowserAdapter(IBrowserProtocol):
                 with sync_playwright() as p:
                     ctx = self._launch_context(p, kwargs)
                     context_started = True
+
+                    # Eagerly navigate the initial about:blank page to CHAT_URL
+                    # so the browser starts loading while route/diagnostics setup
+                    # and orchestrator init happen in parallel.
+                    if ctx.pages:
+                        try:
+                            ctx.pages[0].goto(
+                                CHAT_URL,
+                                wait_until="commit",
+                                timeout=NAVIGATION_TIMEOUT_MS,
+                            )
+                            log.debug("browser_eager_navigate_ok", url=CHAT_URL)
+                        except Error as exc:
+                            log.warning("browser_eager_navigate_failed, will retry in navigate_to_chat: %s", exc)
+
                     if mode != "login":
                         ctx.route(
                             "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
@@ -505,14 +543,18 @@ class BrowserAdapter(IBrowserProtocol):
 
                         def on_request(request: Any) -> None:
                             if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
-                                log.info("browser_mutation_request", method=request.method, url=_sanitize_url(request.url))
+                                log.info(
+                                    "browser_mutation_request", method=request.method, url=_sanitize_url(request.url)
+                                )
 
                         def on_response(response: Any) -> None:
                             url = response.url.lower()
                             if response.status >= 400 and any(
                                 token in url for token in ("chat", "completion", "generate", "conversation", "api")
                             ):
-                                log.warning("browser_http_error", status=response.status, url=_sanitize_url(response.url))
+                                log.warning(
+                                    "browser_http_error", status=response.status, url=_sanitize_url(response.url)
+                                )
                             elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
                                 log.info(
                                     "browser_mutation_response", status=response.status, url=_sanitize_url(response.url)

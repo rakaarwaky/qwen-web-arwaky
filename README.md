@@ -36,6 +36,18 @@
 
 ---
 
+## What's New in v6.0.0
+
+- **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS), `crate::` (Rust), and Markdown link / reference-definition / Obsidian `[[wikilink]]` resolution.
+- **Async MCP job dispatch** — background prompt jobs (`async_run` → `job_id`) with `get_job_status` / `list_jobs` tools; no more MCP stdio timeouts on long runs.
+- **Per-job JSONL logging + TUI observability** — track parallel and long-running jobs with run-in-progress guards and live status.
+- **Standardized role prompt templates** — consistent analyst / architect / backend / devops / frontend templates.
+- **Container support** — official `Containerfile` + `scripts/podman.sh` for containerized execution.
+- **XDG-compliant uninstall** — `scripts/uninstall.sh` removes the venv and all launchers cleanly.
+- ⚠️ **Breaking**: legacy `qwen-web-cli` / `qwc` commands removed — use `qwen-web-arwaky` / `qwa` only.
+
+---
+
 ## Quick Start in 60 Seconds
 
 ### 1. Installation (Cross-Platform)
@@ -74,7 +86,7 @@ python3 -m playwright install chromium
 Initialize standard XDG directory structures and local symlinks with one command:
 
 ```bash
-qwen-web-cli init
+qwen-web-arwaky init
 ```
 
 ### 3. One-Time Login Setup
@@ -82,7 +94,7 @@ qwen-web-cli init
 Authenticate your session once. Persistent session tokens are saved securely under `~/.local/share/qwen-web/qwen_session` with `0o700` restricted permissions:
 
 ```bash
-qwen-web-cli login
+qwen-web-arwaky login
 ```
 
 ---
@@ -91,10 +103,10 @@ qwen-web-cli login
 
 ### Interactive Terminal UI (TUI)
 
-Run `qwen-web-cli` without arguments to launch the Textual TUI dashboard:
+Run `qwen-web-arwaky` without arguments to launch the Textual TUI dashboard:
 
 ```bash
-qwen-web-cli
+qwen-web-arwaky
 ```
 
 ![Qwen Web TUI Dashboard](design/tui_dashboard.svg)
@@ -106,7 +118,7 @@ qwen-web-cli
 Send a quick prompt string directly from your terminal or shell script:
 
 ```bash
-qwen-web-cli prompt-direct -t "Explain quantum computing in 3 bullet points" -o output/result.md --headless
+qwen-web-arwaky prompt-direct -t "Explain quantum computing in 3 bullet points" -o output/result.md --headless
 ```
 
 ### Single Prompt File Processing
@@ -114,7 +126,7 @@ qwen-web-cli prompt-direct -t "Explain quantum computing in 3 bullet points" -o 
 Process a Markdown prompt file:
 
 ```bash
-qwen-web-cli prompt-only -i input/prompt.md -o output/audit_report.md --headless
+qwen-web-arwaky prompt-only -i input/prompt.md -o output/audit_report.md --headless
 ```
 
 ### Prompt File Processing with Document Attachment
@@ -122,7 +134,7 @@ qwen-web-cli prompt-only -i input/prompt.md -o output/audit_report.md --headless
 Send a prompt file along with a local PDF, Markdown, or text attachment:
 
 ```bash
-qwen-web-cli prompt-with-attachment -i input/review_prompt.md -a input/spec.pdf -o output/review_result.md --headless
+qwen-web-arwaky prompt-with-attachment -i input/review_prompt.md -a input/spec.pdf -o output/review_result.md --headless
 ```
 
 ---
@@ -156,6 +168,9 @@ qwen-web-mcp
 - `process_prompt_file_only`: Process input Markdown prompt files and output results locally.
 - `process_prompt_with_attachment`: Send prompt files together with document attachments.
 - `setup_session`: Trigger an interactive browser session for manual re-authentication if session tokens expire.
+- `get_job_status` / `list_jobs`: Poll and list asynchronous background jobs (v6.0.0+).
+
+> **Async mode (v6.0.0+)**: all `process_*` tools accept `async_run: true` and return a `job_id` immediately; poll with `get_job_status` — ideal for long generations that would otherwise exceed MCP stdio timeouts.
 
 ---
 
@@ -188,7 +203,7 @@ Enforced automatically by `lint-arwaky-cli` with **0 architectural layer violati
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'secondaryColor': '#f4f4f4', 'tertiaryColor': '#ffffff', 'clusterBkg': '#ffffff', 'clusterBorder': '#000000', 'titleColor': '#000000', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart TD
     subgraph Client ["Client Interfaces"]
-        CLI["qwen-web-cli (TUI / Subcommands)"]
+        CLI["qwen-web-arwaky (TUI / Subcommands)"]
         MCP["qwen-web-mcp (Stdio Server)"]
     end
 

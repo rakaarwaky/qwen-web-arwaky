@@ -14,13 +14,13 @@ The root parser reads `sys.argv` using a subcommand-based interface (`init`, `lo
 
 | Subcommand | Signal | Result | Validation |
 |---|---|---|---|
-| `doctor` | `qwen-web-cli doctor [--json]` | System health diagnostic | Checks Python, Playwright, workspace, session, permissions. |
-| `login` | `qwen-web-cli login [--headless]` | `mode="login"` | Forces headed browser for manual authentication unless overridden. |
-| `init` | `qwen-web-cli init [--dir]` | Workspace initialization | Creates XDG storage directories and root `.qwen-web` symlinks. |
-| `prompt-direct` | `qwen-web-cli prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
-| `prompt-only` | `qwen-web-cli prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
-| `prompt-with-attachment` | `qwen-web-cli prompt-with-attachment -i FILE -a FILE [--json]` | Attachment prompt | Prompt file and attachment file must exist. |
-| `mcp` | `qwen-web-cli mcp` | MCP Stdio Server | Hands off execution to MCP stdio server. |
+| `doctor` | `qwen-web-arwaky doctor [--json]` | System health diagnostic | Checks Python, Playwright, workspace, session, permissions. |
+| `login` | `qwen-web-arwaky login [--headless]` | `mode="login"` | Forces headed browser for manual authentication unless overridden. |
+| `init` | `qwen-web-arwaky init [--dir]` | Workspace initialization | Creates XDG storage directories and root `.qwen-web` symlinks. |
+| `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
+| `prompt-only` | `qwen-web-arwaky prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
+| `prompt-with-attachment` | `qwen-web-arwaky prompt-with-attachment -i FILE -a FILE [--json]` | Attachment prompt | Prompt file and attachment file must exist. |
+| `mcp` | `qwen-web-arwaky mcp` | MCP Stdio Server | Hands off execution to MCP stdio server. |
 
 An invalid run input is rejected with a non-success exit code and a clear, actionable diagnostic on `stderr`.
 
@@ -28,11 +28,11 @@ An invalid run input is rejected with a non-success exit code and a clear, actio
 
 The no-argument TTY fallback launches the **Obsidian Nebula Textual TUI App** (`surface_cli_tui_app.py`).
 
-1. **Dynamic Versioning**: Header displays package version dynamically via `importlib.metadata.version("qwen-web-cli")`.
+1. **Dynamic Versioning**: Header displays package version dynamically via `importlib.metadata.version("qwen-web-arwaky")`.
 2. **Safe Default Attachment**: If candidate attachment files do not exist on disk, attachment input defaults to an empty string `""` so optional fields never fail validation.
 3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved.
 4. **Destructive Action Safety**: Session reset actions present a modal confirmation screen (`ConfirmModal`) before wiping session tokens.
-5. **Non-TTY Rejection**: Running the interactive TUI in non-interactive environments (pipes/cron) prints a helpful, example-driven guidance message pointing to subcommands and `qwen-web-cli doctor`.
+5. **Non-TTY Rejection**: Running the interactive TUI in non-interactive environments (pipes/cron) prints a helpful, example-driven guidance message pointing to subcommands and `qwen-web-arwaky doctor`.
 
 ### FR-003: Manual Login & Session Setup
 

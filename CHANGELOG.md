@@ -4,6 +4,86 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.1.1] - 2026-09-09
+
+### Fixed
+
+- fix(tui): survive teardown race in session-badge writers
+- fix(tui): stop border-bottom from clipping active tab label to zero rows
+- fix(tui): address slots-table columns by stable keys, not labels
+- fix(repo): refresh stale uv.lock and add CI lock-drift guard
+- fix(tui): use set_interval instead of set_timer(repeat)
+- fix(tui): schedule elapsed timer via call_from_thread
+
+## [6.1.0] - 2026-09-10
+
+### Fixed
+
+- fix(cli): session badge race condition — VALID status was overwritten by stale 15s timeout timer after validation completed successfully
+- fix(cli): comprehensive UI/UX overhaul — 19 findings from merged review plan (A1, A3, A4, A6, A8, C3, C4, L1–L4, P4, U1–U8, V1–V3)
+- fix(cli): WCAG contrast — raise `$status-muted` from `#64748B` (3.8:1) to `#8B9BB4` (5.9:1) in CSS and `QwenTuiLogHandler`
+- fix(cli): WCAG contrast — lighten status badge colors for text-on-dark (ok `#34D399`, info `#60A5FA`)
+- fix(cli): session timeout no longer silently overwrites VALID badge; toast notification added for discoverability
+- fix(cli): cooperative cancellation — `CANCELLING…` intermediate status + generation token guard against stale worker writes
+- fix(cli): cancel confirmation for long-running slots (>30s) via `ConfirmModal`
+- fix(cli): live elapsed-time progress updates in Overview table during slot execution
+- fix(cli): login progress indicator — session badge shows `LOGGING IN…` during login flow
+- fix(cli): init workspace moved to background worker to avoid blocking TUI event loop
+- fix(response): skip pagination indicators in DOM extraction
+
+### Changed
+
+- refactor(tui): split `surface_cli_tui_app` into 5 focused mixin modules (compose, handlers, workers, utils, css)
+- refactor(cli): unified `THEME` dict and CSS tokens via `_COLORS` single source of truth (eliminates palette drift)
+- refactor(cli): `$danger-bg`/`$danger-fg` CSS tokens replace hardcoded `#991B1B` literals
+- refactor(cli): picker target captured in closure instead of instance state (fixes race condition)
+- refactor(cli): `_login_in_flight` initialized eagerly in `QwenTuiApp.__init__`
+
+### Added
+
+- feat(cli): `ctrl+x` keyboard binding to cancel active slot
+- feat(cli): `alt+left`/`alt+right` sequential tab cycling for all slots (including slots ≥ 10)
+- feat(cli): help discoverability hint in Overview pane (`Press ? for keyboard shortcuts`)
+- feat(cli): quit-guard uses `notify()` toast for visibility regardless of active tab
+- feat(cli): session-check timer cancellation to prevent stacking
+
+## [6.0.0] - 2026-09-09
+
+### Added
+
+- feat(cli): add `qwen-web-arwaky` and `qwa` as the canonical CLI entry point aliases
+- feat(folder): implement **import-aware multi-language folder compilation** — compile an entire folder of prompt files into a single Markdown document (`utility_folder_compiler`, `capabilities_folder_compiler`)
+- feat(folder): resolve TypeScript/JavaScript **tsconfig path aliases** during folder compilation
+- feat(folder): resolve Rust **`crate::` imports** from the true crate root during folder compilation
+- feat(core): add folder-to-attachment capability (`capabilities_folder_to_attachment`) so compiled folder output can be attached to prompts
+- feat(mcp): add **async job dispatch and status tracking** (`agent_job_orchestrator`, `capabilities_job_manager`) using `QwenEventType` — background runs avoid MCP timeouts
+- feat(mcp): add `get_job_status` and `list_jobs` tools; `process_*` tools gain an `async_run` option returning a `job_id`
+- feat(obs): add **per-job JSONL logging** and TUI observability for parallel/long-running jobs
+- feat(core): add session cloner (`utility_core_session_cloner`) for parallel session handling
+- feat(taxonomy): standardize prompt templates across all roles (analyst, architect, backend, devops, frontend) in dedicated constant modules plus `utility_core_prompt_template`
+- feat(tui): add dedicated TUI components module (`surface_cli_tui_components`) and slot config; major TUI observability upgrade (run-in-progress guard, job status, quit confirmation)
+- feat(install): add XDG-compliant `scripts/uninstall.sh` that removes the venv and all launchers; clean all launchers on reinstall
+- feat(container): add `Containerfile`, `.containerignore`/`.dockerignore` and `scripts/podman.sh` for containerized execution
+- feat(docs): add root `SKILL.md`; remove obsolete role-specific skill files (5× role SKILL.md and `LEAN-CTX.md`)
+
+### Fixed
+
+- fix(cli): UI/UX hardening from dual AI review (P0–P3) across `doctor`, interactive controller, run command, session setup and TUI app
+- fix(mcp): replace `assert` with `cast` for mypy narrowing (Codacy B101)
+- fix(review): address CodeRabbit feedback on PR #166 (observability setup, MCP tool command, folder compiler, skill constants)
+- fix(install): enforce XDG base directory for venv, root symlinks and bin paths
+- fix(install): migrate venv location to standard XDG data directory
+
+### Changed
+
+- **BREAKING**: refactor(cli): remove legacy `qwen-web-cli` / `qwc` command — the CLI is now exclusively `qwen-web-arwaky` / `qwa`
+- refactor(taxonomy): standardize prompt templates across all roles
+- refactor: generalize frontend template to surface-agnostic UI/UX
+- refactor: standardize `uninstall.sh` to XDG Base Directory spec
+- chore(deps): bump `mcp` from 2.0.0 to 2.1.1
+- chore(deps): bump `sentry-sdk` from 2.68.0 to 2.68.1
+- chore(deps-ci): bump `softprops/action-gh-release` from 3.0.2 to 3.0.3
+
 ## [5.2.2] - 2026-08-20
 
 ### Fixed

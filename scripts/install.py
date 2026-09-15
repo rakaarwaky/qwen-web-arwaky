@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform installation & environment setup script for qwen-web-cli & MCP server.
+"""Cross-platform installation & environment setup script for qwen-web-arwaky & MCP server.
 
 Supports Windows, macOS, and Linux without external shell dependencies.
 """
@@ -45,9 +45,15 @@ def get_venv_pip(venv_dir: Path) -> Path:
 
 def ensure_venv() -> Path:
     venv_dir = get_venv_dir()
-    if sys.prefix != sys.base_prefix:
-        log(f"⚡ [install] Using active virtual environment: {sys.prefix}")
-        return Path(sys.executable)
+
+    # If the current executable is already inside the target XDG venv, use it directly.
+    try:
+        resolved = Path(sys.executable).resolve()
+        if resolved.is_relative_to(venv_dir.resolve()):
+            log(f"⚡ [install] Using active virtual environment: {resolved}")
+            return resolved
+    except (ValueError, OSError):
+        pass
 
     python_bin = get_venv_python(venv_dir)
     if not venv_dir.exists() or not python_bin.exists():
@@ -95,13 +101,13 @@ def setup_project_venv_symlink(venv_dir: Path) -> None:
 def uninstall_previous(python_bin: Path) -> None:
     log("🧹 [install] Removing any previous qwen-web installation...")
     subprocess.run(
-        [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli"],
+        [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli", "qwen-web-arwaky"],
         capture_output=True,
     )
 
     if sys.platform != "win32":
         local_bin = get_local_bin_dir()
-        for name in ("qwen-web-cli", "qwc", "qwen-web-mcp"):
+        for name in ("qwen-web-arwaky", "qwa", "qwen-web-mcp"):
             target = local_bin / name
             if target.is_symlink() or target.exists():
                 with contextlib.suppress(OSError):
@@ -114,8 +120,12 @@ def uninstall_previous(python_bin: Path) -> None:
 
 
 def install_package(python_bin: Path) -> None:
-    log("📦 [install] Installing Python package in editable mode (qwen-web-cli / qwc)...")
-    subprocess.run([str(python_bin), "-m", "pip", "install", "-e", str(PROJECT_ROOT)], check=True)
+    log("📦 [install] Installing Python package (immutable mode)...")
+    subprocess.run([str(python_bin), "-m", "pip", "install", str(PROJECT_ROOT)], check=True)
+    # Cleanup build artifacts
+    build_dir = PROJECT_ROOT / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir, ignore_errors=True)
 
 
 def install_playwright(python_bin: Path) -> None:
@@ -140,8 +150,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
         / "qwen-web"
     )
     xdg_config = (
-        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config")))
-        / "qwen-web"
+        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config"))) / "qwen-web"
     )
 
     roles = ["role-architect", "role-business-analyst", "role-tech-lead"]
@@ -192,7 +201,7 @@ def setup_bin_links(python_bin: Path) -> None:
     local_bin.mkdir(parents=True, exist_ok=True)
 
     venv_bin_dir = python_bin.parent
-    for name in ("qwen-web-arwaky", "qwa", "qwen-web-cli", "qwc", "qwen-web-mcp"):
+    for name in ("qwen-web-arwaky", "qwa", "qwen-web-mcp"):
         src = venv_bin_dir / name
         dst = local_bin / name
         if src.exists():
@@ -209,11 +218,11 @@ def setup_bin_links(python_bin: Path) -> None:
         if str(local_bin) not in content:
             log(f"📝 [install] Adding {local_bin} to PATH in ~/.bashrc...")
             with bashrc.open("a", encoding="utf-8") as f:
-                f.write(f"\n# qwen-web-cli global CLI PATH\n{path_line}\n")
+                f.write(f"\n# qwen-web-arwaky global CLI PATH\n{path_line}\n")
 
 
 def main() -> None:
-    log("🚀 [install] Setting up qwen-web-cli environment (Cross-Platform)...")
+    log("🚀 [install] Setting up qwen-web-arwaky environment (Cross-Platform)...")
     os.chdir(PROJECT_ROOT)
 
     python_bin = ensure_venv()
@@ -228,11 +237,11 @@ def main() -> None:
     if sys.platform == "win32":
         venv_scripts = get_venv_dir() / "Scripts"
         log(f"👉 To run CLI on Windows, activate venv: {venv_scripts}\\Activate.ps1")
-        log("👉 Then run: qwc --login  atau  qwc --mcp")
+        log("👉 Then run: qwa --login  atau  qwa --mcp")
     else:
-        log("👉 You can now run 'qwc' or 'qwen-web-cli' from anywhere in your terminal!")
-        log("👉 To perform initial session login: qwc --login")
-        log("👉 To start MCP server: qwc --mcp")
+        log("👉 You can now run 'qwa' or 'qwen-web-arwaky' from anywhere in your terminal!")
+        log("👉 To perform initial session login: qwa --login")
+        log("👉 To start MCP server: qwa --mcp")
 
 
 if __name__ == "__main__":
