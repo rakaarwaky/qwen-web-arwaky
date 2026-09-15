@@ -38,7 +38,7 @@
 
 ## What's New in v6.0.0
 
-- **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS) and `crate::` (Rust) resolution.
+- **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS), `crate::` (Rust), and Markdown link / reference-definition / Obsidian `[[wikilink]]` resolution.
 - **Async MCP job dispatch** — background prompt jobs (`async_run` → `job_id`) with `get_job_status` / `list_jobs` tools; no more MCP stdio timeouts on long runs.
 - **Per-job JSONL logging + TUI observability** — track parallel and long-running jobs with run-in-progress guards and live status.
 - **Standardized role prompt templates** — consistent analyst / architect / backend / devops / frontend templates.

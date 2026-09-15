@@ -11,6 +11,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import unquote
 
 from modules.shared.src.taxonomy_core_constant import CODE_EXTENSIONS, EXCLUDED_DIR_NAMES, MAX_FOLDER_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderEmptyError, FolderValidationError
@@ -236,6 +237,7 @@ _IMPORTABLE_SUFFIXES: frozenset[str] = frozenset(
         ".sh",
         ".bash",
         ".zsh",
+        ".md",
     }
 )
 
@@ -263,6 +265,12 @@ _RUBY_REQUIRE = re.compile(
     re.MULTILINE,
 )
 _SHELL_SOURCE = re.compile(r"^\s*(?:source|\.)\s+([^\s;#]+)", re.MULTILINE)
+
+_MD_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+_MD_INLINE_LINK = re.compile(r"""\[[^\]]*\]\(\s*(<[^>\n]*>|[^)\s]+)(?:\s+["'][^"']*["'])?\s*\)""")
+_MD_REF_DEF = re.compile(r"^\s{0,3}\[[^\]]+\]:\s*(<[^>\n]*>|[^\s]+)", re.MULTILINE)
+_MD_WIKILINK = re.compile(r"!?\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^]]*)?\]\]")
+_MD_EXTERNAL = re.compile(r"^(?:[A-Za-z][A-Za-z0-9+.\-]*:|/)")
 
 
 def _parse_imports(filepath: Path) -> list[str]:
@@ -308,6 +316,8 @@ def _parse_imports(filepath: Path) -> list[str]:
                 specs.append(spec)
     elif suffix in (".sh", ".bash", ".zsh"):
         specs.extend(_SHELL_SOURCE.findall(content))
+    elif suffix == ".md":
+        specs.extend(_parse_markdown_refs(content))
     return specs
 
 
@@ -486,6 +496,97 @@ def _shell_candidates(base_dir: Path, spec: str) -> list[Path]:
     return [base, base.with_suffix(".sh"), base.with_suffix(".bash")]
 
 
+_MD_SUFFIX: frozenset[str] = frozenset({".md"})
+
+
+def _strip_fenced_blocks(content: str) -> str:
+    """Drop fenced code blocks so example links inside them are not resolved."""
+    kept: list[str] = []
+    fence = ""
+    for line in content.splitlines():
+        marker = _MD_FENCE.match(line)
+        if fence:
+            if marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence):
+                fence = ""
+            continue
+        if marker:
+            fence = marker.group(1)
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def _md_target(raw: str) -> str | None:
+    """Normalise one Markdown link destination; None when it is not a local document."""
+    target = raw.strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    target = re.split(r"[#?]", target, maxsplit=1)[0].strip().strip("\"'")
+    target = target.replace("\\ ", " ")
+    if not target or _MD_EXTERNAL.match(target):
+        return None
+    return target
+
+
+def _parse_markdown_refs(content: str) -> list[str]:
+    """Collect local document references: inline links, link definitions, wikilinks."""
+    body = _strip_fenced_blocks(content)
+    specs: list[str] = []
+    for pattern, prefix in ((_MD_INLINE_LINK, ""), (_MD_REF_DEF, ""), (_MD_WIKILINK, "wiki:")):
+        for match in pattern.finditer(body):
+            target = _md_target(match.group(1))
+            if target:
+                specs.append(f"{prefix}{target}")
+    return specs
+
+
+@lru_cache(maxsize=8)
+def _md_basename_index(folder_path: Path) -> dict[str, tuple[Path, ...]]:
+    """Index Markdown files under ``folder_path`` by stem and relative path.
+
+    Powers Obsidian-style ``[[Note]]`` links, which carry no directory component.
+    """
+    index: dict[str, list[Path]] = {}
+    for md in collect_folder_files(folder_path, include_extensions=_MD_SUFFIX):
+        try:
+            rel = md.relative_to(folder_path).as_posix().lower()
+        except ValueError:
+            continue
+        for key in (md.stem.lower(), rel, rel.removesuffix(".md")):
+            index.setdefault(key, []).append(md)
+    return {key: tuple(paths) for key, paths in index.items()}
+
+
+def _md_candidates(base_dir: Path, folder_path: Path, spec: str) -> list[Path]:
+    """Markdown candidates: link targets relative to the file, folder, or project root.
+
+    Wikilinks (``wiki:Name``) first try the folder-wide stem index, then fall back to
+    plain path resolution. Extension-less targets gain ``.md``; directory targets
+    gain ``index.md``/``README.md``.
+    """
+    if spec.startswith("wiki:"):
+        name = spec[5:]
+        hits = _md_basename_index(folder_path).get(name.lower(), ())
+        if hits:
+            return list(hits)
+        spec = name
+    variants = [spec]
+    decoded = unquote(spec)
+    if decoded != spec:
+        variants.append(decoded)
+    cands: list[Path] = []
+    for variant in variants:
+        for root in (base_dir, folder_path, folder_path.parent):
+            base = root / variant
+            head, name = (base.parent, base.name)
+            if "." in name.lstrip("."):
+                cands.append(base)
+            else:
+                cands.append(head / f"{name}.md")
+            cands.extend((base / "index.md", base / "README.md"))
+    return cands
+
+
 def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None:
     """Resolve one import specifier to an existing local file, or None."""
     suffix = filepath.suffix.lower()
@@ -507,6 +608,8 @@ def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None
         cands = _ruby_candidates(base_dir, spec)
     elif suffix in (".sh", ".bash", ".zsh"):
         cands = _shell_candidates(base_dir, spec)
+    elif suffix == ".md":
+        cands = _md_candidates(base_dir, folder_path, spec)
     for cand in cands:
         try:
             if cand.is_file():
@@ -524,7 +627,8 @@ def collect_folder_files_with_imports(
     """Collect in-folder files plus files they import from outside the folder.
 
     Imports are parsed per language (Python, JS/TS, C/C++, Go, Rust, PHP,
-    Ruby, shell) and resolved relative to the importing file (and the folder
+    Ruby, shell) and Markdown links (inline, reference definitions, Obsidian
+    wikilinks) and resolved relative to the importing file (and the folder
     root where the language allows). External dependencies are included
     recursively with cycle protection, up to ``import_depth`` hops.
 
