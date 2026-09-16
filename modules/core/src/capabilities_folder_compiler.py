@@ -48,14 +48,16 @@ class FolderCompiler(IFolderCompileProtocol):
 
         When ``include_imports`` is enabled (default), files inside the folder
         are scanned for import/reference statements (Python, JS/TS, C/C++,
-        Go, Rust, PHP, Ruby, shell) and files imported from outside the folder
-        are resolved and included recursively, marked as ``(imported by ...)``.
+        Go, Rust, PHP, Ruby, shell) and Markdown links (inline, reference
+        definitions, Obsidian ``[[wikilink]]``), and files referenced from
+        outside the folder are resolved and included recursively, marked as
+        ``(imported by ...)``.
 
         Args:
             folder_path: Directory to compile.
             output_path: Optional output file path. Auto-generated if None.
             max_depth: Maximum recursion depth.
-            include_imports: Follow imports of folder files and include
+            include_imports: Follow imports/links of folder files and include
                 external dependencies (cycle-safe, bounded hops).
 
         Returns:

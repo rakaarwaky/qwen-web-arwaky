@@ -166,3 +166,145 @@ class TestFolderCompilerImportAware:
         out = compiler.compile_folder(target, include_imports=False)
         content = out.read_text(encoding="utf-8")
         assert "helper.py" not in content
+
+    def test_compile_folder_follows_markdown_links(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs_pack"
+        _write(target / "README.md", "# Pack\n\nSee [the API](../reference/api.md).\n")
+        _write(tmp_path / "reference" / "api.md", "# API\n\nEndpoint list.\n")
+
+        compiler = FolderCompiler(input_dir=tmp_path / "out")
+        out = compiler.compile_folder(target)
+        content = out.read_text(encoding="utf-8")
+        assert "../reference/api.md" in content
+        assert "*(imported by README.md)*" in content
+        assert "Endpoint list." in content
+
+
+class TestMarkdownLinkChain:
+    def test_inline_link_from_outside_folder(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "index.md", "Read [the guide](../shared/guide.md) first.\n")
+        _write(tmp_path / "shared" / "guide.md", "# Guide\n\nbody\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert {"index.md", "guide.md"} <= names
+        guide = next(f for f in files if f.name == "guide.md")
+        assert origins[guide] == ("index.md",)
+
+    def test_markdown_chains_through_two_hops(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "index.md", "[a](../ref/api.md)\n")
+        _write(tmp_path / "ref" / "api.md", "[b](./details.md)\n")
+        _write(tmp_path / "ref" / "details.md", "deep detail\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert {"index.md", "api.md", "details.md"} <= names
+        details = next(f for f in files if f.name == "details.md")
+        assert origins[details] == ("../ref/api.md",)
+
+    def test_anchor_and_query_stripped(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "[x](../ref/api.md#section) and [y](../ref/b.md?q=1)\n")
+        _write(tmp_path / "ref" / "api.md", "api\n")
+        _write(tmp_path / "ref" / "b.md", "b\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert {"api.md", "b.md"} <= names
+
+    def test_external_urls_and_bare_anchors_skipped(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(
+            target / "a.md",
+            "[site](https://example.com/docs/x.md) [mail](mailto:a@b.c) [top](#intro) [rel](../ref/real.md)\n",
+        )
+        _write(tmp_path / "ref" / "real.md", "real\n")
+        _write(tmp_path / "ref" / "x.md", "must not be picked by the url\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "real.md" in names
+        assert "x.md" not in names
+
+    def test_image_embeds_not_collected(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "![diagram](../assets/arch.png) [doc](../ref/real.md)\n")
+        _write(tmp_path / "assets" / "arch.png", "\x89PNG\r\n\x1a\n fake png ")
+        _write(tmp_path / "ref" / "real.md", "real\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "real.md" in names
+        assert "arch.png" not in names
+
+    def test_link_inside_code_block_ignored(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(
+            target / "a.md",
+            "Docs live elsewhere.\n\n```markdown\nexample [x](../ref/secret.md)\n```\n\n"
+            "~~~\nanother [y](../ref/other.md)\n~~~\n",
+        )
+        _write(tmp_path / "ref" / "secret.md", "hidden\n")
+        _write(tmp_path / "ref" / "other.md", "hidden\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert names == {"a.md"}
+
+    def test_reference_style_definition(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", 'See [the spec][spec-id].\n\n[spec-id]: ../ref/spec.md "Title"\n')
+        _write(tmp_path / "ref" / "spec.md", "spec\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        spec = next(f for f in files if f.name == "spec.md")
+        assert origins[spec] == ("a.md",)
+
+    def test_angle_bracket_target_with_space(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "[x](<../ref/my file.md>) [y](../ref/percent%20name.md)\n")
+        _write(tmp_path / "ref" / "my file.md", "spaced\n")
+        _write(tmp_path / "ref" / "percent name.md", "encoded\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert {"my file.md", "percent name.md"} <= names
+
+    def test_directory_link_resolves_index(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "[guide](../guide/) and [readme](../manual/)\n")
+        _write(tmp_path / "guide" / "index.md", "index body\n")
+        _write(tmp_path / "manual" / "README.md", "readme body\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert {"index.md", "README.md"} <= names
+
+    def test_wikilink_resolves_folder_wide_by_stem(self, tmp_path: Path) -> None:
+        # Index.md sits in a subfolder; the stem-only wikilink still finds it.
+        target = tmp_path / "vault"
+        _write(target / "a.md", "See [[Setup]] and [[nested/Deep|deep dive]].\n")
+        _write(target / "nested" / "Deep.md", "deep\n")
+        _write(target / "notes" / "Setup.md", "setup\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        assert {f.name for f in files} == {"a.md", "Deep.md", "Setup.md"}
+
+    def test_wikilink_without_extension_outside_folder(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "Link target is extension-less: [[../shared/Setup]]\n")
+        _write(tmp_path / "shared" / "Setup.md", "setup\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        setup = next(f for f in files if f.name == "Setup.md")
+        assert origins[setup] == ("a.md",)
+
+    def test_markdown_cycle_protection(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "[b](../ref/b.md)\n")
+        _write(tmp_path / "ref" / "b.md", "[a](../docs/a.md)\n")
+
+        files, _ = collect_folder_files_with_imports(target)
+        assert [f.name for f in files].count("b.md") == 1
