@@ -21,6 +21,7 @@ from modules.shared.src.contract_core_aggregate import (
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
+    EVENT_FAILED,
     EVENT_GENERATION_FINISHED,
 )
 from modules.shared.src.taxonomy_core_vo import (
@@ -164,7 +165,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                     JobRecord(
                         job_id=str(job_id),
                         created_at=rec.created_at if rec else started_at,
-                        latest_event="EVENT_FAILED",
+                        latest_event=EVENT_FAILED.value,
                         completed=True,
                         started_at=started_at,
                         completed_at=_utc_now_iso(),
@@ -205,7 +206,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 JobRecord(
                     job_id=str(job_id),
                     created_at=rec.created_at if rec else started_at,
-                    latest_event="EVENT_FAILED",
+                    latest_event=EVENT_FAILED.value,
                     completed=True,
                     started_at=started_at,
                     completed_at=_utc_now_iso(),
@@ -257,7 +258,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                     JobRecord(
                         job_id=str(job_id),
                         created_at=rec.created_at if rec else started_at,
-                        latest_event="EVENT_FAILED",
+                        latest_event=EVENT_FAILED.value,
                         completed=True,
                         started_at=started_at,
                         completed_at=_utc_now_iso(),
@@ -300,7 +301,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 JobRecord(
                     job_id=str(job_id),
                     created_at=rec.created_at if rec else started_at,
-                    latest_event="EVENT_FAILED",
+                    latest_event=EVENT_FAILED.value,
                     completed=True,
                     started_at=started_at,
                     completed_at=_utc_now_iso(),
@@ -319,3 +320,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
     def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
         return self._storage.list_jobs(JobLimit(int(limit)))
+
+    def shutdown(self) -> None:
+        """Cancel queued jobs and release executor resources during teardown."""
+        self._executor.shutdown(wait=False, cancel_futures=True)

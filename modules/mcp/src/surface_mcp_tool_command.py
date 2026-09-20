@@ -77,6 +77,36 @@ def _get_workspace_root() -> Path:
     return Path(root).expanduser().resolve() if root else Path.cwd().resolve()
 
 
+def _validate_prompt_path(raw: str, field: str = "prompt_file") -> tuple[Path | None, str | None]:
+    """Resolve a prompt file and require it to remain inside the workspace."""
+    p_path = Path(raw).expanduser().resolve()
+    if not p_path.exists():
+        return None, _format_error_payload(
+            code="FILE_NOT_FOUND",
+            message=f"Prompt file not found: {p_path}",
+            hint="Check the prompt path or use init_workspace.",
+            field=field,
+        )
+    if not p_path.is_file():
+        return None, _format_error_payload(
+            code="INVALID_PATH",
+            message=f"Prompt path is not a regular file: {p_path}",
+            hint="Prompt files must be regular files.",
+            field=field,
+        )
+    root = _get_workspace_root()
+    try:
+        p_path.relative_to(root)
+    except ValueError:
+        return None, _format_error_payload(
+            code="PATH_OUTSIDE_WORKSPACE",
+            message=f"Prompt path is outside the workspace root: {p_path}",
+            hint=f"Place files under {root} or set QWEN_WORKSPACE_ROOT.",
+            field=field,
+        )
+    return p_path, None
+
+
 def _validate_attachment_path(raw: str) -> tuple[Path | None, str | None]:
     """Resolve and validate an attachment path for MCP tool calls.
 
@@ -207,14 +237,11 @@ class McpToolCommand:
         if is_prompt_role(input_file):
             p_path = materialize_role_template(input_file)
         else:
-            p_path = Path(input_file).expanduser().resolve()
-        if not p_path.exists():
-            return _format_error_payload(
-                code="FILE_NOT_FOUND",
-                message=f"Prompt file not found: {p_path}",
-                hint="Check prompt_file path or use init_workspace tool.",
-                field="input_file",
-            )
+            validated_path, path_error = _validate_prompt_path(input_file, field="input_file")
+            if path_error is not None:
+                return path_error
+            assert validated_path is not None
+            p_path = validated_path
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 
@@ -289,14 +316,11 @@ class McpToolCommand:
         if is_prompt_role(prompt_file):
             p_path = materialize_role_template(prompt_file)
         else:
-            p_path = Path(prompt_file).expanduser().resolve()
-        if not p_path.exists():
-            return _format_error_payload(
-                code="FILE_NOT_FOUND",
-                message=f"Prompt file not found: {p_path}",
-                hint="Check prompt_file path.",
-                field="prompt_file",
-            )
+            validated_path, path_error = _validate_prompt_path(prompt_file)
+            if path_error is not None:
+                return path_error
+            assert validated_path is not None
+            p_path = validated_path
 
         a_path, a_err = _validate_attachment_path(attachment_file)
         if a_err is not None:
@@ -502,6 +526,11 @@ class McpToolCommand:
                 message=str(exc),
                 hint="Check filesystem write permissions for session directory.",
             )
+
+    def shutdown(self) -> None:
+        """Release background job resources when the MCP server exits."""
+        if self._jobs is not None:
+            self._jobs.shutdown()
 
     def setup_session(self) -> str:
         """Launch visible browser on chat.qwen.ai for manual login / session setup.

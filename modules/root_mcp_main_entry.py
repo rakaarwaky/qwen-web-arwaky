@@ -274,57 +274,6 @@ setup_session = _async_tool("setup_session")
 
 GENERATED_TOOLS = TOOL_HANDLERS
 
-MCP_TOOL_SPECS: list[dict[str, Any]] = [
-    {
-        "name": "process_direct_prompt",
-        "method": "process_direct_prompt",
-        "doc": "Process a direct text prompt string to chat.qwen.ai and return the AI answer.",
-        "params": [("prompt", "str", True), ("timeout_sec", "int", False, 120), ("headless", "bool", False, True)],
-    },
-    {
-        "name": "process_prompt_file_only",
-        "method": "process_prompt_file_only",
-        "doc": "Process a single Markdown prompt file (no attachment) on chat.qwen.ai.",
-        "params": [
-            ("input_file", "str", True),
-            ("output_file", "Any", False, None),
-            ("headless", "bool", False, True),
-            ("async_run", "bool", False, True),
-        ],
-    },
-    {
-        "name": "process_prompt_with_attachment",
-        "method": "process_prompt_with_attachment",
-        "doc": "Process a Markdown prompt file with a document attachment on chat.qwen.ai.",
-        "params": [
-            ("prompt_file", "str", True),
-            ("attachment_file", "str", True),
-            ("output_file", "Any", False, None),
-            ("headless", "bool", False, True),
-            ("async_run", "bool", False, True),
-        ],
-    },
-    {
-        "name": "get_job_status",
-        "method": "get_job_status",
-        "doc": "Query the current status and result preview of an asynchronous background job.",
-        "params": [("job_id", "str", True)],
-    },
-    {
-        "name": "list_jobs",
-        "method": "list_jobs",
-        "doc": "List recently submitted asynchronous background prompt processing jobs.",
-        "params": [("limit", "int", False, 10)],
-    },
-    {
-        "name": "setup_session",
-        "method": "setup_session",
-        "doc": "Launch visible browser on chat.qwen.ai for manual login / session setup.",
-        "params": [],
-    },
-]
-
-
 # ─── Server runner ──────────────────────────────────────────────────────────
 
 
@@ -386,6 +335,8 @@ def run_mcp_server() -> None:
         asyncio.run(serve())
     except KeyboardInterrupt:
         log.info("MCP server shutting down")
+    finally:
+        _get_tools().shutdown()
 
 
 def main() -> None:
