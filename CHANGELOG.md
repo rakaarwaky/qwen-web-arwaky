@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.3.1] - 2026-09-21
+
+### Added
+
+- feat(attachments): resolve external `.yaml` and `.yml` files referenced by inline and reference-style Markdown links during folder compilation
+- test(compiler): add regression coverage for external YAML and YML Markdown references and importer origin metadata
+
 ## [6.3.0] - 2026-09-20
 
 ### Added
