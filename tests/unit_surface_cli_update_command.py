@@ -147,6 +147,48 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
                 url = f"git+https://github.com/{DEFAULT_GITHUB_REPO}.git"
                 self.assertRegex(url, r"^git\+https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git$")
 
+    def test_fetch_json_rejects_non_github_schemes_and_hosts(self) -> None:
+        """Release discovery must never open file, custom, or foreign URLs."""
+        self.assertIsNone(self.manager._fetch_json("file:///tmp/release.json"))
+        self.assertIsNone(self.manager._fetch_json("https://example.com/releases/latest"))
+        self.assertIsNone(self.manager._fetch_json("custom://api.github.com/releases/latest"))
+
+    @patch.dict("os.environ", {"QWEN_WEB_GITHUB_REPO": "evil.example/owner/repo"})
+    def test_invalid_repository_input_is_rejected(self) -> None:
+        """Repository environment input must remain owner/repository shaped."""
+        with self.assertRaises(ValueError):
+            self.manager._github_repo_url("6.3.0")
+
+    @patch.object(UpdateManager, "sync_browser")
+    @patch.object(UpdateManager, "upgrade_package")
+    @patch.object(UpdateManager, "check_update")
+    @patch.object(UpdateManager, "current_version")
+    def test_perform_update_refuses_unknown_target_without_mutation(
+        self,
+        mock_current_version: MagicMock,
+        mock_check_update: MagicMock,
+        mock_upgrade: MagicMock,
+        mock_sync_browser: MagicMock,
+    ) -> None:
+        """An unavailable release target must not run package or browser changes."""
+        mock_current_version.return_value = VersionString("6.2.0")
+        mock_check_update.return_value = UpdateCheckResult(
+            package_name="qwen-web-arwaky",
+            current_version="6.2.0",
+            latest_version=None,
+            update_available=False,
+            source="unavailable",
+            error="network unavailable",
+        )
+
+        report = self.manager.perform_update(ForceFlag(False))
+
+        self.assertFalse(report.healthy)
+        self.assertFalse(report.changed)
+        self.assertIn("cannot verify target version", report.message)
+        mock_upgrade.assert_not_called()
+        mock_sync_browser.assert_not_called()
+
     def test_perform_update_rejects_stale_post_update_version(self) -> None:
         with (
             patch.object(

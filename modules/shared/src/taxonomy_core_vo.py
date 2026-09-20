@@ -178,6 +178,7 @@ class UpdateReport:
     post_update_version: str | None = None
     healthy: bool = False
     message: str = ""
+    rolled_back: bool = False
 
 
 @dataclass

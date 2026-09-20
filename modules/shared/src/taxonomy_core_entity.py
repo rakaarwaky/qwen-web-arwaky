@@ -24,6 +24,8 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
+log = logging.getLogger(__name__)
+
 
 class CircuitBreaker:
     """Sliding-window circuit breaker for request-level failure tracking."""
@@ -216,6 +218,7 @@ class LifecycleGate:
         try:
             event = event_name if isinstance(event_name, QwenEventType) else QwenEventType(str(event_name))
         except ValueError:
+            log.warning("lifecycle_gate_rejected_unknown_event event=%r", event_name)
             return
 
         predecessor = self._predecessor.get(event)

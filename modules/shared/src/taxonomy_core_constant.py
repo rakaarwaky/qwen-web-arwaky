@@ -66,6 +66,11 @@ XDG_CACHE_HOME = _XDG_CACHE_HOME
 XDG_CONFIG_HOME = _XDG_CONFIG_HOME
 
 DEFAULT_OUTPUT = XDG_DATA_HOME / "output"
+# Swarm runs use the product-specific root agreed for the MVP; regular prompt
+# output remains backward-compatible under DEFAULT_OUTPUT.
+SWARM_OUTPUT_ROOT = (
+    Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share")) / "qwen-web-arwaky" / "output"
+)
 DEFAULT_LOG = XDG_STATE_HOME / "log"
 DEFAULT_SESSION = XDG_DATA_HOME / "qwen_session"
 DEFAULT_VENV = XDG_DATA_HOME / "venv"

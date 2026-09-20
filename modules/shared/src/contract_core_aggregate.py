@@ -109,8 +109,12 @@ class IAttachmentPromptAggregate(ABC):
         attachment_file: Path | AttachmentPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
+        cancel_event: Any | None = None,
     ) -> ResponseText:
-        """Process a prompt file from disk with document attachment."""
+        """Process a prompt file from disk with document attachment.
+
+        ``cancel_event`` targets one browser run without affecting sibling jobs.
+        """
 
 
 class ISessionAggregate(ABC):
@@ -166,6 +170,10 @@ class IJobManagerAggregate(ABC):
     @abstractmethod
     def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
+
+    @abstractmethod
+    def shutdown(self) -> None:
+        """Stop accepting background work and release the job executor."""
 
 
 __all__ = [

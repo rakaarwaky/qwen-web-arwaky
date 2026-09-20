@@ -8,12 +8,12 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 
 ### FR-001: Declarative Tool Registration and Specification
 
-- **Description**: Registers all MCP capabilities as tools from the `MCP_TOOL_SPECS` / `TOOLS` table.
+- **Description**: Registers all MCP capabilities as tools from the `TOOLS` registry.
 - **Input**: A specification entry containing the public tool name, core method name, documentation, and parameter metadata.
 - **Output**: One generated async MCP handler per specification entry.
 - **Business Rules**:
   - The tool table is the single source of truth for MCP registration.
-  - The table maps one-to-one with exposed capabilities: `process_direct_prompt`, `process_prompt_file_only`, `process_prompt_with_attachment`, `check_session`, `delete_session`, `setup_session`, and `init_workspace`.
+  - The `TOOLS` registry maps one-to-one with exposed capabilities: `process_direct_prompt`, `process_prompt_file_only`, `process_prompt_with_attachment`, `check_session`, `delete_session`, `setup_session`, and `init_workspace`.
   - Each parameter declares a supported type and default value.
 - **Error Handling**: Missing dependencies or execution errors return structured JSON error payloads containing `code`, `message`, and `hint`.
 

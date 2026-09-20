@@ -77,21 +77,21 @@ Role fixtures (real source-review prompts, **not** injection payloads):
 pytest tests/ -v
 
 # Behavior lock only (fast, ~90s headless)
-pytest tests/test_qwen_client_behavior.py -v
+pytest tests/unit_browser_adapter.py -v
 
 # With coverage
-pytest tests/test_qwen_client_behavior.py --cov=src --cov-report=term-missing
+pytest tests/unit_browser_adapter.py --cov=modules --cov-report=term-missing
 ```
 
 ### Expected coverage boundary
 
 | Module | Target | Typical | Notes |
 |--------|--------|---------|-------|
-| `src/types.py` | 100% | 100% | Selectors & constants — fully locked |
-| `src/prompt_injector.py` | 100% UI-behavior | ~72% | Uncovered: error branches, clipboard fallback edge cases |
-| `src/sender.py` | 100% | ~90% | Uncovered: PlaywrightError fallback branches |
-| `src/streamer.py` | 100% | ~85% | Uncovered: network timeout branches |
-| `src/pipeline.py` | — | ~19% | Locked via `test_pipeline_fixtures.py` state management |
+| `modules/shared/src/taxonomy_core_constant.py` | 100% | 100% | Selectors & constants — fully locked |
+| `modules/core/src/capabilities_prompt_injector.py` | 100% UI-behavior | ~72% | Uncovered: error branches, clipboard fallback edge cases |
+| `modules/core/src/capabilities_send_dispatcher.py` | 100% | ~90% | Uncovered: PlaywrightError fallback branches |
+| `modules/core/src/capabilities_stream_monitor.py` | 100% | ~85% | Uncovered: network timeout branches |
+| `modules/core/src/agent_shared_flow_orchestrator.py` | — | ~19% | Locked via `test_pipeline_fixtures.py` state management |
 
 The **72-85% coverage** is the expected steady state: the uncovered percentages
 are `except PlaywrightError`, `start_new_chat` network redirects,
@@ -106,7 +106,7 @@ require live network/auth and are tested separately via `test_e2e_pipeline.py`.
 
 1. **Run the lock first** (red baseline — should all pass before you change anything):
    ```bash
-   pytest tests/test_qwen_client_behavior.py -v
+   pytest tests/unit_browser_adapter.py -v
    ```
 
 2. **Write a failing test for the new feature** against `qwen_fixture.html`.
@@ -120,7 +120,7 @@ require live network/auth and are tested separately via `test_e2e_pipeline.py`.
 
 5. **If Qwen UI changes** (selector drift):
    - Update `qwen_fixture.html` to match the new DOM
-   - Update `src/types.py` selectors (if centralized)
+   - Update `modules/shared/src/taxonomy_core_constant.py` selectors (if centralized)
    - Update the affected test(s)
    - Do NOT skip the test — that's how drift goes undetected.
 
@@ -170,7 +170,7 @@ and a real display.
 
 ### E2E tests need internet + session
 - `test_e2e_pipeline.py` is marked `@pytest.mark.e2e` and excluded from CI by default
-- Run with: `pytest tests/test_e2e_pipeline.py -m e2e`
+- Run with: `pytest tests/integration_browser_session.py -m e2e`
 - Requires `qwen_session/Default` to exist (valid saved login)
 
 ---
@@ -189,12 +189,12 @@ tests/
 ├── test_pipeline_fixtures.py            # Fixture state management tests
 ├── test_e2e_pipeline.py                 # Live E2E pipeline tests
 └── manual_probe.py                      # Ad-hoc headed probe for live UI debugging
-src/
-├── types.py                             # Selectors & constants (locked by tests)
-├── prompt_injector.py                   # DOM text injection (locked by tests)
-├── sender.py                            # Send button & message counting (locked by tests)
-├── streamer.py                          # Response streaming & validation (locked by tests)
-└── qwen_client.py                       # Production code under test
+modules/
+├── shared/src/taxonomy_core_constant.py  # Selectors & constants
+├── core/src/capabilities_prompt_injector.py
+├── core/src/capabilities_send_dispatcher.py
+├── core/src/capabilities_stream_monitor.py
+└── core/src/agent_shared_flow_orchestrator.py
 ```
 
 ---
