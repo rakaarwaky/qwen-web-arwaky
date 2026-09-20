@@ -71,6 +71,7 @@ class SessionSetupScreen(Screen[None]):
                     "Confirm Session Reset",
                     "Are you sure you want to delete your saved browser session?\n"
                     "You will need to log in again manually.",
+                    confirm_label="Delete Session & Login Again",
                 ),
                 _on_confirm,
             )

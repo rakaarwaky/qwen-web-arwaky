@@ -50,7 +50,7 @@ AES rule for Core: **1 FR = 1 capability file + 1 contract protocol**.
 Product modes (batch / watcher / single / login / MCP) are how surfaces
 compose these FRs, not additional core FRs.
 
-### P0 — Must Have (Core, 10 FRs)
+### P0 — Must Have (Core, 13 capability FRs)
 
 - [X]  **FR-001 Browser Adapter** — Persistent Chromium/Playwright context,
   stale-lock cleanup, `0o700` session dir, asset blocking, auth
@@ -87,6 +87,11 @@ compose these FRs, not additional core FRs.
   Owns in-process metrics counters and `status.json` writes (merged helpers,
   not extra capabilities).
   *Accept*: process boots with empty `SENTRY_DSN` and no OTLP endpoint.
+- [X] **FR-009 Folder Compiler** — Import-aware folder and Markdown compilation.
+- [X] **FR-010 Folder-to-Attachment Adapter** — Convert compiled folders into uploadable attachments.
+- [X] **FR-011 Job Manager** — Persist and poll asynchronous MCP jobs with bounded worker execution.
+- [X] **FR-012 TUI Slot Configuration** — Resolve validated per-slot prompt, attachment, and output plans.
+- [X] **FR-013 Update Manager** — Check package releases, synchronize Chromium, and report health.
 
 ### P1 — Should Have (Surfaces)
 
@@ -96,14 +101,14 @@ compose these FRs, not additional core FRs.
   first; only an invalid session opens a headed browser for CAPTCHA.
 - [X]  **Atomic file routing**: `input` → `.processing` → `done` / `failed`
   with circuit breaker and rate limiter in the agent.
-- [X]  **MCP server**: 1:1 tools for send / single / batch / watcher /
-  session / audit over stdio.
+- [X]  **MCP server**: live tools for direct prompts, prompt files, attachments,
+  session management, workspace initialization, and asynchronous job status.
 
 ### P2 — Nice to Have
 
 - [X]  **Interactive TUI menu** when the CLI is launched with no args on a TTY.
-- [X]  **OpenTelemetry tracing** (optional OTLP HTTP export; part of FR-009).
-- [X]  **Sentry error capture** (optional; part of FR-009).
+- [X]  **OpenTelemetry tracing** (optional OTLP HTTP export; part of FR-008).
+- [X]  **Sentry error capture** (optional; part of FR-008).
 
 ## Non-functional Requirements (High-level)
 
@@ -118,8 +123,8 @@ compose these FRs, not additional core FRs.
   selector fallbacks. Telemetry is best-effort.
 - **Maintainability**: Strict AES 7-Layer Pattern (Taxonomy → Utility →
   Contract → Capabilities → Agent → Surface → Root) enforced by custom
-  linting. Core stays at **10 FRs**; do not merge capabilities back into
-  bundled requirements.
+  linting. Core inventory is **13 capability FRs**; keep one FR per capability and do not
+  merge independently testable capabilities back into bundled requirements.
 
 ## Open Questions / Risks
 

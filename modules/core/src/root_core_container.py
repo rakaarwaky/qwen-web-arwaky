@@ -143,6 +143,8 @@ class SharedContainer:
             file_only=self.agent_prompt_file_orchestrator,
             attachment=self.agent_attachment_prompt_orchestrator,
             max_workers=max_workers,
+            circuit_breaker=self.cb,
+            rate_limiter=self.rl,
         )
 
     def wire(self) -> None:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -101,7 +102,8 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
 
             if link_path.is_symlink() or link_path.exists():
                 if link_path.is_dir() and not link_path.is_symlink():
-                    shutil.rmtree(link_path, ignore_errors=True)
+                    backup = dot_qwen / f"{link_name}.backup-{time.time_ns()}"
+                    shutil.move(str(link_path), str(backup))
                 else:
                     link_path.unlink(missing_ok=True)
 

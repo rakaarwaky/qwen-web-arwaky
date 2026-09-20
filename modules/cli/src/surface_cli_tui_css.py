@@ -430,6 +430,10 @@ HelpScreen {
     color: $fg_accent;
     border: solid $border;
 }
+
+.btn-slot-retry {
+    display: none;
+}
 """
 )
 

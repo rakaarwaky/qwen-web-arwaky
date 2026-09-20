@@ -111,6 +111,8 @@ class _TuiWorkersMixin:
         self._slot_cancel_events[slot_id] = threading.Event()
 
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = False
         self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
         self._slot_stats[slot_id] = {
             "status": "RUNNING",
@@ -146,6 +148,7 @@ class _TuiWorkersMixin:
                 ConfirmModal(
                     "Cancel Slot",
                     f"Slot {slot_id} has been running for {elapsed:.0f}s.\nCancelling will lose the current progress.",
+                    confirm_label="Cancel Slot",
                 ),
                 _on_confirm,
             )
@@ -204,6 +207,8 @@ class _TuiWorkersMixin:
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
         self._update_slot_status(slot_id, self._format_status(status, "badge"))
         self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = status == "FAILED"
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False

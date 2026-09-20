@@ -167,6 +167,10 @@ class IJobManagerAggregate(ABC):
     def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
 
+    @abstractmethod
+    def shutdown(self) -> None:
+        """Stop accepting background work and release the job executor."""
+
 
 __all__ = [
     "IAttachmentPromptAggregate",

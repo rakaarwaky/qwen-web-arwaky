@@ -18,7 +18,7 @@ import json
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 - argv execution is shell-free and validated below
 import sys
 import urllib.request
 from pathlib import Path
@@ -43,6 +43,8 @@ DEFAULT_GITHUB_REPO = "rakaarwaky/qwen-web-arwaky"
 GITHUB_RELEASE_URL = "https://api.github.com/repos/{repo}/releases/latest"
 GITHUB_REPO_ENV = "QWEN_WEB_GITHUB_REPO"
 USER_AGENT = "qwen-web-arwaky-updater/1.0"
+_GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GITHUB_API_HOST = "api.github.com"
 
 
 # ─── Module-level pure helpers ──────────────────────────────────────────────
@@ -227,11 +229,59 @@ class UpdateManager(IUpdateProtocol):
             detail=f"playwright install chromium failed (rc={rc}): {detail}",
         )
 
+    def rollback_to(self, previous_version: str) -> tuple[UpdateStepResult, ...]:
+        """Best-effort reinstall of the previous release and browser assets."""
+        if not previous_version or previous_version == "unknown":
+            return (UpdateStepResult("rollback", False, False, "previous version is unknown"),)
+        if self._editable_source_dir() is not None:
+            return (UpdateStepResult("rollback", False, False, "rollback is skipped for editable installations"),)
+        repo_url = self._github_repo_url(previous_version)
+        cmd = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-input",
+            "--disable-pip-version-check",
+            "--force-reinstall",
+            "--no-deps",
+            repo_url,
+        ]
+        try:
+            rc, out, err = self._run_subprocess(cmd, self.pip_timeout_sec)
+            package = UpdateStepResult(
+                "rollback:package",
+                True,
+                rc == 0,
+                "reinstalled " + previous_version if rc == 0 else _tail(err or out),
+            )
+            browser = self.sync_browser(ForceFlag(True))
+            return (package, UpdateStepResult("rollback:browser", browser.executed, browser.success, browser.detail))
+        except Exception as exc:
+            return (UpdateStepResult("rollback", True, False, str(exc)),)
+
     def perform_update(self, force: ForceFlag = ForceFlag(False)) -> UpdateReport:
         """Run the full update pipeline."""
         forced = bool(force)
         previous = self.current_version()
         check = self.check_update()
+        if check.latest_version is None:
+            message = "Update refused: cannot verify target version; no package changes were made."
+            log.error("update_refused_unverifiable_target source=%s error=%s", check.source, check.error)
+            return UpdateReport(
+                package_name=self.package_name,
+                previous_version=str(previous),
+                latest_version=None,
+                source=check.source,
+                update_available=False,
+                forced=forced,
+                changed=False,
+                steps=(),
+                health_checks=(),
+                post_update_version=str(previous),
+                healthy=False,
+                message=message,
+            )
         up_to_date = check.latest_version is not None and str(previous) != "unknown" and not check.update_available
         if up_to_date and not forced and self._chromium_present():
             message = (
@@ -282,6 +332,11 @@ class UpdateManager(IUpdateProtocol):
         steps_ok = pkg_step.success and browser_step.success
         checks_ok = all(c.success for c in health_checks)
         healthy = steps_ok and checks_ok
+        rolled_back = False
+        if not healthy and str(previous) != "unknown":
+            rollback_steps = self.rollback_to(str(previous))
+            steps.extend(rollback_steps)
+            rolled_back = bool(rollback_steps) and all(step.success for step in rollback_steps if step.executed)
         if not steps_ok:
             failed_detail = "; ".join(f"{s.name}: {s.detail}" for s in steps if not s.success)
             message = f"Update failed — {failed_detail}"
@@ -310,7 +365,8 @@ class UpdateManager(IUpdateProtocol):
             health_checks=tuple(health_checks),
             post_update_version=str(post_version),
             healthy=healthy,
-            message=message,
+            message=message + (f" Rolled back to {previous}." if rolled_back else ""),
+            rolled_back=rolled_back,
         )
 
     # ─── Block 3: Private Helpers ──
@@ -347,6 +403,8 @@ class UpdateManager(IUpdateProtocol):
     def _github_repo_url(self, target_version: str | None = None) -> str:
         """Build a GitHub source URL, pinning to the discovered release when known."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
+        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+            raise ValueError(f"Invalid GitHub repository name: {repo!r}")
         suffix = f"@v{target_version.lstrip('vV')}" if target_version else ""
         return f"git+https://github.com/{repo}.git{suffix}"
 
@@ -360,13 +418,20 @@ class UpdateManager(IUpdateProtocol):
     def _fetch_json(self, url: str) -> dict[str, Any] | None:
         """Fetch a JSON document over HTTPS using stdlib only."""
         try:
+            parsed = urlparse(url)
+            if (
+                parsed.scheme != "https"
+                or parsed.hostname != _GITHUB_API_HOST
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.port not in (None, 443)
+            ):
+                raise ValueError("Only HTTPS requests to api.github.com are permitted")
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             )
-            if not req.full_url.startswith("https://"):
-                raise ValueError(f"Forbidden URL scheme: {req.full_url}")
-            with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:
+            with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:  # nosec B310 - HTTPS GitHub API only
                 payload = json.loads(resp.read().decode("utf-8"))
             return payload if isinstance(payload, dict) else None
         except Exception as exc:
@@ -376,8 +441,8 @@ class UpdateManager(IUpdateProtocol):
     def _fetch_latest_github(self) -> tuple[str | None, str | None]:
         """Return (version, error) from GitHub releases."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
-        if not repo:
-            return None, f"no GitHub repository configured (set {GITHUB_REPO_ENV}=owner/repo)"
+        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+            return None, f"invalid GitHub repository configured (set {GITHUB_REPO_ENV}=owner/repo)"
         payload = self._fetch_json(GITHUB_RELEASE_URL.format(repo=repo))
         if payload is None:
             return None, f"GitHub releases request failed for '{repo}'"
@@ -442,7 +507,14 @@ class UpdateManager(IUpdateProtocol):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec, check=False)
+            proc = subprocess.run(  # nosec B603 - shell=False, argv and paths are validated above
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                check=False,
+                shell=False,
+            )
             return proc.returncode, proc.stdout or "", proc.stderr or ""
         except subprocess.TimeoutExpired as exc:
             out = (

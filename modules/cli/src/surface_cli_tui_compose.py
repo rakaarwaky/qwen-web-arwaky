@@ -140,6 +140,7 @@ class _TuiComposeMixin:
                             f"⚡ RUN IN SLOT {s}", variant="primary", id=f"btn-run-{s}", classes="btn-slot-run"
                         )
                         yield Button(f"✕ Cancel Slot {s}", id=f"btn-cancel-{s}", classes="btn-slot-cancel")
+                        yield Button(f"↻ Retry Slot {s}", id=f"btn-retry-{s}", classes="btn-slot-retry")
 
                     with Vertical(classes="right-pane"):
                         with Horizontal(classes="pane-title"):
@@ -178,11 +179,11 @@ class _TuiComposeMixin:
         """Attach log handler and write initial messages after first paint."""
         root = logging.getLogger()
 
-        # Detach non-TUI handlers so log output goes only to our RichLog.
+        # Keep existing stderr/file handlers attached. The TUI handler is an
+        # additional view and must not disable operational logging on unmount.
         for handler in list(root.handlers):
             if isinstance(handler, QwenTuiLogHandler):
-                continue
-            root.removeHandler(handler)
+                root.removeHandler(handler)
 
         self._log_handler = QwenTuiLogHandler(self)
         self._log_handler.setLevel(logging.INFO)

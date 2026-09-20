@@ -15,6 +15,7 @@ import threading
 import types
 from contextlib import nullcontext, suppress
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
@@ -137,7 +138,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._status_path = status_path_for(log_path)
         self._status_writer = status_writer or StatusFileWriter(self._status_path)
         self._metrics = MetricsCounter()
-        self._run_handlers: dict[str, logging.FileHandler] = {}
+        self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
@@ -210,7 +211,9 @@ class ObservabilitySetup(IObservabilityProtocol):
             stderr_handler.setFormatter(self._formatter)
             root.addHandler(stderr_handler)
             try:
-                file_handler = logging.FileHandler(log_path / "app.jsonl", encoding="utf-8")
+                file_handler = RotatingFileHandler(
+                    log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+                )
                 file_handler.setFormatter(self._formatter)
                 root.addHandler(file_handler)
             except OSError:
@@ -259,7 +262,9 @@ class ObservabilitySetup(IObservabilityProtocol):
         stderr_handler.setFormatter(formatter)
         root.addHandler(stderr_handler)
         try:
-            file_handler = logging.FileHandler(log_path / "app.jsonl", encoding="utf-8")
+            file_handler = RotatingFileHandler(
+                log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+            )
             file_handler.setFormatter(formatter)
             root.addHandler(file_handler)
         except OSError:
@@ -295,7 +300,7 @@ class ObservabilitySetup(IObservabilityProtocol):
             ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
             path = jobs_dir / f"{safe_name}_{ts}_{run_id}.jsonl"
             if self._formatter is not None:
-                handler = logging.FileHandler(path, encoding="utf-8")
+                handler = RotatingFileHandler(path, maxBytes=10 * 1024 * 1024, backupCount=2, encoding="utf-8")
                 handler.setFormatter(self._formatter)
                 # Keep only records whose bound run_id matches this run so
                 # overlapping runs never leak records into each other's log.
