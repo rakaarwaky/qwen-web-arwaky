@@ -26,6 +26,7 @@ from modules.core.src.agent_session_orchestrator import SessionOrchestrator
 # agent_setup_orchestrator
 from modules.core.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
+from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
 from modules.core.src.capabilities_folder_compiler import FolderCompiler
@@ -49,6 +50,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
+from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -145,6 +147,11 @@ class SharedContainer:
             max_workers=max_workers,
             circuit_breaker=self.cb,
             rate_limiter=self.rl,
+        )
+        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
+            attachment=self.agent_attachment_prompt_orchestrator,
+            folder_adapter=self.folder_adapter,
+            browser_concurrency=max_workers,
         )
 
     def wire(self) -> None:

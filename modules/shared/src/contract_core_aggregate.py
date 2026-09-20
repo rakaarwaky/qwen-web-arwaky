@@ -109,8 +109,12 @@ class IAttachmentPromptAggregate(ABC):
         attachment_file: Path | AttachmentPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
+        cancel_event: Any | None = None,
     ) -> ResponseText:
-        """Process a prompt file from disk with document attachment."""
+        """Process a prompt file from disk with document attachment.
+
+        ``cancel_event`` targets one browser run without affecting sibling jobs.
+        """
 
 
 class ISessionAggregate(ABC):
