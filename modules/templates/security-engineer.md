@@ -14,7 +14,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check attack vectors, trust boundaries, threat mitigation strategies, spoofing risks, tampering risks, and information disclosure risks --&gt;
+<!-- Check attack vectors, trust boundaries, threat mitigation strategies, spoofing risks, tampering risks, and information disclosure risks -->
 
 ### 2. Define the authentication and authorization standards
 
@@ -22,7 +22,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check identity provider integration, role based access control policies, session management rules, token expiration limits, and secret rotation procedures --&gt;
+<!-- Check identity provider integration, role based access control policies, session management rules, token expiration limits, and secret rotation procedures -->
 
 ### 3. Scan for vulnerabilities and audit software dependencies
 
@@ -30,7 +30,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check static application security testing results, dynamic application security testing results, known common vulnerability exposures, and third party library licensing --&gt;
+<!-- Check static application security testing results, dynamic application security testing results, known common vulnerability exposures, and third party library licensing -->
 
 ### 4. Enforce the data privacy and encryption standards
 
@@ -38,7 +38,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check personally identifiable information masking, data at rest encryption, data in transit protection, and cryptographic key management --&gt;
+<!-- Check personally identifiable information masking, data at rest encryption, data in transit protection, and cryptographic key management -->
 
 ### 5. Establish the security breach incident protocol
 
@@ -46,7 +46,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check security event logging, alerting thresholds, forensic data retention, breach notification procedures, and incident containment steps --&gt;
+<!-- Check security event logging, alerting thresholds, forensic data retention, breach notification procedures, and incident containment steps -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Document
 

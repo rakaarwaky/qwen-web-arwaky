@@ -6,6 +6,7 @@ flow used by the direct, file-only, and attachment prompt orchestrators.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -19,7 +20,7 @@ from modules.shared.src.contract_core_protocol import (
     IStreamProtocol,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
+from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, RunCancelledError
 from modules.shared.src.taxonomy_core_event import EVENT_PROMPT_INJECTED
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
@@ -51,8 +52,17 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
+        cancel_event: threading.Event | None = None,
     ) -> str:
-        """Inject prompt, click send, and wait for the AI response."""
+        """Inject prompt, click send, and wait for the AI response.
+
+        ``cancel_event`` is an optional per-run ``threading.Event``.  When it
+        is set (by ``request_cancel`` on the owning orchestrator) the flow
+        raises ``RunCancelledError`` immediately so the caller's browser
+        context is closed without touching sibling runs.
+        """
+        if cancel_event is not None and cancel_event.is_set():
+            raise RunCancelledError("Cancelled by user before dispatch")
         logger = observability.get_logger()
         try:
             baseline_response = latest_message_text(page)
@@ -76,15 +86,21 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
             raise RuntimeError("Cannot wait for response: prompt dispatch is incomplete")
 
         response_timeout_hint = timeout_sec
-        response = streamer.wait_for_response(
-            page,
-            TimeoutSec(response_timeout_hint),
-            msg_count_before,
-            emitter,
-            polling_interval_sec=PollIntervalSec(active_cfg.poll_interval),
-            dispatch_acknowledged=HeadlessFlag(state.dispatch_acknowledged),
-            baseline_text=baseline_response,
-        )
+        try:
+            response = streamer.wait_for_response(
+                page,
+                TimeoutSec(response_timeout_hint),
+                msg_count_before,
+                emitter,
+                polling_interval_sec=PollIntervalSec(active_cfg.poll_interval),
+                dispatch_acknowledged=HeadlessFlag(state.dispatch_acknowledged),
+                baseline_text=baseline_response,
+                cancel_event=cancel_event,
+            )
+        except Exception as err:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RunCancelledError("Cancelled by user while waiting for response") from err
+            raise
 
         if response and len(response.strip()) > 0:
             logger.info("Received response (%d chars)", len(response))

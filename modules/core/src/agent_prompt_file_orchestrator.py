@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import threading
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -29,6 +30,7 @@ from modules.shared.src.contract_core_protocol import (
     IStreamProtocol,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
+from modules.shared.src.taxonomy_core_error import RunCancelledError
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
@@ -40,6 +42,30 @@ from modules.shared.src.taxonomy_core_vo import (
     RunContext,
     RunId,
 )
+
+
+@dataclass
+class _RunState:
+    """Per-run cancellation and browser context state.
+
+    One instance per ``process_prompt_file_only`` invocation, so concurrent
+    TUI slots (which share one orchestrator instance) never touch each
+    other's cancel flag or browser context.
+
+    ``cancel_event`` is owned by the caller when provided (targeted cancel),
+    otherwise a private event is created for internal fail-fast checks.
+    """
+
+    cancel_event: threading.Event = field(default_factory=threading.Event)
+    active_bctx: object | None = None
+    bctx_lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+def _make_run_state(cancel_event: threading.Event | None) -> _RunState:
+    """Create a per-run state, reusing the caller's event when supplied."""
+    if cancel_event is not None:
+        return _RunState(cancel_event=cancel_event)
+    return _RunState()
 
 
 class PromptFileOrchestrator(IPromptFileAggregate):
@@ -62,15 +88,31 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         self._saver = saver
         self._observability = observability
         self._flow = flow
-        self._cancel_event = threading.Event()
-        self._active_bctx: object | None = None
-        self._bctx_lock = threading.Lock()
+        # Registry: cancel_event -> _RunState for every active run.
+        # Keyed on the caller's threading.Event so the TUI worker can target
+        # one specific run without touching sibling runs.
+        self._run_registry: dict[int, _RunState] = {}
+        self._registry_lock = threading.Lock()
 
-    def request_cancel(self) -> None:
-        """Request cancellation of any active browser session."""
-        self._cancel_event.set()
-        with self._bctx_lock:
-            bctx = self._active_bctx
+    def request_cancel(self, cancel_event: threading.Event) -> None:
+        """Cancel a specific in-flight run identified by its cancel event.
+
+        The caller (e.g. the TUI slot worker) creates its own
+        ``threading.Event`` per run, passes it into
+        ``process_prompt_file_only``, and later calls this method with the
+        same event to stop *only that run*. Sibling runs holding different
+        events are unaffected.
+        """
+        with self._registry_lock:
+            run_state = self._run_registry.get(id(cancel_event))
+        if run_state is None:
+            # Run already finished — still set the event so any in-progress
+            # flow check sees it.
+            cancel_event.set()
+            return
+        cancel_event.set()
+        with run_state.bctx_lock:
+            bctx = run_state.active_bctx
         if bctx is not None:
             close_fn = getattr(bctx, "close", None)
             if callable(close_fn):
@@ -82,10 +124,21 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         prompt_file: Path | PromptPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
+        cancel_event: threading.Event | None = None,
     ) -> ResponseText:
-        """Pipeline 2: Process a prompt file from disk without attachment."""
+        """Pipeline 2: Process a prompt file from disk without attachment.
+
+        Pass ``cancel_event`` to enable targeted cancellation: the TUI
+        worker creates one ``threading.Event`` per slot and hands it in;
+        ``request_cancel`` can then stop only that slot's run without
+        closing sibling slots' browser contexts. When omitted (non-TUI
+        callers), a private event is used internally and the run is not
+        externally cancellable.
+        """
         ctx = RunContext()
-        self._cancel_event.clear()
+        run_state = _make_run_state(cancel_event)
+        with self._registry_lock:
+            self._run_registry[id(run_state.cancel_event)] = run_state
         try:
             p_path, out_path = resolve_pipeline_output_path(prompt_file, output_file)
             cfg = build_app_config(
@@ -99,22 +152,27 @@ class PromptFileOrchestrator(IPromptFileAggregate):
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                with self._bctx_lock:
-                    self._active_bctx = bctx
+                with run_state.bctx_lock:
+                    run_state.active_bctx = bctx
                 try:
-                    if self._cancel_event.is_set():
-                        raise RuntimeError("Cancelled by user")
+                    if run_state.cancel_event.is_set():
+                        raise RunCancelledError("Cancelled by user before browser launch")
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                    text = self._execute_file_on_page(page, p_path, cfg.request_timeout, cfg, emitter, state)
+                    text = self._execute_file_on_page(
+                        page, p_path, cfg.request_timeout, cfg, emitter, state, run_state.cancel_event
+                    )
+
                 finally:
-                    with self._bctx_lock:
-                        self._active_bctx = None
+                    with run_state.bctx_lock:
+                        run_state.active_bctx = None
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
         finally:
+            with self._registry_lock:
+                self._run_registry.pop(id(run_state.cancel_event), None)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 
@@ -126,6 +184,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         active_cfg: AppConfig,
         emitter: LifecycleEmitter,
         state: LifecycleState,
+        cancel_event: threading.Event | None = None,
     ) -> str:
         prompt = filepath.read_text(encoding="utf-8").strip()
 
@@ -148,6 +207,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
             msg_count_before=msg_count_before,
             timeout_sec=timeout_sec,
             active_cfg=active_cfg,
+            cancel_event=cancel_event,
         )
 
 

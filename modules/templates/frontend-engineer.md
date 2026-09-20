@@ -14,7 +14,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check component structure, reusability, props interface, semantic HTML, design system adherence, and visual rendering accuracy --&gt;
+<!-- Check component structure, reusability, props interface, semantic HTML, design system adherence, and visual rendering accuracy -->
 
 ### 2. Manage the client side application state
 
@@ -22,7 +22,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check state initialization, state updates, local versus global state boundaries, data synchronization, and memory leak prevention --&gt;
+<!-- Check state initialization, state updates, local versus global state boundaries, data synchronization, and memory leak prevention -->
 
 ### 3. Consume the backend API and handle client errors
 
@@ -30,7 +30,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check API request execution, response parsing, loading state handling, client side error display, retry mechanisms, and optimistic updates --&gt;
+<!-- Check API request execution, response parsing, loading state handling, client side error display, retry mechanisms, and optimistic updates -->
 
 ### 4. Tune the frontend performance and responsiveness
 
@@ -38,7 +38,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check render latency, unnecessary re-renders, bundle size impact, responsive layout adaptation, input responsiveness, and resource loading strategy --&gt;
+<!-- Check render latency, unnecessary re-renders, bundle size impact, responsive layout adaptation, input responsiveness, and resource loading strategy -->
 
 ### 5. Write the frontend unit and component tests
 
@@ -46,7 +46,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check component rendering tests, user interaction simulation, state change verification, mock API integration, and test coverage metrics --&gt;
+<!-- Check component rendering tests, user interaction simulation, state change verification, mock API integration, and test coverage metrics -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Frontend Engineer agent, read all relevant attached documents, analyze the 
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Code
 

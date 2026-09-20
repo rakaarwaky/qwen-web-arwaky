@@ -14,7 +14,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check endpoint routing, request parsing, response formatting, error handling, input validation, HTTP method usage, and API contract adherence --&gt;
+<!-- Check endpoint routing, request parsing, response formatting, error handling, input validation, HTTP method usage, and API contract adherence -->
 
 ### 2. Build the physical database schema
 
@@ -22,7 +22,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check table creation, column types, indexing strategy, foreign keys, constraints, migration scripts, and query execution plans --&gt;
+<!-- Check table creation, column types, indexing strategy, foreign keys, constraints, migration scripts, and query execution plans -->
 
 ### 3. Enforce the business rules in server code
 
@@ -30,7 +30,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check domain logic implementation, transaction boundaries, data consistency, state transitions, concurrency control, and authorization checks --&gt;
+<!-- Check domain logic implementation, transaction boundaries, data consistency, state transitions, concurrency control, and authorization checks -->
 
 ### 4. Tune the backend service performance
 
@@ -38,7 +38,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check N plus 1 queries, memory allocation, blocking IO, caching strategy, algorithmic complexity, connection pooling, and timeout configurations --&gt;
+<!-- Check N plus 1 queries, memory allocation, blocking IO, caching strategy, algorithmic complexity, connection pooling, and timeout configurations -->
 
 ### 5. Write the backend test code
 
@@ -46,7 +46,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check unit test coverage, integration test scenarios, mock external dependencies, test data setup, edge case verification, and continuous integration readiness --&gt;
+<!-- Check unit test coverage, integration test scenarios, mock external dependencies, test data setup, edge case verification, and continuous integration readiness -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Code
 

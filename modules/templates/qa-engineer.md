@@ -14,7 +14,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check test scope, test environment requirements, test data requirements, resource allocation, and testing schedule --&gt;
+<!-- Check test scope, test environment requirements, test data requirements, resource allocation, and testing schedule -->
 
 ### 2. Execute functional and regression tests
 
@@ -22,7 +22,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check happy path verification, edge case execution, negative path testing, cross browser testing, and regression suite completion --&gt;
+<!-- Check happy path verification, edge case execution, negative path testing, cross browser testing, and regression suite completion -->
 
 ### 3. Create the test automation scripts
 
@@ -30,7 +30,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check script maintainability, continuous integration integration, test data generation, mock usage, and execution speed --&gt;
+<!-- Check script maintainability, continuous integration integration, test data generation, mock usage, and execution speed -->
 
 ### 4. Log and classify the system defects
 
@@ -38,7 +38,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check reproduction steps clarity, environment details, expected versus actual results, severity classification accuracy, and defect assignment --&gt;
+<!-- Check reproduction steps clarity, environment details, expected versus actual results, severity classification accuracy, and defect assignment -->
 
 ### 5. Report the system quality metrics
 
@@ -46,7 +46,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check test coverage percentage, defect density, pass or fail rate, automation coverage, and release quality recommendation --&gt;
+<!-- Check test coverage percentage, defect density, pass or fail rate, automation coverage, and release quality recommendation -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Test Artifacts
 

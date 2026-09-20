@@ -23,7 +23,6 @@ from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
-from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -32,7 +31,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
+from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.utility_core_version import get_package_version
@@ -92,6 +91,7 @@ class QwenTuiApp(
         direct: IDirectPromptAggregate,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
+        slot_config: ITuiSlotConfigProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
@@ -104,9 +104,13 @@ class QwenTuiApp(
         self._setup = setup
         self._session = session
         self._jobs = jobs
-        self._slot_config = TuiSlotConfigResolver()
+        # AR-1: TUI slot config is injected from the Root container, never
+        # imported from Capabilities directly.
+        self._slot_config = slot_config
         self._target_field_for_picker: str | None = None
         self._slot_workers: dict[int, Any] = {}
+        # AR-2/FE-1: per-slot cancel events isolate concurrent runs.
+        self._slot_cancel_events: dict[int, Any] = {}
         self._slot_stats: dict[int, dict[str, Any]] = {
             s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
         }

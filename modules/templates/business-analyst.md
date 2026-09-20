@@ -14,7 +14,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check root cause, business need, target user, business value, success metric, problem scope, assumptions, and domain context --&gt;
+<!-- Check root cause, business need, target user, business value, success metric, problem scope, assumptions, and domain context -->
 
 ### 2. Model the business process
 
@@ -22,7 +22,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check current flow, target flow, business rules, approvals, exceptions, recovery path, role handoff, and compliance constraints --&gt;
+<!-- Check current flow, target flow, business rules, approvals, exceptions, recovery path, role handoff, and compliance constraints -->
 
 ### 3. Formulate acceptance criteria
 
@@ -30,7 +30,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check requirement clarity, user story completeness, acceptance criteria, edge cases, negative paths, measurable outcomes, and stable requirement IDs --&gt;
+<!-- Check requirement clarity, user story completeness, acceptance criteria, edge cases, negative paths, measurable outcomes, and stable requirement IDs -->
 
 ### 4. Align business stakeholders
 
@@ -38,7 +38,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check stakeholder agreement, shared understanding, conflicting requirements, scope changes, technical constraint impact, and sign-off readiness --&gt;
+<!-- Check stakeholder agreement, shared understanding, conflicting requirements, scope changes, technical constraint impact, and sign-off readiness -->
 
 ### 5. Execute user acceptance testing
 
@@ -46,7 +46,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check UAT scenarios, test data, business validation, edge case coverage, result evidence, user sign-off, and readiness for release --&gt;
+<!-- Check UAT scenarios, test data, business validation, edge case coverage, result evidence, user sign-off, and readiness for release -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Business Analyst agent, read all relevant  file, analyze the feature, and f
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Document
 

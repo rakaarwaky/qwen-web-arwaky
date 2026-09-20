@@ -36,6 +36,7 @@ from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
+from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.core.src.capabilities_update_manager import UpdateManager
 from modules.core.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_core_aggregate import (
@@ -47,7 +48,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -89,6 +90,10 @@ class SharedContainer:
         self.updater: IUpdateProtocol = UpdateManager()
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
+        # AR-1: TUI slot-config resolver exposed via the Root container so the
+        # Surface (QwenTuiApp) can consume it through ITuiSlotConfigProtocol
+        # instead of importing the Capabilities class directly.
+        self.tui_slot_config: ITuiSlotConfigProtocol = TuiSlotConfigResolver()
 
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()

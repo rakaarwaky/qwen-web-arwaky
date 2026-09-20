@@ -6,6 +6,7 @@ Implements IStreamProtocol.
 from __future__ import annotations
 
 import contextlib
+import threading
 import time
 
 from playwright.sync_api import Error, Page
@@ -22,6 +23,7 @@ from modules.shared.src.taxonomy_core_error import (
     AuthRequiredError,
     OutputValidationError,
     ResponseDetectionTimeoutError,
+    RunCancelledError,
 )
 from modules.shared.src.taxonomy_core_event import (
     EVENT_GENERATION_FINISHED,
@@ -114,6 +116,7 @@ class StreamMonitor(IStreamProtocol):
         min_text_length: int = 1,
         dispatch_acknowledged: bool = True,
         baseline_text: ResponseText | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> ResponseText | None:
         """Wait for a terminal assistant response using event-driven DOM signals.
 
@@ -121,7 +124,16 @@ class StreamMonitor(IStreamProtocol):
         it is not a response cutoff. The loop exits on a terminal generation event
         (stable response plus a completed generation state), or raises when an
         explicit browser/auth error cannot be recovered.
+
+        ``cancel_event`` is an optional per-run ``threading.Event`` created by
+        the calling orchestrator. When it is set, the loop raises
+        ``RunCancelledError`` immediately so the caller can close only its own
+        browser context without affecting sibling concurrent runs.
         """
+        # Step 0: If already cancelled, fail fast before touching the DOM.
+        if cancel_event is not None and cancel_event.is_set():
+            raise RunCancelledError("Cancelled before waiting for response")
+
         # Step 1: Check dispatch acknowledgment gate
         if not dispatch_acknowledged:
             raise RuntimeError("Cannot wait for response: prompt dispatch (EVENT_DISPATCH_ACKNOWLEDGED) is incomplete")
@@ -149,6 +161,10 @@ class StreamMonitor(IStreamProtocol):
 
         # Poll DOM for event signals and content stability until a terminal event.
         while True:
+            # Step 0a: check cancellation before each poll iteration.
+            if cancel_event is not None and cancel_event.is_set():
+                raise RunCancelledError(f"Cancelled by user after {int(time.time() - start)}s of polling")
+
             now = time.time()
             elapsed = now - start
             if elapsed >= self.safety_timeout_sec:

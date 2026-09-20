@@ -14,7 +14,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check user goal, persona, entry point, task flow, interaction path, navigation logic, drop off risk, and alignment with business process --&gt;
+<!-- Check user goal, persona, entry point, task flow, interaction path, navigation logic, drop off risk, and alignment with business process -->
 
 ### 2. Produce the wireframe prototype
 
@@ -22,7 +22,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check low fidelity wireframe, high fidelity prototype, visual hierarchy, layout structure, responsive behavior, interaction affordance, and user feedback loop --&gt;
+<!-- Check low fidelity wireframe, high fidelity prototype, visual hierarchy, layout structure, responsive behavior, interaction affordance, and user feedback loop -->
 
 ### 3. Define the design system
 
@@ -30,7 +30,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check design tokens, color palette, typography scale, spacing scale, component library, iconography, visual assets, and consistency across screens --&gt;
+<!-- Check design tokens, color palette, typography scale, spacing scale, component library, iconography, visual assets, and consistency across screens -->
 
 ### 4. Specify inclusive usability requirements
 
@@ -38,7 +38,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check accessibility standard, keyboard support, screen reader support, color contrast, target size, cognitive load, discoverability, and usability heuristic compliance --&gt;
+<!-- Check accessibility standard, keyboard support, screen reader support, color contrast, target size, cognitive load, discoverability, and usability heuristic compliance -->
 
 ### 5. Define interface state behavior
 
@@ -46,7 +46,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check loading state, empty state, error state, success state, partial data state, disabled state, retry behavior, and feedback clarity --&gt;
+<!-- Check loading state, empty state, error state, success state, partial data state, disabled state, retry behavior, and feedback clarity -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Design
 
