@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.3.0] - 2026-09-20
+
+### Added
+
+- feat(core): activate circuit-breaker and rate-limiter protection for asynchronous job dispatch
+- feat(cli): add retry action for failed TUI slots and contextual confirmation labels
+- feat(mcp): add explicit workspace path validation and graceful job executor shutdown
+- docs: add UAT and reproducible demo guides plus starter Sentry alert policy
+
+### Changed
+
+- refactor(core): consolidate file and attachment job lifecycle persistence and output preview handling
+- refactor(mcp): consolidate prompt-path resolution and remove the stale tool registry table
+- refactor(observability): rotate aggregate and per-run JSONL logs to bound disk usage
+- docs: update the PRD capability inventory and test documentation for the current modules layout
+
+### Fixed
+
+- fix(core): replace destructive workspace collision deletion with reversible backups
+- fix(core): fail closed when an update target version cannot be verified and attempt rollback after partial updates
+- fix(mcp): reject prompt paths outside `QWEN_WORKSPACE_ROOT`
+- fix(mcp): replace security-sensitive assertions with explicit runtime error handling
+- fix(security): restrict release discovery to HTTPS requests for `api.github.com` and validate repository input
+- fix(security): execute updater subprocesses with `shell=False` and validated argv/path arguments
+- fix(tui): preserve existing logging handlers while the TUI is mounted
+
 ## [6.2.0] - 2026-09-20
 
 ### Added
