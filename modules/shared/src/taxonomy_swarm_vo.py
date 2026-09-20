@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, NewType
 
+SwarmId = NewType("SwarmId", str)
 SwarmStatus = Literal["queued", "running", "completed", "partial", "failed", "cancelled"]
 AgentStatus = Literal["queued", "running", "retrying", "completed", "failed", "cancelled"]
 
@@ -26,7 +27,7 @@ class SwarmAgentSnapshot:
 class SwarmSnapshot:
     """Persistable status for one Swarm execution."""
 
-    swarm_id: str
+    swarm_id: SwarmId
     input_path: Path
     root_path: Path
     status: SwarmStatus
@@ -43,4 +44,4 @@ class SwarmSnapshot:
         return sum(agent.status == "failed" for agent in self.agents)
 
 
-__all__ = ["AgentStatus", "SwarmAgentSnapshot", "SwarmSnapshot", "SwarmStatus"]
+__all__ = ["AgentStatus", "SwarmAgentSnapshot", "SwarmId", "SwarmSnapshot", "SwarmStatus"]

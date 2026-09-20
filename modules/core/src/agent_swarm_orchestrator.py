@@ -9,14 +9,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate
 from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, MAX_ATTEMPTS, SWARM_OUTPUT_ROOT
 from modules.shared.src.taxonomy_core_vo import HeadlessFlag
-from modules.shared.src.taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmSnapshot
+from modules.shared.src.taxonomy_swarm_vo import AgentStatus, SwarmAgentSnapshot, SwarmId, SwarmSnapshot, SwarmStatus
 from modules.shared.src.utility_core_prompt_template import list_prompt_templates, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
 
@@ -38,10 +37,10 @@ class SwarmOrchestrator(ISwarmAggregate):
         self._browser_concurrency = min(10, max(1, int(browser_concurrency)))
         self._max_attempts = max(1, int(max_attempts))
         self._lock = threading.RLock()
-        self._snapshots: dict[str, SwarmSnapshot] = {}
-        self._cancel_events: dict[str, dict[str, threading.Event]] = {}
-        self._executors: dict[str, ThreadPoolExecutor] = {}
-        self._attachment_paths: dict[str, Path] = {}
+        self._snapshots: dict[SwarmId, SwarmSnapshot] = {}
+        self._cancel_events: dict[SwarmId, dict[str, threading.Event]] = {}
+        self._executors: dict[SwarmId, ThreadPoolExecutor] = {}
+        self._attachment_paths: dict[SwarmId, Path] = {}
 
     def start(self, input_path: Path) -> SwarmSnapshot:
         """Create a Swarm directory and schedule all discovered templates."""
@@ -85,12 +84,12 @@ class SwarmOrchestrator(ISwarmAggregate):
             executor.submit(self._run_agent, swarm_id, role)
         return self.snapshot(swarm_id) or snapshot
 
-    def snapshot(self, swarm_id: str) -> SwarmSnapshot | None:
+    def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return a thread-safe immutable snapshot."""
         with self._lock:
             return self._snapshots.get(swarm_id)
 
-    def cancel(self, swarm_id: str) -> None:
+    def cancel(self, swarm_id: SwarmId) -> None:
         """Stop active browser contexts and prevent queued work from running."""
         with self._lock:
             snapshot = self._snapshots.get(swarm_id)
@@ -130,7 +129,7 @@ class SwarmOrchestrator(ISwarmAggregate):
                 executor.shutdown(wait=False, cancel_futures=True)
             self._attachment_paths.pop(swarm_id, None)
 
-    def _run_agent(self, swarm_id: str, role: str) -> None:
+    def _run_agent(self, swarm_id: SwarmId, role: str) -> None:
         start = time.perf_counter()
         event = self._cancel_events[swarm_id][role]
         output_path = self._output_root / swarm_id / role / "output.md"
@@ -173,9 +172,9 @@ class SwarmOrchestrator(ISwarmAggregate):
 
     def _update_agent(
         self,
-        swarm_id: str,
+        swarm_id: SwarmId,
         role: str,
-        status: Any,
+        status: AgentStatus,
         attempt: int,
         output_path: Path,
         error: str | None,
@@ -222,7 +221,7 @@ class SwarmOrchestrator(ISwarmAggregate):
                 if executor is not None:
                     executor.shutdown(wait=False, cancel_futures=False)
 
-    def _replace(self, snapshot: SwarmSnapshot, status: Any) -> None:
+    def _replace(self, snapshot: SwarmSnapshot, status: SwarmStatus) -> None:
         updated = SwarmSnapshot(
             swarm_id=snapshot.swarm_id,
             input_path=snapshot.input_path,
@@ -275,9 +274,9 @@ class SwarmOrchestrator(ISwarmAggregate):
         )
 
     @staticmethod
-    def _new_swarm_id() -> str:
+    def _new_swarm_id() -> SwarmId:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        return f"swarm_{timestamp}_{secrets.token_hex(3)}"
+        return SwarmId(f"swarm_{timestamp}_{secrets.token_hex(3)}")
 
 
 __all__ = ["SwarmOrchestrator"]

@@ -22,7 +22,7 @@ import subprocess  # nosec B404 - argv execution is shell-free and validated bel
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import unquote, urlparse
 
 from modules.core.src.utility_core_logger_factory import get_logger
@@ -507,15 +507,26 @@ class UpdateManager(IUpdateProtocol):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
-            proc = subprocess.run(  # nosec B603 - shell=False, argv and paths are validated above
+            proc = subprocess.Popen(  # nosec B603 - shell=False, argv and paths are validated above
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout_sec,
-                check=False,
                 shell=False,
             )
-            return proc.returncode, proc.stdout or "", proc.stderr or ""
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout_sec)
+            except subprocess.TimeoutExpired as exc:
+                proc.kill()
+                timed_out_stdout, timed_out_stderr = proc.communicate()
+                out = timed_out_stdout or cast(str | bytes | None, exc.stdout) or ""
+                err = timed_out_stderr or cast(str | bytes | None, exc.stderr) or ""
+                if isinstance(out, bytes):
+                    out = out.decode("utf-8", errors="replace")
+                if isinstance(err, bytes):
+                    err = err.decode("utf-8", errors="replace")
+                return 124, out, err or f"Command timed out after {timeout_sec:.0f}s"
+            return proc.returncode, stdout or "", stderr or ""
         except subprocess.TimeoutExpired as exc:
             out = (
                 exc.stdout.decode(encoding="utf-8", errors="replace")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from modules.shared.src.taxonomy_swarm_vo import SwarmSnapshot
+from modules.shared.src.taxonomy_swarm_vo import SwarmId, SwarmSnapshot
 
 
 class ISwarmAggregate(ABC):
@@ -16,11 +16,11 @@ class ISwarmAggregate(ABC):
         """Start a Swarm and return its initial snapshot."""
 
     @abstractmethod
-    def snapshot(self, swarm_id: str) -> SwarmSnapshot | None:
+    def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a Swarm."""
 
     @abstractmethod
-    def cancel(self, swarm_id: str) -> None:
+    def cancel(self, swarm_id: SwarmId) -> None:
         """Cancel queued and active work for a Swarm."""
 
 

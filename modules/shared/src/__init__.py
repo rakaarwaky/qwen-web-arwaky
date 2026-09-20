@@ -190,7 +190,7 @@ from .taxonomy_core_vo import (
 )
 
 # ─── Taxonomy: Swarm VOs ───────────────────────────────────────
-from .taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmSnapshot
+from .taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmId, SwarmSnapshot
 
 # ─── Utility: events ──────────────────────────────────────────
 from .utility_core_events import is_stability_satisfied, should_treat_as_new_response
@@ -399,6 +399,7 @@ __all__ = [
     "ISwarmAggregate",
     # Swarm VOs
     "SwarmAgentSnapshot",
+    "SwarmId",
     "SwarmSnapshot",
     # Utilities
     "detect_processing_failure",
