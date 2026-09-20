@@ -8,7 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- feat(swarm): add adaptive parallel agent execution based on discovered role templates
+- feat(swarm): batch up to 10 browser workers, retry transient failures up to three attempts, preserve partial results, and support cancellation
+- feat(cli): add an always-available Swarm tab with file/folder input, progress monitoring, and per-agent output folders
 - feat(attachments): resolve external `.yaml` and `.yml` files referenced by inline and reference-style Markdown links during folder compilation
+- feat(templates): format all ten role templates as GitHub Issue-style analysis plans with three issue placeholders per scope
+
+### Changed
+
+- refactor(templates): preserve each role's original five scopes and severity guidance while separating issue-generation instructions from the output plan
+
+### Tests
+
+- test(swarm): add coverage for adaptive fan-out, per-agent output paths, retry behavior, cancellation, and partial completion
 - test(compiler): add regression coverage for external YAML and YML Markdown references and importer origin metadata
 
 ## [6.3.0] - 2026-09-20
