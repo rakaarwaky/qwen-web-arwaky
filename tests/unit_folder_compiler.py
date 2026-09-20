@@ -262,6 +262,27 @@ class TestMarkdownLinkChain:
         spec = next(f for f in files if f.name == "spec.md")
         assert origins[spec] == ("a.md",)
 
+    def test_inline_yaml_link_outside_folder(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(target / "a.md", "See the deployment config: [config](../ref/deployment.yaml)\n")
+        _write(tmp_path / "ref" / "deployment.yaml", "apiVersion: v1\nkind: ConfigMap\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        config = next(f for f in files if f.name == "deployment.yaml")
+        assert origins[config] == ("a.md",)
+
+    def test_reference_style_yml_link_outside_folder(self, tmp_path: Path) -> None:
+        target = tmp_path / "docs"
+        _write(
+            target / "a.md",
+            "See [the compose config][compose].\n\n[compose]: ../ref/docker-compose.yml\n",
+        )
+        _write(tmp_path / "ref" / "docker-compose.yml", "services:\n  app:\n    image: example\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        config = next(f for f in files if f.name == "docker-compose.yml")
+        assert origins[config] == ("a.md",)
+
     def test_angle_bracket_target_with_space(self, tmp_path: Path) -> None:
         target = tmp_path / "docs"
         _write(target / "a.md", "[x](<../ref/my file.md>) [y](../ref/percent%20name.md)\n")
