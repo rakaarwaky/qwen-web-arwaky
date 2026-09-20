@@ -3,7 +3,7 @@ As a Security Engineer agent, read all relevant attached documents, analyze the 
 Issue Section Template
 #### Issue SE-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [SE][{Severity}] {concise issue title}
+- **Title**: \[SE\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

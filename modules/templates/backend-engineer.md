@@ -3,7 +3,7 @@ As a Backend Engineer agent, read all relevant attached documents, analyze the f
 Issue Section Template
 #### Issue BE-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [BE][{Severity}] {concise issue title}
+- **Title**: \[BE\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

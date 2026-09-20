@@ -3,7 +3,7 @@ As a UI/UX Designer agent, read all relevant attached documents, analyze the fea
 Issue Section Template
 #### Issue UX-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [UX][{Severity}] {concise issue title}
+- **Title**: \[UX\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

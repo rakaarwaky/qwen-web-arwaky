@@ -3,7 +3,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 Issue Section Template
 #### Issue SA-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [SA][{Severity}] {concise issue title}
+- **Title**: \[SA\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

@@ -3,7 +3,7 @@ As a Business Analyst agent, read all relevant attached documents, analyze the f
 Issue Section Template
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [BA][{Severity}] {concise issue title}
+- **Title**: \[BA\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

@@ -3,7 +3,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 Issue Section Template
 #### Issue DO-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [DO][{Severity}] {concise issue title}
+- **Title**: \[DO\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

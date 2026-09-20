@@ -3,7 +3,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 Issue Section Template
 #### Issue PE-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [PE][{Severity}] {concise issue title}
+- **Title**: \[PE\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}

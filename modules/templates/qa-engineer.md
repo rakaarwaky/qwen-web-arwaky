@@ -3,7 +3,7 @@ As a QA Engineer agent, read all relevant attached documents, analyze the featur
 Issue Section Template
 #### Issue QA-{SCOPE-NUMBER}-{ID}
 
-- **Title**: [QA][{Severity}] {concise issue title}
+- **Title**: \[QA\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
