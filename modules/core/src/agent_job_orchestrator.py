@@ -19,6 +19,8 @@ from modules.shared.src.contract_core_aggregate import (
     IPromptFileAggregate,
 )
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
+from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_FAILED,
@@ -50,11 +52,22 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
         max_workers: int = 1,
+        circuit_breaker: CircuitBreaker | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._storage = storage
         self._file_only = file_only
         self._attachment = attachment
+        self._circuit_breaker = circuit_breaker
+        self._rate_limiter = rate_limiter
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="qwen_job_worker")
+
+    def _guard_dispatch(self) -> None:
+        """Apply shared throughput and failure guards before submitting work."""
+        if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
+            raise CircuitBreakerOpenError("circuit open: too many recent job failures")
+        if self._rate_limiter is not None:
+            self._rate_limiter.acquire()
 
     def _generate_job_id(self, prefix: str = "job") -> JobId:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -70,6 +83,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         """Submit a prompt file job for asynchronous background processing."""
         p_path = Path(prompt_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
+        self._guard_dispatch()
         job_id = self._generate_job_id("file")
         now = _utc_now_iso()
 
@@ -103,6 +117,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         p_path = Path(prompt_file).expanduser().resolve()
         a_path = Path(attachment_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
+        self._guard_dispatch()
         job_id = self._generate_job_id("att")
         now = _utc_now_iso()
 
@@ -186,6 +201,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             elif res_str:
                 preview = res_str[:500]
 
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_success()
             self._storage.save_job(
                 JobRecord(
                     job_id=str(job_id),
@@ -201,6 +218,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 )
             )
         except Exception as exc:
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_failure()
             duration = round(time.perf_counter() - start_t, 2)
             self._storage.save_job(
                 JobRecord(
@@ -280,6 +299,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             elif res_str:
                 preview = res_str[:500]
 
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_success()
             self._storage.save_job(
                 JobRecord(
                     job_id=str(job_id),
@@ -296,6 +317,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 )
             )
         except Exception as exc:
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_failure()
             duration = round(time.perf_counter() - start_t, 2)
             self._storage.save_job(
                 JobRecord(
