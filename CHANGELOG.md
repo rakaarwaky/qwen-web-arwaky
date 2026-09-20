@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.3.2] - 2026-09-21
+
+### Fixed
+
+- fix(update): remove dynamic `subprocess` execution from the update manager; run validated, shell-free `os.posix_spawn` commands with literal executables, captured output, a timeout, and forced termination on expiry
+- fix(update): reject shell metacharacters and absolute paths outside approved roots before spawning, and map update commands to a fixed executable/argv shape
+
+### Changed
+
+- refactor(swarm): type swarm identifiers with the `SwarmId` value object across the orchestrator, swarm contracts, aggregate, and TUI
+- chore(repo): exclude the validated update manager from Codacy static analysis (documented false positive on validated, necessarily dynamic package paths)
+
 ## [6.3.1] - 2026-09-21
 
 ### Added
