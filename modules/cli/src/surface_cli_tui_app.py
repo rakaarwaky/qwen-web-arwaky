@@ -33,7 +33,8 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, PROMPT_TEMPLATE_MANIFEST
+from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
+from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.utility_core_version import get_package_version
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
@@ -110,10 +111,11 @@ class QwenTuiApp(
             s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
         }
         # C5: build template options / roles once instead of per-compose.
-        self._template_options: list[tuple[str, str]] = [
-            (meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
-        ]
-        self._template_roles: set[str] = set(PROMPT_TEMPLATE_MANIFEST)
+        # Roles are discovered dynamically from modules/templates/*.md, so a
+        # new template file added to that folder shows up here with no code change.
+        manifest = prompt_template_manifest()
+        self._template_options: list[tuple[str, str]] = [(meta["title"], role) for role, meta in manifest.items()]
+        self._template_roles: set[str] = set(manifest)
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
         self._metric_done: Any = None

@@ -1,12 +1,4 @@
-"""Taxonomy: DevOps/SRE role prompt template constant.
-
-Domain taxonomy constant layer for the built-in DevOps/SRE prompt template.
-Operational concerns: deployment, observability, reliability, security hardening.
-"""
-
-from __future__ import annotations
-
-EMBEDDED_DEVOPS_TEMPLATE: str = r"""# Plan: {feature} — DevOps / SRE
+# Plan: {feature} — DevOps / SRE
 
 ## Summary
 
@@ -74,6 +66,3 @@ automation, changelog generation, branch protection -->
 | CRITICAL | Outage risk, security vuln, data leak, observability blind spot. Immediate fix. |
 | WARNING | Resilience gap, config fragility, CI gap, missing instrumentation. Fix this cycle. |
 | INFO | Hardening suggestion, cost optimization, DX improvement. Deferrable. |
-"""
-
-__all__ = ["EMBEDDED_DEVOPS_TEMPLATE"]
