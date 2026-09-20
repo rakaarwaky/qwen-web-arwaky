@@ -3,6 +3,10 @@
 Kept separate from ``surface_cli_tui_app`` so the app surface stays thin
 (AES406 SURFACE_ROLE: control-flow budget) while these components remain
 independently testable.
+
+SA-1: ``ConfirmModal`` lives here (not in ``surface_cli_session_setup``) so
+the TUI handler, slot-cancel confirm, and session-setup flow all reference one
+single, well-tested modal component.
 """
 
 from __future__ import annotations
@@ -117,6 +121,49 @@ class HelpScreen(ModalScreen[None]):
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
+
+
+class ConfirmModal(ModalScreen[bool]):
+    """Modal screen asking confirmation for destructive actions.
+
+    SA-1: single source of truth for the TUI's confirm-destructive-action
+    modal. Used by:
+    - slot cancel (``surface_cli_tui_workers._cancel_slot``)
+    - quit-with-running-jobs (``surface_cli_tui_handlers.action_request_quit``)
+    - session-setup submenu (``surface_cli_session_setup.SessionSetupScreen``)
+    """
+
+    BINDINGS = [
+        Binding("escape", "dismiss_no", "Cancel"),
+        Binding("n", "dismiss_no", "Cancel", show=False),
+        Binding("y", "dismiss_yes", "Confirm", show=False),
+    ]
+
+    def __init__(self, title: str, message: str) -> None:
+        super().__init__()
+        self._title = title
+        self._message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-modal-container"):
+            yield Static(f"[bold red]{self._title.upper()}[/bold red]\n\n{self._message}\n")
+            yield Button("Cancel", id="btn-cancel", variant="default")
+            yield Button("Delete Session & Login", id="btn-confirm", variant="error")
+
+    def on_mount(self) -> None:
+        self.query_one("#btn-cancel").focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-confirm":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+    def action_dismiss_no(self) -> None:
+        self.dismiss(False)
+
+    def action_dismiss_yes(self) -> None:
+        self.dismiss(True)
 
 
 class QwenTuiLogHandler(logging.Handler):

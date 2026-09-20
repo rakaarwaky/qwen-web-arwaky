@@ -60,10 +60,11 @@ fi
 
 # Gate 3: Bandit security scan (source code only, exclude tests) — always runs (not optional)
 info "Gate 3/5 — Bandit security scan..."
-if uv run bandit modules/root_cli_main_entry.py modules/root_mcp_main_entry.py -r modules/ -s B110,B112 2>&1 | grep -q "No issues"; then
+if uv run bandit -r modules/ -s B110,B112 2>&1 | grep -q "No issues"; then
     ok "Bandit clean"
 else
     warn "Bandit found potential issues"
+    uv run bandit -r modules/ -s B110,B112 2>&1 | grep -E "^\s+Severity" || true
     FAILURES=$((FAILURES + 1))
 fi
 
@@ -82,6 +83,16 @@ if command -v lint-arwaky-cli &>/dev/null; then
 else
     warn "lint-arwaky-cli not installed — skipping AES check (see CI: downloads release binary)"
     FAILURES=$((FAILURES + 1))
+fi
+
+# Gate 4b: AD-05 template hygiene — modules/templates/*.md must not contain
+# HTML-escaped tokens that leak into the TUI/MCP/CLI role-template path.
+info "Gate 4b/5 — Template hygiene (AD-05)..."
+if grep -rEl '&lt;|&gt;' modules/templates/ 2>/dev/null; then
+    warn "HTML-escaped tokens found in modules/templates/*.md"
+    FAILURES=$((FAILURES + 1))
+else
+    ok "Template hygiene clean"
 fi
 
 # Gate 5: Pytest test suite

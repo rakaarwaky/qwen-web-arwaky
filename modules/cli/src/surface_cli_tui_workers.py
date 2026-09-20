@@ -19,8 +19,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Input, Label, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
-from modules.core.src.capabilities_tui_slot_config import SlotInputError
-from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
+from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
 from modules.shared.src.utility_core_response import detect_processing_failure
 
 # A badge write can land while the app is tearing down: the worker thread's
@@ -51,6 +50,7 @@ class _TuiWorkersMixin:
     _session_check_timed_out: bool
     _login_in_flight: bool
     _slot_generation: dict[int, int]
+    _slot_cancel_events: dict[int, threading.Event]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -89,8 +89,13 @@ class _TuiWorkersMixin:
                 self.notify(msg, severity="error", title=f"Slot {slot_id}")
             return
 
-        plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
-        if isinstance(plan, SlotInputError):
+        plan = self._slot_config.resolve_slot_run_plan(
+            PromptText(prompt_val),
+            PromptText(file_val),
+            cast(FilePath, out_val),
+            HeadlessFlag(headless_val),
+        )
+        if isinstance(plan, SlotInputValue):
             msg = f"[bold {THEME['err']}]ERROR:[/] {escape(str(plan.message))} (Slot {slot_id})"
             self._log_msg(msg, slot_id)
             self._log_msg(msg)
@@ -100,6 +105,10 @@ class _TuiWorkersMixin:
 
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
+
+        # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
+        # never touches another slot's in-flight browser context.
+        self._slot_cancel_events[slot_id] = threading.Event()
 
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
         self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
@@ -131,7 +140,7 @@ class _TuiWorkersMixin:
                 if confirmed:
                     self._do_cancel_slot(slot_id)
 
-            from modules.cli.src.surface_cli_session_setup import ConfirmModal
+            from modules.cli.src.surface_cli_tui_components import ConfirmModal
 
             self.push_screen(
                 ConfirmModal(
@@ -152,11 +161,14 @@ class _TuiWorkersMixin:
         self._update_slot_status(slot_id, "⚠ CANCELLING…")
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ⚠")
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
-        # Close active browser contexts so Playwright operations unblock
-        with contextlib.suppress(Exception):
-            self._attachment.request_cancel()
-        with contextlib.suppress(Exception):
-            self._file_only.request_cancel()
+        # AR-2/FE-1: cancel only this slot's run via its own cancel event.
+        # Sibling slots' browser contexts are untouched.
+        slot_event = self._slot_cancel_events.get(slot_id)
+        if slot_event is not None:
+            with contextlib.suppress(Exception):
+                self._attachment.request_cancel(slot_event)
+            with contextlib.suppress(Exception):
+                self._file_only.request_cancel(slot_event)
         worker.cancel()
         self._slot_workers[slot_id] = None
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
@@ -186,6 +198,8 @@ class _TuiWorkersMixin:
             return  # stale worker — slot was cancelled or restarted
         icon = "✅" if ok else "❌"
         self._slot_workers[slot_id] = None
+        # AR-2/FE-1: release the per-slot cancel event now the run is done.
+        self._slot_cancel_events.pop(slot_id, None)
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
         self._update_slot_status(slot_id, self._format_status(status, "badge"))
@@ -212,6 +226,9 @@ class _TuiWorkersMixin:
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
         threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
         self._ensure_log_handler()
+        # AR-2/FE-1: pass the per-slot cancel event so the orchestrator can
+        # be targeted from _do_cancel_slot without touching sibling slots.
+        slot_cancel_event = self._slot_cancel_events.get(slot_id)
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
         self.call_from_thread(
             self._log_msg,
@@ -236,12 +253,14 @@ class _TuiWorkersMixin:
                     attachment_file=cfg.file_path,
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
+                    cancel_event=slot_cancel_event,
                 )
             else:
                 res = self._file_only.process_prompt_file_only(
                     prompt_file=cfg.prompt_path or cfg.input_path,
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
+                    cancel_event=slot_cancel_event,
                 )
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)

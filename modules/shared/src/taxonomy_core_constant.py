@@ -94,6 +94,24 @@ MODEL_SELECTOR_BUTTON = "Select Model"
 
 MAX_ATTEMPTS = 3
 
+# ─── Response retry policy ──────────────────────────────────────────────────
+# SharedFlowOrchestrator retries a dispatch when the model returns a
+# rate-limit / throttling page instead of a real answer. Attempts are bounded
+# by MAX_ATTEMPTS (3); the wait before retry N is RETRY_BASE_DELAY_SEC * N.
+RETRY_BASE_DELAY_SEC: int = 30
+
+RATE_LIMIT_KEYWORDS: tuple[str, ...] = (
+    "too many requests",
+    "rate limit",
+    "rate-limit",
+    "ratelimit",
+    "throttl",
+    "429",
+    "slow down",
+    "try again later",
+    "there was an issue connecting to",
+)
+
 SERVICE_NAME = "qwen-web"
 
 SD_NOTIFY_READY = "READY=1"
@@ -358,29 +376,7 @@ DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
 
 # ─── Prompt templates (role-based built-in templates) ─────────────────────
-# Each role is embedded in its own taxonomy constant module:
-#   taxonomy_architect_constant.py, taxonomy_backend_constant.py,
-#   taxonomy_frontend_constant.py, taxonomy_analyst_constant.py
-PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
-    "architect": {
-        "title": "Architect",
-        "dimensions": "Layer Boundaries, Naming, Orphan, Scalability, Data Flow",
-    },
-    "backend": {
-        "title": "Backend",
-        "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
-    },
-    "frontend": {
-        "title": "UI/UX",
-        "dimensions": "Accessibility & Usability, Layout & Responsiveness, UX Patterns & User Flow, Component / Module Quality, Visual Consistency & Design Tokens, Performance",
-    },
-    "analyst": {
-        "title": "Business Analyst",
-        "dimensions": "Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability",
-    },
-    "devops": {
-        "title": "DevOps / SRE",
-        "dimensions": "Deployment, Observability, Reliability, Security Hardening, Configuration, Release CI",
-    },
-}
-PROMPT_TEMPLATE_ROLES: tuple[str, ...] = tuple(PROMPT_TEMPLATE_MANIFEST.keys())
+# Role templates now live as Markdown files under ``modules/templates/{role}.md``
+# and are discovered dynamically at runtime by
+# ``modules/shared/src/utility_core_prompt_template.py``. No hardcoded manifest
+# remains in this module.
