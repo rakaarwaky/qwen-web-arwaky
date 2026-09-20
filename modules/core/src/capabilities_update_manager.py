@@ -232,6 +232,23 @@ class UpdateManager(IUpdateProtocol):
         forced = bool(force)
         previous = self.current_version()
         check = self.check_update()
+        if check.latest_version is None:
+            message = "Update refused: cannot verify target version; no package changes were made."
+            log.error("update_refused_unverifiable_target source=%s error=%s", check.source, check.error)
+            return UpdateReport(
+                package_name=self.package_name,
+                previous_version=str(previous),
+                latest_version=None,
+                source=check.source,
+                update_available=False,
+                forced=forced,
+                changed=False,
+                steps=(),
+                health_checks=(),
+                post_update_version=str(previous),
+                healthy=False,
+                message=message,
+            )
         up_to_date = check.latest_version is not None and str(previous) != "unknown" and not check.update_available
         if up_to_date and not forced and self._chromium_present():
             message = (
