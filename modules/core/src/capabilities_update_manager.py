@@ -514,12 +514,13 @@ class UpdateManager(IUpdateProtocol):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
+            executable, argv = self._approved_spawn_command(cmd)
             with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
                 file_actions = [
                     (os.POSIX_SPAWN_DUP2, stdout_file.fileno(), 1),
                     (os.POSIX_SPAWN_DUP2, stderr_file.fileno(), 2),
                 ]
-                pid = os.posix_spawn(cmd[0], cmd, os.environ.copy(), file_actions=file_actions)
+                pid = os.posix_spawn(executable, argv, os.environ.copy(), file_actions=file_actions)
                 deadline = time.monotonic() + timeout_sec
                 status: int | None = None
                 while status is None:
@@ -547,6 +548,15 @@ class UpdateManager(IUpdateProtocol):
             return 127, "", f"Executable not found: {exc}"
         except Exception as exc:
             return 1, "", f"Subprocess execution error: {exc}"
+
+    @staticmethod
+    def _approved_spawn_command(cmd: list[str]) -> tuple[str, list[str]]:
+        """Map validated update commands to a fixed executable and argv shape."""
+        if cmd and cmd[0] == "git":
+            return "git", cmd
+        if len(cmd) >= 3 and cmd[1:2] == ["-m"] and cmd[2] in {"pip", "playwright"}:
+            return "python3", ["python3", *cmd[1:]]
+        raise ValueError("Unsupported update command")
 
     def _playwright_browsers_path(self) -> Path:
         """Resolve the Playwright browser cache honoring PLAYWRIGHT_BROWSERS_PATH and OS conventions."""
