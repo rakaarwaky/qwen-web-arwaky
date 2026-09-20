@@ -30,6 +30,8 @@ class _TuiHandlersMixin:
     _template_roles: set[str]
     _slot_workers: dict[int, Any]
     _NUM_SLOTS: int
+    _run_swarm: Any
+    _cancel_swarm: Any
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
@@ -49,6 +51,15 @@ class _TuiHandlersMixin:
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
+        if button_id == "btn-swarm-start":
+            self._run_swarm()
+            return
+        if button_id == "btn-swarm-cancel":
+            self._cancel_swarm()
+            return
+        if button_id == "btn-browse-swarm-file":
+            self._open_picker("input-swarm-file", select_directories=True)
+            return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
             ("btn-cancel-", self._cancel_slot),
@@ -147,6 +158,10 @@ class _TuiHandlersMixin:
     def action_switch_tab_overview(self) -> None:
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-overview"
+
+    def action_switch_tab_swarm(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-swarm"
 
     def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):

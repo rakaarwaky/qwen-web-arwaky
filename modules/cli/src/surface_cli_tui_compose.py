@@ -51,6 +51,7 @@ class _TuiComposeMixin:
 
     # Stubs for methods provided by other mixins / App at runtime.
     _init_table: Any
+    _init_swarm_table: Any
     query_one: Any
     set_timer: Any
     _log_msg: Any
@@ -84,6 +85,30 @@ class _TuiComposeMixin:
                 yield Static(
                     "[dim]Press ? for keyboard shortcuts. Configure a slot tab, then press Enter to run.[/dim]",
                     classes="metric-item",
+                )
+
+            # ─── Tab 2: Adaptive Swarm ─────────────────────────
+            with TabPane("Swarm 🐝", id="tab-swarm"), Vertical(classes="overview-container"):
+                yield Label("Attachment File or Folder", classes="field-label")
+                with Horizontal(classes="field-row"):
+                    yield Input(
+                        value="",
+                        placeholder="path/to/file or folder",
+                        id="input-swarm-file",
+                        classes="field-input",
+                    )
+                    yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
+                with Horizontal(classes="toggle-row"):
+                    yield Button("⚡ START SWARM", variant="primary", id="btn-swarm-start")
+                    yield Button("✕ CANCEL SWARM", id="btn-swarm-cancel")
+                    yield Label("Adaptive templates · maximum 10 browsers", id="swarm-summary")
+                yield DataTable(id="swarm-table")
+                yield RichLog(
+                    id="log-view-swarm",
+                    highlight=True,
+                    markup=True,
+                    max_lines=2000,
+                    auto_scroll=True,
                 )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
@@ -159,6 +184,7 @@ class _TuiComposeMixin:
 
     def on_mount(self) -> None:
         self._init_table()
+        self._init_swarm_table()
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)
@@ -168,6 +194,8 @@ class _TuiComposeMixin:
         self._log_views: dict[int, RichLog] = {}
         with contextlib.suppress(NoMatches):
             self._log_views[0] = self.query_one("#log-view-overview", RichLog)
+        with contextlib.suppress(NoMatches):
+            self._log_views[-1] = self.query_one("#log-view-swarm", RichLog)
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", RichLog)
