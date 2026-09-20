@@ -142,6 +142,97 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         )
         return record
 
+    def _save_started(
+        self, record: JobRecord | None, started_at: str, *, attachment_path: Path | None = None
+    ) -> JobRecord | None:
+        """Persist the common in-progress state for either job kind."""
+        if record is None:
+            return None
+        self._storage.save_job(
+            JobRecord(
+                job_id=record.job_id,
+                created_at=record.created_at,
+                latest_event=record.latest_event or EVENT_DISPATCH_ACKNOWLEDGED.value,
+                completed=False,
+                started_at=started_at,
+                input_file=record.input_file,
+                attachment_file=str(attachment_path) if attachment_path else record.attachment_file,
+                output_file=record.output_file,
+            )
+        )
+        return record
+
+    def _save_failure(
+        self,
+        job_id: JobId,
+        record: JobRecord | None,
+        started_at: str,
+        duration: float,
+        input_path: Path,
+        error: str,
+        *,
+        attachment_path: Path | None = None,
+        output_path: Path | None = None,
+    ) -> None:
+        """Persist a normalized failed terminal state."""
+        self._storage.save_job(
+            JobRecord(
+                job_id=str(job_id),
+                created_at=record.created_at if record else started_at,
+                latest_event=EVENT_FAILED.value,
+                completed=True,
+                started_at=started_at,
+                completed_at=_utc_now_iso(),
+                duration_sec=duration,
+                input_file=str(input_path),
+                attachment_file=str(attachment_path) if attachment_path else None,
+                output_file=str(output_path) if output_path else None,
+                error=error,
+            )
+        )
+
+    def _save_success(
+        self,
+        job_id: JobId,
+        record: JobRecord | None,
+        started_at: str,
+        duration: float,
+        input_path: Path,
+        preview: str | None,
+        *,
+        attachment_path: Path | None = None,
+        output_path: Path | None = None,
+    ) -> None:
+        """Persist a normalized successful terminal state."""
+        if self._circuit_breaker is not None:
+            self._circuit_breaker.record_success()
+        self._storage.save_job(
+            JobRecord(
+                job_id=str(job_id),
+                created_at=record.created_at if record else started_at,
+                latest_event=EVENT_GENERATION_FINISHED.value,
+                completed=True,
+                started_at=started_at,
+                completed_at=_utc_now_iso(),
+                duration_sec=duration,
+                input_file=str(input_path),
+                attachment_file=str(attachment_path) if attachment_path else None,
+                output_file=str(output_path) if output_path else None,
+                result_preview=preview,
+            )
+        )
+
+    @staticmethod
+    def _preview_result(output_path: Path | None, result: object) -> str | None:
+        """Read a short output preview, falling back to the returned result."""
+        result_text = str(result) if result is not None else ""
+        if output_path and output_path.exists():
+            try:
+                return output_path.read_text(encoding="utf-8")[:500]
+            except OSError:
+                return result_text[:500] if result_text else None
+        return result_text[:500] if result_text else None
+
     def _run_file_job(
         self,
         job_id: JobId,
@@ -149,91 +240,47 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         output_path: Path | None,
         headless: HeadlessFlag,
     ) -> None:
+        """Execute and persist a prompt-file job."""
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
-        rec = self._storage.get_job(job_id)
-        if rec is not None:
-            self._storage.save_job(
-                JobRecord(
-                    job_id=rec.job_id,
-                    created_at=rec.created_at,
-                    latest_event=rec.latest_event or EVENT_DISPATCH_ACKNOWLEDGED.value,
-                    completed=False,
-                    started_at=started_at,
-                    input_file=rec.input_file,
-                    output_file=rec.output_file,
-                )
-            )
-
+        record = self._storage.get_job(job_id)
+        self._save_started(record, started_at)
         try:
-            res = self._file_only.process_prompt_file_only(
+            result = self._file_only.process_prompt_file_only(
                 prompt_file=FilePath(prompt_path),
                 output_file=FilePath(output_path) if output_path else None,
                 headless=headless,
             )
             duration = round(time.perf_counter() - start_t, 2)
-            res_str = str(res) if res is not None else ""
-            fail_msg = detect_processing_failure(res_str) or (res_str if res_str.startswith("ERROR") else None)
-
-            if fail_msg:
-                self._storage.save_job(
-                    JobRecord(
-                        job_id=str(job_id),
-                        created_at=rec.created_at if rec else started_at,
-                        latest_event=EVENT_FAILED.value,
-                        completed=True,
-                        started_at=started_at,
-                        completed_at=_utc_now_iso(),
-                        duration_sec=duration,
-                        input_file=str(prompt_path),
-                        output_file=str(output_path) if output_path else None,
-                        error=fail_msg,
-                    )
-                )
+            result_text = str(result) if result is not None else ""
+            failure = detect_processing_failure(result_text) or (
+                result_text if result_text.startswith("ERROR") else None
+            )
+            if failure:
+                if self._circuit_breaker is not None:
+                    self._circuit_breaker.record_failure()
+                self._save_failure(job_id, record, started_at, duration, prompt_path, failure, output_path=output_path)
                 return
-
-            preview: str | None = None
-            if output_path and output_path.exists():
-                try:
-                    preview = output_path.read_text(encoding="utf-8")[:500]
-                except Exception:
-                    preview = res_str[:500] if res_str else None
-            elif res_str:
-                preview = res_str[:500]
-
-            if self._circuit_breaker is not None:
-                self._circuit_breaker.record_success()
-            self._storage.save_job(
-                JobRecord(
-                    job_id=str(job_id),
-                    created_at=rec.created_at if rec else started_at,
-                    latest_event=EVENT_GENERATION_FINISHED.value,
-                    completed=True,
-                    started_at=started_at,
-                    completed_at=_utc_now_iso(),
-                    duration_sec=duration,
-                    input_file=str(prompt_path),
-                    output_file=str(output_path) if output_path else None,
-                    result_preview=preview,
-                )
+            self._save_success(
+                job_id,
+                record,
+                started_at,
+                duration,
+                prompt_path,
+                self._preview_result(output_path, result),
+                output_path=output_path,
             )
         except Exception as exc:
             if self._circuit_breaker is not None:
                 self._circuit_breaker.record_failure()
-            duration = round(time.perf_counter() - start_t, 2)
-            self._storage.save_job(
-                JobRecord(
-                    job_id=str(job_id),
-                    created_at=rec.created_at if rec else started_at,
-                    latest_event=EVENT_FAILED.value,
-                    completed=True,
-                    started_at=started_at,
-                    completed_at=_utc_now_iso(),
-                    duration_sec=duration,
-                    input_file=str(prompt_path),
-                    output_file=str(output_path) if output_path else None,
-                    error=str(exc),
-                )
+            self._save_failure(
+                job_id,
+                record,
+                started_at,
+                round(time.perf_counter() - start_t, 2),
+                prompt_path,
+                str(exc),
+                output_path=output_path,
             )
 
     def _run_attachment_job(
@@ -244,96 +291,59 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         output_path: Path | None,
         headless: HeadlessFlag,
     ) -> None:
+        """Execute and persist a prompt-with-attachment job."""
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
-        rec = self._storage.get_job(job_id)
-        if rec is not None:
-            self._storage.save_job(
-                JobRecord(
-                    job_id=rec.job_id,
-                    created_at=rec.created_at,
-                    latest_event=rec.latest_event or EVENT_DISPATCH_ACKNOWLEDGED.value,
-                    completed=False,
-                    started_at=started_at,
-                    input_file=rec.input_file,
-                    attachment_file=rec.attachment_file,
-                    output_file=rec.output_file,
-                )
-            )
-
+        record = self._storage.get_job(job_id)
+        self._save_started(record, started_at, attachment_path=attachment_path)
         try:
-            res = self._attachment.process_prompt_with_attachment(
+            result = self._attachment.process_prompt_with_attachment(
                 prompt_file=FilePath(prompt_path),
                 attachment_file=FilePath(attachment_path),
                 output_file=FilePath(output_path) if output_path else None,
                 headless=headless,
             )
             duration = round(time.perf_counter() - start_t, 2)
-            res_str = str(res) if res is not None else ""
-            fail_msg = detect_processing_failure(res_str) or (res_str if res_str.startswith("ERROR") else None)
-
-            if fail_msg:
-                self._storage.save_job(
-                    JobRecord(
-                        job_id=str(job_id),
-                        created_at=rec.created_at if rec else started_at,
-                        latest_event=EVENT_FAILED.value,
-                        completed=True,
-                        started_at=started_at,
-                        completed_at=_utc_now_iso(),
-                        duration_sec=duration,
-                        input_file=str(prompt_path),
-                        attachment_file=str(attachment_path),
-                        output_file=str(output_path) if output_path else None,
-                        error=fail_msg,
-                    )
+            result_text = str(result) if result is not None else ""
+            failure = detect_processing_failure(result_text) or (
+                result_text if result_text.startswith("ERROR") else None
+            )
+            if failure:
+                if self._circuit_breaker is not None:
+                    self._circuit_breaker.record_failure()
+                self._save_failure(
+                    job_id,
+                    record,
+                    started_at,
+                    duration,
+                    prompt_path,
+                    failure,
+                    attachment_path=attachment_path,
+                    output_path=output_path,
                 )
                 return
-
-            preview: str | None = None
-            if output_path and output_path.exists():
-                try:
-                    preview = output_path.read_text(encoding="utf-8")[:500]
-                except Exception:
-                    preview = res_str[:500] if res_str else None
-            elif res_str:
-                preview = res_str[:500]
-
-            if self._circuit_breaker is not None:
-                self._circuit_breaker.record_success()
-            self._storage.save_job(
-                JobRecord(
-                    job_id=str(job_id),
-                    created_at=rec.created_at if rec else started_at,
-                    latest_event=EVENT_GENERATION_FINISHED.value,
-                    completed=True,
-                    started_at=started_at,
-                    completed_at=_utc_now_iso(),
-                    duration_sec=duration,
-                    input_file=str(prompt_path),
-                    attachment_file=str(attachment_path),
-                    output_file=str(output_path) if output_path else None,
-                    result_preview=preview,
-                )
+            self._save_success(
+                job_id,
+                record,
+                started_at,
+                duration,
+                prompt_path,
+                self._preview_result(output_path, result),
+                attachment_path=attachment_path,
+                output_path=output_path,
             )
         except Exception as exc:
             if self._circuit_breaker is not None:
                 self._circuit_breaker.record_failure()
-            duration = round(time.perf_counter() - start_t, 2)
-            self._storage.save_job(
-                JobRecord(
-                    job_id=str(job_id),
-                    created_at=rec.created_at if rec else started_at,
-                    latest_event=EVENT_FAILED.value,
-                    completed=True,
-                    started_at=started_at,
-                    completed_at=_utc_now_iso(),
-                    duration_sec=duration,
-                    input_file=str(prompt_path),
-                    attachment_file=str(attachment_path),
-                    output_file=str(output_path) if output_path else None,
-                    error=str(exc),
-                )
+            self._save_failure(
+                job_id,
+                record,
+                started_at,
+                round(time.perf_counter() - start_t, 2),
+                prompt_path,
+                str(exc),
+                attachment_path=attachment_path,
+                output_path=output_path,
             )
 
     def get_job_status(self, job_id: JobId | str) -> JobRecord | None:

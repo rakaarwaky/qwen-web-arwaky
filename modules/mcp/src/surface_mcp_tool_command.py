@@ -161,6 +161,23 @@ def _format_error_payload(
     return json.dumps({"success": False, "error": err}, indent=2)
 
 
+def _resolve_prompt_path(prompt_file: str, *, field: str = "prompt_file") -> Path | str:
+    """Resolve a role or workspace prompt path with explicit runtime validation."""
+    if is_prompt_role(prompt_file):
+        return materialize_role_template(prompt_file)
+    validated_path, path_error = _validate_prompt_path(prompt_file, field=field)
+    if path_error is not None:
+        return path_error
+    if validated_path is None:
+        return _format_error_payload(
+            code="PATH_VALIDATION_FAILED",
+            message="Prompt path validation returned no usable path.",
+            hint="Provide a readable prompt file inside the configured workspace.",
+            retryable=False,
+        )
+    return validated_path
+
+
 class McpToolCommand:
     """MCP tool dispatcher — delegates to individual agent aggregate contracts."""
 
@@ -234,20 +251,9 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result preview (or job_id if async).
         """
-        if is_prompt_role(input_file):
-            p_path = materialize_role_template(input_file)
-        else:
-            validated_path, path_error = _validate_prompt_path(input_file, field="input_file")
-            if path_error is not None:
-                return path_error
-            if validated_path is None:
-                return _format_error_payload(
-                    code="PATH_VALIDATION_FAILED",
-                    message="Prompt path validation returned no usable path.",
-                    hint="Provide a readable prompt file inside the configured workspace.",
-                    retryable=False,
-                )
-            p_path = validated_path
+        p_path = _resolve_prompt_path(input_file, field="input_file")
+        if isinstance(p_path, str):
+            return p_path
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 
@@ -319,20 +325,9 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result (or job_id if async).
         """
-        if is_prompt_role(prompt_file):
-            p_path = materialize_role_template(prompt_file)
-        else:
-            validated_path, path_error = _validate_prompt_path(prompt_file)
-            if path_error is not None:
-                return path_error
-            if validated_path is None:
-                return _format_error_payload(
-                    code="PATH_VALIDATION_FAILED",
-                    message="Prompt path validation returned no usable path.",
-                    hint="Provide a readable prompt file inside the configured workspace.",
-                    retryable=False,
-                )
-            p_path = validated_path
+        p_path = _resolve_prompt_path(prompt_file)
+        if isinstance(p_path, str):
+            return p_path
 
         a_path, a_err = _validate_attachment_path(attachment_file)
         if a_err is not None:

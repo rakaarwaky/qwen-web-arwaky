@@ -18,7 +18,7 @@ import json
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 - argv execution is shell-free and validated below
 import sys
 import urllib.request
 from pathlib import Path
@@ -43,6 +43,8 @@ DEFAULT_GITHUB_REPO = "rakaarwaky/qwen-web-arwaky"
 GITHUB_RELEASE_URL = "https://api.github.com/repos/{repo}/releases/latest"
 GITHUB_REPO_ENV = "QWEN_WEB_GITHUB_REPO"
 USER_AGENT = "qwen-web-arwaky-updater/1.0"
+_GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GITHUB_API_HOST = "api.github.com"
 
 
 # ─── Module-level pure helpers ──────────────────────────────────────────────
@@ -401,6 +403,8 @@ class UpdateManager(IUpdateProtocol):
     def _github_repo_url(self, target_version: str | None = None) -> str:
         """Build a GitHub source URL, pinning to the discovered release when known."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
+        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+            raise ValueError(f"Invalid GitHub repository name: {repo!r}")
         suffix = f"@v{target_version.lstrip('vV')}" if target_version else ""
         return f"git+https://github.com/{repo}.git{suffix}"
 
@@ -414,13 +418,20 @@ class UpdateManager(IUpdateProtocol):
     def _fetch_json(self, url: str) -> dict[str, Any] | None:
         """Fetch a JSON document over HTTPS using stdlib only."""
         try:
+            parsed = urlparse(url)
+            if (
+                parsed.scheme != "https"
+                or parsed.hostname != _GITHUB_API_HOST
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.port not in (None, 443)
+            ):
+                raise ValueError("Only HTTPS requests to api.github.com are permitted")
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             )
-            if not req.full_url.startswith("https://"):
-                raise ValueError(f"Forbidden URL scheme: {req.full_url}")
-            with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:
+            with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:  # nosec B310 - HTTPS GitHub API only
                 payload = json.loads(resp.read().decode("utf-8"))
             return payload if isinstance(payload, dict) else None
         except Exception as exc:
@@ -430,8 +441,8 @@ class UpdateManager(IUpdateProtocol):
     def _fetch_latest_github(self) -> tuple[str | None, str | None]:
         """Return (version, error) from GitHub releases."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
-        if not repo:
-            return None, f"no GitHub repository configured (set {GITHUB_REPO_ENV}=owner/repo)"
+        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+            return None, f"invalid GitHub repository configured (set {GITHUB_REPO_ENV}=owner/repo)"
         payload = self._fetch_json(GITHUB_RELEASE_URL.format(repo=repo))
         if payload is None:
             return None, f"GitHub releases request failed for '{repo}'"
@@ -496,7 +507,14 @@ class UpdateManager(IUpdateProtocol):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec, check=False)
+            proc = subprocess.run(  # nosec B603 - shell=False, argv and paths are validated above
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                check=False,
+                shell=False,
+            )
             return proc.returncode, proc.stdout or "", proc.stderr or ""
         except subprocess.TimeoutExpired as exc:
             out = (
