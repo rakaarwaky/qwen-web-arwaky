@@ -73,6 +73,7 @@ def _format_report(report: UpdateReport) -> str:
         f"  Previous version : {report.previous_version}",
         f"  Latest version   : {report.latest_version or 'unknown'} (source: {report.source})",
         f"  Forced reinstall : {'yes' if report.forced else 'no'}",
+        f"  Rolled back      : {'yes' if report.rolled_back else 'no'}",
     ]
     if report.steps:
         lines.append("")

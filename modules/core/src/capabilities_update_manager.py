@@ -227,6 +227,37 @@ class UpdateManager(IUpdateProtocol):
             detail=f"playwright install chromium failed (rc={rc}): {detail}",
         )
 
+    def rollback_to(self, previous_version: str) -> tuple[UpdateStepResult, ...]:
+        """Best-effort reinstall of the previous release and browser assets."""
+        if not previous_version or previous_version == "unknown":
+            return (UpdateStepResult("rollback", False, False, "previous version is unknown"),)
+        if self._editable_source_dir() is not None:
+            return (UpdateStepResult("rollback", False, False, "rollback is skipped for editable installations"),)
+        repo_url = self._github_repo_url(previous_version)
+        cmd = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-input",
+            "--disable-pip-version-check",
+            "--force-reinstall",
+            "--no-deps",
+            repo_url,
+        ]
+        try:
+            rc, out, err = self._run_subprocess(cmd, self.pip_timeout_sec)
+            package = UpdateStepResult(
+                "rollback:package",
+                True,
+                rc == 0,
+                "reinstalled " + previous_version if rc == 0 else _tail(err or out),
+            )
+            browser = self.sync_browser(ForceFlag(True))
+            return (package, UpdateStepResult("rollback:browser", browser.executed, browser.success, browser.detail))
+        except Exception as exc:
+            return (UpdateStepResult("rollback", True, False, str(exc)),)
+
     def perform_update(self, force: ForceFlag = ForceFlag(False)) -> UpdateReport:
         """Run the full update pipeline."""
         forced = bool(force)
@@ -299,6 +330,11 @@ class UpdateManager(IUpdateProtocol):
         steps_ok = pkg_step.success and browser_step.success
         checks_ok = all(c.success for c in health_checks)
         healthy = steps_ok and checks_ok
+        rolled_back = False
+        if not healthy and str(previous) != "unknown":
+            rollback_steps = self.rollback_to(str(previous))
+            steps.extend(rollback_steps)
+            rolled_back = bool(rollback_steps) and all(step.success for step in rollback_steps if step.executed)
         if not steps_ok:
             failed_detail = "; ".join(f"{s.name}: {s.detail}" for s in steps if not s.success)
             message = f"Update failed — {failed_detail}"
@@ -327,7 +363,8 @@ class UpdateManager(IUpdateProtocol):
             health_checks=tuple(health_checks),
             post_update_version=str(post_version),
             healthy=healthy,
-            message=message,
+            message=message + (f" Rolled back to {previous}." if rolled_back else ""),
+            rolled_back=rolled_back,
         )
 
     # ─── Block 3: Private Helpers ──
