@@ -16,11 +16,14 @@ from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 
 
 def _make_app() -> QwenTuiApp:
+    # AR-1: slot_config is injected (ITuiSlotConfigProtocol), no longer
+    # constructed inside the TUI surface.
     return QwenTuiApp(
         workspace=MagicMock(),
         direct=MagicMock(),
         file_only=MagicMock(),
         attachment=MagicMock(),
+        slot_config=MagicMock(),
         setup=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),

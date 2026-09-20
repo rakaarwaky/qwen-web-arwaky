@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from playwright.sync_api import Page
 
@@ -61,8 +62,14 @@ class IPromptFlowAggregate(ABC):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
+        cancel_event: Any | None = None,
     ) -> str:
-        """Inject prompt, click send, and wait for the AI response."""
+        """Inject prompt, click send, and wait for the AI response.
+
+        ``cancel_event`` is an optional ``threading.Event`` created per-run;
+        when set, the flow raises ``RunCancelledError`` so the caller's
+        browser context can be closed without touching sibling runs.
+        """
 
 
 class IDirectPromptAggregate(ABC):

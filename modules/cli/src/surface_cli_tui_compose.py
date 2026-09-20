@@ -104,7 +104,7 @@ class _TuiComposeMixin:
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
-                                placeholder="path/to/prompt.md or role (architect|backend|frontend|analyst)",
+                                placeholder="path/to/prompt.md or role (any .md in modules/templates/)",
                                 id=f"input-prompt-{s}",
                                 classes="field-input",
                             )

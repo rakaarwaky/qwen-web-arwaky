@@ -23,7 +23,6 @@ from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
-from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -32,8 +31,9 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, PROMPT_TEMPLATE_MANIFEST
+from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
+from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.utility_core_version import get_package_version
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
@@ -91,6 +91,7 @@ class QwenTuiApp(
         direct: IDirectPromptAggregate,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
+        slot_config: ITuiSlotConfigProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
@@ -103,17 +104,22 @@ class QwenTuiApp(
         self._setup = setup
         self._session = session
         self._jobs = jobs
-        self._slot_config = TuiSlotConfigResolver()
+        # AR-1: TUI slot config is injected from the Root container, never
+        # imported from Capabilities directly.
+        self._slot_config = slot_config
         self._target_field_for_picker: str | None = None
         self._slot_workers: dict[int, Any] = {}
+        # AR-2/FE-1: per-slot cancel events isolate concurrent runs.
+        self._slot_cancel_events: dict[int, Any] = {}
         self._slot_stats: dict[int, dict[str, Any]] = {
             s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
         }
         # C5: build template options / roles once instead of per-compose.
-        self._template_options: list[tuple[str, str]] = [
-            (meta["title"], role) for role, meta in PROMPT_TEMPLATE_MANIFEST.items()
-        ]
-        self._template_roles: set[str] = set(PROMPT_TEMPLATE_MANIFEST)
+        # Roles are discovered dynamically from modules/templates/*.md, so a
+        # new template file added to that folder shows up here with no code change.
+        manifest = prompt_template_manifest()
+        self._template_options: list[tuple[str, str]] = [(meta["title"], role) for role, meta in manifest.items()]
+        self._template_roles: set[str] = set(manifest)
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
         self._metric_done: Any = None

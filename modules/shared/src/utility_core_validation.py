@@ -8,11 +8,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from modules.shared.src.taxonomy_core_constant import CHALLENGE_KEYWORDS
+from modules.shared.src.taxonomy_core_constant import CHALLENGE_KEYWORDS, RATE_LIMIT_KEYWORDS
 from modules.shared.src.taxonomy_core_error import (
     AuthRequiredError,
     FileValidationError,
     OutputValidationError,
+    RateLimitError,
 )
 
 
@@ -22,6 +23,9 @@ def validate_response_content(text: str) -> None:
         raise OutputValidationError("Response content is empty")
 
     text_lower = text.lower()
+    for kw in RATE_LIMIT_KEYWORDS:
+        if kw in text_lower and len(text) < 500:
+            raise RateLimitError(f"Rate limit / throttling response detected: '{kw}'")
     for kw in CHALLENGE_KEYWORDS:
         if kw in text_lower and len(text) < 500:
             if "verify you are human" in text_lower or "attention required!" in text_lower:

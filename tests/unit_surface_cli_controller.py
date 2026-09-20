@@ -11,6 +11,8 @@ from modules.shared.src import AppConfig
 
 
 def _make_controller() -> InteractiveController:
+    # AR-1: 5th positional arg is slot_config (ITuiSlotConfigProtocol), now
+    # injected from the Root container instead of being constructed in the Surface.
     return InteractiveController(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
 

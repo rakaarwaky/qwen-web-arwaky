@@ -41,7 +41,7 @@
 - **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS), `crate::` (Rust), and Markdown link / reference-definition / Obsidian `[[wikilink]]` resolution.
 - **Async MCP job dispatch** — background prompt jobs (`async_run` → `job_id`) with `get_job_status` / `list_jobs` tools; no more MCP stdio timeouts on long runs.
 - **Per-job JSONL logging + TUI observability** — track parallel and long-running jobs with run-in-progress guards and live status.
-- **Standardized role prompt templates** — consistent analyst / architect / backend / devops / frontend templates.
+- **Standardized role prompt templates** — 10 SDLC roles (business-analyst, system-analyst, ui-ux-designer, software-architect, backend-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, devops-engineer).
 - **Container support** — official `Containerfile` + `scripts/podman.sh` for containerized execution.
 - **XDG-compliant uninstall** — `scripts/uninstall.sh` removes the venv and all launchers cleanly.
 - ⚠️ **Breaking**: legacy `qwen-web-cli` / `qwc` commands removed — use `qwen-web-arwaky` / `qwa` only.
