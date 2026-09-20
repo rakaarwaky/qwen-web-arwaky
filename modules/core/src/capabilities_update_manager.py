@@ -521,9 +521,9 @@ class UpdateManager(IUpdateProtocol):
                     (os.POSIX_SPAWN_DUP2, stderr_file.fileno(), 2),
                 ]
                 if executable == "git":
-                    pid = os.posix_spawn("git", argv, os.environ.copy(), file_actions=file_actions)
+                    pid = os.posix_spawn("git", ["git", *argv[1:]], os.environ.copy(), file_actions=file_actions)
                 else:
-                    pid = os.posix_spawn("python3", argv, os.environ.copy(), file_actions=file_actions)
+                    pid = os.posix_spawn("python3", ["python3", *argv[1:]], os.environ.copy(), file_actions=file_actions)
                 deadline = time.monotonic() + timeout_sec
                 status: int | None = None
                 while status is None:
