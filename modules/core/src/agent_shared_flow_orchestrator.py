@@ -7,6 +7,7 @@ flow used by the direct, file-only, and attachment prompt orchestrators.
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -19,8 +20,13 @@ from modules.shared.src.contract_core_protocol import (
     ISendProtocol,
     IStreamProtocol,
 )
+from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS, RETRY_BASE_DELAY_SEC
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, RunCancelledError
+from modules.shared.src.taxonomy_core_error import (
+    RateLimitError,
+    ResponseDetectionTimeoutError,
+    RunCancelledError,
+)
 from modules.shared.src.taxonomy_core_event import EVENT_PROMPT_INJECTED
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
@@ -63,6 +69,69 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
         """
         if cancel_event is not None and cancel_event.is_set():
             raise RunCancelledError("Cancelled by user before dispatch")
+        logger = observability.get_logger()
+
+        last_error: Exception
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                response = self._dispatch_once(
+                    page,
+                    injector,
+                    sender,
+                    streamer,
+                    emitter,
+                    state,
+                    observability,
+                    filepath,
+                    prompt,
+                    msg_count_before,
+                    timeout_sec,
+                    active_cfg,
+                    sender_config,
+                    document_parsed,
+                    cancel_event,
+                )
+            except (RateLimitError, ResponseDetectionTimeoutError) as e:
+                last_error = e
+                if cancel_event is not None and cancel_event.is_set():
+                    break
+                if attempt >= MAX_ATTEMPTS:
+                    raise
+                delay = RETRY_BASE_DELAY_SEC * attempt
+                logger.warning(
+                    "Dispatch attempt %d/%d failed (%s); retrying in %ds",
+                    attempt,
+                    MAX_ATTEMPTS,
+                    type(e).__name__,
+                    delay,
+                )
+                time.sleep(delay)
+            else:
+                return response
+
+        if cancel_event is not None and cancel_event.is_set():
+            raise RunCancelledError("Cancelled by user while waiting for response") from last_error
+        raise last_error
+
+    def _dispatch_once(
+        self,
+        page: Page,
+        injector: IInjectionProtocol,
+        sender: ISendProtocol,
+        streamer: IStreamProtocol,
+        emitter: LifecycleEmitter,
+        state: LifecycleState,
+        observability: IObservabilityProtocol,
+        filepath: Path,
+        prompt: str,
+        msg_count_before: MessageCount,
+        timeout_sec: int,
+        active_cfg: AppConfig,
+        sender_config: SenderConfig | None = None,
+        document_parsed: bool = True,
+        cancel_event: threading.Event | None = None,
+    ) -> str:
+        """Single inject → send → wait cycle. Raises on failure; caller retries."""
         logger = observability.get_logger()
         try:
             baseline_response = latest_message_text(page)

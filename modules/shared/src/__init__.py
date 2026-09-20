@@ -48,6 +48,8 @@ from .taxonomy_core_constant import (
     MAX_ATTEMPTS,
     MESSAGE_SELECTORS,
     NEW_CHAT_SELECTORS,
+    RATE_LIMIT_KEYWORDS,
+    RETRY_BASE_DELAY_SEC,
     SD_NOTIFY_READY,
     SD_NOTIFY_RELOADING,
     SD_NOTIFY_STOPPING,
@@ -361,6 +363,8 @@ __all__ = [
     "COMBINED_MESSAGE_SELECTOR",
     "JS_GET_RESPONSE_TEXT",
     "JS_COUNT_TURNS",
+    "RATE_LIMIT_KEYWORDS",
+    "RETRY_BASE_DELAY_SEC",
     # Entities
     "CircuitBreaker",
     "RateLimiter",

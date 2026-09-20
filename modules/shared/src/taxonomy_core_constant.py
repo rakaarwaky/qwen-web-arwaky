@@ -94,6 +94,24 @@ MODEL_SELECTOR_BUTTON = "Select Model"
 
 MAX_ATTEMPTS = 3
 
+# ─── Response retry policy ──────────────────────────────────────────────────
+# SharedFlowOrchestrator retries a dispatch when the model returns a
+# rate-limit / throttling page instead of a real answer. Attempts are bounded
+# by MAX_ATTEMPTS (3); the wait before retry N is RETRY_BASE_DELAY_SEC * N.
+RETRY_BASE_DELAY_SEC: int = 30
+
+RATE_LIMIT_KEYWORDS: tuple[str, ...] = (
+    "too many requests",
+    "rate limit",
+    "rate-limit",
+    "ratelimit",
+    "throttl",
+    "429",
+    "slow down",
+    "try again later",
+    "there was an issue connecting to",
+)
+
 SERVICE_NAME = "qwen-web"
 
 SD_NOTIFY_READY = "READY=1"
