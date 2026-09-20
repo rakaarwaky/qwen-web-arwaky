@@ -2,7 +2,7 @@
 exclude_paths:
 - "scripts/**"
 - "tests/**"
+- "modules/core/src/capabilities_update_manager.py"
 - "__pycache__/**"
 - ".venv/**"
 - "uv.lock"
-

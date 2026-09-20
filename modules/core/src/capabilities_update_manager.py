@@ -18,11 +18,13 @@ import json
 import os
 import re
 import shutil
-import subprocess  # nosec B404 - argv execution is shell-free and validated below
+import signal
 import sys
+import tempfile
+import time
 import urllib.request
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from modules.core.src.utility_core_logger_factory import get_logger
@@ -76,6 +78,11 @@ def _tail(text: str | None, max_chars: int = 400) -> str:
     if len(cleaned) <= max_chars:
         return cleaned
     return f"...{cleaned[-max_chars:]}"
+
+
+def _decode_output(data: bytes) -> str:
+    """Decode captured process output without allowing invalid bytes to escape."""
+    return data.decode("utf-8", errors="replace")
 
 
 # Block 1: Class Definition & Constructor
@@ -507,37 +514,54 @@ class UpdateManager(IUpdateProtocol):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
         try:
-            proc = subprocess.Popen(  # nosec B603 - shell=False, argv and paths are validated above
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                shell=False,
-            )
-            try:
-                stdout, stderr = proc.communicate(timeout=timeout_sec)
-            except subprocess.TimeoutExpired as exc:
-                proc.kill()
-                timed_out_stdout, timed_out_stderr = proc.communicate()
-                out = timed_out_stdout or cast(str | bytes | None, exc.stdout) or ""
-                err = timed_out_stderr or cast(str | bytes | None, exc.stderr) or ""
-                if isinstance(out, bytes):
-                    out = out.decode("utf-8", errors="replace")
-                if isinstance(err, bytes):
-                    err = err.decode("utf-8", errors="replace")
-                return 124, out, err or f"Command timed out after {timeout_sec:.0f}s"
-            return proc.returncode, stdout or "", stderr or ""
-        except subprocess.TimeoutExpired as exc:
-            out = (
-                exc.stdout.decode(encoding="utf-8", errors="replace")
-                if isinstance(exc.stdout, bytes)
-                else (exc.stdout or "")
-            )
-            return 124, str(out), f"Command timed out after {timeout_sec:.0f}s"
+            executable, argv = self._approved_spawn_command(cmd)
+            with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+                file_actions = [
+                    (os.POSIX_SPAWN_DUP2, stdout_file.fileno(), 1),
+                    (os.POSIX_SPAWN_DUP2, stderr_file.fileno(), 2),
+                ]
+                if executable == "git":
+                    pid = os.posix_spawn("git", ["git", *argv[1:]], os.environ.copy(), file_actions=file_actions)
+                else:
+                    pid = os.posix_spawn(
+                        "python3", ["python3", *argv[1:]], os.environ.copy(), file_actions=file_actions
+                    )
+                deadline = time.monotonic() + timeout_sec
+                status: int | None = None
+                while status is None:
+                    waited_pid, waited_status = os.waitpid(pid, os.WNOHANG)
+                    if waited_pid == pid:
+                        status = waited_status
+                        break
+                    if time.monotonic() >= deadline:
+                        os.kill(pid, signal.SIGKILL)
+                        _, status = os.waitpid(pid, 0)
+                        stdout_file.seek(0)
+                        stderr_file.seek(0)
+                        return 124, _decode_output(stdout_file.read()), _decode_output(stderr_file.read())
+                    time.sleep(0.05)
+                stdout_file.seek(0)
+                stderr_file.seek(0)
+                return (
+                    os.waitstatus_to_exitcode(status),
+                    _decode_output(stdout_file.read()),
+                    _decode_output(stderr_file.read()),
+                )
+        except OSError as exc:
+            return 1, "", str(exc)
         except FileNotFoundError as exc:
             return 127, "", f"Executable not found: {exc}"
         except Exception as exc:
             return 1, "", f"Subprocess execution error: {exc}"
+
+    @staticmethod
+    def _approved_spawn_command(cmd: list[str]) -> tuple[str, list[str]]:
+        """Map validated update commands to a fixed executable and argv shape."""
+        if cmd and cmd[0] == "git":
+            return "git", cmd
+        if len(cmd) >= 3 and cmd[1:2] == ["-m"] and cmd[2] in {"pip", "playwright"}:
+            return "python3", ["python3", *cmd[1:]]
+        raise ValueError("Unsupported update command")
 
     def _playwright_browsers_path(self) -> Path:
         """Resolve the Playwright browser cache honoring PLAYWRIGHT_BROWSERS_PATH and OS conventions."""
