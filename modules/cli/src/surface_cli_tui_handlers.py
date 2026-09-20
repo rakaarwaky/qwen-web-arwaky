@@ -17,8 +17,8 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input, Select, TabbedContent
 
-from modules.cli.src.surface_cli_session_setup import ConfirmModal
-from modules.cli.src.surface_cli_tui_components import FilePickerModal, HelpScreen
+from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
+from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen
 from modules.cli.src.surface_cli_tui_css import THEME
 
 
@@ -43,6 +43,7 @@ class _TuiHandlersMixin:
     _login_in_flight: bool
     call_from_thread: Any
     notify: Any
+    _session: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -170,6 +171,30 @@ class _TuiHandlersMixin:
         # U3: re-entrancy guard — one login flow at a time.
         if getattr(self, "_login_in_flight", False):
             self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Login already in progress.")
+            return
+
+        # SA-1: wire the previously-dead SessionSetupScreen into the TUI login
+        # path.  Show the session-setup submenu; "Delete Session & Login
+        # Again" triggers the blocking setup_session() worker after
+        # confirmation, "Back to Main Menu" dismisses the screen.
+        self._log_msg(f"[bold {THEME['accent']}]>>> Opening session setup menu...[/]")
+        self.push_screen(
+            SessionSetupScreen(
+                status_text=f"[bold]Session status: {self._session_badge_text()}[/]",
+                on_login=self._start_login_worker,
+                on_back=lambda: self._log_msg(f"[{THEME['muted']}]Session setup cancelled — back to main menu.[/]"),
+            )
+        )
+
+    def _session_badge_text(self) -> str:
+        """Return a short session status string for the setup screen."""
+        if self._session is None:
+            return "N/A (no session orchestrator)"
+        return "CHECKING — run 'qwen-web-arwaky doctor' for diagnostics"
+
+    def _start_login_worker(self, confirmed: bool) -> None:
+        """SA-1: start the blocking login worker after user confirmation."""
+        if not confirmed:
             return
         self._login_in_flight = True
         self._log_msg(f"[bold {THEME['accent']}]>>> Launching interactive session setup...[/]")

@@ -14,7 +14,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check module ownership, dependency direction, abstraction layers, circular dependencies, responsibility segregation, service granularity, and interface segregation --&gt;
+<!-- Check module ownership, dependency direction, abstraction layers, circular dependencies, responsibility segregation, service granularity, and interface segregation -->
 
 ### 2. Design cross-feature integration patterns
 
@@ -22,7 +22,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check synchronous and asynchronous boundaries, event-driven patterns, message contracts, data consistency across modules, pipeline integrity, and backpressure handling --&gt;
+<!-- Check synchronous and asynchronous boundaries, event-driven patterns, message contracts, data consistency across modules, pipeline integrity, and backpressure handling -->
 
 ### 3. Architect system scalability
 
@@ -30,7 +30,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check stateless design, bottleneck identification, resource contention, horizontal scaling readiness, reliability targets, capacity planning, and performance baseline --&gt;
+<!-- Check stateless design, bottleneck identification, resource contention, horizontal scaling readiness, reliability targets, capacity planning, and performance baseline -->
 
 ### 4. Govern technology standards
 
@@ -38,7 +38,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check technology stack selection, naming convention, architectural pattern adherence, framework standardization, dependency policy, and security architecture baseline --&gt;
+<!-- Check technology stack selection, naming convention, architectural pattern adherence, framework standardization, dependency policy, and security architecture baseline -->
 
 ### 5. Manage technical debt strategy
 
@@ -46,7 +46,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check debt identification, debt classification, refactoring priority, deprecation path, backward compatibility, and migration plan --&gt;
+<!-- Check debt identification, debt classification, refactoring priority, deprecation path, backward compatibility, and migration plan -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Software Architect agent, read all relevant attached documents, analyze the
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Document
 

@@ -159,3 +159,16 @@ jobs:
           violations=$(echo "$output" | grep -oP 'Total:\s*\K\d+') || violations="PARSE_FAILURE"
           echo "Violations: ${violations}"
           [ "${violations}" = "0" ]
+
+      # AD-05: template hygiene — modules/templates/*.md must not contain
+      # HTML-escaped tokens (&lt; &gt; or backslash-escaped markdown brackets)
+      # that leak into the TUI file picker, MCP role-template path, and CLI
+      # --prompt-role flag.
+      - name: Check template files are not HTML-escaped
+        run: |
+          if grep -rEl '&lt;|&gt;|\\\\\[' modules/templates/; then
+            echo "ERROR: HTML-escaped tokens found in modules/templates/*.md"
+            grep -rEn '&lt;|&gt;|\\\\\[' modules/templates/
+            exit 1
+          fi
+          echo "Template hygiene check passed."

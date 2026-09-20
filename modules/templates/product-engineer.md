@@ -14,7 +14,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check engineering milestones, backend and frontend completion status, design handoff status, technical specification adherence, and timeline alignment --&gt;
+<!-- Check engineering milestones, backend and frontend completion status, design handoff status, technical specification adherence, and timeline alignment -->
 
 ### 2. Map the cross-team dependencies
 
@@ -22,7 +22,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check blocking dependencies between backend and frontend, external team reliance, API contract readiness, and environment provisioning status --&gt;
+<!-- Check blocking dependencies between backend and frontend, external team reliance, API contract readiness, and environment provisioning status -->
 
 ### 3. Identify blockers and specification gaps
 
@@ -30,7 +30,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check mismatches between business requirements and implementation, missing technical edge cases, unresolved architectural blockers, and unclarified technical assumptions --&gt;
+<!-- Check mismatches between business requirements and implementation, missing technical edge cases, unresolved architectural blockers, and unclarified technical assumptions -->
 
 ### 4. Coordinate the demo environment preparation
 
@@ -38,7 +38,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check test data availability, environment configuration status, feature toggle setup, cross-module integration status, and demo script readiness for stakeholders --&gt;
+<!-- Check test data availability, environment configuration status, feature toggle setup, cross-module integration status, and demo script readiness for stakeholders -->
 
 ### 5. Verify the release candidate completeness
 
@@ -46,7 +46,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check code freeze status, documentation updates, deployment artifact readiness, rollback plan availability, and release checklist sign-offs from all required roles --&gt;
+<!-- Check code freeze status, documentation updates, deployment artifact readiness, rollback plan availability, and release checklist sign-offs from all required roles -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a Product Engineer agent, read all relevant attached documents, analyze the f
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Document
 

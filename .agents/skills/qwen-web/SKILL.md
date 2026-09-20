@@ -5,7 +5,7 @@ description: >
   zero API keys, persistent browser sessions. Use when an AI agent needs to send
   prompts, review code, or analyze document attachments via CLI or MCP tools.
 version: 6.0.0
-trigger_keywords:
+triggers:
   - qwen
   - chat.qwen.ai
   - prompt automation
@@ -100,15 +100,21 @@ qwa prompt-with-attachment -i .qwen-web/input/audit_spec.md -a .qwen-web/input/c
 
 ### Use Case 4: Standard Reviews Using Built-in Role Templates
 Instead of writing a custom prompt file, you can pass a built-in role template name directly as the prompt input:
-- `backend`: Security, performance, error handling, code quality, and maintainability.
-- `architect`: Layer boundaries, architecture violations, scalability, and data flow.
-- `frontend`: Usability, responsive layout, component quality, and design tokens.
-- `analyst`: Requirements clarity, business logic flow, and testability.
+- `business-analyst`: Business problem, process model, acceptance criteria, stakeholder alignment, UAT.
+- `system-analyst`: Technical behavior, data model, API contract, sequences, requirement traceability.
+- `ui-ux-designer`: User journey, wireframes, design system, accessibility, interface states.
+- `software-architect`: Module boundaries, integration patterns, scalability, standards, tech debt.
+- `backend-engineer`: Server API, database schema, business rules, performance, backend tests.
+- `frontend-engineer`: UI components, client state, API consumption, responsiveness, component tests.
+- `product-engineer`: Delivery tracking, cross-team dependencies, blockers, demo prep, release readiness.
+- `qa-engineer`: Test strategy, functional/regression, automation, defects, quality metrics.
+- `security-engineer`: Threat model, auth standards, vuln scan, privacy/encryption, incident protocol.
+- `devops-engineer`: CI/CD pipeline, infra provisioning, deployment/rollback, observability, incident response.
 
 **MCP:**
 ```json
 {
-  "prompt_file": "backend",
+  "prompt_file": "backend-engineer",
   "attachment_file": "src/api/auth.py",
   "output_file": ".qwen-web/output/auth_review_20260911_133000.md"
 }
@@ -116,8 +122,8 @@ Instead of writing a custom prompt file, you can pass a built-in role template n
 
 **CLI:**
 ```bash
-qwa prompt-with-attachment -i backend -a src/api/auth.py -o .qwen-web/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
-qwa prompt-with-attachment -i architect -a README.md -o .qwen-web/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt-with-attachment -i backend-engineer -a src/api/auth.py -o .qwen-web/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt-with-attachment -i software-architect -a README.md -o .qwen-web/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---

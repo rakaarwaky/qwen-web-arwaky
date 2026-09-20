@@ -14,7 +14,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check build reproducibility, lint and test gates, artifact packaging, dependency caching, deployment triggers, and pipeline execution speed --&gt;
+<!-- Check build reproducibility, lint and test gates, artifact packaging, dependency caching, deployment triggers, and pipeline execution speed -->
 
 ### 2. Provision the infrastructure and environment configurations
 
@@ -22,7 +22,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check infrastructure as code templates, environment variable injection, secrets management integration, resource limits, and auto-scaling policies --&gt;
+<!-- Check infrastructure as code templates, environment variable injection, secrets management integration, resource limits, and auto-scaling policies -->
 
 ### 3. Execute the application deployment and release rollbacks
 
@@ -30,7 +30,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check deployment strategy, zero downtime requirements, database migration execution, rollback mechanisms, and release safety checks --&gt;
+<!-- Check deployment strategy, zero downtime requirements, database migration execution, rollback mechanisms, and release safety checks -->
 
 ### 4. Configure system observability and uptime monitoring
 
@@ -38,7 +38,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check metric collection, log aggregation, distributed tracing, alerting rules, dashboard setup, and service level objective definitions --&gt;
+<!-- Check metric collection, log aggregation, distributed tracing, alerting rules, dashboard setup, and service level objective definitions -->
 
 ### 5. Respond to infrastructure and operational incidents
 
@@ -46,7 +46,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check on-call routing, operational runbooks, disaster recovery procedures, backup verification, and incident post-mortem tracking --&gt;
+<!-- Check on-call routing, operational runbooks, disaster recovery procedures, backup verification, and incident post-mortem tracking -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a DevOps engineer agent, read all relevant attached documents, analyze the in
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Configuration
 

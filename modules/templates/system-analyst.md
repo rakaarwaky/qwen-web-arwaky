@@ -14,7 +14,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check feature input and output, system behavior, processing steps, system boundaries, feature scope, technical assumptions, and impacted modules --&gt;
+<!-- Check feature input and output, system behavior, processing steps, system boundaries, feature scope, technical assumptions, and impacted modules -->
 
 ### 2. Design the logical data model
 
@@ -22,7 +22,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check entity definition, key attributes, entity relationships, business constraints, data lifecycle, and CRUD operations required by the feature --&gt;
+<!-- Check entity definition, key attributes, entity relationships, business constraints, data lifecycle, and CRUD operations required by the feature -->
 
 ### 3. Design the API contract
 
@@ -30,7 +30,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check endpoint definition, request and response schema, status codes, error contract, versioning, and contract between frontend backend and external systems --&gt;
+<!-- Check endpoint definition, request and response schema, status codes, error contract, versioning, and contract between frontend backend and external systems -->
 
 ### 4. Map the sequence diagram and edge cases
 
@@ -38,7 +38,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check component interaction, happy path, failure path, timeout scenario, retry behavior, fallback path, and technical edge cases from business requirements --&gt;
+<!-- Check component interaction, happy path, failure path, timeout scenario, retry behavior, fallback path, and technical edge cases from business requirements -->
 
 ### 5. Trace the requirement to specification
 
@@ -46,7 +46,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 | --- | --- | --- | --- | --- |
 
-&lt;!-- Check requirement coverage, orphan requirement detection, ambiguous requirement flag, clarification request to Business Analyst, and cross-feature impact analysis --&gt;
+<!-- Check requirement coverage, orphan requirement detection, ambiguous requirement flag, clarification request to Business Analyst, and cross-feature impact analysis -->
 
 ## Open Questions
 
@@ -58,7 +58,7 @@ As a System Analyst agent, read all relevant attached documents, analyze the fea
 
 ## Action Items
 
-- \[ \] {Priority} {Item}
+- [ ] {Priority} {Item}
 
 ## Fixed Document
 
