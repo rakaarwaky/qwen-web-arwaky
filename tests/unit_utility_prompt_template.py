@@ -13,7 +13,18 @@ from modules.shared.src.utility_core_prompt_template import (
     render_prompt,
 )
 
-BUNDLED_ROLES = ("architect", "backend", "frontend", "analyst", "devops")
+BUNDLED_ROLES = (
+    "business-analyst",
+    "system-analyst",
+    "ui-ux-designer",
+    "software-architect",
+    "backend-engineer",
+    "frontend-engineer",
+    "product-engineer",
+    "qa-engineer",
+    "security-engineer",
+    "devops-engineer",
+)
 
 
 def test_is_prompt_role_valid() -> None:

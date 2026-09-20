@@ -15,29 +15,29 @@ class TestCliPromptTemplateIntegration:
     """Test CLI argument parsing and config construction for role templates."""
 
     def test_prompt_only_with_role(self) -> None:
-        args = _parse_args(["prompt-only", "-i", "architect", "--headless"])
+        args = _parse_args(["prompt-only", "-i", "software-architect", "--headless"])
         cfg = _build_config(args)
 
         assert cfg.mode == "single"
         assert cfg.prompt_path is not None
         assert cfg.prompt_path.exists()
-        assert cfg.prompt_path.name == "architect.md"
-        assert cfg.output_path.name == "architect_output.md"
+        assert cfg.prompt_path.name == "software-architect.md"
+        assert cfg.output_path.name == "software-architect_output.md"
         assert cfg.headless is True
 
     def test_prompt_with_attachment_and_role(self, tmp_path: Path) -> None:
         dummy_att = tmp_path / "dummy.txt"
         dummy_att.write_text("hello world")
 
-        args = _parse_args(["prompt-with-attachment", "-i", "backend", "-a", str(dummy_att)])
+        args = _parse_args(["prompt-with-attachment", "-i", "backend-engineer", "-a", str(dummy_att)])
         cfg = _build_config(args)
 
         assert cfg.mode == "single"
         assert cfg.prompt_path is not None
         assert cfg.prompt_path.exists()
-        assert cfg.prompt_path.name == "backend.md"
+        assert cfg.prompt_path.name == "backend-engineer.md"
         assert cfg.file_path == dummy_att.resolve()
-        assert cfg.output_path.name == "backend_output.md"
+        assert cfg.output_path.name == "backend-engineer_output.md"
 
 
 class TestMcpPromptTemplateIntegration:
@@ -57,11 +57,11 @@ class TestMcpPromptTemplateIntegration:
             jobs=None,
         )
 
-        res = cmd.process_prompt_file_only(input_file="frontend", async_run=False)
+        res = cmd.process_prompt_file_only(input_file="frontend-engineer", async_run=False)
         assert "Mock result" in res
         mock_file_only.process_prompt_file_only.assert_called_once()
         called_prompt = mock_file_only.process_prompt_file_only.call_args[0][0]
-        assert str(called_prompt).endswith("frontend.md")
+        assert str(called_prompt).endswith("frontend-engineer.md")
 
     def test_mcp_attachment_with_role(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
@@ -82,14 +82,14 @@ class TestMcpPromptTemplateIntegration:
         )
 
         res = cmd.process_prompt_with_attachment(
-            prompt_file="analyst",
+            prompt_file="business-analyst",
             attachment_file=str(dummy_att),
             async_run=False,
         )
         assert "Mock attachment result" in res
         mock_attachment.process_prompt_with_attachment.assert_called_once()
         called_prompt = mock_attachment.process_prompt_with_attachment.call_args[0][0]
-        assert str(called_prompt).endswith("analyst.md")
+        assert str(called_prompt).endswith("business-analyst.md")
 
 
 class TestTuiPromptTemplateIntegration:
@@ -100,7 +100,7 @@ class TestTuiPromptTemplateIntegration:
 
         app = QwenTuiApp(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
-        mock_input_prompt = MagicMock(value="architect")
+        mock_input_prompt = MagicMock(value="software-architect")
         mock_input_file = MagicMock(value="")
         mock_input_output = MagicMock(value="")
         mock_switch = MagicMock(value=True)
@@ -125,5 +125,5 @@ class TestTuiPromptTemplateIntegration:
         app._execute_slot_worker.assert_called_once()
         cfg = app._execute_slot_worker.call_args[0][1]
         assert cfg.prompt_path is not None
-        assert cfg.prompt_path.name == "architect.md"
+        assert cfg.prompt_path.name == "software-architect.md"
         assert cfg.prompt_path.exists()
