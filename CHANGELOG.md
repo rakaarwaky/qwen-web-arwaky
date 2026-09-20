@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.2.0] - 2026-09-20
+
+### Added
+
+- feat(compiler): Markdown link and wikilink resolution in folder compilation
+- feat(core): container support via `scripts/podman.sh` and updated CLI entry points
+- feat(core): timestamped output protection and enhanced prompt templates
+- feat(ui): prompt template selection in TUI with updated defaults
+- feat(cli): unified output path resolution prioritizing local `.qwen-web/output`
+- feat: direct single-file processing mode for prompt and attachment paths
+
+### Changed
+
+- refactor(core): unify output path resolution and update podman volumes
+- refactor(core): enhance browser diagnostics and tighten type checking
+- refactor(ui): dynamic slot keybindings and content rendering; rename batch-row to template-row
+- refactor(core): callback support during manual login polling; manual login triggers on browser close
+- refactor: remove legacy watcher and batch mode features from MCP tools and CLI controller
+- chore: remove LEAN-CTX.md and legacy taxonomy error facade
+
+### Fixed
+
+- fix(core): session dir permissions repaired; job list hardened against temp files
+- fix: harden qwen dispatch and inline response recovery
+- fix: stabilize Qwen parse gate, browser session, and single-file response monitoring
+- fix: reject Qwen page shell as assistant output; preserve pre-send baseline for response detection
+- fix: upgrade MCP server to MCP 2.0.0 API; align upload selectors
+- test(uploader): skip unreadable file test when running as root
+
+### Removed
+
+- Removed legacy batch directory dispatch functionality and legacy file mover module
+
 ## [6.1.1] - 2026-09-09
 
 ### Fixed
