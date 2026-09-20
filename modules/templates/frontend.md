@@ -1,13 +1,4 @@
-"""Taxonomy: UI/UX role prompt template constant.
-
-Domain taxonomy constant layer for the built-in UI/UX prompt template.
-Consumer-oriented: every dimension maps to end-user experience impact
-across any interactive surface (GUI, web, TUI, CLI, mobile, etc.).
-"""
-
-from __future__ import annotations
-
-EMBEDDED_UI_UX_TEMPLATE: str = r"""# Plan: {feature} — UI/UX
+# Plan: {feature} — UI/UX
 
 ## Summary
 
@@ -74,6 +65,3 @@ EMBEDDED_UI_UX_TEMPLATE: str = r"""# Plan: {feature} — UI/UX
 | CRITICAL | A11y/usability blocker, broken user flow, data loss risk, render crash. Immediate fix. |
 | WARNING | UX friction, missing state, performance regression, inconsistent design. Fix this cycle. |
 | INFO | Polish, micro-interaction, nice-to-have. Deferrable. |
-"""
-
-__all__ = ["EMBEDDED_UI_UX_TEMPLATE"]

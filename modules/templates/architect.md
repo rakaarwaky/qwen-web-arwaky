@@ -1,11 +1,4 @@
-"""Taxonomy: architect role prompt template constant.
-
-Generic architecture review prompt template — no framework coupling.
-"""
-
-from __future__ import annotations
-
-EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architecture Review
+# Plan: {feature} — Architecture Review
 
 ## Summary
 
@@ -62,6 +55,3 @@ EMBEDDED_ARCHITECT_TEMPLATE: str = r"""# Plan: {feature} — Architecture Review
 | CRITICAL | Layering breach, security risk, data leak. Immediate fix. |
 | WARNING | Convention/perf/maintainability. Fix this cycle. |
 | INFO | Suggestion. Deferrable. |
-"""
-
-__all__ = ["EMBEDDED_ARCHITECT_TEMPLATE"]

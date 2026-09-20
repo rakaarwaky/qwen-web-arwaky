@@ -97,7 +97,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
     )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_only.add_argument(
@@ -117,7 +117,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")

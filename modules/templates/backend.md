@@ -1,11 +1,4 @@
-"""Taxonomy: backend/tech-lead role prompt template constant.
-
-Domain taxonomy constant layer for the built-in Backend/Tech Lead prompt template.
-"""
-
-from __future__ import annotations
-
-EMBEDDED_BACKEND_TEMPLATE: str = r"""# Plan: {feature} — Tech Lead
+# Plan: {feature} — Tech Lead
 
 ## Summary
 
@@ -62,6 +55,3 @@ EMBEDDED_BACKEND_TEMPLATE: str = r"""# Plan: {feature} — Tech Lead
 | CRITICAL | Security vuln, data leak, crash risk. Immediate fix. |
 | WARNING | Perf bottleneck, SOLID violation, bypass pattern. Fix this cycle. |
 | INFO | Nice-to-have. Deferrable. |
-"""
-
-__all__ = ["EMBEDDED_BACKEND_TEMPLATE"]

@@ -196,7 +196,7 @@ class McpToolCommand:
 
         Args:
             input_file: Path to Markdown prompt file OR a built-in role template
-                name (architect|backend|frontend|analyst).
+                name (any .md file in modules/templates/).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
@@ -276,7 +276,7 @@ class McpToolCommand:
 
         Args:
             prompt_file: Path to Markdown prompt file OR a built-in role template
-                name (architect|backend|frontend|analyst).
+                name (any .md file in modules/templates/).
             attachment_file: Path to document attachment file (PDF, TXT, MD) or directory
                 (will be compiled to single markdown file).
             output_file: Optional output file destination path.
