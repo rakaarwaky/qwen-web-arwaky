@@ -240,7 +240,13 @@ class McpToolCommand:
             validated_path, path_error = _validate_prompt_path(input_file, field="input_file")
             if path_error is not None:
                 return path_error
-            assert validated_path is not None
+            if validated_path is None:
+                return _format_error_payload(
+                    code="PATH_VALIDATION_FAILED",
+                    message="Prompt path validation returned no usable path.",
+                    hint="Provide a readable prompt file inside the configured workspace.",
+                    retryable=False,
+                )
             p_path = validated_path
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
@@ -319,7 +325,13 @@ class McpToolCommand:
             validated_path, path_error = _validate_prompt_path(prompt_file)
             if path_error is not None:
                 return path_error
-            assert validated_path is not None
+            if validated_path is None:
+                return _format_error_payload(
+                    code="PATH_VALIDATION_FAILED",
+                    message="Prompt path validation returned no usable path.",
+                    hint="Provide a readable prompt file inside the configured workspace.",
+                    retryable=False,
+                )
             p_path = validated_path
 
         a_path, a_err = _validate_attachment_path(attachment_file)
