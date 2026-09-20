@@ -89,6 +89,35 @@ class _TuiUtilsMixin:
             table.update_cell(row_key, self.COL_FILE, filename)
             table.update_cell(row_key, self.COL_DURATION, duration)
 
+    def _init_swarm_table(self) -> None:
+        with contextlib.suppress(NoMatches):
+            table = self.query_one("#swarm-table", DataTable)
+            table.add_columns(
+                ("Agent", "swarm-agent"),
+                ("Status", "swarm-status"),
+                ("Attempt", "swarm-attempt"),
+                ("Output", "swarm-output"),
+            )
+
+    def _render_swarm_snapshot(self, snapshot: Any) -> None:
+        with contextlib.suppress(NoMatches):
+            table = self.query_one("#swarm-table", DataTable)
+            table.clear()
+            for agent in snapshot.agents:
+                output = str(agent.output_path) if agent.status == "completed" and agent.output_path else "-"
+                table.add_row(
+                    agent.agent_id,
+                    agent.status.upper(),
+                    f"{agent.attempt}/{snapshot.max_attempts}",
+                    output,
+                    key=f"swarm-{agent.agent_id}",
+                )
+            summary = self.query_one("#swarm-summary", Label)
+            summary.update(
+                f"{snapshot.status.upper()} · {snapshot.completed_count}/{len(snapshot.agents)} completed · "
+                f"{snapshot.failed_count} failed · max {snapshot.browser_concurrency} browsers"
+            )
+
     # ── Metrics bar ──────────────────────────────────────────────────────
 
     def _refresh_metrics(self) -> None:

@@ -28,6 +28,7 @@ from .contract_core_protocol import (
     IStreamProtocol,
     IUploadProtocol,
 )
+from .contract_swarm_aggregate import ISwarmAggregate
 
 # ─── Taxonomy: constants ──────────────────────────────────────
 from .taxonomy_core_constant import (
@@ -57,6 +58,7 @@ from .taxonomy_core_constant import (
     SEND_SELECTORS,
     SERVICE_NAME,
     STOP_BUTTON_SELECTORS,
+    SWARM_OUTPUT_ROOT,
     TEXTAREA_SELECTOR,
     XDG_CACHE_HOME,
     XDG_CONFIG_HOME,
@@ -97,6 +99,7 @@ from .taxonomy_core_event import (
     EVENT_DESCRIPTIONS,
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,
+    EVENT_FAILED,
     EVENT_FILE_UPLOADED,
     EVENT_GENERATION_FINISHED,
     EVENT_LOGIN_VERIFIED,
@@ -185,6 +188,9 @@ from .taxonomy_core_vo import (
     UserAgent,
     WaitTimeoutMs,
 )
+
+# ─── Taxonomy: Swarm VOs ───────────────────────────────────────
+from .taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmId, SwarmSnapshot
 
 # ─── Utility: events ──────────────────────────────────────────
 from .utility_core_events import is_stability_satisfied, should_treat_as_new_response
@@ -281,6 +287,7 @@ __all__ = [
     "EVENT_FILE_UPLOADED",
     "EVENT_PROMPT_INJECTED",
     "EVENT_DOCUMENT_PARSED",
+    "EVENT_FAILED",
     "EVENT_SEND_CLICKED",
     "EVENT_DISPATCH_ACKNOWLEDGED",
     "EVENT_THINKING_STARTED",
@@ -344,6 +351,7 @@ __all__ = [
     "DEFAULT_SESSION",
     "DEFAULT_VENV",
     "DEFAULT_JOBS_DIR",
+    "SWARM_OUTPUT_ROOT",
     "XDG_SKILL_MD",
     "get_playwright_browsers_path",
     "MAX_ATTEMPTS",
@@ -388,6 +396,11 @@ __all__ = [
     "IPromptFlowAggregate",
     "ISessionAggregate",
     "ISetupAggregate",
+    "ISwarmAggregate",
+    # Swarm VOs
+    "SwarmAgentSnapshot",
+    "SwarmId",
+    "SwarmSnapshot",
     # Utilities
     "detect_processing_failure",
     "error_response",

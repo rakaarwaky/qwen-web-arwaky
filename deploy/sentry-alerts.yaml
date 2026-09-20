@@ -1,0 +1,19 @@
+version: 1
+service: qwen-web-arwaky
+# Starter policy. Configure notification targets in the Sentry project.
+alerts:
+  - name: session-expiry-critical
+    error_type: AuthRequiredError
+    threshold: 2
+    window: 10m
+    severity: critical
+  - name: browser-launch-failure
+    error_type: BrowserLaunchError
+    threshold: 3
+    window: 5m
+    severity: critical
+  - name: rate-limit-warning
+    error_type: RateLimitError
+    threshold: 10
+    window: 15m
+    severity: warning

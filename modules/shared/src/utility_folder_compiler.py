@@ -234,6 +234,8 @@ _IMPORTABLE_SUFFIXES: frozenset[str] = frozenset(
         ".rs",
         ".php",
         ".rb",
+        ".yaml",
+        ".yml",
         ".sh",
         ".bash",
         ".zsh",

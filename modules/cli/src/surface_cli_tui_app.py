@@ -32,7 +32,9 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
+from modules.shared.src.taxonomy_swarm_vo import SwarmId
 from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.utility_core_version import get_package_version
 
@@ -61,6 +63,7 @@ class QwenTuiApp(
     # alt+0 → Overview, alt+1..9 → Slot 1..9, ctrl+alt+0..9 → Slots 10..19.
     BINDINGS = [
         Binding("alt+0", "switch_tab_overview", "Overview"),
+        Binding("ctrl+alt+s", "switch_tab_swarm", "Swarm"),
         *[
             Binding(
                 f"alt+{s}" if s <= 9 else _EXTRA_SLOT_KEYS[s],
@@ -95,6 +98,7 @@ class QwenTuiApp(
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
+        swarm: ISwarmAggregate | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -104,6 +108,8 @@ class QwenTuiApp(
         self._setup = setup
         self._session = session
         self._jobs = jobs
+        self._swarm = swarm
+        self._swarm_id: SwarmId | None = None
         # AR-1: TUI slot config is injected from the Root container, never
         # imported from Capabilities directly.
         self._slot_config = slot_config
