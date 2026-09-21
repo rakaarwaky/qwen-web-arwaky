@@ -322,6 +322,7 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
 
 # ─── Folder compiler defaults ───────────────────────────────────────────────
 MAX_FOLDER_DEPTH: int = 5
+MAX_IMPORT_DEPTH: int = 1
 
 CODE_EXTENSIONS: frozenset[str] = frozenset(
     {

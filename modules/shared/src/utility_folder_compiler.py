@@ -13,7 +13,12 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import unquote
 
-from modules.shared.src.taxonomy_core_constant import CODE_EXTENSIONS, EXCLUDED_DIR_NAMES, MAX_FOLDER_DEPTH
+from modules.shared.src.taxonomy_core_constant import (
+    CODE_EXTENSIONS,
+    EXCLUDED_DIR_NAMES,
+    MAX_FOLDER_DEPTH,
+    MAX_IMPORT_DEPTH,
+)
 from modules.shared.src.taxonomy_core_error import FolderEmptyError, FolderValidationError
 
 
@@ -624,7 +629,7 @@ def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None
 def collect_folder_files_with_imports(
     folder_path: Path,
     max_depth: int = MAX_FOLDER_DEPTH,
-    import_depth: int = 3,
+    import_depth: int = MAX_IMPORT_DEPTH,
 ) -> tuple[list[Path], dict[Path, tuple[str, ...]]]:
     """Collect in-folder files plus files they import from outside the folder.
 

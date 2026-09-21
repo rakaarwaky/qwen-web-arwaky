@@ -198,11 +198,15 @@ class TestMarkdownLinkChain:
         _write(tmp_path / "ref" / "api.md", "[b](./details.md)\n")
         _write(tmp_path / "ref" / "details.md", "deep detail\n")
 
+        # Default import_depth=1: api.md is included (hop 1), details.md is not (hop 2).
         files, origins = collect_folder_files_with_imports(target)
         names = {f.name for f in files}
-        assert {"index.md", "api.md", "details.md"} <= names
-        details = next(f for f in files if f.name == "details.md")
-        assert origins[details] == ("../ref/api.md",)
+        assert {"index.md", "api.md"} <= names
+        assert "details.md" not in names
+
+        # Explicit import_depth=3: details.md is included (hop 2).
+        files2, _ = collect_folder_files_with_imports(target, import_depth=3)
+        assert "details.md" in {f.name for f in files2}
 
     def test_anchor_and_query_stripped(self, tmp_path: Path) -> None:
         target = tmp_path / "docs"
