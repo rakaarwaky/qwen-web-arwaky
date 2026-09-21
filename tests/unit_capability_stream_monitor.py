@@ -380,9 +380,15 @@ class TestWaitForResponseEdgeCases:
         # Text changes every ~250s (below the 300s stall window). Total
         # elapsed time reaches 1000s — far beyond the stall threshold —
         # yet each text change resets the forward-event clock.
-        text_side_effect = [None, "chunk 1 with enough text", "chunk 2 with enough text",
-                           "chunk 3 with enough text", "final answer with enough text",
-                           "final answer with enough text", "final answer with enough text"]
+        text_side_effect = [
+            None,
+            "chunk 1 with enough text",
+            "chunk 2 with enough text",
+            "chunk 3 with enough text",
+            "final answer with enough text",
+            "final answer with enough text",
+            "final answer with enough text",
+        ]
         time_calls = [0, 250, 500, 750, 1000, 1000, 1000]
 
         with (

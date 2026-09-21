@@ -92,9 +92,7 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
     error recorded — proving the stuck path never hangs the swarm."""
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"architect": 2, "security-reviewer": 100})
-    orchestrator = SwarmOrchestrator(
-        aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3
-    )
+    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -146,9 +144,7 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
 
     aggregate.process_prompt_with_attachment = process_with_auth_error
 
-    orchestrator = SwarmOrchestrator(
-        aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3
-    )
+    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
