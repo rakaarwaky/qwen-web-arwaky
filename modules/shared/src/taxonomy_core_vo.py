@@ -107,7 +107,6 @@ CardRenderTimeoutMs = NewType("CardRenderTimeoutMs", int)
 # ─── Brand types: saver config ────────────────────────────────
 InputChars = NewType("InputChars", int)
 OutputChars = NewType("OutputChars", int)
-IncludeHeaderFlag = NewType("IncludeHeaderFlag", bool)
 GenerateSidecarFlag = NewType("GenerateSidecarFlag", bool)
 AtomicWriteFlag = NewType("AtomicWriteFlag", bool)
 
@@ -467,7 +466,6 @@ class OutputMetadata:
 class SaverConfig:
     """Configuration options for saver module."""
 
-    include_header: bool = True
     generate_sidecar: bool = True
     atomic_write: bool = True
 
@@ -582,7 +580,6 @@ __all__ = [
     "CardRenderTimeoutMs",
     "InputChars",
     "OutputChars",
-    "IncludeHeaderFlag",
     "GenerateSidecarFlag",
     "AtomicWriteFlag",
     "ChromeProfile",
