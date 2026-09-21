@@ -148,7 +148,7 @@ Underline {
 
 #slots-table {
     height: auto;
-    max-height: 9;
+    max-height: 4;
     background: $bg_surface;
     border: solid $border;
     margin-bottom: 1;
