@@ -10,7 +10,7 @@ from pathlib import Path
 
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
-from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
+from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files_with_imports,
@@ -42,6 +42,7 @@ class FolderCompiler(IFolderCompileProtocol):
         folder_path: Path,
         output_path: Path | None = None,
         max_depth: int = MAX_FOLDER_DEPTH,
+        import_depth: int = MAX_IMPORT_DEPTH,
         include_imports: bool = True,
     ) -> Path:
         """Compile folder contents to a single markdown file.
@@ -50,13 +51,17 @@ class FolderCompiler(IFolderCompileProtocol):
         are scanned for import/reference statements (Python, JS/TS, C/C++,
         Go, Rust, PHP, Ruby, shell) and Markdown links (inline, reference
         definitions, Obsidian ``[[wikilink]]``), and files referenced from
-        outside the folder are resolved and included recursively, marked as
+        outside the folder are resolved and included, marked as
         ``(imported by ...)``.
 
         Args:
             folder_path: Directory to compile.
             output_path: Optional output file path. Auto-generated if None.
             max_depth: Maximum recursion depth.
+            import_depth: Maximum hops for resolving external imports/links.
+                With the default of 1, only files linked directly from
+                in-folder documents are included; transitive links are
+                not followed.
             include_imports: Follow imports/links of folder files and include
                 external dependencies (cycle-safe, bounded hops).
 
@@ -69,11 +74,21 @@ class FolderCompiler(IFolderCompileProtocol):
             FolderCompileError: If compilation fails.
         """
         folder_path = Path(folder_path).resolve()
-        log.info("Compiling folder: %s (max_depth=%d, include_imports=%s)", folder_path, max_depth, include_imports)
+        log.info(
+            "Compiling folder: %s (max_depth=%d, import_depth=%d, include_imports=%s)",
+            folder_path,
+            max_depth,
+            import_depth,
+            include_imports,
+        )
 
         try:
             if include_imports:
-                files, origins = collect_folder_files_with_imports(folder_path, max_depth=max_depth)
+                files, origins = collect_folder_files_with_imports(
+                    folder_path,
+                    max_depth=max_depth,
+                    import_depth=import_depth,
+                )
                 log.info("Found %d files (%d imported)", len(files), sum(1 for o in origins.values() if o))
             else:
                 files = validate_folder_for_compile(folder_path, max_depth=max_depth)

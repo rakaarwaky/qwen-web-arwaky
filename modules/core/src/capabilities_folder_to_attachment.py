@@ -10,7 +10,7 @@ from pathlib import Path
 
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IFolderCompileProtocol, IFolderToAttachmentProtocol
-from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
+from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderValidationError
 
 log = get_logger("capabilities_folder_to_attachment")
@@ -37,12 +37,16 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
         self,
         path: Path,
         max_depth: int = MAX_FOLDER_DEPTH,
+        import_depth: int = MAX_IMPORT_DEPTH,
     ) -> Path:
         """Resolve path to an attachment-ready file.
 
         Args:
             path: Path to file or folder.
             max_depth: Maximum recursion depth for folder compilation.
+            import_depth: Maximum hops for resolving external imports/links.
+                With the default of 1, only files linked directly from
+                in-folder documents are included.
 
         Returns:
             Path to attachment file (original file or compiled markdown).
@@ -59,7 +63,7 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
 
         if self._compiler.is_folder(path):
             log.info("Path is a folder, compiling to markdown: %s", path)
-            return self._compiler.compile_folder(path, max_depth=max_depth)
+            return self._compiler.compile_folder(path, max_depth=max_depth, import_depth=import_depth)
 
         if not path.is_file():
             raise FolderValidationError(f"Path is not a file or directory: {path}")
