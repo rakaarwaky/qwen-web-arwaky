@@ -144,7 +144,7 @@ class ObservabilitySetup(IObservabilityProtocol):
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
 
     def setup_observability(
-        self, log_path: Path | None = None, verbose: bool = False, attach_stderr: bool = True
+        self, log_path: Path, verbose: bool = False, attach_stderr: bool = True
     ) -> None:
         """Bootstrap observability stack in 4 sequential steps:
 

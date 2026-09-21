@@ -223,7 +223,7 @@ class IObservabilityProtocol(ABC):
     """Observability capability contract (logging, tracing, hooks)."""
 
     @abstractmethod
-    def setup_observability(self, log_path: Path, attach_stderr: bool = True) -> None:
+    def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Bootstrap Sentry/OTel/structlog + global hooks.
 
         Parameters

@@ -304,7 +304,8 @@ def _dispatch(
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
         return 1
 
-    container.observability.setup_observability(log_path=cfg.log_path, verbose=cfg.verbose)
+    resolved_log_path = cfg.log_path if cfg.log_path is not None else DEFAULT_LOG
+    container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
 
     args._cfg = cfg
     result = surface_cli_run_command.handle(
