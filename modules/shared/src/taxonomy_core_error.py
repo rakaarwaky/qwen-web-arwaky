@@ -67,6 +67,10 @@ class UIInteractionError(FileUploadError):
     """Raised when upload UI elements cannot be found or interacted with."""
 
 
+class RunCancelledError(QwenCliError):
+    """Raised when a run is cancelled by a user-initiated cancellation request."""
+
+
 class PipelineError(QwenCliError):
     """Base exception for queue processing pipeline errors."""
 
@@ -145,6 +149,7 @@ __all__ = [
     "UploadFailureError",
     "UploadTimeoutError",
     "UIInteractionError",
+    "RunCancelledError",
     "PipelineError",
     "QuarantineError",
     "SendDispatchError",

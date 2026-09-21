@@ -117,8 +117,13 @@ Underline {
 }
 
 #log-view-overview {
-    min-height: 5;
+    height: 1fr;
+    min-height: 3;
     max-width: 100%;
+    background: $bg_base;
+    border: solid $border;
+    color: $fg_primary;
+    padding: 1;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -143,7 +148,7 @@ Underline {
 
 #slots-table {
     height: auto;
-    max-height: 16;
+    max-height: 4;
     background: $bg_surface;
     border: solid $border;
     margin-bottom: 1;
@@ -429,6 +434,10 @@ HelpScreen {
     background: $bg_hover;
     color: $fg_accent;
     border: solid $border;
+}
+
+.btn-slot-retry {
+    display: none;
 }
 """
 )

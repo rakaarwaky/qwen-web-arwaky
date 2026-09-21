@@ -26,6 +26,7 @@ from modules.core.src.agent_session_orchestrator import SessionOrchestrator
 # agent_setup_orchestrator
 from modules.core.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
+from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
 from modules.core.src.capabilities_folder_compiler import FolderCompiler
@@ -36,6 +37,7 @@ from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
+from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.core.src.capabilities_update_manager import UpdateManager
 from modules.core.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_core_aggregate import (
@@ -47,7 +49,8 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
+from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -89,6 +92,10 @@ class SharedContainer:
         self.updater: IUpdateProtocol = UpdateManager()
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
+        # AR-1: TUI slot-config resolver exposed via the Root container so the
+        # Surface (QwenTuiApp) can consume it through ITuiSlotConfigProtocol
+        # instead of importing the Capabilities class directly.
+        self.tui_slot_config: ITuiSlotConfigProtocol = TuiSlotConfigResolver()
 
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
@@ -138,6 +145,13 @@ class SharedContainer:
             file_only=self.agent_prompt_file_orchestrator,
             attachment=self.agent_attachment_prompt_orchestrator,
             max_workers=max_workers,
+            circuit_breaker=self.cb,
+            rate_limiter=self.rl,
+        )
+        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
+            attachment=self.agent_attachment_prompt_orchestrator,
+            folder_adapter=self.folder_adapter,
+            browser_concurrency=max_workers,
         )
 
     def wire(self) -> None:

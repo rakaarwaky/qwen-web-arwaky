@@ -31,11 +31,14 @@ from modules.shared.src.taxonomy_core_vo import (
     MessageCount,
     MinTextLength,
     OutputChars,
+    OutputPath,
     PollIntervalSec,
     PromptText,
     ResponseText,
     RunContext,
     RunId,
+    SlotInputValue,
+    SlotRunPlan,
     StabilityChecks,
     StatusRecordVO,
     TimeoutSec,
@@ -156,8 +159,14 @@ class IStreamProtocol(ABC):
         min_text_length: MinTextLength = MinTextLength(1),
         dispatch_acknowledged: HeadlessFlag = HeadlessFlag(True),
         baseline_text: ResponseText | None = None,
+        cancel_event: Any | None = None,
     ) -> ResponseText | None:
-        """Wait for a stable assistant response; return its text."""
+        """Wait for a stable assistant response; return its text.
+
+        ``cancel_event`` is an optional per-run ``threading.Event``; when set
+        the wait loop raises ``RunCancelledError`` instead of continuing to
+        poll.
+        """
 
     @abstractmethod
     def is_generation_complete(self, page: Page) -> bool:
@@ -214,8 +223,16 @@ class IObservabilityProtocol(ABC):
     """Observability capability contract (logging, tracing, hooks)."""
 
     @abstractmethod
-    def setup_observability(self, log_path: Path) -> None:
-        """Bootstrap Sentry/OTel/structlog + global hooks."""
+    def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
+        """Bootstrap Sentry/OTel/structlog + global hooks.
+
+        Parameters
+        ----------
+        attach_stderr:
+            When False, skip attaching the stderr stream handler. Required by
+            the interactive TUI so browser-callback logs do not corrupt the
+            terminal canvas.
+        """
 
     @abstractmethod
     def get_logger(self, name: LoggerName = LoggerName("qwen-cli")) -> Any:
@@ -364,12 +381,17 @@ class ITuiSlotConfigProtocol(ABC):
     @abstractmethod
     def resolve_slot_run_plan(
         self,
-        prompt_val: str,
-        file_val: str,
-        output_val: str,
-        headless: bool,
-    ) -> object:
+        prompt_val: PromptText,
+        file_val: PromptText,
+        output_val: OutputPath,
+        headless: HeadlessFlag,
+    ) -> SlotRunPlan | SlotInputValue:
         """Resolve raw TUI slot widget values into an executable run plan."""
+
+    @abstractmethod
+    def discover_batch_prompts(self, batch_dir: FilePath) -> object:
+        """Return a list of prompt files, or an error descriptor, for a batch dir."""
+        ...
 
 
 __all__ = [

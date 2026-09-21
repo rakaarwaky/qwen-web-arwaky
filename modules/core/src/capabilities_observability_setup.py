@@ -15,6 +15,7 @@ import threading
 import types
 from contextlib import nullcontext, suppress
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
@@ -137,18 +138,26 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._status_path = status_path_for(log_path)
         self._status_writer = status_writer or StatusFileWriter(self._status_path)
         self._metrics = MetricsCounter()
-        self._run_handlers: dict[str, logging.FileHandler] = {}
+        self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
 
-    def setup_observability(self, log_path: Path | None = None, verbose: bool = False) -> None:
+    def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Bootstrap observability stack in 4 sequential steps:
 
         Step 1: Ensure log target directory exists
         Step 2: Configure error tracking (Sentry) & distributed tracing (OpenTelemetry)
         Step 3: Configure structlog/stdlib logging & JSONL file handlers
         Step 4: Install global process excepthooks
+
+        Parameters
+        ----------
+        attach_stderr:
+            When False, skip attaching the ``StreamHandler(sys.stderr)``. This
+            is required for the interactive TUI: Playwright browser callbacks
+            run on their own threads and emit log records that would otherwise
+            be written straight to the terminal, corrupting the TUI canvas.
         """
         # Step 1: Ensure log target directory
         target_path = log_path or self._log_path
@@ -159,7 +168,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._configure_tracing()
 
         # Step 3: Configure structlog/stdlib logging
-        self._configure_logging(target_path, verbose=verbose)
+        self._configure_logging(target_path, verbose=verbose, attach_stderr=attach_stderr)
 
         # Step 4: Install global process excepthooks
         install_excepthooks()
@@ -197,7 +206,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         except (ImportError, RuntimeError):
             pass
 
-    def _configure_logging(self, log_path: Path, verbose: bool = False) -> None:
+    def _configure_logging(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Configure structlog/stdlib logging (private helper)."""
         log_level = logging.DEBUG if verbose else logging.INFO
         if structlog is None:
@@ -206,11 +215,14 @@ class ObservabilitySetup(IObservabilityProtocol):
             self._formatter = _make_json_formatter()
             root = logging.getLogger()
             root.setLevel(log_level)
-            stderr_handler = logging.StreamHandler(sys.stderr)
-            stderr_handler.setFormatter(self._formatter)
-            root.addHandler(stderr_handler)
+            if attach_stderr:
+                stderr_handler = logging.StreamHandler(sys.stderr)
+                stderr_handler.setFormatter(self._formatter)
+                root.addHandler(stderr_handler)
             try:
-                file_handler = logging.FileHandler(log_path / "app.jsonl", encoding="utf-8")
+                file_handler = RotatingFileHandler(
+                    log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+                )
                 file_handler.setFormatter(self._formatter)
                 root.addHandler(file_handler)
             except OSError:
@@ -255,11 +267,14 @@ class ObservabilitySetup(IObservabilityProtocol):
             if handler.__class__.__name__.endswith("LogHandler"):
                 continue
             root.removeHandler(handler)
-        stderr_handler = logging.StreamHandler(sys.stderr)
-        stderr_handler.setFormatter(formatter)
-        root.addHandler(stderr_handler)
+        if attach_stderr:
+            stderr_handler = logging.StreamHandler(sys.stderr)
+            stderr_handler.setFormatter(formatter)
+            root.addHandler(stderr_handler)
         try:
-            file_handler = logging.FileHandler(log_path / "app.jsonl", encoding="utf-8")
+            file_handler = RotatingFileHandler(
+                log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+            )
             file_handler.setFormatter(formatter)
             root.addHandler(file_handler)
         except OSError:
@@ -295,7 +310,7 @@ class ObservabilitySetup(IObservabilityProtocol):
             ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
             path = jobs_dir / f"{safe_name}_{ts}_{run_id}.jsonl"
             if self._formatter is not None:
-                handler = logging.FileHandler(path, encoding="utf-8")
+                handler = RotatingFileHandler(path, maxBytes=10 * 1024 * 1024, backupCount=2, encoding="utf-8")
                 handler.setFormatter(self._formatter)
                 # Keep only records whose bound run_id matches this run so
                 # overlapping runs never leak records into each other's log.

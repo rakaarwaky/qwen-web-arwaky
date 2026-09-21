@@ -141,8 +141,8 @@ TOOLS: list[Tool] = [
             "properties": {
                 "input_file": {
                     "type": "string",
-                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (architect|backend|frontend|analyst).",
-                    "examples": ["/home/user/prompts/analysis.md", "backend", "architect"],
+                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/templates/).",
+                    "examples": ["/home/user/prompts/analysis.md", "backend-engineer", "software-architect"],
                 },
                 "output_file": {
                     "type": "string",
@@ -172,8 +172,8 @@ TOOLS: list[Tool] = [
             "properties": {
                 "prompt_file": {
                     "type": "string",
-                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (architect|backend|frontend|analyst).",
-                    "examples": ["/home/user/prompts/analyze_doc.md", "architect", "backend"],
+                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/templates/).",
+                    "examples": ["/home/user/prompts/analyze_doc.md", "software-architect", "backend-engineer"],
                 },
                 "attachment_file": {
                     "type": "string",
@@ -274,63 +274,12 @@ setup_session = _async_tool("setup_session")
 
 GENERATED_TOOLS = TOOL_HANDLERS
 
-MCP_TOOL_SPECS: list[dict[str, Any]] = [
-    {
-        "name": "process_direct_prompt",
-        "method": "process_direct_prompt",
-        "doc": "Process a direct text prompt string to chat.qwen.ai and return the AI answer.",
-        "params": [("prompt", "str", True), ("timeout_sec", "int", False, 120), ("headless", "bool", False, True)],
-    },
-    {
-        "name": "process_prompt_file_only",
-        "method": "process_prompt_file_only",
-        "doc": "Process a single Markdown prompt file (no attachment) on chat.qwen.ai.",
-        "params": [
-            ("input_file", "str", True),
-            ("output_file", "Any", False, None),
-            ("headless", "bool", False, True),
-            ("async_run", "bool", False, True),
-        ],
-    },
-    {
-        "name": "process_prompt_with_attachment",
-        "method": "process_prompt_with_attachment",
-        "doc": "Process a Markdown prompt file with a document attachment on chat.qwen.ai.",
-        "params": [
-            ("prompt_file", "str", True),
-            ("attachment_file", "str", True),
-            ("output_file", "Any", False, None),
-            ("headless", "bool", False, True),
-            ("async_run", "bool", False, True),
-        ],
-    },
-    {
-        "name": "get_job_status",
-        "method": "get_job_status",
-        "doc": "Query the current status and result preview of an asynchronous background job.",
-        "params": [("job_id", "str", True)],
-    },
-    {
-        "name": "list_jobs",
-        "method": "list_jobs",
-        "doc": "List recently submitted asynchronous background prompt processing jobs.",
-        "params": [("limit", "int", False, 10)],
-    },
-    {
-        "name": "setup_session",
-        "method": "setup_session",
-        "doc": "Launch visible browser on chat.qwen.ai for manual login / session setup.",
-        "params": [],
-    },
-]
-
-
 # ─── Server runner ──────────────────────────────────────────────────────────
 
 
 def run_mcp_server() -> None:
     """Run the MCP server over stdio."""
-    ObservabilitySetup(DEFAULT_LOG).setup_observability()
+    ObservabilitySetup(DEFAULT_LOG).setup_observability(log_path=DEFAULT_LOG)
 
     async def serve() -> None:
         async with stdio_server() as (read_stream, write_stream):
@@ -386,6 +335,8 @@ def run_mcp_server() -> None:
         asyncio.run(serve())
     except KeyboardInterrupt:
         log.info("MCP server shutting down")
+    finally:
+        _get_tools().shutdown()
 
 
 def main() -> None:

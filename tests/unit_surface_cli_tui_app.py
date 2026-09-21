@@ -16,11 +16,14 @@ from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 
 
 def _make_app() -> QwenTuiApp:
+    # AR-1: slot_config is injected (ITuiSlotConfigProtocol), no longer
+    # constructed inside the TUI surface.
     return QwenTuiApp(
         workspace=MagicMock(),
         direct=MagicMock(),
         file_only=MagicMock(),
         attachment=MagicMock(),
+        slot_config=MagicMock(),
         setup=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),
@@ -31,7 +34,7 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
     app = _make_app()
 
     async def _run() -> None:
-        async with app.run_test():
+        async with app.run_test(size=(100, 40)):
             tabs = app.query_one(TabbedContent)
             assert tabs.active == "tab-overview"
 
@@ -60,6 +63,19 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             app._log_msg("Slot 1 specific log", slot_id=1)
             slot_log = app.query_one("#log-view-1", RichLog)
             assert slot_log is not None
+            assert slot_log.wrap
+
+            # Log views must stay inside the visible tab container.
+            active_pane = tabs.get_pane("tab-overview")
+            overview_log = app.query_one("#log-view-overview", RichLog)
+            assert overview_log.region.height > 0
+            assert overview_log.region.width > 0
+            assert overview_log.region.y >= active_pane.region.y
+            assert overview_log.region.x >= active_pane.region.x
+            assert (
+                overview_log.region.y + overview_log.region.height <= active_pane.region.y + active_pane.region.height
+            )
+            assert overview_log.region.x + overview_log.region.width <= active_pane.region.x + active_pane.region.width
 
             # Test metrics update
             app._slot_stats[1]["status"] = "RUNNING"

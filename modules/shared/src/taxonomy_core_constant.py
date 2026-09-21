@@ -14,49 +14,54 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 
 STATUS_FILENAME: str = "status.json"
 
+# Application identifier used as the leaf of every XDG base directory.
+# Previously the hardcoded "qwen-web" string; standardized to the product
+# name "qwen-web-arwaky" so all state lives under ~/.local/share/qwen-web-arwaky.
+_APP_NAME = "qwen-web-arwaky"
+
 # ─── Application paths (computed inline — pure constants, no functions) ──────
 _XDG_DATA_HOME = (
-    Path(os.environ["XDG_DATA_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_DATA_HOME"]) / _APP_NAME
     if os.environ.get("XDG_DATA_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Application Support" / "qwen-web"
+        else Path.home() / "Library" / "Application Support" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".local/share/qwen-web"
+        else Path.home() / ".local/share" / _APP_NAME
     )
 )
 _XDG_STATE_HOME = (
-    Path(os.environ["XDG_STATE_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_STATE_HOME"]) / _APP_NAME
     if os.environ.get("XDG_STATE_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web" / "state"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME / "state"
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Logs" / "qwen-web"
+        else Path.home() / "Library" / "Logs" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".local/state/qwen-web"
+        else Path.home() / ".local/state" / _APP_NAME
     )
 )
 _XDG_CACHE_HOME = (
-    Path(os.environ["XDG_CACHE_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_CACHE_HOME"]) / _APP_NAME
     if os.environ.get("XDG_CACHE_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web" / "cache"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME / "cache"
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Caches" / "qwen-web"
+        else Path.home() / "Library" / "Caches" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".cache/qwen-web"
+        else Path.home() / ".cache" / _APP_NAME
     )
 )
 _XDG_CONFIG_HOME = (
-    Path(os.environ["XDG_CONFIG_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_CONFIG_HOME"]) / _APP_NAME
     if os.environ.get("XDG_CONFIG_HOME")
     else (
-        Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")) / "qwen-web"
+        Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")) / _APP_NAME
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Application Support" / "qwen-web"
+        else Path.home() / "Library" / "Application Support" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".config/qwen-web"
+        else Path.home() / ".config" / _APP_NAME
     )
 )
 
@@ -66,6 +71,9 @@ XDG_CACHE_HOME = _XDG_CACHE_HOME
 XDG_CONFIG_HOME = _XDG_CONFIG_HOME
 
 DEFAULT_OUTPUT = XDG_DATA_HOME / "output"
+# Swarm runs use a dedicated sub-directory under the same XDG root so the
+# per-swarm run folders do not collide with regular prompt outputs.
+SWARM_OUTPUT_ROOT = XDG_DATA_HOME / "swarm"
 DEFAULT_LOG = XDG_STATE_HOME / "log"
 DEFAULT_SESSION = XDG_DATA_HOME / "qwen_session"
 DEFAULT_VENV = XDG_DATA_HOME / "venv"
@@ -93,6 +101,24 @@ DEFAULT_MODEL = "Qwen3.8-Max"
 MODEL_SELECTOR_BUTTON = "Select Model"
 
 MAX_ATTEMPTS = 3
+
+# ─── Response retry policy ──────────────────────────────────────────────────
+# SharedFlowOrchestrator retries a dispatch when the model returns a
+# rate-limit / throttling page instead of a real answer. Attempts are bounded
+# by MAX_ATTEMPTS (3); the wait before retry N is RETRY_BASE_DELAY_SEC * N.
+RETRY_BASE_DELAY_SEC: int = 30
+
+RATE_LIMIT_KEYWORDS: tuple[str, ...] = (
+    "too many requests",
+    "rate limit",
+    "rate-limit",
+    "ratelimit",
+    "throttl",
+    "429",
+    "slow down",
+    "try again later",
+    "there was an issue connecting to",
+)
 
 SERVICE_NAME = "qwen-web"
 
@@ -358,29 +384,7 @@ DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
 
 # ─── Prompt templates (role-based built-in templates) ─────────────────────
-# Each role is embedded in its own taxonomy constant module:
-#   taxonomy_architect_constant.py, taxonomy_backend_constant.py,
-#   taxonomy_frontend_constant.py, taxonomy_analyst_constant.py
-PROMPT_TEMPLATE_MANIFEST: dict[str, dict[str, str]] = {
-    "architect": {
-        "title": "Architect",
-        "dimensions": "Layer Boundaries, Naming, Orphan, Scalability, Data Flow",
-    },
-    "backend": {
-        "title": "Backend",
-        "dimensions": "Security, Performance, Error Handling, SOLID, Code Quality, Maintainability",
-    },
-    "frontend": {
-        "title": "UI/UX",
-        "dimensions": "Accessibility & Usability, Layout & Responsiveness, UX Patterns & User Flow, Component / Module Quality, Visual Consistency & Design Tokens, Performance",
-    },
-    "analyst": {
-        "title": "Business Analyst",
-        "dimensions": "Requirements Clarity, Business Flow, Logic Implementation, Testability, Traceability",
-    },
-    "devops": {
-        "title": "DevOps / SRE",
-        "dimensions": "Deployment, Observability, Reliability, Security Hardening, Configuration, Release CI",
-    },
-}
-PROMPT_TEMPLATE_ROLES: tuple[str, ...] = tuple(PROMPT_TEMPLATE_MANIFEST.keys())
+# Role templates now live as Markdown files under ``modules/templates/{role}.md``
+# and are discovered dynamically at runtime by
+# ``modules/shared/src/utility_core_prompt_template.py``. No hardcoded manifest
+# remains in this module.

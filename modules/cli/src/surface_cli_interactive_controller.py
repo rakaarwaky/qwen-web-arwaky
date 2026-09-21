@@ -18,7 +18,8 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
+from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.utility_core_response import error_response, safe_handle, success_response
 
@@ -32,18 +33,24 @@ class InteractiveController:
         direct: IDirectPromptAggregate,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
+        slot_config: ITuiSlotConfigProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
+        swarm: ISwarmAggregate | None = None,
     ) -> None:
         """Inject the specialized pipeline orchestrators, workspace, and setup."""
         self._workspace = workspace
         self._direct = direct
         self._file_only = file_only
         self._attachment = attachment
+        # AR-1: slot config resolver comes from the Root container, not the
+        # Capabilities layer, so the TUI Surface stays AES-compliant.
+        self._slot_config = slot_config
         self._setup = setup
         self._session = session
         self._jobs = jobs
+        self._swarm = swarm
 
     @safe_handle
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
@@ -72,9 +79,11 @@ class InteractiveController:
                 self._direct,
                 self._file_only,
                 self._attachment,
+                self._slot_config,
                 self._setup,
                 self._session,
                 self._jobs,
+                self._swarm,
             )
             app.run()
             return success_response("TUI Session Closed.")

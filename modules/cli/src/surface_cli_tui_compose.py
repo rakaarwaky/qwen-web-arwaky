@@ -51,6 +51,7 @@ class _TuiComposeMixin:
 
     # Stubs for methods provided by other mixins / App at runtime.
     _init_table: Any
+    _init_swarm_table: Any
     query_one: Any
     set_timer: Any
     _log_msg: Any
@@ -79,11 +80,37 @@ class _TuiComposeMixin:
                     markup=True,
                     max_lines=2000,
                     auto_scroll=True,
+                    wrap=True,
                 )
                 # A3: help discoverability hint for first-time users
                 yield Static(
                     "[dim]Press ? for keyboard shortcuts. Configure a slot tab, then press Enter to run.[/dim]",
                     classes="metric-item",
+                )
+
+            # ─── Tab 2: Adaptive Swarm ─────────────────────────
+            with TabPane("Swarm 🐝", id="tab-swarm"), Vertical(classes="overview-container"):
+                yield Label("Attachment File or Folder", classes="field-label")
+                with Horizontal(classes="field-row"):
+                    yield Input(
+                        value="",
+                        placeholder="path/to/file or folder",
+                        id="input-swarm-file",
+                        classes="field-input",
+                    )
+                    yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
+                with Horizontal(classes="toggle-row"):
+                    yield Button("⚡ START SWARM", variant="primary", id="btn-swarm-start")
+                    yield Button("✕ CANCEL SWARM", id="btn-swarm-cancel")
+                    yield Label("Adaptive templates · maximum 10 browsers", id="swarm-summary")
+                yield DataTable(id="swarm-table")
+                yield RichLog(
+                    id="log-view-swarm",
+                    highlight=True,
+                    markup=True,
+                    max_lines=2000,
+                    auto_scroll=True,
+                    wrap=True,
                 )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
@@ -104,7 +131,7 @@ class _TuiComposeMixin:
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
-                                placeholder="path/to/prompt.md or role (architect|backend|frontend|analyst)",
+                                placeholder="path/to/prompt.md or role (any .md in modules/templates/)",
                                 id=f"input-prompt-{s}",
                                 classes="field-input",
                             )
@@ -140,6 +167,7 @@ class _TuiComposeMixin:
                             f"⚡ RUN IN SLOT {s}", variant="primary", id=f"btn-run-{s}", classes="btn-slot-run"
                         )
                         yield Button(f"✕ Cancel Slot {s}", id=f"btn-cancel-{s}", classes="btn-slot-cancel")
+                        yield Button(f"↻ Retry Slot {s}", id=f"btn-retry-{s}", classes="btn-slot-retry")
 
                     with Vertical(classes="right-pane"):
                         with Horizontal(classes="pane-title"):
@@ -152,12 +180,14 @@ class _TuiComposeMixin:
                             markup=True,
                             classes="slot-log-view",
                             max_lines=2000,
+                            wrap=True,
                         )
 
         yield Footer()
 
     def on_mount(self) -> None:
         self._init_table()
+        self._init_swarm_table()
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)
@@ -167,6 +197,8 @@ class _TuiComposeMixin:
         self._log_views: dict[int, RichLog] = {}
         with contextlib.suppress(NoMatches):
             self._log_views[0] = self.query_one("#log-view-overview", RichLog)
+        with contextlib.suppress(NoMatches):
+            self._log_views[-1] = self.query_one("#log-view-swarm", RichLog)
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", RichLog)
@@ -178,11 +210,11 @@ class _TuiComposeMixin:
         """Attach log handler and write initial messages after first paint."""
         root = logging.getLogger()
 
-        # Detach non-TUI handlers so log output goes only to our RichLog.
+        # Keep existing stderr/file handlers attached. The TUI handler is an
+        # additional view and must not disable operational logging on unmount.
         for handler in list(root.handlers):
             if isinstance(handler, QwenTuiLogHandler):
-                continue
-            root.removeHandler(handler)
+                root.removeHandler(handler)
 
         self._log_handler = QwenTuiLogHandler(self)
         self._log_handler.setLevel(logging.INFO)
@@ -195,6 +227,7 @@ class _TuiComposeMixin:
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", RichLog)
+                log_view.auto_scroll = True
                 log_view.write(f"[{THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
 
         self._refresh_session_badge()

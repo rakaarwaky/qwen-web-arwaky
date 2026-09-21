@@ -178,6 +178,7 @@ class UpdateReport:
     post_update_version: str | None = None
     healthy: bool = False
     message: str = ""
+    rolled_back: bool = False
 
 
 @dataclass
@@ -252,6 +253,32 @@ def __getattr__(name: str) -> object:
 
         return getattr(taxonomy_core_error, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+@dataclass(frozen=True)
+class SlotInputValue:
+    """Invalid slot input from the TUI resolver; the surface only forwards the message.
+
+    Mirrors the capabilities-layer ``SlotInputError`` shape but lives in the
+    taxonomy so contract signatures stay domain-safe (no Capabilities import
+    from the contract layer).
+    """
+
+    message: str
+
+
+@dataclass(frozen=True)
+class SlotRunPlan:
+    """Validated TUI slot configuration ready to execute.
+
+    Shared VO so the contract layer can name the success return type of
+    ``ITuiSlotConfigProtocol.resolve_slot_run_plan`` without importing the
+    Capabilities layer.
+    """
+
+    prompt_path: Path
+    attachment_path: Path | None
+    config: AppConfig
 
 
 @dataclass
@@ -586,6 +613,8 @@ __all__ = [
     "ObservabilityConfig",
     "MCPToolResponse",
     "MCPServerConfig",
+    "SlotInputValue",
+    "SlotRunPlan",
     "QwenClientConfig",
     "BrowserConfig",
     "SenderConfig",

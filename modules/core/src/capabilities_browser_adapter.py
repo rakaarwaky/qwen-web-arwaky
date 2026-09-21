@@ -157,7 +157,7 @@ class BrowserAdapter(IBrowserProtocol):
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
             except Error as err:
-                log.warning("Load state wait failed, proceeding: %s", err)
+                log.warning("load_state_wait_failed_proceeding", err=str(err))
             return
 
         max_attempts = 4
@@ -173,18 +173,18 @@ class BrowserAdapter(IBrowserProtocol):
                 try:
                     page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
                 except Error as err:
-                    log.warning("Load state wait failed, proceeding: %s", err)
+                    log.warning("load_state_wait_failed_proceeding", err=str(err))
                 return
             except Error as err:
                 last_error = err
                 if attempt < max_attempts - 1:
                     wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
                     log.warning(
-                        "page.goto attempt %d/%d failed (%s), retrying in %ds...",
-                        attempt + 1,
-                        max_attempts,
-                        err,
-                        wait // 1000,
+                        "page_goto_failed_retrying",
+                        attempt=attempt + 1,
+                        max=max_attempts,
+                        err=str(err),
+                        retry_in_sec=wait // 1000,
                     )
                     page.wait_for_timeout(wait)
         if last_error is not None:
@@ -196,7 +196,7 @@ class BrowserAdapter(IBrowserProtocol):
             emitter.emit(EVENT_NETWORK_RECONNECTING, {"url": CHAT_URL})
             self._goto_chat(page, 10_000, NAVIGATION_LOAD_TIMEOUT_MS)
         except Error as e:
-            log.warning("Failed to reset page: %s", e)
+            log.warning("page_reset_failed", err=str(e))
 
     def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Navigate to chat.qwen.ai, verify session, and emit lifecycle events step-by-step:
@@ -371,7 +371,7 @@ class BrowserAdapter(IBrowserProtocol):
             return
         try:
             if "/c/" in page.url.lower():
-                log.info("Active chat thread detected (%s). Navigating to root chat URL...", page.url)
+                log.info("active_chat_thread_detected_navigating", url=page.url)
                 self._goto_chat(page, 15_000, NAVIGATION_LOAD_TIMEOUT_MS)
                 page.wait_for_timeout(1000)
 
@@ -381,7 +381,7 @@ class BrowserAdapter(IBrowserProtocol):
                     page.wait_for_selector("textarea.message-input-textarea, textarea", state="visible", timeout=3000)
                 log.debug("Started a clean Qwen chat before dispatch")
         except Error as exc:
-            log.debug("New Chat reset unavailable; continuing with current chat: %s", exc)
+            log.debug("new_chat_reset_unavailable", err=str(exc))
 
     def check_auth(self, page: Page) -> None:
         """Raise AuthRequiredError if the page is on a login/auth URL or login form detected."""
@@ -422,7 +422,7 @@ class BrowserAdapter(IBrowserProtocol):
                 if lock_path.is_symlink() or lock_path.exists():
                     lock_path.unlink(missing_ok=True)
             except OSError as e:
-                log.warning("Failed to delete stale lock %s: %s", lock_path, e)
+                log.warning("stale_lock_delete_failed", lock=lock_path, err=str(e))
 
     def _launch_context(self, p: Playwright, kwargs: dict[str, Any]) -> BrowserContext:
         """Launch the persistent context with tenacity retry for transient crashes."""
@@ -515,7 +515,7 @@ class BrowserAdapter(IBrowserProtocol):
                             )
                             log.debug("browser_eager_navigate_ok", url=CHAT_URL)
                         except Error as exc:
-                            log.warning("browser_eager_navigate_failed, will retry in navigate_to_chat: %s", exc)
+                            log.warning("browser_eager_navigate_failed_retry_in_navigate", err=str(exc))
 
                     if mode != "login":
                         ctx.route(

@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import threading
 import time
+from pathlib import Path
 from typing import Any, cast
 
 from rich.markup import escape
@@ -19,8 +20,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Input, Label, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
-from modules.core.src.capabilities_tui_slot_config import SlotInputError
-from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
+from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
 from modules.shared.src.utility_core_response import detect_processing_failure
 
 # A badge write can land while the app is tearing down: the worker thread's
@@ -48,9 +48,12 @@ class _TuiWorkersMixin:
     _file_only: Any
     _setup: Any
     _session: Any
+    _swarm: Any
+    _swarm_id: str | None
     _session_check_timed_out: bool
     _login_in_flight: bool
     _slot_generation: dict[int, int]
+    _slot_cancel_events: dict[int, threading.Event]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -68,6 +71,7 @@ class _TuiWorkersMixin:
     _ensure_log_handler: Any
     push_screen: Any
     _session_check_timer: Any
+    _render_swarm_snapshot: Any
 
     # ── Slot run / cancel ────────────────────────────────────────────────
 
@@ -89,8 +93,13 @@ class _TuiWorkersMixin:
                 self.notify(msg, severity="error", title=f"Slot {slot_id}")
             return
 
-        plan = self._slot_config.resolve_slot_run_plan(prompt_val, file_val, out_val, headless_val)
-        if isinstance(plan, SlotInputError):
+        plan = self._slot_config.resolve_slot_run_plan(
+            PromptText(prompt_val),
+            PromptText(file_val),
+            cast(FilePath, out_val),
+            HeadlessFlag(headless_val),
+        )
+        if isinstance(plan, SlotInputValue):
             msg = f"[bold {THEME['err']}]ERROR:[/] {escape(str(plan.message))} (Slot {slot_id})"
             self._log_msg(msg, slot_id)
             self._log_msg(msg)
@@ -101,7 +110,13 @@ class _TuiWorkersMixin:
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
 
+        # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
+        # never touches another slot's in-flight browser context.
+        self._slot_cancel_events[slot_id] = threading.Event()
+
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = False
         self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
         self._slot_stats[slot_id] = {
             "status": "RUNNING",
@@ -131,12 +146,13 @@ class _TuiWorkersMixin:
                 if confirmed:
                     self._do_cancel_slot(slot_id)
 
-            from modules.cli.src.surface_cli_session_setup import ConfirmModal
+            from modules.cli.src.surface_cli_tui_components import ConfirmModal
 
             self.push_screen(
                 ConfirmModal(
                     "Cancel Slot",
                     f"Slot {slot_id} has been running for {elapsed:.0f}s.\nCancelling will lose the current progress.",
+                    confirm_label="Cancel Slot",
                 ),
                 _on_confirm,
             )
@@ -152,11 +168,14 @@ class _TuiWorkersMixin:
         self._update_slot_status(slot_id, "⚠ CANCELLING…")
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ⚠")
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
-        # Close active browser contexts so Playwright operations unblock
-        with contextlib.suppress(Exception):
-            self._attachment.request_cancel()
-        with contextlib.suppress(Exception):
-            self._file_only.request_cancel()
+        # AR-2/FE-1: cancel only this slot's run via its own cancel event.
+        # Sibling slots' browser contexts are untouched.
+        slot_event = self._slot_cancel_events.get(slot_id)
+        if slot_event is not None:
+            with contextlib.suppress(Exception):
+                self._attachment.request_cancel(slot_event)
+            with contextlib.suppress(Exception):
+                self._file_only.request_cancel(slot_event)
         worker.cancel()
         self._slot_workers[slot_id] = None
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
@@ -186,10 +205,14 @@ class _TuiWorkersMixin:
             return  # stale worker — slot was cancelled or restarted
         icon = "✅" if ok else "❌"
         self._slot_workers[slot_id] = None
+        # AR-2/FE-1: release the per-slot cancel event now the run is done.
+        self._slot_cancel_events.pop(slot_id, None)
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
         self._update_slot_status(slot_id, self._format_status(status, "badge"))
         self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = status == "FAILED"
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -208,10 +231,74 @@ class _TuiWorkersMixin:
             label,
         )
 
+    # ── Adaptive Swarm run / cancel ──────────────────────────────────────
+
+    def _run_swarm(self) -> None:
+        if self._swarm is None:
+            self.notify("Swarm is not available in this container.", severity="error")
+            return
+        if self._swarm_id is not None:
+            self.notify("A Swarm is already running.", severity="warning")
+            return
+        try:
+            raw_input = self.query_one("#input-swarm-file", Input).value.strip()
+            input_path = Path(raw_input).expanduser()
+        except Exception as exc:
+            self.notify(f"Could not read Swarm input: {exc}", severity="error")
+            return
+        if not raw_input:
+            self.notify("Select a file or folder before starting Swarm.", severity="error")
+            return
+        self._swarm_worker(input_path)
+
+    def _cancel_swarm(self) -> None:
+        if self._swarm_id is None or self._swarm is None:
+            self.notify("No Swarm is currently running.", severity="warning")
+            return
+        self._swarm.cancel(self._swarm_id)
+        snapshot = self._swarm.snapshot(self._swarm_id)
+        if snapshot is not None:
+            self._render_swarm_snapshot(snapshot)
+        self._log_msg(f"[bold {THEME['warn']}]SWARM:[/] cancelled; active browsers are stopping.")
+
+    @work(thread=True)
+    def _swarm_worker(self, input_path: Path) -> None:
+        try:
+            snapshot = self._swarm.start(input_path)
+            self._swarm_id = snapshot.swarm_id
+            self.call_from_thread(self._render_swarm_snapshot, snapshot)
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {THEME['accent']}]SWARM:[/] started {snapshot.swarm_id} with {len(snapshot.agents)} agents.",
+            )
+            while True:
+                time.sleep(1.0)
+                latest = self._swarm.snapshot(snapshot.swarm_id)
+                if latest is None:
+                    break
+                self.call_from_thread(self._render_swarm_snapshot, latest)
+                if latest.status in {"completed", "partial", "failed", "cancelled"}:
+                    self.call_from_thread(
+                        self._log_msg,
+                        f"[bold {THEME['ok'] if latest.status == 'completed' else THEME['warn']}]SWARM:[/] "
+                        f"{latest.status} ({latest.completed_count}/{len(latest.agents)} completed).",
+                    )
+                    break
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {THEME['err']}]SWARM ERROR:[/] {escape(str(exc))}",
+            )
+        finally:
+            self._swarm_id = None
+
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
         threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
         self._ensure_log_handler()
+        # AR-2/FE-1: pass the per-slot cancel event so the orchestrator can
+        # be targeted from _do_cancel_slot without touching sibling slots.
+        slot_cancel_event = self._slot_cancel_events.get(slot_id)
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
         self.call_from_thread(
             self._log_msg,
@@ -236,12 +323,14 @@ class _TuiWorkersMixin:
                     attachment_file=cfg.file_path,
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
+                    cancel_event=slot_cancel_event,
                 )
             else:
                 res = self._file_only.process_prompt_file_only(
                     prompt_file=cfg.prompt_path or cfg.input_path,
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
+                    cancel_event=slot_cancel_event,
                 )
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)

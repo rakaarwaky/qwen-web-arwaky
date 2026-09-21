@@ -60,10 +60,11 @@ fi
 
 # Gate 3: Bandit security scan (source code only, exclude tests) — always runs (not optional)
 info "Gate 3/5 — Bandit security scan..."
-if uv run bandit modules/root_cli_main_entry.py modules/root_mcp_main_entry.py -r modules/ -s B110,B112 2>&1 | grep -q "No issues"; then
+if uv run bandit -r modules/ -s B110,B112 2>&1 | grep -q "No issues"; then
     ok "Bandit clean"
 else
     warn "Bandit found potential issues"
+    uv run bandit -r modules/ -s B110,B112 2>&1 | grep -E "^\s+Severity" || true
     FAILURES=$((FAILURES + 1))
 fi
 
@@ -84,9 +85,22 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
+# Gate 4b: AD-05 template hygiene — modules/templates/*.md must not contain
+# HTML-escaped tokens that leak into the TUI/MCP/CLI role-template path.
+info "Gate 4b/5 — Template hygiene (AD-05)..."
+if grep -rEl '&lt;|&gt;' modules/templates/ 2>/dev/null; then
+    warn "HTML-escaped tokens found in modules/templates/*.md"
+    FAILURES=$((FAILURES + 1))
+else
+    ok "Template hygiene clean"
+fi
+
 # Gate 5: Pytest test suite
 info "Gate 5/5 — Running pytest..."
-if uv run python -m pytest tests/ --ignore=tests/test_e2e_pipeline.py -v >/tmp/gates_pytest.log 2>&1; then
+# Live-network / auth-session tests are gated by the `e2e` marker in
+# pytest.ini; skip them in local and CI gates, run them explicitly with
+# `uv run python -m pytest tests/ -m e2e` when a session is available.
+if uv run python -m pytest tests/ -m "not e2e" -v >/tmp/gates_pytest.log 2>&1; then
     ok "Tests passed"
 else
     warn "Tests failed (see output above)"

@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from playwright.sync_api import Page
 
@@ -61,8 +62,14 @@ class IPromptFlowAggregate(ABC):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
+        cancel_event: Any | None = None,
     ) -> str:
-        """Inject prompt, click send, and wait for the AI response."""
+        """Inject prompt, click send, and wait for the AI response.
+
+        ``cancel_event`` is an optional ``threading.Event`` created per-run;
+        when set, the flow raises ``RunCancelledError`` so the caller's
+        browser context can be closed without touching sibling runs.
+        """
 
 
 class IDirectPromptAggregate(ABC):
@@ -102,8 +109,12 @@ class IAttachmentPromptAggregate(ABC):
         attachment_file: Path | AttachmentPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
+        cancel_event: Any | None = None,
     ) -> ResponseText:
-        """Process a prompt file from disk with document attachment."""
+        """Process a prompt file from disk with document attachment.
+
+        ``cancel_event`` targets one browser run without affecting sibling jobs.
+        """
 
 
 class ISessionAggregate(ABC):
@@ -159,6 +170,10 @@ class IJobManagerAggregate(ABC):
     @abstractmethod
     def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
         """List recently submitted jobs."""
+
+    @abstractmethod
+    def shutdown(self) -> None:
+        """Stop accepting background work and release the job executor."""
 
 
 __all__ = [

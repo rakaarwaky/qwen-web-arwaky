@@ -97,7 +97,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
     )
     p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_only.add_argument(
@@ -117,7 +117,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (architect|backend|frontend|analyst)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")
@@ -170,8 +170,16 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     if raw_output:
         out_p = Path(raw_output)
     else:
+        # Prefer the project-local .qwen-web/output when it is a symlink to the
+        # XDG DEFAULT_OUTPUT (i.e. `qwa init` was run). Otherwise fall back to
+        # the XDG DEFAULT_OUTPUT directly so output always lands in the
+        # standardized location even if the local dir is missing or stale.
         local_out = Path.cwd() / ".qwen-web" / "output"
-        base_dir = local_out if local_out.exists() else DEFAULT_OUTPUT
+        if local_out.is_dir() and not local_out.is_symlink():
+            # A real directory means `qwa init` was not run; use XDG.
+            base_dir = DEFAULT_OUTPUT
+        else:
+            base_dir = local_out if local_out.exists() else DEFAULT_OUTPUT
         if prompt_p:
             out_name = prompt_label or prompt_p.stem
             out_p = base_dir / f"{out_name}_output.md"
@@ -261,16 +269,21 @@ def _dispatch(
         # even in interactive TUI mode, so logs are persisted to DEFAULT_LOG
         # instead of being dropped. (FileHandler is otherwise only attached in
         # the non-interactive CLI subcommand path below.)
-        container.observability.setup_observability(log_path=DEFAULT_LOG)
+        # attach_stderr=False: the TUI owns the terminal canvas. Playwright
+        # browser callbacks emit log records from their own threads; a stderr
+        # handler would write them straight to the terminal, corrupting the UI.
+        container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
         result = surface_cli_interactive_controller.InteractiveController(
             container.workspace,
             container.agent_direct_prompt_orchestrator,
             container.agent_prompt_file_orchestrator,
             container.agent_attachment_prompt_orchestrator,
+            container.tui_slot_config,
             container.agent_setup_orchestrator,
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,
+            container.agent_swarm_orchestrator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -299,7 +312,8 @@ def _dispatch(
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
         return 1
 
-    container.observability.setup_observability(log_path=cfg.log_path, verbose=cfg.verbose)
+    resolved_log_path = cfg.log_path if cfg.log_path is not None else DEFAULT_LOG
+    container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
 
     args._cfg = cfg
     result = surface_cli_run_command.handle(

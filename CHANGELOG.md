@@ -4,6 +4,113 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.4.0] - 2026-09-21
+
+### Fixed
+
+- fix(observability): convert 7 structlog `%`-style positional-arg log calls in `capabilities_browser_adapter.py` to keyword-arg form so `app.jsonl` records no longer emit literal `%s` placeholders with values stashed in an unread `positional_args` field
+- fix(workspace): stop `root_cli_main_entry.py` from routing CLI output to a stale real `.qwen-web/output/` directory; when the local dir is not a symlink the path now resolves to the XDG `DEFAULT_OUTPUT` directly
+
+### Changed
+
+- refactor(paths): standardize all XDG base directories (data, state, cache, config) under the app name `qwen-web-arwaky` via a single `_APP_NAME` constant; unify `SWARM_OUTPUT_ROOT` to `XDG_DATA_HOME / "swarm"` so swarm output and `qwa init` output both land in `~/.local/share/qwen-web-arwaky/`
+- feat(workspace): `qwa init` now creates a `swarm` symlink in `.qwen-web/` mirroring the standardized swarm root, so swarm results are visible alongside the regular output
+
+### Tests
+
+- test(observability): add regression tests pinning the structlog clean-keyword contract (no `%`-placeholder in `event`, no `positional_args` in emitted JSONL records) and a static guard against reintroducing `%`-style log calls in `capabilities_browser_adapter.py`
+- test(workspace): extend `qwa init` integration test to assert the new `swarm` symlink targets `SWARM_OUTPUT_ROOT`
+
+## [6.3.2] - 2026-09-21
+
+### Fixed
+
+- fix(update): remove dynamic `subprocess` execution from the update manager; run validated, shell-free `os.posix_spawn` commands with literal executables, captured output, a timeout, and forced termination on expiry
+- fix(update): reject shell metacharacters and absolute paths outside approved roots before spawning, and map update commands to a fixed executable/argv shape
+
+### Changed
+
+- refactor(swarm): type swarm identifiers with the `SwarmId` value object across the orchestrator, swarm contracts, aggregate, and TUI
+- chore(repo): exclude the validated update manager from Codacy static analysis (documented false positive on validated, necessarily dynamic package paths)
+
+## [6.3.1] - 2026-09-21
+
+### Added
+
+- feat(swarm): add adaptive parallel agent execution based on discovered role templates
+- feat(swarm): batch up to 10 browser workers, retry transient failures up to three attempts, preserve partial results, and support cancellation
+- feat(cli): add an always-available Swarm tab with file/folder input, progress monitoring, and per-agent output folders
+- feat(attachments): resolve external `.yaml` and `.yml` files referenced by inline and reference-style Markdown links during folder compilation
+- feat(templates): format all ten role templates as GitHub Issue-style analysis plans with three issue placeholders per scope
+
+### Changed
+
+- refactor(templates): preserve each role's original five scopes and severity guidance while separating issue-generation instructions from the output plan
+
+### Tests
+
+- test(swarm): add coverage for adaptive fan-out, per-agent output paths, retry behavior, cancellation, and partial completion
+- test(compiler): add regression coverage for external YAML and YML Markdown references and importer origin metadata
+
+## [6.3.0] - 2026-09-20
+
+### Added
+
+- feat(core): activate circuit-breaker and rate-limiter protection for asynchronous job dispatch
+- feat(cli): add retry action for failed TUI slots and contextual confirmation labels
+- feat(mcp): add explicit workspace path validation and graceful job executor shutdown
+- docs: add UAT and reproducible demo guides plus starter Sentry alert policy
+
+### Changed
+
+- refactor(core): consolidate file and attachment job lifecycle persistence and output preview handling
+- refactor(mcp): consolidate prompt-path resolution and remove the stale tool registry table
+- refactor(observability): rotate aggregate and per-run JSONL logs to bound disk usage
+- docs: update the PRD capability inventory and test documentation for the current modules layout
+
+### Fixed
+
+- fix(core): replace destructive workspace collision deletion with reversible backups
+- fix(core): fail closed when an update target version cannot be verified and attempt rollback after partial updates
+- fix(mcp): reject prompt paths outside `QWEN_WORKSPACE_ROOT`
+- fix(mcp): replace security-sensitive assertions with explicit runtime error handling
+- fix(security): restrict release discovery to HTTPS requests for `api.github.com` and validate repository input
+- fix(security): execute updater subprocesses with `shell=False` and validated argv/path arguments
+- fix(tui): preserve existing logging handlers while the TUI is mounted
+
+## [6.2.0] - 2026-09-20
+
+### Added
+
+- feat(compiler): Markdown link and wikilink resolution in folder compilation
+- feat(core): container support via `scripts/podman.sh` and updated CLI entry points
+- feat(core): timestamped output protection and enhanced prompt templates
+- feat(ui): prompt template selection in TUI with updated defaults
+- feat(cli): unified output path resolution prioritizing local `.qwen-web/output`
+- feat: direct single-file processing mode for prompt and attachment paths
+
+### Changed
+
+- refactor(core): unify output path resolution and update podman volumes
+- refactor(core): enhance browser diagnostics and tighten type checking
+- refactor(ui): dynamic slot keybindings and content rendering; rename batch-row to template-row
+- refactor(core): callback support during manual login polling; manual login triggers on browser close
+- refactor: remove legacy watcher and batch mode features from MCP tools and CLI controller
+- chore: remove LEAN-CTX.md and legacy taxonomy error facade
+
+### Fixed
+
+- fix(core): session dir permissions repaired; job list hardened against temp files
+- fix: harden qwen dispatch and inline response recovery
+- fix: stabilize Qwen parse gate, browser session, and single-file response monitoring
+- fix: reject Qwen page shell as assistant output; preserve pre-send baseline for response detection
+- fix: upgrade MCP server to MCP 2.0.0 API; align upload selectors
+- test(uploader): skip unreadable file test when running as root
+
+### Removed
+
+- Removed legacy batch directory dispatch functionality and legacy file mover module
+
 ## [6.1.1] - 2026-09-09
 
 ### Fixed

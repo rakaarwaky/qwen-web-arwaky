@@ -77,6 +77,36 @@ def _get_workspace_root() -> Path:
     return Path(root).expanduser().resolve() if root else Path.cwd().resolve()
 
 
+def _validate_prompt_path(raw: str, field: str = "prompt_file") -> tuple[Path | None, str | None]:
+    """Resolve a prompt file and require it to remain inside the workspace."""
+    p_path = Path(raw).expanduser().resolve()
+    if not p_path.exists():
+        return None, _format_error_payload(
+            code="FILE_NOT_FOUND",
+            message=f"Prompt file not found: {p_path}",
+            hint="Check the prompt path or use init_workspace.",
+            field=field,
+        )
+    if not p_path.is_file():
+        return None, _format_error_payload(
+            code="INVALID_PATH",
+            message=f"Prompt path is not a regular file: {p_path}",
+            hint="Prompt files must be regular files.",
+            field=field,
+        )
+    root = _get_workspace_root()
+    try:
+        p_path.relative_to(root)
+    except ValueError:
+        return None, _format_error_payload(
+            code="PATH_OUTSIDE_WORKSPACE",
+            message=f"Prompt path is outside the workspace root: {p_path}",
+            hint=f"Place files under {root} or set QWEN_WORKSPACE_ROOT.",
+            field=field,
+        )
+    return p_path, None
+
+
 def _validate_attachment_path(raw: str) -> tuple[Path | None, str | None]:
     """Resolve and validate an attachment path for MCP tool calls.
 
@@ -129,6 +159,23 @@ def _format_error_payload(
     if field:
         err["field"] = field
     return json.dumps({"success": False, "error": err}, indent=2)
+
+
+def _resolve_prompt_path(prompt_file: str, *, field: str = "prompt_file") -> Path | str:
+    """Resolve a role or workspace prompt path with explicit runtime validation."""
+    if is_prompt_role(prompt_file):
+        return materialize_role_template(prompt_file)
+    validated_path, path_error = _validate_prompt_path(prompt_file, field=field)
+    if path_error is not None:
+        return path_error
+    if validated_path is None:
+        return _format_error_payload(
+            code="PATH_VALIDATION_FAILED",
+            message="Prompt path validation returned no usable path.",
+            hint="Provide a readable prompt file inside the configured workspace.",
+            retryable=False,
+        )
+    return validated_path
 
 
 class McpToolCommand:
@@ -196,7 +243,7 @@ class McpToolCommand:
 
         Args:
             input_file: Path to Markdown prompt file OR a built-in role template
-                name (architect|backend|frontend|analyst).
+                name (any .md file in modules/templates/).
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
@@ -204,17 +251,9 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result preview (or job_id if async).
         """
-        if is_prompt_role(input_file):
-            p_path = materialize_role_template(input_file)
-        else:
-            p_path = Path(input_file).expanduser().resolve()
-        if not p_path.exists():
-            return _format_error_payload(
-                code="FILE_NOT_FOUND",
-                message=f"Prompt file not found: {p_path}",
-                hint="Check prompt_file path or use init_workspace tool.",
-                field="input_file",
-            )
+        p_path = _resolve_prompt_path(input_file, field="input_file")
+        if isinstance(p_path, str):
+            return p_path
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
 
@@ -276,7 +315,7 @@ class McpToolCommand:
 
         Args:
             prompt_file: Path to Markdown prompt file OR a built-in role template
-                name (architect|backend|frontend|analyst).
+                name (any .md file in modules/templates/).
             attachment_file: Path to document attachment file (PDF, TXT, MD) or directory
                 (will be compiled to single markdown file).
             output_file: Optional output file destination path.
@@ -286,17 +325,9 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, resolved output path, and result (or job_id if async).
         """
-        if is_prompt_role(prompt_file):
-            p_path = materialize_role_template(prompt_file)
-        else:
-            p_path = Path(prompt_file).expanduser().resolve()
-        if not p_path.exists():
-            return _format_error_payload(
-                code="FILE_NOT_FOUND",
-                message=f"Prompt file not found: {p_path}",
-                hint="Check prompt_file path.",
-                field="prompt_file",
-            )
+        p_path = _resolve_prompt_path(prompt_file)
+        if isinstance(p_path, str):
+            return p_path
 
         a_path, a_err = _validate_attachment_path(attachment_file)
         if a_err is not None:
@@ -502,6 +533,11 @@ class McpToolCommand:
                 message=str(exc),
                 hint="Check filesystem write permissions for session directory.",
             )
+
+    def shutdown(self) -> None:
+        """Release background job resources when the MCP server exits."""
+        if self._jobs is not None:
+            self._jobs.shutdown()
 
     def setup_session(self) -> str:
         """Launch visible browser on chat.qwen.ai for manual login / session setup.
