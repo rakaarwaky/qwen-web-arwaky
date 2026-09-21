@@ -279,7 +279,7 @@ GENERATED_TOOLS = TOOL_HANDLERS
 
 def run_mcp_server() -> None:
     """Run the MCP server over stdio."""
-    ObservabilitySetup(DEFAULT_LOG).setup_observability()
+    ObservabilitySetup(DEFAULT_LOG).setup_observability(log_path=DEFAULT_LOG)
 
     async def serve() -> None:
         async with stdio_server() as (read_stream, write_stream):

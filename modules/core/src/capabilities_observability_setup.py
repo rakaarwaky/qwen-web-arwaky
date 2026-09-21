@@ -143,9 +143,7 @@ class ObservabilitySetup(IObservabilityProtocol):
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
 
-    def setup_observability(
-        self, log_path: Path, verbose: bool = False, attach_stderr: bool = True
-    ) -> None:
+    def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Bootstrap observability stack in 4 sequential steps:
 
         Step 1: Ensure log target directory exists
