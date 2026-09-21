@@ -379,7 +379,6 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
 )
 
 # ─── Saver defaults ─────────────────────────────────────────
-DEFAULT_INCLUDE_HEADER: bool = True
 DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
 
