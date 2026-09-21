@@ -43,6 +43,18 @@ class ResponseDetectionTimeoutError(QwenCliError):
     """Raised when a valid dispatch produces no detectable assistant response."""
 
 
+class StuckDetectedError(QwenCliError):
+    """Raised when the event-driven monitor sees no forward progress.
+
+    Detection is event-based, not wall-clock: the stream monitor tracks the
+    last forward event (thinking, streaming text change, or terminal
+    completion). When no forward event arrives within ``stall_timeout_sec``,
+    the run is classified stuck and this error is raised so callers can
+    retry. Slow-but-alive generations keep emitting events and are never
+    misclassified.
+    """
+
+
 class OutputValidationError(QwenCliError):
     """Raised when response content fails sanity check, such as a challenge page."""
 
@@ -109,6 +121,7 @@ _ERROR_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("response detection", "response timeout", "stream timeout"), "response_timeout"),
     (("network", "connection", "timeout", "dns", "socket"), "network"),
     (("rate", "limit", "throttl", "429"), "rate_limit"),
+    (("stuck", "stalled", "no forward progress"), "stuck"),
     (("browser", "launch", "dom", "playwright", "chromium"), "browser"),
     (("injection", "paste", "clipboard", "fill"), "injection"),
     (("parse", "empty", "no response", "timeout"), "parsing"),
@@ -143,6 +156,7 @@ __all__ = [
     "ElementNotFoundError",
     "NetworkTimeoutError",
     "ResponseDetectionTimeoutError",
+    "StuckDetectedError",
     "OutputValidationError",
     "FileUploadError",
     "FileValidationError",
