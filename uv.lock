@@ -1066,7 +1066,7 @@ wheels = [
 
 [[package]]
 name = "qwen-web-arwaky"
-version = "6.3.2"
+version = "6.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },

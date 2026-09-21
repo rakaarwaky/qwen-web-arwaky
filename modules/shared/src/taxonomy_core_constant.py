@@ -14,49 +14,54 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 
 STATUS_FILENAME: str = "status.json"
 
+# Application identifier used as the leaf of every XDG base directory.
+# Previously the hardcoded "qwen-web" string; standardized to the product
+# name "qwen-web-arwaky" so all state lives under ~/.local/share/qwen-web-arwaky.
+_APP_NAME = "qwen-web-arwaky"
+
 # ─── Application paths (computed inline — pure constants, no functions) ──────
 _XDG_DATA_HOME = (
-    Path(os.environ["XDG_DATA_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_DATA_HOME"]) / _APP_NAME
     if os.environ.get("XDG_DATA_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Application Support" / "qwen-web"
+        else Path.home() / "Library" / "Application Support" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".local/share/qwen-web"
+        else Path.home() / ".local/share" / _APP_NAME
     )
 )
 _XDG_STATE_HOME = (
-    Path(os.environ["XDG_STATE_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_STATE_HOME"]) / _APP_NAME
     if os.environ.get("XDG_STATE_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web" / "state"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME / "state"
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Logs" / "qwen-web"
+        else Path.home() / "Library" / "Logs" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".local/state/qwen-web"
+        else Path.home() / ".local/state" / _APP_NAME
     )
 )
 _XDG_CACHE_HOME = (
-    Path(os.environ["XDG_CACHE_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_CACHE_HOME"]) / _APP_NAME
     if os.environ.get("XDG_CACHE_HOME")
     else (
-        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / "qwen-web" / "cache"
+        Path(os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")) / _APP_NAME / "cache"
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Caches" / "qwen-web"
+        else Path.home() / "Library" / "Caches" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".cache/qwen-web"
+        else Path.home() / ".cache" / _APP_NAME
     )
 )
 _XDG_CONFIG_HOME = (
-    Path(os.environ["XDG_CONFIG_HOME"]) / "qwen-web"
+    Path(os.environ["XDG_CONFIG_HOME"]) / _APP_NAME
     if os.environ.get("XDG_CONFIG_HOME")
     else (
-        Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")) / "qwen-web"
+        Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")) / _APP_NAME
         if sys.platform == "win32"
-        else Path.home() / "Library" / "Application Support" / "qwen-web"
+        else Path.home() / "Library" / "Application Support" / _APP_NAME
         if sys.platform == "darwin"
-        else Path.home() / ".config/qwen-web"
+        else Path.home() / ".config" / _APP_NAME
     )
 )
 
@@ -66,11 +71,9 @@ XDG_CACHE_HOME = _XDG_CACHE_HOME
 XDG_CONFIG_HOME = _XDG_CONFIG_HOME
 
 DEFAULT_OUTPUT = XDG_DATA_HOME / "output"
-# Swarm runs use the product-specific root agreed for the MVP; regular prompt
-# output remains backward-compatible under DEFAULT_OUTPUT.
-SWARM_OUTPUT_ROOT = (
-    Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share")) / "qwen-web-arwaky" / "output"
-)
+# Swarm runs use a dedicated sub-directory under the same XDG root so the
+# per-swarm run folders do not collide with regular prompt outputs.
+SWARM_OUTPUT_ROOT = XDG_DATA_HOME / "swarm"
 DEFAULT_LOG = XDG_STATE_HOME / "log"
 DEFAULT_SESSION = XDG_DATA_HOME / "qwen_session"
 DEFAULT_VENV = XDG_DATA_HOME / "venv"

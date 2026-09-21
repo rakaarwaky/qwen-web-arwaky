@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from modules.core.src.root_core_container import SharedContainer
-from modules.shared.src import DEFAULT_LOG, DEFAULT_OUTPUT
+from modules.shared.src import DEFAULT_LOG, DEFAULT_OUTPUT, SWARM_OUTPUT_ROOT
 
 
 class TestQwaInit(unittest.TestCase):
@@ -32,13 +32,16 @@ class TestQwaInit(unittest.TestCase):
             log_link = dot_qwen / "log"
             output_link = dot_qwen / "output"
             session_link = dot_qwen / "qwen_session"
+            swarm_link = dot_qwen / "swarm"
 
             self.assertTrue(log_link.is_symlink())
             self.assertTrue(output_link.is_symlink())
             self.assertTrue(session_link.is_symlink())
+            self.assertTrue(swarm_link.is_symlink())
 
             self.assertEqual(log_link.resolve(), DEFAULT_LOG.resolve())
             self.assertEqual(output_link.resolve(), DEFAULT_OUTPUT.resolve())
+            self.assertEqual(swarm_link.resolve(), SWARM_OUTPUT_ROOT.resolve())
 
             # 3. Verify .gitignore
             gitignore = target_path / ".gitignore"
