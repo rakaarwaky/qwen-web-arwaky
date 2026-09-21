@@ -170,8 +170,16 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     if raw_output:
         out_p = Path(raw_output)
     else:
+        # Prefer the project-local .qwen-web/output when it is a symlink to the
+        # XDG DEFAULT_OUTPUT (i.e. `qwa init` was run). Otherwise fall back to
+        # the XDG DEFAULT_OUTPUT directly so output always lands in the
+        # standardized location even if the local dir is missing or stale.
         local_out = Path.cwd() / ".qwen-web" / "output"
-        base_dir = local_out if local_out.exists() else DEFAULT_OUTPUT
+        if local_out.is_dir() and not local_out.is_symlink():
+            # A real directory means `qwa init` was not run; use XDG.
+            base_dir = DEFAULT_OUTPUT
+        else:
+            base_dir = local_out if local_out.exists() else DEFAULT_OUTPUT
         if prompt_p:
             out_name = prompt_label or prompt_p.stem
             out_p = base_dir / f"{out_name}_output.md"
