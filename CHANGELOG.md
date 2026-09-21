@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.4.0] - 2026-09-21
+
+### Fixed
+
+- fix(observability): convert 7 structlog `%`-style positional-arg log calls in `capabilities_browser_adapter.py` to keyword-arg form so `app.jsonl` records no longer emit literal `%s` placeholders with values stashed in an unread `positional_args` field
+- fix(workspace): stop `root_cli_main_entry.py` from routing CLI output to a stale real `.qwen-web/output/` directory; when the local dir is not a symlink the path now resolves to the XDG `DEFAULT_OUTPUT` directly
+
+### Changed
+
+- refactor(paths): standardize all XDG base directories (data, state, cache, config) under the app name `qwen-web-arwaky` via a single `_APP_NAME` constant; unify `SWARM_OUTPUT_ROOT` to `XDG_DATA_HOME / "swarm"` so swarm output and `qwa init` output both land in `~/.local/share/qwen-web-arwaky/`
+- feat(workspace): `qwa init` now creates a `swarm` symlink in `.qwen-web/` mirroring the standardized swarm root, so swarm results are visible alongside the regular output
+
+### Tests
+
+- test(observability): add regression tests pinning the structlog clean-keyword contract (no `%`-placeholder in `event`, no `positional_args` in emitted JSONL records) and a static guard against reintroducing `%`-style log calls in `capabilities_browser_adapter.py`
+- test(workspace): extend `qwa init` integration test to assert the new `swarm` symlink targets `SWARM_OUTPUT_ROOT`
+
 ## [6.3.2] - 2026-09-21
 
 ### Fixed
