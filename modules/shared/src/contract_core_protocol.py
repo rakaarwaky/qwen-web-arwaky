@@ -12,7 +12,7 @@ from typing import Any
 
 from playwright.sync_api import ElementHandle, Page
 
-from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH
+from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_event import EventMessage
 from modules.shared.src.taxonomy_core_vo import (
@@ -77,6 +77,7 @@ class IFolderCompileProtocol(ABC):
         folder_path: Path,
         output_path: Path | None = None,
         max_depth: int = MAX_FOLDER_DEPTH,
+        import_depth: int = MAX_IMPORT_DEPTH,
     ) -> Path:
         """Compile folder contents to a single markdown file.
 
@@ -84,6 +85,11 @@ class IFolderCompileProtocol(ABC):
             folder_path: Directory to compile.
             output_path: Optional output file path. Auto-generated if None.
             max_depth: Maximum recursion depth.
+            import_depth: Maximum number of hops for resolving external
+                imports/links beyond the first-hop files linked from the
+                folder.  With the default of 1, only files linked directly
+                from in-folder documents are included; transitive
+                (second-hop) links are not followed.
 
         Returns:
             Path to the compiled markdown file.
@@ -102,6 +108,7 @@ class IFolderToAttachmentProtocol(ABC):
         self,
         path: Path,
         max_depth: int = MAX_FOLDER_DEPTH,
+        import_depth: int = MAX_IMPORT_DEPTH,
     ) -> Path:
         """Resolve a path to an attachment-ready file (compile folders to markdown)."""
 
