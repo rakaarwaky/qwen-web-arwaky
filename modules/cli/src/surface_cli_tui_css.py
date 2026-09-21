@@ -113,12 +113,12 @@ Underline {
     width: 100%;
     padding: 1 2;
     background: $bg_base;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
 #log-view-overview {
     height: 1fr;
-    min-height: 5;
+    min-height: 3;
     max-width: 100%;
     background: $bg_base;
     border: solid $border;
