@@ -19,7 +19,7 @@ from modules.shared.src import (
     OutputValidationError,
 )
 from modules.shared.src.taxonomy_core_constant import JS_GET_RESPONSE_TEXT
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
+from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
 
 # ─── validate_response_content ──────────────────────────────────────────────
 
@@ -344,6 +344,65 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=2,
             )
             assert result == stable_text
+
+    def test_stall_detection_raises_stuck_error_when_no_forward_event(self):
+        """No forward event (thinking, text change, or completion) for the
+        stall window must raise StuckDetectedError — not a wall-clock
+        ResponseDetectionTimeoutError."""
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 300]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(StuckDetectedError, match="Stuck detected"):
+                StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                    page,
+                    timeout_sec=120,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
+
+    def test_slow_generation_stays_alive_as_long_as_text_changes(self):
+        """A slow-but-alive generation that keeps emitting forward events
+        (text changes) must never trip the stall detector, even when
+        elapsed wall time far exceeds the stall threshold."""
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        # Text changes every ~250s (below the 300s stall window). Total
+        # elapsed time reaches 1000s — far beyond the stall threshold —
+        # yet each text change resets the forward-event clock.
+        text_side_effect = [None, "chunk 1 with enough text", "chunk 2 with enough text",
+                           "chunk 3 with enough text", "final answer with enough text",
+                           "final answer with enough text", "final answer with enough text"]
+        time_calls = [0, 250, 500, 750, 1000, 1000, 1000]
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=text_side_effect),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = time_calls
+            mock_time.sleep = MagicMock()
+
+            result = StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                page,
+                timeout_sec=120,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=2,
+            )
+            assert result == "final answer with enough text"
 
 
 class TestResponseExtractionContract:

@@ -24,6 +24,7 @@ from modules.shared.src.taxonomy_core_error import (
     OutputValidationError,
     ResponseDetectionTimeoutError,
     RunCancelledError,
+    StuckDetectedError,
 )
 from modules.shared.src.taxonomy_core_event import (
     EVENT_GENERATION_FINISHED,
@@ -42,6 +43,11 @@ from modules.shared.src.utility_core_validation import validate_response_content
 
 log = get_logger("capabilities_stream_monitor")
 DEFAULT_SAFETY_TIMEOUT_SEC = 4 * 60 * 60
+# Event-driven stall threshold: if no forward event (thinking, streaming text
+# change, or terminal completion) arrives within this window, the run is
+# classified stuck. Slow-but-alive generations keep emitting events and are
+# never misclassified. This is not a wall-clock cutoff for generation.
+DEFAULT_STALL_TIMEOUT_SEC = 300
 
 
 # Block 1: Class Definition & Constructor
@@ -55,10 +61,14 @@ class StreamMonitor(IStreamProtocol):
         config: StreamerConfig | None = None,
         *,
         safety_timeout_sec: int = DEFAULT_SAFETY_TIMEOUT_SEC,
+        stall_timeout_sec: int = DEFAULT_STALL_TIMEOUT_SEC,
     ) -> None:
         if safety_timeout_sec <= 0:
             raise ValueError("safety_timeout_sec must be greater than zero")
+        if stall_timeout_sec <= 0:
+            raise ValueError("stall_timeout_sec must be greater than zero")
         self.safety_timeout_sec = int(safety_timeout_sec)
+        self.stall_timeout_sec = int(stall_timeout_sec)
         if config is not None:
             self.polling_interval_sec = PollIntervalSec(config.polling_interval_sec)
             self.stability_checks = StabilityChecks(config.stability_checks)
@@ -125,6 +135,14 @@ class StreamMonitor(IStreamProtocol):
         (stable response plus a completed generation state), or raises when an
         explicit browser/auth error cannot be recovered.
 
+        Failure detection is event-driven, not wall-clock: the monitor tracks
+        the last *forward event* (thinking started, streamed text change, or
+        terminal completion). When no forward event arrives within
+        ``stall_timeout_sec``, a ``StuckDetectedError`` is raised so callers can
+        retry. Slow-but-alive generations keep emitting forward events and are
+        never misclassified as stuck. The ``safety_timeout_sec`` circuit
+        breaker remains as an absolute backstop for pathological cases.
+
         ``cancel_event`` is an optional per-run ``threading.Event`` created by
         the calling orchestrator. When it is set, the loop raises
         ``RunCancelledError`` immediately so the caller can close only its own
@@ -158,6 +176,7 @@ class StreamMonitor(IStreamProtocol):
         last_text: str | None = None
         stable_count = 0
         last_reload_time = start
+        last_forward_event_time = start
 
         # Poll DOM for event signals and content stability until a terminal event.
         while True:
@@ -175,12 +194,15 @@ class StreamMonitor(IStreamProtocol):
 
             is_thinking = self.is_thinking_active(page)
             is_complete = self.is_generation_complete(page)
+            forward_event_this_iteration = False
 
             try:
                 # Active thinking detection
                 if not has_thinking and is_thinking:
                     emitter.emit(EVENT_THINKING_STARTED, {"source": "qwen-thinking-dom"})
                     has_thinking = True
+                    last_forward_event_time = now
+                    forward_event_this_iteration = True
 
                 text = _dom_latest(page)
                 if text is not None and should_treat_as_new_response(text, previous_text, int(active_min_len)):
@@ -208,6 +230,21 @@ class StreamMonitor(IStreamProtocol):
                             emitter.emit(EVENT_STREAMING_GENERATION, {"text_length": len(text)})
                         stable_count = 0
                         last_text = text
+                        last_forward_event_time = now
+                        forward_event_this_iteration = True
+
+                # Event-driven stall detection: only flag stuck when this
+                # iteration produced no forward event (thinking, text
+                # change, or completion). A slow-but-alive generation that
+                # keeps changing text resets the stall clock each time.
+                if not forward_event_this_iteration:
+                    stall_elapsed = now - last_forward_event_time
+                    if stall_elapsed >= self.stall_timeout_sec:
+                        raise StuckDetectedError(
+                            "Stuck detected: no forward lifecycle event "
+                            f"(thinking/streaming/completion) for {int(stall_elapsed)}s "
+                            f"(stall threshold {self.stall_timeout_sec}s)"
+                        )
 
                 # Periodic cloud sync is recovery, not a response timeout. It runs
                 # while waiting so a long-running Qwen generation can continue past

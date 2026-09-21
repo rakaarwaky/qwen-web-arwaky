@@ -270,7 +270,8 @@ class SwarmOrchestrator(ISwarmAggregate):
     def _is_retryable(message: str) -> bool:
         lowered = message.lower()
         return any(
-            token in lowered for token in ("rate", "429", "timeout", "timed out", "connection", "network", "empty")
+            token in lowered
+            for token in ("rate", "429", "timeout", "timed out", "connection", "network", "empty", "stuck")
         )
 
     @staticmethod
