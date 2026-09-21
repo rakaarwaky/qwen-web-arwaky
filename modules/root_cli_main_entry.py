@@ -261,7 +261,10 @@ def _dispatch(
         # even in interactive TUI mode, so logs are persisted to DEFAULT_LOG
         # instead of being dropped. (FileHandler is otherwise only attached in
         # the non-interactive CLI subcommand path below.)
-        container.observability.setup_observability(log_path=DEFAULT_LOG)
+        # attach_stderr=False: the TUI owns the terminal canvas. Playwright
+        # browser callbacks emit log records from their own threads; a stderr
+        # handler would write them straight to the terminal, corrupting the UI.
+        container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
         result = surface_cli_interactive_controller.InteractiveController(
             container.workspace,
@@ -301,7 +304,8 @@ def _dispatch(
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
         return 1
 
-    container.observability.setup_observability(log_path=cfg.log_path, verbose=cfg.verbose)
+    resolved_log_path = cfg.log_path if cfg.log_path is not None else DEFAULT_LOG
+    container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
 
     args._cfg = cfg
     result = surface_cli_run_command.handle(
