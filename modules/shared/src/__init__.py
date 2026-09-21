@@ -145,7 +145,6 @@ from .taxonomy_core_vo import (
     FilePath,
     GenerateSidecarFlag,
     HeadlessFlag,
-    IncludeHeaderFlag,
     InjectorConfig,
     InputChars,
     InputPath,
@@ -224,7 +223,7 @@ from .utility_core_response import (
 )
 
 # ─── Utility: text ────────────────────────────────────────────
-from .utility_core_text import build_metadata_header, strip_ui_noise
+from .utility_core_text import strip_ui_noise, utc_now_iso
 
 # ─── Utility: validation ──────────────────────────────────────
 from .utility_core_validation import validate_file, validate_response_content
@@ -246,7 +245,6 @@ __all__ = [
     "FilePath",
     "GenerateSidecarFlag",
     "HeadlessFlag",
-    "IncludeHeaderFlag",
     "InputChars",
     "InputPath",
     "JobId",
@@ -416,7 +414,7 @@ __all__ = [
     "validate_response_content",
     "validate_file",
     "strip_ui_noise",
-    "build_metadata_header",
+    "utc_now_iso",
     "ErrorCategory",
     "exit_code_for",
     "should_treat_as_new_response",
