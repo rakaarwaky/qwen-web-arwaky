@@ -89,9 +89,7 @@ def test_structlog_kwarg_call_produces_clean_event() -> None:
 def test_old_percent_style_leaks_positional_args() -> None:
     """Document the old broken style: event keeps its %-placeholder, value leaks to positional_args."""
     _, _, buf = _make_jsonl_sink()
-    structlog.get_logger("regression_probe").warning(
-        "Load state wait failed, proceeding: %s", "TimeoutError('x')"
-    )
+    structlog.get_logger("regression_probe").warning("Load state wait failed, proceeding: %s", "TimeoutError('x')")
     buf.seek(0)
     record = json.loads(buf.readline())
     # The defect signature: literal %-placeholder in event + stashed positional_args.
@@ -99,18 +97,14 @@ def test_old_percent_style_leaks_positional_args() -> None:
     assert "positional_args" in record
 
     # The fixed keyword style is clean.
-    fixed = _clean_emit_and_read(
-        "load_state_wait_failed_proceeding", err="TimeoutError('x')"
-    )
+    fixed = _clean_emit_and_read("load_state_wait_failed_proceeding", err="TimeoutError('x')")
     assert fixed["event"] == "load_state_wait_failed_proceeding"
     assert fixed["err"] == "TimeoutError('x')"
     assert "%" not in fixed["event"]
     assert "positional_args" not in fixed
 
 
-_PERCENT_IN_LOG_CALL_RE = re.compile(
-    r"""log\.(?:debug|info|warning|error|critical|exception)\(\s*["'].*?%[a-zA-Z]"""
-)
+_PERCENT_IN_LOG_CALL_RE = re.compile(r"""log\.(?:debug|info|warning|error|critical|exception)\(\s*["'].*?%[a-zA-Z]""")
 
 
 def test_browser_adapter_has_no_percent_style_structlog_calls() -> None:
@@ -118,18 +112,10 @@ def test_browser_adapter_has_no_percent_style_structlog_calls() -> None:
 
     Locks the source so a future edit cannot reintroduce the defect.
     """
-    src = (
-        Path(__file__).resolve().parents[1]
-        / "modules"
-        / "core"
-        / "src"
-        / "capabilities_browser_adapter.py"
-    )
+    src = Path(__file__).resolve().parents[1] / "modules" / "core" / "src" / "capabilities_browser_adapter.py"
     text = src.read_text(encoding="utf-8")
     offenders = [m.group(0) for m in _PERCENT_IN_LOG_CALL_RE.finditer(text)]
-    assert not offenders, (
-        "%-style structlog log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)
-    )
+    assert not offenders, "%-style structlog log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)
 
 
 def test_browser_adapter_module_logger_emits_no_positional_args() -> None:
@@ -137,9 +123,7 @@ def test_browser_adapter_module_logger_emits_no_positional_args() -> None:
     from modules.core.src import capabilities_browser_adapter as adapter
 
     assert adapter.log is not None
-    record = _clean_emit_and_read(
-        "load_state_wait_failed_proceeding", err="TimeoutError('15000ms exceeded')"
-    )
+    record = _clean_emit_and_read("load_state_wait_failed_proceeding", err="TimeoutError('15000ms exceeded')")
     assert record["event"] == "load_state_wait_failed_proceeding"
     assert record["err"] == "TimeoutError('15000ms exceeded')"
     assert "%" not in record["event"]
