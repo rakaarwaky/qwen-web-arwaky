@@ -80,6 +80,7 @@ class _TuiComposeMixin:
                     markup=True,
                     max_lines=2000,
                     auto_scroll=True,
+                    wrap=True,
                 )
                 # A3: help discoverability hint for first-time users
                 yield Static(
@@ -109,6 +110,7 @@ class _TuiComposeMixin:
                     markup=True,
                     max_lines=2000,
                     auto_scroll=True,
+                    wrap=True,
                 )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
@@ -178,6 +180,7 @@ class _TuiComposeMixin:
                             markup=True,
                             classes="slot-log-view",
                             max_lines=2000,
+                            wrap=True,
                         )
 
         yield Footer()
@@ -224,6 +227,7 @@ class _TuiComposeMixin:
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", RichLog)
+                log_view.auto_scroll = True
                 log_view.write(f"[{THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
 
         self._refresh_session_badge()

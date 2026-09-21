@@ -113,12 +113,17 @@ Underline {
     width: 100%;
     padding: 1 2;
     background: $bg_base;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 
 #log-view-overview {
+    height: 1fr;
     min-height: 5;
     max-width: 100%;
+    background: $bg_base;
+    border: solid $border;
+    color: $fg_primary;
+    padding: 1;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -143,7 +148,7 @@ Underline {
 
 #slots-table {
     height: auto;
-    max-height: 16;
+    max-height: 9;
     background: $bg_surface;
     border: solid $border;
     margin-bottom: 1;

@@ -97,7 +97,10 @@ fi
 
 # Gate 5: Pytest test suite
 info "Gate 5/5 — Running pytest..."
-if uv run python -m pytest tests/ --ignore=tests/test_e2e_pipeline.py -v >/tmp/gates_pytest.log 2>&1; then
+# Live-network / auth-session tests are gated by the `e2e` marker in
+# pytest.ini; skip them in local and CI gates, run them explicitly with
+# `uv run python -m pytest tests/ -m e2e` when a session is available.
+if uv run python -m pytest tests/ -m "not e2e" -v >/tmp/gates_pytest.log 2>&1; then
     ok "Tests passed"
 else
     warn "Tests failed (see output above)"
