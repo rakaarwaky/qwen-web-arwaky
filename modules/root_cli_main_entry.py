@@ -261,7 +261,10 @@ def _dispatch(
         # even in interactive TUI mode, so logs are persisted to DEFAULT_LOG
         # instead of being dropped. (FileHandler is otherwise only attached in
         # the non-interactive CLI subcommand path below.)
-        container.observability.setup_observability(log_path=DEFAULT_LOG)
+        # attach_stderr=False: the TUI owns the terminal canvas. Playwright
+        # browser callbacks emit log records from their own threads; a stderr
+        # handler would write them straight to the terminal, corrupting the UI.
+        container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
         result = surface_cli_interactive_controller.InteractiveController(
             container.workspace,

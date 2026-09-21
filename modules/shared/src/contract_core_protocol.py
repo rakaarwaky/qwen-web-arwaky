@@ -223,8 +223,16 @@ class IObservabilityProtocol(ABC):
     """Observability capability contract (logging, tracing, hooks)."""
 
     @abstractmethod
-    def setup_observability(self, log_path: Path) -> None:
-        """Bootstrap Sentry/OTel/structlog + global hooks."""
+    def setup_observability(self, log_path: Path, attach_stderr: bool = True) -> None:
+        """Bootstrap Sentry/OTel/structlog + global hooks.
+
+        Parameters
+        ----------
+        attach_stderr:
+            When False, skip attaching the stderr stream handler. Required by
+            the interactive TUI so browser-callback logs do not corrupt the
+            terminal canvas.
+        """
 
     @abstractmethod
     def get_logger(self, name: LoggerName = LoggerName("qwen-cli")) -> Any:
