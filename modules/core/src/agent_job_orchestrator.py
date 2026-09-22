@@ -20,7 +20,7 @@ from modules.shared.src.contract_core_aggregate import (
 )
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
+from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, RateLimitError
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_FAILED,
@@ -28,6 +28,7 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
+    ErrorReason,
     FilePath,
     HeadlessFlag,
     JobId,
@@ -63,11 +64,25 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="qwen_job_worker")
 
     def _guard_dispatch(self) -> None:
-        """Apply shared throughput and failure guards before submitting work."""
+        """Apply shared throughput and failure guards before submitting work.
+
+        Job submission must stay responsive: instead of blocking the calling
+        thread until a rate-limit slot frees up (which makes MCP clients hang
+        with no explanation), raise ``RateLimitError`` carrying a retry hint so
+        the caller can back off deliberately.
+        """
         if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
             raise CircuitBreakerOpenError("circuit open: too many recent job failures")
         if self._rate_limiter is not None:
-            self._rate_limiter.acquire()
+            wait_sec = self._rate_limiter.try_acquire()
+            if wait_sec is not None:
+                raise RateLimitError(
+                    ErrorReason(
+                        f"rate limit reached: at most {self._rate_limiter.max_per_minute} "
+                        f"job submissions per minute; retry in {wait_sec:.1f}s"
+                    ),
+                    retry_after_sec=wait_sec,
+                )
 
     def _generate_job_id(self, prefix: str = "job") -> JobId:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from modules.shared.src.taxonomy_core_vo import ErrorReason, RetryWaitSec
+
 
 class QwenCliError(RuntimeError):
     """Base exception for qwen-cli errors."""
@@ -20,7 +22,22 @@ class PromptInjectionError(QwenCliError):
 
 
 class RateLimitError(QwenCliError):
-    """Raised when the server returns a rate-limit / throttling response."""
+    """Raised when the server returns a rate-limit / throttling response.
+
+    Attributes:
+        retry_after_sec: Seconds the caller should wait before retrying, when
+            the throttling source can estimate it. ``None`` when unknown.
+
+    """
+
+    def __init__(
+        self,
+        message: ErrorReason,
+        retry_after_sec: RetryWaitSec | None = None,
+    ) -> None:
+        """Store the human-readable reason plus an optional retry hint."""
+        super().__init__(message)
+        self.retry_after_sec = retry_after_sec
 
 
 class CircuitBreakerOpenError(QwenCliError):

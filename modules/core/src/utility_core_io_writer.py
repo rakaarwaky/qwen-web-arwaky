@@ -17,6 +17,12 @@ from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import OutputWriteError
 from modules.shared.src.taxonomy_core_event import EVENT_OUTPUT_COPIED
 
+#: Suffix appended to in-flight atomic writes. Deliberately not a ``.json``/
+#: ``.md`` extension so directory scans (e.g. ``JobManager.list_jobs`` globbing
+#: ``*.json``) never pick up a partial write, and so real records are free to
+#: contain arbitrary substrings without being mistaken for temp artifacts.
+ATOMIC_TEMP_SUFFIX = ".tmpwrite"
+
 
 def _atomic_write(target: Path, content: str) -> None:
     """Write content to a file atomically via temp + replace.
@@ -29,7 +35,7 @@ def _atomic_write(target: Path, content: str) -> None:
         Text content to write.
 
     """
-    tmp_path = target.with_suffix(f".tmp_{target.name}")
+    tmp_path = target.with_name(target.name + ATOMIC_TEMP_SUFFIX)
     try:
         tmp_path.write_text(content, encoding="utf-8")
         tmp_path.replace(target)

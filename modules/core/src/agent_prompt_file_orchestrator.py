@@ -89,9 +89,10 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         self._observability = observability
         self._flow = flow
         # Registry: cancel_event -> _RunState for every active run.
-        # Keyed on the caller's threading.Event so the TUI worker can target
-        # one specific run without touching sibling runs.
-        self._run_registry: dict[int, _RunState] = {}
+        # Keyed on the caller's threading.Event object itself (not id(), whose
+        # address can be recycled once an Event is garbage collected) so the TUI
+        # worker can target one specific run without touching sibling runs.
+        self._run_registry: dict[threading.Event, _RunState] = {}
         self._registry_lock = threading.Lock()
 
     def request_cancel(self, cancel_event: threading.Event) -> None:
@@ -104,7 +105,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         events are unaffected.
         """
         with self._registry_lock:
-            run_state = self._run_registry.get(id(cancel_event))
+            run_state = self._run_registry.get(cancel_event)
         if run_state is None:
             # Run already finished — still set the event so any in-progress
             # flow check sees it.
@@ -138,7 +139,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         ctx = RunContext()
         run_state = _make_run_state(cancel_event)
         with self._registry_lock:
-            self._run_registry[id(run_state.cancel_event)] = run_state
+            self._run_registry[run_state.cancel_event] = run_state
         try:
             p_path, out_path = resolve_pipeline_output_path(prompt_file, output_file)
             cfg = build_app_config(
@@ -172,7 +173,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
             return to_error_response(exc)
         finally:
             with self._registry_lock:
-                self._run_registry.pop(id(run_state.cancel_event), None)
+                self._run_registry.pop(run_state.cancel_event, None)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 

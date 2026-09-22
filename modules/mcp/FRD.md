@@ -20,8 +20,26 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 ### FR-002: Structured Response Envelopes & Agent-Friendly Payloads
 
 - **Description**: All MCP tools return machine-readable, structured JSON strings.
-- **Success Payload**: `{"success": true, "status": "SUCCESS", "result": "...", "output_path": "...", "run_id": "..."}`.
+- **Success Payload**: `{"success": true, "status": "<STATUS>", ...}`.
 - **Error Payload**: `{"success": false, "error": {"code": "...", "message": "...", "hint": "...", "retryable": boolean}}`.
+- **Business Rules**:
+  - Every successful payload carries `success: true` **and** a `status` discriminator.
+    A consumer branching on `status` must never encounter a missing key, whatever
+    code path produced the response.
+  - Every successful payload carries either `result` (work finished) or `job_id`
+    (work queued), so a consumer always knows where the answer will come from.
+
+| `status` | Meaning | Also present |
+|----------|---------|--------------|
+| `SUCCESS` | Synchronous work completed. | `result`, optional `output_path`, `run_id` |
+| `ACCEPTED` | Async job queued (`async_run=True`, the default). | `job_id`, `latest_event`, `created_at` |
+| `RUNNING` | Polled job is still executing. | `job_id`, `latest_event` |
+| `COMPLETED` | Polled job finished successfully. | `job_id`, `result_preview`, `duration_sec` |
+| `FAILED` | Polled job finished with an error. | `job_id`, `error` |
+
+- **Throttling**: when the submission rate limit is reached, tools return the error
+  envelope with `code: "RATE_LIMITED"`, `retryable: true`, and a `retry_after_sec`
+  hint rather than blocking the tool call until a slot frees up.
 
 ### FR-003: Session Management Tools
 
@@ -35,7 +53,7 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 
 | Operation | Input | Output | Description |
 |-----------|-------|--------|-------------|
-| `process_direct_prompt` | `prompt`, `timeout_sec=120`, `headless=True` | `JSON str` | Processes a raw text prompt. |
+| `process_direct_prompt` | `prompt`, `timeout_sec=120`, `headless=True`, `output_file=None` | `JSON str` | Processes a raw text prompt. `output_file` mirrors the CLI's `prompt-direct -o FILE`. |
 | `process_prompt_file_only` | `input_file`, `output_file=None`, `headless=True` | `JSON str` | Processes one Markdown file. |
 | `process_prompt_with_attachment` | `prompt_file`, `attachment_file`, `output_file=None`, `headless=True` | `JSON str` | Processes a Markdown file with a document attachment. |
 | `check_session` | None | `JSON str` | Checks validity of saved Chromium session tokens. |

@@ -134,6 +134,15 @@ class SwarmOrchestrator(ISwarmAggregate):
         event = self._cancel_events[swarm_id][role]
         output_path = self._output_root / swarm_id / role / "output.md"
         last_error = "Unknown Swarm agent failure"
+        # cancel() pops _attachment_paths[swarm_id] under the lock while this
+        # worker thread runs. Snapshot the path once, up front, so a cancel that
+        # lands mid-attempt cannot raise KeyError and get misreported as a
+        # processing failure. A missing entry means the swarm was cancelled.
+        with self._lock:
+            attachment_path = self._attachment_paths.get(swarm_id)
+        if attachment_path is None:
+            self._update_agent(swarm_id, role, "cancelled", 0, output_path, "Cancelled by user", start)
+            return
         for attempt in range(1, self._max_attempts + 1):
             if event.is_set():
                 self._update_agent(swarm_id, role, "cancelled", attempt - 1, output_path, "Cancelled by user", start)
@@ -146,7 +155,7 @@ class SwarmOrchestrator(ISwarmAggregate):
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 result = self._attachment.process_prompt_with_attachment(
                     prompt_file=prompt_file,
-                    attachment_file=self._attachment_paths[swarm_id],
+                    attachment_file=attachment_path,
                     output_file=output_path,
                     headless=HeadlessFlag(True),
                     cancel_event=event,

@@ -17,19 +17,24 @@ that mirrors the exact DOM structure verified live on `chat.qwen.ai`.
 
 | Module | Method | Verified behavior | Source of truth |
 |--------|--------|-------------------|-----------------|
-| `prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
-| `prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
-| `prompt_injector.py` | `type_slowly` | Character-by-character typing with error escalation | Live probe 2026-08-09 |
-| `file_uploader.py` | `upload_file_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
-| `sender.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
-| `sender.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
-| `sender.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
-| `streamer.py` | `validate_response_content` | Detects CAPTCHA challenges, server error pages, empty responses | Live probe 2026-08-09 |
-| `streamer.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
-| `browser.py` | `SessionCheck.is_alive` | Verifies page readiness and textarea presence | Live probe 2026-08-09 |
-| `browser.py` | `SessionCheck.check_auth` | Detects login redirects and missing textarea | Live probe 2026-08-09 |
-| `qwen_client.py` | `send_file` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
-| `qwen_client.py` | `send_prompt` | Same pipeline without attachment | Live probe 2026-08-09 |
+| `core/src/capabilities_prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
+| `core/src/capabilities_prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
+| `core/src/capabilities_file_uploader.py` | `upload_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
+| `core/src/capabilities_file_uploader.py` | `validate_file` | Rejects oversized files before the chooser opens | Live probe 2026-08-09 |
+| `core/src/capabilities_send_dispatcher.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
+| `core/src/capabilities_send_dispatcher.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
+| `core/src/capabilities_send_dispatcher.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
+| `shared/src/utility_core_validation.py` | `validate_response_content` | Detects CAPTCHA challenges, server error pages, empty responses | Live probe 2026-08-09 |
+| `core/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
+| `core/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
+| `core/src/capabilities_browser_adapter.py` | `SessionCheck.is_alive` | Verifies page readiness and textarea presence | Live probe 2026-08-09 |
+| `core/src/capabilities_browser_adapter.py` | `SessionCheck.check_auth` | Detects login redirects and missing textarea | Live probe 2026-08-09 |
+| `core/src/agent_attachment_prompt_orchestrator.py` | `process_prompt_with_attachment` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
+| `core/src/agent_prompt_file_orchestrator.py` | `process_prompt_file_only` | Same pipeline without attachment | Live probe 2026-08-09 |
+
+> Paths are relative to `modules/`. Method names in this table must always
+> resolve against the current tree — if a rename lands, update this table in the
+> same commit.
 
 ### Dead code removed (verified 2026-08-09)
 
@@ -185,9 +190,10 @@ tests/
 │   ├── input/                           # 1:1 production mirror (real task prompts)
 │   ├── output/
 │   └── log/
-├── test_qwen_client_behavior.py         # Behavior-lock tests (TDD safety net)
-├── test_pipeline_fixtures.py            # Fixture state management tests
-├── test_e2e_pipeline.py                 # Live E2E pipeline tests
+├── contract_qwen_auto.py                # Behavior-lock tests (TDD safety net)
+├── pipeline_fixtures.py                 # Fixture state management tests
+├── unit_concurrency_guards.py           # Thread-safety locks for breaker/limiter/jobs
+├── unit_mcp_hardening.py                # MCP registry + workspace path safety
 └── manual_probe.py                      # Ad-hoc headed probe for live UI debugging
 modules/
 ├── shared/src/taxonomy_core_constant.py  # Selectors & constants

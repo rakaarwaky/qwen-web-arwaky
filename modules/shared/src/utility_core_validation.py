@@ -15,6 +15,7 @@ from modules.shared.src.taxonomy_core_error import (
     OutputValidationError,
     RateLimitError,
 )
+from modules.shared.src.taxonomy_core_vo import ErrorReason
 
 
 def validate_response_content(text: str) -> None:
@@ -25,7 +26,7 @@ def validate_response_content(text: str) -> None:
     text_lower = text.lower()
     for kw in RATE_LIMIT_KEYWORDS:
         if kw in text_lower and len(text) < 500:
-            raise RateLimitError(f"Rate limit / throttling response detected: '{kw}'")
+            raise RateLimitError(ErrorReason(f"Rate limit / throttling response detected: '{kw}'"))
     for kw in CHALLENGE_KEYWORDS:
         if kw in text_lower and len(text) < 500:
             if "verify you are human" in text_lower or "attention required!" in text_lower:

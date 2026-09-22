@@ -147,6 +147,17 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     out_p: Path | None = None
     text: str | None = getattr(args, "text", None)
 
+    # Reject an empty direct prompt here rather than deep in dispatch: building
+    # the config and initialising observability first wastes the whole setup
+    # path before surfacing a generic message.
+    if action == "prompt-direct" and not (text or "").strip():
+        raise ValueError(
+            "Empty prompt text for prompt-direct.\n"
+            "Why: --text/-t must carry non-empty content to send to Qwen.\n"
+            "How to fix: supply a prompt, e.g.\n"
+            '  qwen-web-arwaky prompt-direct -t "Summarize this document"'
+        )
+
     raw_prompt = getattr(args, "prompt_path", None)
     raw_attach = getattr(args, "attachment_path", None)
     raw_output = getattr(args, "output_path", None)

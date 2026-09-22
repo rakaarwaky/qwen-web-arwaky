@@ -6,6 +6,7 @@ Taxonomy layer (taxonomy(entity)): identity-bearing stateful entities, no I/O.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import deque
 from collections.abc import Callable, Sequence
@@ -22,7 +23,13 @@ from modules.shared.src.taxonomy_core_event import (
     LifecycleEvent,
     QwenEventType,
 )
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.taxonomy_core_vo import (
+    EventTimestamp,
+    FailureThreshold,
+    MaxPerMinute,
+    RetryWaitSec,
+    WindowSec,
+)
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +60,10 @@ class CircuitBreaker:
         self._window_sec = window_sec
         self._failures: deque[float] = deque()
         self._trip: bool = False
+        # Job workers call record_failure/record_success from up to
+        # DEFAULT_MAX_WORKERS threads; every mutation must be serialized so the
+        # prune-then-count sequence in _refresh_state stays atomic.
+        self._lock = threading.Lock()
 
     def configure(self, threshold: FailureThreshold, window_sec: WindowSec) -> None:
         """Update limits while preserving accumulated failure history."""
@@ -60,12 +71,16 @@ class CircuitBreaker:
             raise ValueError(f"threshold must be >= 1, got {threshold}")
         if window_sec < 1:
             raise ValueError(f"window_sec must be >= 1, got {window_sec}")
-        self._threshold = threshold
-        self._window_sec = window_sec
-        self._refresh_state()
+        with self._lock:
+            self._threshold = threshold
+            self._window_sec = window_sec
+            self._refresh_state()
 
     def _refresh_state(self) -> None:
-        """Discard expired failures and recompute the trip state."""
+        """Discard expired failures and recompute the trip state.
+
+        Callers must already hold ``self._lock``.
+        """
         current = time.time()
         while self._failures and (current - self._failures[0]) > self._window_sec:
             self._failures.popleft()
@@ -73,13 +88,15 @@ class CircuitBreaker:
 
     def record_success(self) -> None:
         """Reset the breaker on a successful request."""
-        self._failures.clear()
-        self._trip = False
+        with self._lock:
+            self._failures.clear()
+            self._trip = False
 
     def record_failure(self) -> None:
         """Record a failure and trip if threshold exceeded within window."""
-        self._failures.append(time.time())
-        self._refresh_state()
+        with self._lock:
+            self._failures.append(time.time())
+            self._refresh_state()
 
     @property
     def threshold(self) -> int:
@@ -94,8 +111,9 @@ class CircuitBreaker:
     @property
     def is_tripped(self) -> bool:
         """True when the breaker has tripped."""
-        self._refresh_state()
-        return self._trip
+        with self._lock:
+            self._refresh_state()
+            return self._trip
 
 
 class RateLimiter:
@@ -115,33 +133,55 @@ class RateLimiter:
             raise ValueError(f"max_per_minute must be >= 1, got {max_per_minute}")
         self._max_per_minute = max_per_minute
         self._timestamps: deque[float] = deque()
+        # Dispatch guards may run concurrently (MCP executes submits on an
+        # executor); the prune/count/append sequence must not interleave.
+        self._lock = threading.Lock()
 
     def configure(self, max_per_minute: MaxPerMinute) -> None:
         """Update the request limit while preserving timestamp history."""
         if max_per_minute < MaxPerMinute(1):
             raise ValueError(f"max_per_minute must be >= 1, got {max_per_minute}")
-        self._max_per_minute = max_per_minute
+        with self._lock:
+            self._max_per_minute = max_per_minute
 
     @property
     def max_per_minute(self) -> int:
         """Configured maximum requests per minute."""
         return int(self._max_per_minute)
 
+    def _try_reserve_locked(self, now: EventTimestamp) -> RetryWaitSec | None:
+        """Reserve a slot if available; else return seconds until one frees.
+
+        Callers must already hold ``self._lock``.
+        """
+        window_start = now - 60.0
+        while self._timestamps and self._timestamps[0] < window_start:
+            self._timestamps.popleft()
+        if len(self._timestamps) < self._max_per_minute:
+            self._timestamps.append(now)
+            return None
+        oldest = self._timestamps[0]
+        return RetryWaitSec(max(0.1, 60.0 - (now - oldest) + 0.1))
+
+    def try_acquire(self) -> RetryWaitSec | None:
+        """Reserve a slot without blocking.
+
+        Returns:
+            ``None`` when a slot was reserved, otherwise the number of seconds
+            the caller should wait before retrying.
+
+        """
+        with self._lock:
+            return self._try_reserve_locked(time.time())
+
     def acquire(self) -> None:
         """Wait until a request slot is available."""
-        now = time.time()
-        window_start = now - 60.0
         while True:
-            while self._timestamps and self._timestamps[0] < window_start:
-                self._timestamps.popleft()
-            if len(self._timestamps) < self._max_per_minute:
-                break
-            oldest = self._timestamps[0]
-            wait_sec = max(0.1, 60.0 - (now - oldest) + 0.1)
+            with self._lock:
+                wait_sec = self._try_reserve_locked(time.time())
+            if wait_sec is None:
+                return
             time.sleep(wait_sec)
-            now = time.time()
-            window_start = now - 60.0
-        self._timestamps.append(time.time())
 
 
 class LifecycleState:
