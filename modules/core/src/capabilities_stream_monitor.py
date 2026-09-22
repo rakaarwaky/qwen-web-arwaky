@@ -141,18 +141,22 @@ class StreamMonitor(IStreamProtocol):
     ) -> ResponseText | None:
         """Wait for a terminal assistant response using event-driven DOM signals.
 
-        ``timeout_sec`` is retained for API compatibility and observability only;
-        it is not a response cutoff. The loop exits on a terminal generation event
-        (stable response plus a completed generation state), or raises when an
-        explicit browser/auth error cannot be recovered.
+        ``timeout_sec`` is a **hard cutoff** (issue #372), matching the
+        MCP/CLI contract wording ("maximum seconds to wait for the assistant
+        response"): when the elapsed wait exceeds it without a terminal
+        generation event, a ``ResponseDetectionTimeoutError`` is raised so the
+        caller's dispatch loop can retry or fail the run. The loop otherwise
+        exits on a terminal generation event (stable response plus a
+        completed generation state).
 
-        Failure detection is event-driven, not wall-clock: the monitor tracks
-        the last *forward event* (thinking started, streamed text change, or
-        terminal completion). When no forward event arrives within
-        ``stall_timeout_sec``, a ``StuckDetectedError`` is raised so callers can
-        retry. Slow-but-alive generations keep emitting forward events and are
-        never misclassified as stuck. The ``safety_timeout_sec`` circuit
-        breaker remains as an absolute backstop for pathological cases.
+        Failure detection is event-driven inside the budget: the monitor
+        tracks the last *forward event* (thinking started, streamed text
+        change, or terminal completion). When no forward event arrives within
+        ``stall_timeout_sec``, a ``StuckDetectedError`` is raised so callers
+        can retry. Slow-but-alive generations keep emitting forward events
+        and are never misclassified as stuck — but they are still bounded by
+        the ``timeout_sec`` hard cutoff, and the ``safety_timeout_sec``
+        circuit breaker remains an absolute backstop for pathological cases.
 
         ``cancel_event`` is an optional per-run ``threading.Event`` created by
         the calling orchestrator. When it is set, the loop raises
@@ -177,7 +181,7 @@ class StreamMonitor(IStreamProtocol):
 
         # Step 2: Capture baseline message state
         log.info(
-            "Waiting for AI response until terminal event (timeout hint: %ss; safety circuit breaker: %ss)",
+            "Waiting for AI response until terminal event (hard timeout: %ss; safety circuit breaker: %ss)",
             timeout_sec,
             self.safety_timeout_sec,
         )
@@ -201,6 +205,14 @@ class StreamMonitor(IStreamProtocol):
                 raise ResponseDetectionTimeoutError(
                     "Response safety circuit breaker tripped after "
                     f"{self.safety_timeout_sec}s without a terminal generation event"
+                )
+            # Issue #372: timeout_sec is a hard cutoff (as the MCP/CLI contracts
+            # promise: "maximum seconds to wait"), raised past the safety check
+            # so the absolute backstop wins when both fire on the same poll.
+            if elapsed >= timeout_sec:
+                raise ResponseDetectionTimeoutError(
+                    f"Response hard timeout: {int(elapsed)}s elapsed exceeds the "
+                    f"{timeout_sec}s cutoff without a terminal generation event"
                 )
 
             is_thinking = self.is_thinking_active(page)

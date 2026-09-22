@@ -221,9 +221,12 @@ class TestWaitForResponseEdgeCases:
             mock_time.time.side_effect = [0, 1, 2, 3, 4, 5]
             mock_time.sleep = MagicMock()
 
+            # Budget (120s) comfortably covers the mocked 5s sequence; the
+            # test targets transient Playwright TimeoutError recovery, not
+            # the hard cutoff (issue #372).
             result = StreamMonitor(safety_timeout_sec=100).wait_for_response(
                 page,
-                timeout_sec=1,
+                timeout_sec=120,
                 msg_count_before=1,
                 emitter=emitter,
                 polling_interval_sec=0,
@@ -232,7 +235,10 @@ class TestWaitForResponseEdgeCases:
 
         assert result == response
 
-    def test_timeout_hint_does_not_end_wait_before_terminal_event(self):
+    def test_wait_continues_until_terminal_event_within_timeout_budget(self):
+        """Inside the timeout budget the loop must wait for the terminal
+        event (not return early); the hard cutoff only fires once the budget
+        is exhausted (issue #372; covered in TestHardResponseTimeout)."""
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
         response = "A delayed response that must wait for the explicit completed signal."
@@ -243,12 +249,12 @@ class TestWaitForResponseEdgeCases:
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
         ):
-            mock_time.time.side_effect = [0, 9999, 9999, 9999]
+            mock_time.time.side_effect = [0, 0.4, 0.5, 0.6]
             mock_time.sleep = MagicMock()
 
             result = StreamMonitor().wait_for_response(
                 page,
-                timeout_sec=1,
+                timeout_sec=120,
                 msg_count_before=1,
                 emitter=emitter,
                 polling_interval_sec=0,
@@ -276,7 +282,7 @@ class TestWaitForResponseEdgeCases:
 
             result = StreamMonitor().wait_for_response(
                 page,
-                timeout_sec=1,
+                timeout_sec=120,
                 msg_count_before=1,
                 emitter=emitter,
                 polling_interval_sec=0,
@@ -358,13 +364,16 @@ class TestWaitForResponseEdgeCases:
             patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
         ):
+            # The stall window (300s) trips well inside the 900s hard-cutoff
+            # budget (issue #372) so the event-driven error surfaces, not the
+            # wall-clock cutoff.
             mock_time.time.side_effect = [0, 300]
             mock_time.sleep = MagicMock()
 
             with pytest.raises(StuckDetectedError, match="Stuck detected"):
                 StreamMonitor(stall_timeout_sec=300).wait_for_response(
                     page,
-                    timeout_sec=120,
+                    timeout_sec=900,
                     msg_count_before=1,
                     emitter=emitter,
                     polling_interval_sec=0,
@@ -378,8 +387,9 @@ class TestWaitForResponseEdgeCases:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         # Text changes every ~250s (below the 300s stall window). Total
-        # elapsed time reaches 1000s — far beyond the stall threshold —
-        # yet each text change resets the forward-event clock.
+        # elapsed time reaches 1000s — far beyond the stall threshold but
+        # inside the 3600s hard-cutoff budget (issue #372) — and each text
+        # change resets the forward-event clock.
         text_side_effect = [
             None,
             "chunk 1 with enough text",
@@ -402,7 +412,7 @@ class TestWaitForResponseEdgeCases:
 
             result = StreamMonitor(stall_timeout_sec=300).wait_for_response(
                 page,
-                timeout_sec=120,
+                timeout_sec=3600,
                 msg_count_before=1,
                 emitter=emitter,
                 polling_interval_sec=0,
@@ -452,3 +462,54 @@ class TestPreSendBaseline:
         event_names = [call.args[0] for call in emitter.emit.call_args_list]
         assert EVENT_STREAMING_GENERATION in event_names
         assert EVENT_GENERATION_FINISHED in event_names
+
+
+class TestHardResponseTimeout:
+    """Issue #372: timeout_sec is a hard cutoff, not an observability hint."""
+
+    def test_hard_cutoff_raises_at_timeout_sec(self):
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            # wall clock jumps past the 120s budget while the 4h safety
+            # breaker and the 5min stall window are nowhere near tripping.
+            mock_time.time.side_effect = [0, 121]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(ResponseDetectionTimeoutError, match="hard timeout"):
+                StreamMonitor().wait_for_response(
+                    page,
+                    timeout_sec=120,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
+
+    def test_safety_breaker_wins_when_both_trip_same_poll(self):
+        """The absolute backstop message must win if both budgets trip together."""
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
+            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 14_400]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(ResponseDetectionTimeoutError, match="circuit breaker"):
+                StreamMonitor(safety_timeout_sec=14_400).wait_for_response(
+                    page,
+                    timeout_sec=120,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
