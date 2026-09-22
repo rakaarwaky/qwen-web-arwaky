@@ -37,6 +37,7 @@ class JobManager(IJobStorageProtocol):
         self.storage_dir = storage_dir or DEFAULT_JOBS_DIR
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.cleanup_stale_jobs()
+        self.reconcile_zombies()
 
     def _job_file_path(self, job_id: JobId | str) -> Path:
         """Map a job ID onto a filesystem-safe path inside the storage dir.
@@ -82,12 +83,52 @@ class JobManager(IJobStorageProtocol):
                 attachment_file=raw.get("attachment_file"),
                 output_file=raw.get("output_file"),
                 prompt_text=raw.get("prompt_text"),
+                owner_pid=raw.get("owner_pid"),
+                heartbeat_at=raw.get("heartbeat_at"),
                 error=raw.get("error"),
                 result_preview=raw.get("result_preview"),
             )
         except Exception as exc:
             log.error("job_read_failed", job_id=str(job_id), error=str(exc))
             return None
+
+    def reconcile_zombies(self) -> int:
+        """Mark started-but-incomplete records owned by dead processes as failed."""
+        import os
+
+        reconciled = 0
+        for path in self.storage_dir.glob("*.json"):
+            if path.name.endswith(ATOMIC_TEMP_SUFFIX):
+                continue
+            rec = self.get_job(path.stem)
+            if rec is None or rec.completed or rec.owner_pid is None:
+                continue
+            alive = True
+            try:
+                os.kill(rec.owner_pid, 0)
+            except OSError:
+                alive = False
+            if not alive:
+                updated = JobRecord(
+                    job_id=rec.job_id,
+                    created_at=rec.created_at,
+                    latest_event=rec.latest_event,
+                    completed=True,
+                    started_at=rec.started_at,
+                    completed_at=datetime.now(timezone.utc).isoformat(),
+                    duration_sec=rec.duration_sec,
+                    input_file=rec.input_file,
+                    attachment_file=rec.attachment_file,
+                    output_file=rec.output_file,
+                    prompt_text=rec.prompt_text,
+                    owner_pid=rec.owner_pid,
+                    heartbeat_at=rec.heartbeat_at,
+                    error="process exited before completion",
+                    result_preview=rec.result_preview,
+                )
+                self.save_job(updated)
+                reconciled += 1
+        return reconciled
 
     def cleanup_stale_jobs(
         self,

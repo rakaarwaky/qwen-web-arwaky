@@ -6,15 +6,16 @@ Supports folder-to-attachment compilation (folder -> single markdown file).
 
 from __future__ import annotations
 
-import contextlib
 import threading
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.core.src.utility_core_config_factory import build_app_config
+from modules.core.src.utility_core_config_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.core.src.utility_core_error_mapping import to_error_response
 from modules.core.src.utility_core_io_writer import save_orchestrator_output
@@ -24,12 +25,12 @@ from modules.shared.src.contract_core_protocol import (
     IFolderToAttachmentProtocol,
     IInjectionProtocol,
     IObservabilityProtocol,
+    IRunCancelProtocol,
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
     IUploadProtocol,
 )
-from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE
@@ -43,32 +44,16 @@ from modules.shared.src.taxonomy_core_vo import (
     ResponseText,
     RunContext,
     RunId,
+    RunState,
     SenderConfig,
 )
 
 
-@dataclass
-class _RunState:
-    """Per-run cancellation and browser context state.
-
-    One instance per ``process_prompt_with_attachment`` invocation so that
-    concurrent TUI slots sharing one orchestrator instance never touch each
-    other's cancel flag or browser context.
-
-    ``cancel_event`` is owned by the caller when provided (targeted cancel),
-    otherwise a private event is created for internal fail-fast checks.
-    """
-
-    cancel_event: threading.Event = field(default_factory=threading.Event)
-    active_bctx: object | None = None
-    bctx_lock: threading.Lock = field(default_factory=threading.Lock)
-
-
-def _make_run_state(cancel_event: threading.Event | None) -> _RunState:
-    """Create a per-run state, reusing the caller's event when supplied."""
+def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
+    """Create per-run state, reusing the caller event when supplied."""
     if cancel_event is not None:
-        return _RunState(cancel_event=cancel_event)
-    return _RunState()
+        return RunState(cancel_event=cancel_event)
+    return RunState()
 
 
 class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
@@ -85,6 +70,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         observability: IObservabilityProtocol,
         flow: IPromptFlowAggregate,
         folder_adapter: IFolderToAttachmentProtocol,
+        cancel: IRunCancelProtocol,
     ) -> None:
         self._browser = browser
         self._injector = injector
@@ -95,12 +81,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._observability = observability
         self._flow = flow
         self._folder_adapter = folder_adapter
-        # Registry: cancel_event -> _RunState for every active run.
-        # Keyed on the caller's threading.Event object itself (not id(), whose
-        # address can be recycled once an Event is garbage collected) so the TUI
-        # worker can target one specific run without touching sibling runs.
-        self._run_registry: dict[threading.Event, _RunState] = {}
-        self._registry_lock = threading.Lock()
+        self._cancel = cancel
 
     def request_cancel(self, cancel_event: threading.Event) -> None:
         """Cancel a specific in-flight run identified by its cancel event.
@@ -111,19 +92,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         the same event to stop *only that run*. Sibling runs holding
         different events are unaffected.
         """
-        with self._registry_lock:
-            run_state = self._run_registry.get(cancel_event)
-        if run_state is None:
-            cancel_event.set()
-            return
-        cancel_event.set()
-        with run_state.bctx_lock:
-            bctx = run_state.active_bctx
-        if bctx is not None:
-            close_fn = getattr(bctx, "close", None)
-            if callable(close_fn):
-                with contextlib.suppress(Exception):
-                    close_fn()
+        self._cancel.cancel_run(cancel_event)
 
     def process_prompt_with_attachment(
         self,
@@ -146,9 +115,8 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         externally cancellable.
         """
         ctx = RunContext()
-        run_state = _make_run_state(cancel_event)
-        with self._registry_lock:
-            self._run_registry[run_state.cancel_event] = run_state
+        run_state = new_run_state(cancel_event)
+        self._cancel.register(run_state)
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
@@ -158,10 +126,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
             self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
 
             att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
-
-            out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
-            if out_path.is_dir():
-                out_path = out_path / f"{p_path.stem}_output.md"
+            p_path, out_path = resolve_pipeline_output_path(p_path, output_file, attachment_path=att_path)
 
             cfg = build_app_config(
                 input_path=p_path,
@@ -173,8 +138,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                with run_state.bctx_lock:
-                    run_state.active_bctx = bctx
+                self._cancel.set_active_bctx(run_state.cancel_event, bctx)
                 try:
                     if run_state.cancel_event.is_set():
                         raise RunCancelledError("Cancelled by user before browser launch")
@@ -183,16 +147,14 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                         page, p_path, att_path, cfg.request_timeout, cfg, emitter, state, run_state.cancel_event
                     )
                 finally:
-                    with run_state.bctx_lock:
-                        run_state.active_bctx = None
+                    self._cancel.set_active_bctx(run_state.cancel_event, None)
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
         except Exception as exc:
             return to_error_response(exc)
         finally:
-            with self._registry_lock:
-                self._run_registry.pop(run_state.cancel_event, None)
+            self._cancel.release(run_state)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 

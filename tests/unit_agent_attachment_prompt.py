@@ -8,6 +8,7 @@ from playwright.sync_api import Error
 
 from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentPromptOrchestrator
 from modules.core.src.capabilities_prompt_injector import PromptInjector
+from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.shared.src import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,
@@ -40,6 +41,7 @@ def _make_attachment_orchestrator() -> AttachmentPromptOrchestrator:
         observability=MagicMock(get_logger=MagicMock(return_value=MagicMock())),
         flow=MagicMock(),
         folder_adapter=MagicMock(),
+        cancel=CapabilitiesRunCancelRegistry(),
     )
 
 

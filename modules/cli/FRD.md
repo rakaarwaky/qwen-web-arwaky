@@ -10,7 +10,7 @@ The CLI root (`modules/root_cli_main_entry.py`) owns the CLI lifecycle: parse ar
 
 ### FR-001: Subcommand Argument Parsing & Config Building
 
-The root parser reads `sys.argv` using a subcommand-based interface (`init`, `login`, `doctor`, `prompt-direct`, `prompt-only`, `prompt-with-attachment`, `mcp`).
+The root parser reads `sys.argv` using a subcommand-based interface (`init`, `login`, `doctor`, `prompt-direct`, `prompt-only`, `prompt-with-attachment`, `update`, `mcp`).
 
 | Subcommand | Signal | Result | Validation |
 |---|---|---|---|
@@ -20,6 +20,7 @@ The root parser reads `sys.argv` using a subcommand-based interface (`init`, `lo
 | `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
 | `prompt-only` | `qwen-web-arwaky prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
 | `prompt-with-attachment` | `qwen-web-arwaky prompt-with-attachment -i FILE -a FILE [--json]` | Attachment prompt | Prompt file and attachment file must exist. |
+| `update` | `qwen-web-arwaky update [--check/--force/--dry-run/--rollback]` | Self-update management | Discovers latest release, upgrades package, synchronizes Playwright binaries. |
 | `mcp` | `qwen-web-arwaky mcp` | MCP Stdio Server | Hands off execution to MCP stdio server. |
 
 An invalid run input is rejected with a non-success exit code and a clear, actionable diagnostic on `stderr`.
@@ -61,6 +62,7 @@ Supports optional `--json` flag for machine-readable JSON output by AI agents an
 | `handle` (run) | args, core | response envelope | `modules/cli/src/surface_cli_run_command.py` |
 | `handle` (login) | args, core, cfg | response envelope | `modules/cli/src/surface_cli_login_command.py` |
 | `handle` (init) | args, core | response envelope | `modules/cli/src/surface_cli_init_command.py` |
+| `handle` (update) | args, core | response envelope | `modules/cli/src/surface_cli_update_command.py` |
 | `run_doctor` | json_output flag | process exit code | `modules/cli/src/surface_cli_doctor_command.py` |
 | `InteractiveController.run` | optional config | response envelope | `modules/root_cli_main_entry.py` |
 

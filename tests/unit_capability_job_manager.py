@@ -61,6 +61,25 @@ class TestJobManager(unittest.TestCase):
         jobs = self.mgr.list_jobs(limit=10)
         self.assertEqual(len(jobs), 3)
 
+    def test_reconcile_zombies_marks_dead_owner_pid_as_failed(self) -> None:
+        rec = JobRecord(
+            job_id="zombie_job_1",
+            latest_event=EVENT_DISPATCH_ACKNOWLEDGED.value,
+            completed=False,
+            created_at="2026-08-27T00:00:00Z",
+            owner_pid=999999999,  # non-existent process PID
+        )
+        self.mgr.save_job(rec)
+
+        reconciled = self.mgr.reconcile_zombies()
+        self.assertEqual(reconciled, 1)
+
+        loaded = self.mgr.get_job(JobId("zombie_job_1"))
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertTrue(loaded.completed)
+        self.assertEqual(loaded.error, "process exited before completion")
+
 
 class TestAgentJobOrchestrator(unittest.TestCase):
     """Test suite for AgentJobOrchestrator."""

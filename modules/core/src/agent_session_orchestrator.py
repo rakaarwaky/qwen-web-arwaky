@@ -62,11 +62,16 @@ class SessionOrchestrator(ISessionAggregate):
         # Safety assertion: only delete a path that is (a) the default session dir
         # under the XDG data home, or (b) an explicitly-passed path whose final
         # component is 'qwen_session'/'session'-like and sits under the user's
-        # home directory. Never accept arbitrary system paths.
+        # home directory (but not directly as a top-level ~/session directory).
+        # Never accept arbitrary system paths or root.
         default_session = DEFAULT_SESSION.resolve()
+        home = Path.home().resolve()
+        if target in {home, Path("/"), Path(".").resolve()} or not target.is_dir():
+            raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
+
         inside_default = target == default_session or default_session in target.parents
-        safe_name = target.name in {"qwen_session", "session"}
-        under_home = Path.home() in target.parents or target == Path.home()
+        safe_name = target.name in {"qwen_session", "session", ".qwen_session"}
+        under_home = home in target.parents and target != home and target.parent != home
         if not (inside_default or (safe_name and under_home)):
             raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
 

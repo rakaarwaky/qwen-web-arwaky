@@ -16,6 +16,8 @@ from urllib.parse import unquote
 from modules.shared.src.taxonomy_core_constant import (
     CODE_EXTENSIONS,
     EXCLUDED_DIR_NAMES,
+    EXCLUDED_FILE_EXTENSIONS,
+    EXCLUDED_FILE_PATTERNS,
     MAX_FOLDER_DEPTH,
     MAX_IMPORT_DEPTH,
 )
@@ -34,6 +36,14 @@ def _is_excluded(path: Path, root: Path) -> bool:
     except ValueError:
         return True
     return any(part in EXCLUDED_DIR_NAMES for part in relative.parts)
+
+
+def _is_excluded_file(path: Path) -> bool:
+    """Return True if the file matches secret/credential or ignored file patterns."""
+    name = path.name.lower()
+    if name in EXCLUDED_FILE_PATTERNS or name.startswith(".env"):
+        return True
+    return path.suffix.lower() in EXCLUDED_FILE_EXTENSIONS
 
 
 def _is_text_file(filepath: Path) -> bool:
@@ -95,6 +105,8 @@ def collect_folder_files(
                 continue
 
             if entry.is_file():
+                if _is_excluded_file(entry):
+                    continue
                 ext = entry.suffix.lower()
                 if ext in include_extensions and _is_text_file(entry):
                     files.append(entry)
@@ -689,6 +701,8 @@ def collect_folder_files_with_imports(
             for spec in _parse_imports(f):
                 resolved = _resolve_import(f, spec, folder_path)
                 if resolved is None or resolved in seen:
+                    continue
+                if _is_excluded_file(resolved):
                     continue
                 if resolved.suffix.lower() not in _IMPORTABLE_SUFFIXES:
                     continue

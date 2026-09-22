@@ -6,6 +6,7 @@ Capabilities implement these; agents/surfaces depend on them via DI.
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,7 @@ from modules.shared.src.taxonomy_core_vo import (
     ResponseText,
     RunContext,
     RunId,
+    RunState,
     SlotInputValue,
     SlotRunPlan,
     StabilityChecks,
@@ -335,6 +337,10 @@ class IUpdateProtocol(ABC):
         Sequence: version check → package upgrade → browser sync → health checks.
         """
 
+    @abstractmethod
+    def rollback_to(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
+        """Rollback to a previously installed package version."""
+
 
 class IWorkspaceProtocol(ABC):
     """Workspace directory provisioning capability contract."""
@@ -411,6 +417,36 @@ class ITuiSlotConfigProtocol(ABC):
         ...
 
 
+class IRunCancelProtocol(ABC):
+    """Contract for the shared targeted-cancel registry of in-flight runs.
+
+    Implemented by ``capabilities_run_cancel_registry.CapabilitiesRunCancelRegistry``
+    and injected into the prompt file / attachment / swarm orchestrators so
+    that a cancel can stop one run's browser context without touching sibling
+    runs.
+    """
+
+    @abstractmethod
+    def register(self, run_state: RunState) -> None:
+        """Track a newly started in-flight run."""
+
+    @abstractmethod
+    def release(self, run_state: RunState) -> None:
+        """Drop the entry for a finished run."""
+
+    @abstractmethod
+    def cancel_run(self, cancel_event: threading.Event) -> None:
+        """Stop the run identified by ``cancel_event`` and close its browser context."""
+
+    @abstractmethod
+    def set_active_bctx(self, cancel_event: threading.Event, bctx: Any) -> None:
+        """Update the live browser context for a registered run (None clears it)."""
+
+    @abstractmethod
+    def active_bctx(self, cancel_event: threading.Event) -> Any:
+        """Return the live browser context for ``cancel_event``, or None."""
+
+
 __all__ = [
     "IUploadProtocol",
     "IFolderCompileProtocol",
@@ -426,4 +462,5 @@ __all__ = [
     "IMetricsProtocol",
     "IJobStorageProtocol",
     "ITuiSlotConfigProtocol",
+    "IRunCancelProtocol",
 ]

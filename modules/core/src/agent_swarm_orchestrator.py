@@ -135,23 +135,21 @@ class SwarmOrchestrator(ISwarmAggregate):
             )
             self._snapshots[swarm_id] = cancelled
             self._write_manifest(cancelled)
-            executor = self._executors.get(swarm_id)
+            executor = self._executors.pop(swarm_id, None)
             if executor is not None:
                 executor.shutdown(wait=False, cancel_futures=True)
+            self._cancel_events.pop(swarm_id, None)
             self._attachment_paths.pop(swarm_id, None)
 
     def _run_agent(self, swarm_id: SwarmId, role: str) -> None:
         start = time.perf_counter()
-        event = self._cancel_events[swarm_id][role]
+        with self._lock:
+            events_map = self._cancel_events.get(swarm_id, {})
+            event = events_map.get(role)
+            attachment_path = self._attachment_paths.get(swarm_id)
         output_path = self._output_root / swarm_id / role / "output.md"
         last_error = "Unknown Swarm agent failure"
-        # cancel() pops _attachment_paths[swarm_id] under the lock while this
-        # worker thread runs. Snapshot the path once, up front, so a cancel that
-        # lands mid-attempt cannot raise KeyError and get misreported as a
-        # processing failure. A missing entry means the swarm was cancelled.
-        with self._lock:
-            attachment_path = self._attachment_paths.get(swarm_id)
-        if attachment_path is None:
+        if event is None or attachment_path is None:
             self._update_agent(swarm_id, role, "cancelled", 0, output_path, "Cancelled by user", start)
             return
         for attempt in range(1, self._max_attempts + 1):

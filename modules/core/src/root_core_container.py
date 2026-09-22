@@ -35,6 +35,7 @@ from modules.core.src.capabilities_job_manager import JobManager
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
 from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
+from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
 from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
@@ -101,6 +102,9 @@ class SharedContainer:
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
 
+        # Shared targeted-cancel registry (injected into the prompt file / attachment orchestrators)
+        self.run_cancel_registry: CapabilitiesRunCancelRegistry = CapabilitiesRunCancelRegistry()
+
         # The 5 specialized agent orchestrators
         self.agent_direct_prompt_orchestrator: IDirectPromptAggregate = DirectPromptOrchestrator(
             browser=self.browser,
@@ -119,6 +123,7 @@ class SharedContainer:
             saver=self.saver,
             observability=self.observability,
             flow=self.agent_shared_flow_orchestrator,
+            cancel=self.run_cancel_registry,
         )
         self.agent_attachment_prompt_orchestrator: IAttachmentPromptAggregate = AttachmentPromptOrchestrator(
             browser=self.browser,
@@ -130,6 +135,7 @@ class SharedContainer:
             observability=self.observability,
             flow=self.agent_shared_flow_orchestrator,
             folder_adapter=self.folder_adapter,
+            cancel=self.run_cancel_registry,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
