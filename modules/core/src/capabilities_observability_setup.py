@@ -55,6 +55,7 @@ class MetricsCounter(IMetricsProtocol):
         self._lock = threading.Lock()
         self._metrics_path = Path(metrics_path or (DEFAULT_LOG / "metrics.json"))
         self._counters: dict[str, int] = {}
+        self._execution_events: list[dict[str, Any]] = []
         self._start_time = datetime.now(tz=timezone.utc)
         self._load()
 
@@ -64,19 +65,39 @@ class MetricsCounter(IMetricsProtocol):
             counters = raw.get("counters", {}) if isinstance(raw, dict) else {}
             if isinstance(counters, dict):
                 self._counters = {str(k): int(v) for k, v in counters.items()}
+            events = raw.get("execution_events", []) if isinstance(raw, dict) else []
+            if isinstance(events, list):
+                self._execution_events = [event for event in events if isinstance(event, dict)]
+            self._prune_events()
         except (OSError, ValueError, TypeError):
             self._counters = {}
+            self._execution_events = []
+
+    def _prune_events(self) -> None:
+        cutoff = datetime.now(tz=timezone.utc).timestamp() - 24 * 60 * 60
+        kept: list[dict[str, Any]] = []
+        for event in self._execution_events:
+            try:
+                if datetime.fromisoformat(str(event["at"]).replace("Z", "+00:00")).timestamp() >= cutoff:
+                    kept.append(event)
+            except (KeyError, TypeError, ValueError):
+                continue
+        self._execution_events = kept
 
     def _persist(self) -> None:
         self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        self._prune_events()
+        total = len(self._execution_events)
+        successful = sum(1 for event in self._execution_events if event.get("success") is True)
         atomic_write_json(
             self._metrics_path,
             {
                 "window": "rolling_24h",
                 "updated_at": datetime.now(tz=timezone.utc).isoformat(),
                 "counters": self._counters,
-                "total_executions": self._counters.get("total_executions", 0),
-                "successful_executions": self._counters.get("successful_executions", 0),
+                "execution_events": self._execution_events,
+                "total_executions": total,
+                "successful_executions": successful,
             },
         )
 
@@ -88,9 +109,9 @@ class MetricsCounter(IMetricsProtocol):
     def record_execution(self, success: bool) -> None:
         """Record one terminal pipeline execution for the reliability SLO."""
         with self._lock:
-            self._counters["total_executions"] = self._counters.get("total_executions", 0) + 1
-            if success:
-                self._counters["successful_executions"] = self._counters.get("successful_executions", 0) + 1
+            self._execution_events.append(
+                {"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)}
+            )
             self._persist()
 
     def get(self, key: str) -> MessageCount:
@@ -99,11 +120,13 @@ class MetricsCounter(IMetricsProtocol):
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
+            self._prune_events()
             result = dict(self._counters)
-            total = result.get("total_executions", 0)
-            result["success_rate"] = (
-                round(result.get("successful_executions", 0) / total, 6) if total else None
-            )
+            total = len(self._execution_events)
+            successful = sum(1 for event in self._execution_events if event.get("success") is True)
+            result["total_executions"] = total
+            result["successful_executions"] = successful
+            result["success_rate"] = round(successful / total, 6) if total else None
             return result
 
     def __repr__(self) -> str:

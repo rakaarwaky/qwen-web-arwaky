@@ -32,7 +32,8 @@ The no-argument TTY fallback launches the **Obsidian Nebula Textual TUI App** (`
 
 1. **Dynamic Versioning**: Header displays package version dynamically via `importlib.metadata.version("qwen-web-arwaky")`.
 2. **Safe Default Attachment**: If candidate attachment files do not exist on disk, attachment input defaults to an empty string `""` so optional fields never fail validation.
-3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved.
+3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved. Existing files are never silently overwritten.
+   Invalid, unwritable, or conflicting paths produce an actionable validation error.
 4. **Destructive Action Safety**: Session reset actions present a modal confirmation screen (`ConfirmModal`) before wiping session tokens.
 5. **Non-TTY Rejection**: Running the interactive TUI in non-interactive environments (pipes/cron) prints a helpful, example-driven guidance message pointing to subcommands and `qwen-web-arwaky doctor`.
 
