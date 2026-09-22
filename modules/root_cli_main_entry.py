@@ -11,8 +11,8 @@ Usage:
   qwen-web-arwaky prompt-with-attachment \\
                                  --prompt-path FILE --attachment-path FILE \\
                                  [--output-path FILE] [--headless]
-  qwen-web-arwaky batch --input-dir DIR --output-dir DIR [--headless] [--json]
-  qwen-web-arwaky watch --input-dir DIR --interval SEC [--headless] [--json]
+  qwen-web-arwaky batch --input-dir DIR [--output-dir DIR] [--headless] [--json]
+  qwen-web-arwaky watch --input-dir DIR [--output-dir DIR] --interval SEC [--headless] [--json]
   qwen-web-arwaky mcp
 """
 
@@ -135,7 +135,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── batch / watch ─────────────────────────────────────────────────────────
     p_batch = sub.add_parser("batch", help="Process every Markdown prompt in a folder", parents=[parent])
     p_batch.add_argument("--input-dir", required=True, help="Directory containing Markdown prompts")
-    p_batch.add_argument("--output-dir", required=True, help="Directory for generated outputs")
+    p_batch.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory for generated outputs (default: XDG application output directory)",
+    )
     p_batch.add_argument("--headless", action=argparse.BooleanOptionalAction, default=True)
     p_batch.add_argument("--json", action="store_true")
 
@@ -201,7 +205,12 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         if action == "watch" and float(getattr(args, "interval", 0)) < 1:
             raise ValueError("Watch interval must be at least 1 second")
         prompt_p = batch_dir
-        out_p = Path(getattr(args, "output_dir", batch_dir / "output")).expanduser().resolve()
+        raw_batch_output = getattr(args, "output_dir", None)
+        out_p = (
+            Path(raw_batch_output).expanduser().resolve()
+            if raw_batch_output
+            else DEFAULT_OUTPUT
+        )
     elif raw_output:
         out_p = Path(raw_output)
     else:

@@ -20,8 +20,8 @@ The root parser reads `sys.argv` using a subcommand-based interface (`init`, `lo
 | `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
 | `prompt-only` | `qwen-web-arwaky prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
 | `prompt-with-attachment` | `qwen-web-arwaky prompt-with-attachment -i FILE -a FILE [--json]` | Attachment prompt | Prompt file and attachment file must exist. |
-| `batch` | `qwen-web-arwaky batch --input-dir DIR --output-dir DIR [--headless] [--json]` | Batch folder processing | Input directory exists and contains `.md` files. |
-| `watch` | `qwen-web-arwaky watch --input-dir DIR --interval SEC [--headless] [--json]` | Continuous folder polling | Interval is at least 1 second; SIGINT/SIGTERM stops cleanly. |
+| `batch` | `qwen-web-arwaky batch --input-dir DIR [--output-dir DIR] [--headless] [--json]` | Batch folder processing | Input directory exists and contains `.md` files; output defaults to XDG application output. |
+| `watch` | `qwen-web-arwaky watch --input-dir DIR [--output-dir DIR] --interval SEC [--headless] [--json]` | Continuous folder polling | Interval is at least 1 second; output defaults to XDG application output; SIGINT/SIGTERM stops cleanly. |
 | `mcp` | `qwen-web-arwaky mcp` | MCP Stdio Server | Hands off execution to MCP stdio server. |
 
 An invalid run input is rejected with a non-success exit code and a clear, actionable diagnostic on `stderr`.
