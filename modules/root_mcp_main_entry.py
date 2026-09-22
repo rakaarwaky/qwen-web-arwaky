@@ -69,7 +69,6 @@ _TOOL_METHOD_MAP: dict[str, str] = {
     "delete_session": "delete_session",
     "setup_session": "setup_session",
     "init": "init_workspace",
-    "init_workspace": "init_workspace",
 }
 
 

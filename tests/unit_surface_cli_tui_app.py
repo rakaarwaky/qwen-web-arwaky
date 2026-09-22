@@ -130,7 +130,7 @@ def test_slots_table_uses_stable_column_keys() -> None:
             assert [str(c.label) for c in table.columns.values()] == ["Slot", "Status", "Prompt File", "Duration"]
             # Cells must be readable BY KEY — this raises CellDoesNotExist if
             # _init_table goes back to label-only add_columns().
-            assert table.get_cell("row-slot-1", "status") == "IDLE 💤"
+            assert table.get_cell("row-slot-1", "status") == "IDLE ●"
 
     asyncio.run(_run())
 
@@ -147,7 +147,7 @@ def test_slots_table_update_table_row_actually_writes_cells() -> None:
                 table.get_cell("row-slot-1", "file"),
                 table.get_cell("row-slot-1", "duration"),
             )
-            assert before == ("IDLE 💤", "-", "0.0s")
+            assert before == ("IDLE ●", "-", "0.0s")
 
             app._update_table_row(1, "SUCCESS", "task.md", "12.3s")
 
@@ -162,7 +162,7 @@ def test_slots_table_update_table_row_actually_writes_cells() -> None:
             assert table.get_cell("row-slot-1", "slot") == "Slot 1"
 
             # Other rows must not be affected.
-            assert table.get_cell("row-slot-2", "status") == "IDLE 💤"
+            assert table.get_cell("row-slot-2", "status") == "IDLE ●"
 
     asyncio.run(_run())
 
@@ -197,13 +197,13 @@ def test_slots_table_tick_elapsed_updates_duration_live() -> None:
                 "duration": 0.0,
                 "_start_perf": time.perf_counter() - 42,
             }
-            app._update_table_row(1, "RUNNING ⏳", "task.md", "running…")
+            app._update_table_row(1, "RUNNING ▶", "task.md", "running…")
             assert table.get_cell("row-slot-1", "duration") == "running…"
 
             app._tick_elapsed(1)
 
             assert table.get_cell("row-slot-1", "duration") == "42s"
-            assert table.get_cell("row-slot-1", "status") == "RUNNING ⏳"
+            assert table.get_cell("row-slot-1", "status") == "RUNNING ▶"
 
     asyncio.run(_run())
 

@@ -82,9 +82,10 @@ def run_doctor(json_output: bool = False) -> int:
         {
             "name": "Workspace Initialization",
             "passed": ws_ok,
-            "detail": f"Workspace found at {dot_qwen}"
+            "detail": f"Workspace found at {dot_qwen} (per-directory; session/output are global XDG)"
             if ws_ok
-            else "Workspace not initialized (run: qwen-web-arwaky init)",
+            else "Workspace not initialized in this directory (run: qwen-web-arwaky init). "
+            "Note: workspaces are per-directory; your login session and outputs are global.",
         }
     )
 

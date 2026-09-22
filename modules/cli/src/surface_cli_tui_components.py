@@ -24,6 +24,8 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Label, Static
 
+from modules.cli.src.surface_cli_tui_css import THEME
+
 
 class FilePickerModal(ModalScreen[str | None]):
     """Modal screen for visual file picking using DirectoryTree."""
@@ -96,25 +98,42 @@ class HelpScreen(ModalScreen[None]):
         Binding("q", "dismiss_modal", "Close"),
     ]
 
+    def __init__(self, num_slots: int = 10) -> None:
+        super().__init__()
+        self._num_slots = num_slots
+
     def compose(self) -> ComposeResult:
+        # UX-1-2: render the slot-chord section from the live slot count so the
+        # help never advertises chords that do not exist for this configuration.
+        lines = ["alt+0            Overview tab"]
+        primary = min(9, self._num_slots)
+        if primary > 1:
+            lines.append(f"alt+1 .. alt+{primary}   Slots 1-{primary}")
+        elif primary == 1:
+            lines.append("alt+1            Slot 1")
+        for s in range(10, min(self._num_slots, 19) + 1):
+            lines.append(f"ctrl+alt+{s - 10}       Slot {s}")
+        lines += [
+            "enter / ctrl+r   Run active slot",
+            "ctrl+x           Cancel active slot",
+            "ctrl+alt+s       Swarm tab",
+            "ctrl+l           Login / session setup",
+            "ctrl+i           Init workspace",
+            "ctrl+q           Quit (confirm when jobs running)",
+            "alt+left         Previous slot",
+            "alt+right        Next slot",
+            "escape           Dismiss modal / quit when idle",
+            "?                This help screen",
+        ]
+        if self._num_slots > 19:
+            lines += [
+                "",
+                "Note: Textual alt-chords accept a single digit, so slots",
+                "beyond 19 are reachable by mouse or the Overview table only.",
+            ]
         with Vertical(id="help-container"):
             yield Label("[ KEYBOARD SHORTCUTS ]", id="help-title")
-            yield Static(
-                "alt+0            Overview tab\n"
-                "alt+1 .. alt+9   Slots 1-9\n"
-                "ctrl+alt+0..9    Slots 10-19 (A3)\n"
-                "enter / ctrl+r   Run active slot\n"
-                "ctrl+l           Login / session setup\n"
-                "ctrl+i           Init workspace\n"
-                "ctrl+q           Quit (confirm when jobs running)\n"
-                "alt+left         Previous slot\n"
-                "alt+right        Next slot\n"
-                "escape           Dismiss modal / quit when idle\n"
-                "?                This help screen\n\n"
-                "Note: Textual alt-chords accept a single digit, so slots\n"
-                "beyond 19 are reachable by mouse or the Overview table only.",
-                id="help-body",
-            )
+            yield Static("\n".join(lines), id="help-body")
             yield Button("Close", id="help-close")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -215,24 +234,24 @@ class QwenTuiLogHandler(logging.Handler):
             text = Text()
 
             if record.levelno >= logging.ERROR:
-                text.append(f"[{lvl}]", style=Style(bold=True, color="#EF4444"))
-                text.append(f"[{name}]", style=Style(bold=True, color="#EF4444"))
+                text.append(f"[{lvl}]", style=Style(bold=True, color=THEME["err"]))
+                text.append(f"[{name}]", style=Style(bold=True, color=THEME["err"]))
                 text.append(" ")
-                text.append(msg, style="#EF4444")
+                text.append(msg, style=THEME["err"])
             elif record.levelno >= logging.WARNING:
-                text.append(f"[{lvl}]", style=Style(bold=True, color="#F59E0B"))
-                text.append(f"[{name}]", style=Style(bold=True, color="#F59E0B"))
+                text.append(f"[{lvl}]", style=Style(bold=True, color=THEME["warn"]))
+                text.append(f"[{name}]", style=Style(bold=True, color=THEME["warn"]))
                 text.append(" ")
-                text.append(msg, style="#F59E0B")
+                text.append(msg, style=THEME["warn"])
             elif record.levelno >= logging.INFO:
-                text.append(f"[{name}]", style=Style(bold=True, color="#3B82F6"))
+                text.append(f"[{name}]", style=Style(bold=True, color=THEME["info"]))
                 text.append(" ")
-                text.append(msg, style="#d5e4fa")
+                text.append(msg, style=THEME["primary"])
             else:
                 # A1: #8B9BB4 ≈ 5.9:1 on $bg-base (AA pass; was #64748B ≈ 3.8:1)
-                text.append(f"[{name}]", style="#8B9BB4")
+                text.append(f"[{name}]", style=THEME["muted"])
                 text.append(" ")
-                text.append(msg, style="#908fa0")
+                text.append(msg, style=THEME["muted"])
 
             slot_id: int | None = None
             if record.threadName and record.threadName.startswith("qwen_slot_worker_"):
