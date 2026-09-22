@@ -406,6 +406,7 @@ def _dispatch(
             container.agent_prompt_file_orchestrator,
             watch=action == "watch",
         )
+        container.observability.metrics.record_execution(bool(result.get("success")))
         return _result_exit_code(result, json_output=json_output)
 
     args._cfg = cfg
@@ -416,6 +417,7 @@ def _dispatch(
         container.agent_prompt_file_orchestrator,
         container.agent_attachment_prompt_orchestrator,
     )
+    container.observability.metrics.record_execution(bool(result.get("success")))
     return _result_exit_code(result, json_output=json_output)
 
 
