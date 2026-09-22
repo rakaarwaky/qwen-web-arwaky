@@ -7,6 +7,7 @@ Lifecycle events live in taxonomy_core_event; domain errors live in taxonomy_cor
 
 from __future__ import annotations
 
+import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -541,6 +542,26 @@ class AppConfig:
         self.validate()
 
 
+@dataclass
+class RunState:
+    """Per-run cancellation and browser-context state.
+
+    One instance per orchestrator invocation.  cancel_event is owned by
+    the caller when provided (targeted cancel), otherwise a private event is
+    created for internal fail-fast checks.  active_bctx holds the live
+    browser context so a cancel can close it; bctx_lock guards that field
+    against concurrent set/clear from the run's worker thread.
+    """
+
+    cancel_event: threading.Event = field(default_factory=threading.Event)
+    active_bctx: object | None = None
+    bctx_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def cancel_requested(self) -> bool:
+        """True when the run's cancel event is set."""
+        return self.cancel_event.is_set()
+
+
 __all__ = [
     "PromptText",
     "InputPath",
@@ -623,4 +644,5 @@ __all__ = [
     "SaverConfig",
     "DEFAULT_SAVER_CONFIG",
     "AppConfig",
+    "RunState",
 ]
