@@ -40,7 +40,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     textarea present, and no login form.
 - **Edge Cases**: stale profile after crash; missing execute bit on an
   existing session dir; concurrent Chromium instances; headed login vs
-  headless batch; user closes the page mid-navigation; load-state wait times
+  headless prompt-only; user closes the page mid-navigation; load-state wait times
   out while the chat UI is already usable.
 - **Error Handling**:
   - `BrowserLaunchError` after launch retries are exhausted.
@@ -324,9 +324,6 @@ API. It sequences FR-001…FR-008; it does not implement their business rules.
 | Operation             | Input                                        | Output         | Description                                          |
 | ----------------------- | ---------------------------------------------- | ---------------- | ------------------------------------------------------ |
 | `process_single_file` | `input_file`, `output_file`, `headless`      | `ResponseText` | One file: attach → inject → send → save → audit. |
-| `process_batch`       | `input_dir`, `output_dir`, `headless`        | `ResponseText` | All processable files; per-file isolation.           |
-| `process_watcher`     | `interval_sec`, `headless`                   | `ResponseText` | Poll input dir until SIGINT/SIGTERM.                 |
-| `process_mode`        | `AppConfig`                                  | `ResponseText` | Dispatch watcher / single / batch.                   |
 | `send_prompt`         | `prompt`, `timeout_sec`, `headless`          | `ResponseText` | Raw text without durable file routing.               |
 | `setup_session`       | confirmation callback, optional session path | `ResponseText` | Validate saved session or headed login.              |
 | `init_workspace`      | `target_dir`                                 | `None`         | Provision skill + XDG links (FR-007).                |
@@ -363,8 +360,7 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - **Security**: session dir `0o700`; no credentials in stdout/JSONL; scraped
   model text is untrusted data (never agent instructions).
 - **Reliability**: atomic output writes; upload degrades to text-only;
-  telemetry is best-effort; watcher answers SIGINT/SIGTERM within ~1s sleep
-  chunk.
+  telemetry is best-effort.
 - **Maintainability**: capabilities implement protocols only; no
   inter-capability imports; agent depends on contracts.
 
@@ -379,8 +375,8 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - [ ]  FR-006: circuit of Stop button → streaming text → stable text completes.
 - [ ]  FR-007: second `init` is idempotent.
 - [ ]  FR-008: process starts with empty `SENTRY_DSN` and no OTLP endpoint.
-- [ ]  Aggregate boundary: failed batch items report `Failed: 1`, failed single
-  files return an error envelope, nested role routing is preserved, and a
+- [ ]  Aggregate boundary: failed single-file prompts return an error envelope,
+  nested role routing is preserved, and a
   supplied `AppConfig` reaches the browser session unchanged. Input files stay
   in place; status is represented by the error envelope and logs.
 
