@@ -233,12 +233,14 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
         self.assertIn("behind latest 5.2.0", report.message)
 
     def test_upgrade_package_falls_back_to_pinned_release_for_stale_editable_source(self) -> None:
+        pinned_sha = "b8e79ccc4e26ceed72b7b5713d1c64ef3c1a2d68"
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp)
             (source / ".git").mkdir()
             (source / "pyproject.toml").write_text('version = "5.0.0"\n', encoding="utf-8")
             with (
                 patch.object(self.manager, "_editable_source_dir", return_value=source),
+                patch.object(self.manager, "_resolve_release_commit", return_value=("v5.2.0", pinned_sha)),
                 patch.object(self.manager, "_run_subprocess", side_effect=[(0, "", ""), (0, "", "")]) as run,
             ):
                 result = self.manager.upgrade_package(target_version="5.2.0")
@@ -246,7 +248,13 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
         self.assertTrue(result.success)
         commands = [call.args[0] for call in run.call_args_list]
         self.assertEqual(commands[0], ["git", "-C", str(source), "pull", "--ff-only"])
+        # Issue #368: the fallback installs the immutable commit SHA (never a
+        # mutable tag), so a re-pointed release tag cannot swap the code.
         self.assertIn(
+            f"git+https://github.com/rakaarwaky/qwen-web-arwaky.git@{pinned_sha}",
+            commands[1],
+        )
+        self.assertNotIn(
             "git+https://github.com/rakaarwaky/qwen-web-arwaky.git@v5.2.0",
             commands[1],
         )
@@ -288,3 +296,80 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUpdateManagerShaPinning(unittest.TestCase):
+    """Issue #368: installs must pin the release to its immutable commit SHA."""
+
+    SHA_COMMIT = "a" * 40
+    SHA_TAG_OBJ = "b" * 40
+    SHA_DEREF = "c" * 40
+
+    def setUp(self) -> None:
+        self.manager = UpdateManager()
+
+    @patch.object(UpdateManager, "_fetch_json")
+    def test_lightweight_tag_resolves_to_commit(self, mock_fetch: MagicMock) -> None:
+        mock_fetch.return_value = {"ref": "refs/tags/v6.4.0", "object": {"sha": self.SHA_COMMIT, "type": "commit"}}
+        url = self.manager._github_pinned_url("6.4.0")
+        self.assertEqual(
+            url,
+            f"git+https://github.com/rakaarwaky/qwen-web-arwaky.git@{self.SHA_COMMIT}",
+        )
+
+    @patch.object(UpdateManager, "_fetch_json")
+    def test_annotated_tag_is_dereferenced_to_commit(self, mock_fetch: MagicMock) -> None:
+        def side_effect(url: str) -> dict:
+            if "/git/refs/tags/" in url:
+                return {"object": {"sha": self.SHA_TAG_OBJ, "type": "tag"}}
+            return {"object": {"sha": self.SHA_DEREF, "type": "commit"}}
+
+        mock_fetch.side_effect = side_effect
+        url = self.manager._github_pinned_url("6.4.0")
+        self.assertTrue(url.endswith(f"@{self.SHA_DEREF}"))
+
+    @patch.object(UpdateManager, "_fetch_json")
+    def test_unresolvable_tag_returns_none(self, mock_fetch: MagicMock) -> None:
+        mock_fetch.return_value = None
+        self.assertIsNone(self.manager._github_pinned_url("9.9.9"))
+
+    @patch.object(UpdateManager, "_fetch_json")
+    def test_malformed_sha_is_refused(self, mock_fetch: MagicMock) -> None:
+        mock_fetch.return_value = {"object": {"sha": "not-a-real-sha", "type": "commit"}}
+        self.assertIsNone(self.manager._github_pinned_url("6.4.0"))
+
+    def test_no_target_version_returns_none(self) -> None:
+        self.assertIsNone(self.manager._github_pinned_url(None))
+
+    @patch.object(UpdateManager, "_resolve_release_commit", return_value=None)
+    @patch.object(UpdateManager, "_run_subprocess")
+    def test_upgrade_refuses_unpinnable_release_fail_closed(
+        self, mock_run: MagicMock, mock_resolve: MagicMock
+    ) -> None:
+        with patch.object(self.manager, "_editable_source_dir", return_value=None):
+            step = self.manager.upgrade_package(target_version="6.4.0")
+        self.assertFalse(step.success)
+        self.assertFalse(step.executed)
+        self.assertIn("refusing to install unverified remote code", step.detail)
+        mock_run.assert_not_called()
+
+    @patch.object(UpdateManager, "_fetch_json")
+    @patch.object(UpdateManager, "_run_subprocess")
+    def test_upgrade_installs_pinned_commit_url(self, mock_run: MagicMock, mock_fetch: MagicMock) -> None:
+        mock_fetch.return_value = {"object": {"sha": self.SHA_COMMIT, "type": "commit"}}
+        mock_run.return_value = (0, "ok", "")
+        with patch.object(self.manager, "_editable_source_dir", return_value=None):
+            step = self.manager.upgrade_package(target_version="6.4.0")
+        cmd = mock_run.call_args[0][0]
+        self.assertEqual(cmd[-1], f"git+https://github.com/rakaarwaky/qwen-web-arwaky.git@{self.SHA_COMMIT}")
+        self.assertNotIn("@v6.4.0", cmd[-1])
+        self.assertTrue(step.success)
+
+    @patch.object(UpdateManager, "_resolve_release_commit", return_value=None)
+    @patch.object(UpdateManager, "_run_subprocess")
+    def test_rollback_refuses_unpinnable_release(self, mock_run: MagicMock, mock_resolve: MagicMock) -> None:
+        with patch.object(self.manager, "_editable_source_dir", return_value=None):
+            steps = self.manager.rollback_to("6.3.0")
+        self.assertFalse(steps[0].success)
+        self.assertIn("refusing to install unverified remote code", steps[0].detail)
+        mock_run.assert_not_called()

@@ -43,6 +43,8 @@ log = get_logger("capabilities_update_manager")
 DEFAULT_PACKAGE_NAME = "qwen-web-arwaky"
 DEFAULT_GITHUB_REPO = "rakaarwaky/qwen-web-arwaky"
 GITHUB_RELEASE_URL = "https://api.github.com/repos/{repo}/releases/latest"
+GITHUB_GIT_REF_URL = "https://api.github.com/repos/{repo}/git/refs/tags/{tag}"
+GITHUB_GIT_TAG_URL = "https://api.github.com/repos/{repo}/git/tags/{sha}"
 GITHUB_REPO_ENV = "QWEN_WEB_GITHUB_REPO"
 USER_AGENT = "qwen-web-arwaky-updater/1.0"
 _GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -169,7 +171,9 @@ class UpdateManager(IUpdateProtocol):
                 ]
                 mode_desc = f"git pull & editable reinstall from {editable_dir}"
             else:
-                repo_url = self._github_repo_url(target_version)
+                repo_url = self._github_pinned_url(target_version)
+                if repo_url is None:
+                    return self._refuse_unverified_install(target_version, "fallback pip reinstall")
                 cmd = [
                     sys.executable,
                     "-m",
@@ -184,7 +188,9 @@ class UpdateManager(IUpdateProtocol):
                 ]
                 mode_desc = f"fallback pip reinstall from GitHub ({repo_url})"
         else:
-            repo_url = self._github_repo_url(target_version)
+            repo_url = self._github_pinned_url(target_version)
+            if repo_url is None:
+                return self._refuse_unverified_install(target_version, "pip upgrade")
             cmd = [
                 sys.executable,
                 "-m",
@@ -242,7 +248,10 @@ class UpdateManager(IUpdateProtocol):
             return (UpdateStepResult("rollback", False, False, "previous version is unknown"),)
         if self._editable_source_dir() is not None:
             return (UpdateStepResult("rollback", False, False, "rollback is skipped for editable installations"),)
-        repo_url = self._github_repo_url(previous_version)
+        repo_url = self._github_pinned_url(previous_version)
+        if repo_url is None:
+            step = self._refuse_unverified_install(previous_version, "rollback")
+            return (UpdateStepResult("rollback", step.executed, step.success, step.detail),)
         cmd = [
             sys.executable,
             "-m",
@@ -415,6 +424,57 @@ class UpdateManager(IUpdateProtocol):
         suffix = f"@v{target_version.lstrip('vV')}" if target_version else ""
         return f"git+https://github.com/{repo}.git{suffix}"
 
+    def _resolve_release_commit(self, target_version: str) -> tuple[str, str] | None:
+        """Pin a release version to its immutable commit SHA (supply-chain fix, issue #368).
+
+        A git tag is *mutable*: a maintainer account (or an attacker who gains
+        push access) can re-point ``vX.Y.Z`` at different code, and pip cannot
+        detect the swap when installing ``git+https://...@vX.Y.Z``. Resolving
+        the tag to its commit SHA via the GitHub API makes the installed
+        artifact immutable — a re-pointed tag can no longer silently swap the
+        code pip installs. Returns ``(tag, commit_sha)`` or ``None``.
+        Lightweight tags resolve in one call; annotated tags need one extra
+        dereference. Both tag spellings (``vX.Y.Z`` and ``X.Y.Z``) are tried.
+        """
+        repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
+        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+            return None
+        cleaned = target_version.strip().lstrip("vV")
+        sha_pattern = re.compile(r"[0-9a-f]{40}")
+        for tag in (f"v{cleaned}", cleaned):
+            ref = self._fetch_json(GITHUB_GIT_REF_URL.format(repo=repo, tag=tag))
+            if ref is None:
+                continue
+            obj = ref.get("object") or {}
+            sha, obj_type = str(obj.get("sha", "")), str(obj.get("type", ""))
+            if sha_pattern.fullmatch(sha) is None:
+                continue
+            if obj_type == "commit":
+                return tag, sha
+            if obj_type == "tag":
+                tag_obj = self._fetch_json(GITHUB_GIT_TAG_URL.format(repo=repo, sha=sha)) or {}
+                inner = tag_obj.get("object") or {}
+                commit_sha = str(inner.get("sha", ""))
+                if str(inner.get("type", "")) == "commit" and sha_pattern.fullmatch(commit_sha):
+                    return tag, commit_sha
+        return None
+
+    def _github_pinned_url(self, target_version: str | None) -> str | None:
+        """Build the install URL pinned to the release's immutable commit SHA.
+
+        Returns ``None`` when the release cannot be pinned (unknown target
+        version or unresolvable tag ref); callers must then REFUSE the
+        install rather than fall back to a mutable tag reference.
+        """
+        if not target_version:
+            return None
+        resolved = self._resolve_release_commit(target_version)
+        if resolved is None:
+            return None
+        _tag, sha = resolved
+        repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
+        return f"git+https://github.com/{repo}.git@{sha}"
+
     def _discover_latest(self) -> tuple[str | None, str, str | None]:
         """Return (latest_version, source, error) via GitHub releases exclusively."""
         latest, gh_err = self._fetch_latest_github()
@@ -457,6 +517,21 @@ class UpdateManager(IUpdateProtocol):
         if not tag:
             return None, "GitHub release payload missing tag_name"
         return str(tag).strip().lstrip("vV"), None
+
+    @staticmethod
+    def _refuse_unverified_install(target_version: str | None, mode: str) -> UpdateStepResult:
+        """Fail-closed refusal when a release cannot be pinned to a commit SHA.
+
+        Never falls back to a mutable tag reference (issue #368): installing
+        unverifiable remote code is strictly worse than refusing the update.
+        """
+        detail = (
+            f"{mode} refused: release {target_version!r} could not be pinned to an immutable "
+            "commit SHA via the GitHub API; refusing to install unverified remote code. "
+            "Check that the release tag exists and the network can reach api.github.com."
+        )
+        log.error("install_refused_unverified target=%s mode=%s", target_version, mode)
+        return UpdateStepResult(name="package_upgrade", executed=False, success=False, detail=detail)
 
     def _editable_source_dir(self) -> Path | None:
         """Detect a PEP 610 editable install or fallback to cwd source checkout."""
