@@ -33,7 +33,7 @@ Use this skill when an AI agent needs to send prompts or document files to **Qwe
 | Check session health | `check_session` | `qwa doctor` |
 | Manual login / CAPTCHA | `setup_session` | `qwa login` |
 | Reset session | `delete_session` | — |
-| Initialize workspace | `init_workspace` | `qwa init` |
+| Initialize workspace | `init` | `qwa init` |
 
 > **File conventions:** Place inputs under `.qwen-web/input/` and outputs under `.qwen-web/output/`. Always append a timestamp to output filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or `YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous runs.
 

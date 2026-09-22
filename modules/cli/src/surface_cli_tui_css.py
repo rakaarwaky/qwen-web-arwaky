@@ -33,7 +33,8 @@ _COLORS: dict[str, str] = {
 }
 
 THEME: dict[str, str] = {
-    "accent": _COLORS["fg_accent"],
+    "accent": _COLORS["accent"],
+    "accent_fg": _COLORS["fg_accent"],
     "primary": _COLORS["fg_primary"],
     "muted": _COLORS["fg_muted"],
     "ok": _COLORS["status_ok"],
@@ -147,8 +148,7 @@ Underline {
 }
 
 #slots-table {
-    height: auto;
-    max-height: 4;
+    height: 1fr;
     background: $bg_surface;
     border: solid $border;
     margin-bottom: 1;
@@ -438,6 +438,18 @@ HelpScreen {
 
 .btn-slot-retry {
     display: none;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    color: $status_warn;
+    border: solid $status_warn;
+    text-style: bold;
+    margin-top: 1;
+}
+
+.btn-slot-retry:hover {
+    background: $bg_base;
+    color: $status_warn;
 }
 """
 )

@@ -184,7 +184,7 @@ class _TuiHandlersMixin:
 
     def action_show_help(self) -> None:
         """A4: push the keyboard-shortcut reference overlay."""
-        self.push_screen(HelpScreen())
+        self.push_screen(HelpScreen(self._NUM_SLOTS))
 
     def action_login_action(self) -> None:
         # U3: re-entrancy guard — one login flow at a time.
@@ -196,7 +196,7 @@ class _TuiHandlersMixin:
         # path.  Show the session-setup submenu; "Delete Session & Login
         # Again" triggers the blocking setup_session() worker after
         # confirmation, "Back to Main Menu" dismisses the screen.
-        self._log_msg(f"[bold {THEME['accent']}]>>> Opening session setup menu...[/]")
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Opening session setup menu...[/]")
         self.push_screen(
             SessionSetupScreen(
                 status_text=f"[bold]Session status: {self._session_badge_text()}[/]",
@@ -209,6 +209,9 @@ class _TuiHandlersMixin:
         """Return a short session status string for the setup screen."""
         if self._session is None:
             return "N/A (no session orchestrator)"
+        last = getattr(self, "_last_session_state", None)
+        if last:
+            return f"{last} — run 'qwen-web-arwaky doctor' for diagnostics"
         return "CHECKING — run 'qwen-web-arwaky doctor' for diagnostics"
 
     def _start_login_worker(self, confirmed: bool) -> None:
@@ -216,12 +219,12 @@ class _TuiHandlersMixin:
         if not confirmed:
             return
         self._login_in_flight = True
-        self._log_msg(f"[bold {THEME['accent']}]>>> Launching interactive session setup...[/]")
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Launching interactive session setup...[/]")
         self._login_worker()
 
     def action_init_action(self) -> None:
         """U8: trigger workspace initialization on a background thread."""
-        self._log_msg(f"[bold {THEME['accent']}]>>> Initializing workspace...[/]")
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
         self._init_worker()
 
     @work(thread=True)
@@ -247,14 +250,14 @@ class _TuiHandlersMixin:
 
         active = [s for s, w in self._slot_workers.items() if w is not None]
         if not active:
-            # A4: double-escape guard — require two Esc presses within 1s.
+            # A4: double-escape guard — require two Esc presses within 2s.
             now = time.monotonic()
             last = getattr(self, "_last_esc_time", 0.0)
-            if now - last > 1.0:
+            if now - last > 2.0:
                 self._last_esc_time = now
                 # A6: use notify for visibility regardless of active tab
-                self.notify("Press Escape again within 1s to quit", timeout=1.5)
-                self._log_msg(f"[{THEME['muted']}]Press Escape again within 1s to quit.[/]")
+                self.notify("Press Escape again within 2s to quit", timeout=3.0)
+                self._log_msg(f"[{THEME['muted']}]Press Escape again within 2s to quit.[/]")
                 return
             self.exit()
             return
