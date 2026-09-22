@@ -129,6 +129,10 @@ TOOLS: list[Tool] = [
                     "description": "Run the browser headlessly (True) or with visible UI (False).",
                     "default": True,
                 },
+                "output_file": {
+                    "type": "string",
+                    "description": "Optional destination path for the AI response (CLI parity with 'prompt-direct -o FILE').",
+                },
             },
             "required": ["prompt"],
         },

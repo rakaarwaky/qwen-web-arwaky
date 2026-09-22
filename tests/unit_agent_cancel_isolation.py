@@ -27,8 +27,8 @@ def test_file_orchestrator_cancel_only_closes_target_context() -> None:
     first_context = MagicMock()
     second_context = MagicMock()
     orchestrator._run_registry = {
-        id(first_event): FileRunState(cancel_event=first_event, active_bctx=first_context),
-        id(second_event): FileRunState(cancel_event=second_event, active_bctx=second_context),
+        first_event: FileRunState(cancel_event=first_event, active_bctx=first_context),
+        second_event: FileRunState(cancel_event=second_event, active_bctx=second_context),
     }
 
     orchestrator.request_cancel(first_event)
@@ -47,8 +47,8 @@ def test_attachment_orchestrator_cancel_only_closes_target_context() -> None:
     first_context = MagicMock()
     second_context = MagicMock()
     orchestrator._run_registry = {
-        id(first_event): AttachmentRunState(cancel_event=first_event, active_bctx=first_context),
-        id(second_event): AttachmentRunState(cancel_event=second_event, active_bctx=second_context),
+        first_event: AttachmentRunState(cancel_event=first_event, active_bctx=first_context),
+        second_event: AttachmentRunState(cancel_event=second_event, active_bctx=second_context),
     }
 
     orchestrator.request_cancel(first_event)

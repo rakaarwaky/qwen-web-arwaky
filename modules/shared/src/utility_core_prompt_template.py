@@ -13,7 +13,7 @@ there makes it available to CLI, MCP, and TUI surfaces with no code change.
 from __future__ import annotations
 
 import re
-from functools import lru_cache
+import threading
 from pathlib import Path
 
 # ``modules/shared/src`` -> ``modules`` (parents[2]) -> ``modules/templates``
@@ -21,18 +21,50 @@ _TEMPLATE_DIR: Path = Path(__file__).resolve().parents[2] / "templates"
 
 _HEADING_RE = re.compile(r"^##\s+(?P<title>.+)$")
 
+# Discovery cache. Keyed on the templates directory mtime rather than cached for
+# the process lifetime: the MCP server is long-running, so a template dropped
+# into the folder must become visible without a restart. Creating or deleting a
+# file bumps the directory mtime, so a stale entry is detected with a single
+# stat() instead of a full glob.
+_roles_cache: tuple[str, ...] = ()
+_roles_cache_key: float | None = None
+_roles_cache_lock = threading.Lock()
 
-@lru_cache(maxsize=1)
+
+def _templates_dir_mtime() -> float | None:
+    """Directory mtime used as the discovery cache key, or None when absent."""
+    try:
+        return _TEMPLATE_DIR.stat().st_mtime
+    except OSError:
+        return None
+
+
+def invalidate_template_cache() -> None:
+    """Force the next discovery call to re-scan the templates folder."""
+    global _roles_cache_key
+    with _roles_cache_lock:
+        _roles_cache_key = None
+
+
 def _discovered_roles() -> tuple[str, ...]:
     """Return the sorted set of role names discoverable in the templates folder.
 
     A role is any file ``*.md`` directly under the templates directory.
-    An empty folder yields an empty tuple.
+    An empty folder yields an empty tuple. Results are cached until the
+    templates directory changes.
     """
-    if not _TEMPLATE_DIR.is_dir():
-        return ()
-    roles = [p.stem.lower() for p in _TEMPLATE_DIR.glob("*.md") if p.is_file()]
-    return tuple(sorted(set(roles)))
+    global _roles_cache, _roles_cache_key
+    key = _templates_dir_mtime()
+    with _roles_cache_lock:
+        if key is not None and key == _roles_cache_key:
+            return _roles_cache
+        if not _TEMPLATE_DIR.is_dir():
+            roles: tuple[str, ...] = ()
+        else:
+            roles = tuple(sorted({p.stem.lower() for p in _TEMPLATE_DIR.glob("*.md") if p.is_file()}))
+        _roles_cache = roles
+        _roles_cache_key = key
+        return roles
 
 
 def list_prompt_templates() -> tuple[str, ...]:

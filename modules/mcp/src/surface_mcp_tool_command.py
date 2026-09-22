@@ -21,6 +21,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
+from modules.shared.src.taxonomy_core_error import RateLimitError
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
@@ -31,6 +32,22 @@ from modules.shared.src.taxonomy_core_vo import (
 )
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
+
+# ─── FR-002 success envelope status values ──────────────────────────────────
+# Every successful MCP payload carries a `status` discriminator so agent
+# consumers can branch on one field instead of sniffing for optional keys.
+STATUS_SUCCESS = "SUCCESS"  # work finished, `result` is present
+STATUS_ACCEPTED = "ACCEPTED"  # async job queued, poll `job_id`
+STATUS_RUNNING = "RUNNING"  # async job still executing
+STATUS_COMPLETED = "COMPLETED"  # async job finished successfully
+STATUS_FAILED = "FAILED"  # async job finished with an error
+
+
+def _job_status(record: Any) -> str:
+    """Derive the FR-002 status discriminator for a job record."""
+    if not record.completed:
+        return STATUS_RUNNING
+    return STATUS_FAILED if record.error else STATUS_COMPLETED
 
 
 def _check_execution_result(res_str: str) -> str | None:
@@ -59,7 +76,7 @@ def _format_success_payload(
 
     payload: dict[str, Any] = {
         "success": True,
-        "status": "SUCCESS",
+        "status": STATUS_SUCCESS,
         "result": result_text,
     }
     if output_path:
@@ -161,6 +178,20 @@ def _format_error_payload(
     return json.dumps({"success": False, "error": err}, indent=2)
 
 
+def _format_rate_limit_payload(exc: RateLimitError) -> str:
+    """Render a throttled submission as a retryable RATE_LIMITED envelope."""
+    retry_after = getattr(exc, "retry_after_sec", None)
+    payload: dict[str, Any] = {
+        "code": "RATE_LIMITED",
+        "message": str(exc),
+        "hint": "Submission quota reached. Wait for retry_after_sec, then resubmit.",
+        "retryable": True,
+    }
+    if retry_after is not None:
+        payload["retry_after_sec"] = round(float(retry_after), 1)
+    return json.dumps({"success": False, "error": payload}, indent=2)
+
+
 def _resolve_prompt_path(prompt_file: str, *, field: str = "prompt_file") -> Path | str:
     """Resolve a role or workspace prompt path with explicit runtime validation."""
     if is_prompt_role(prompt_file):
@@ -200,13 +231,21 @@ class McpToolCommand:
         self._workspace = workspace
         self._jobs = jobs
 
-    def process_direct_prompt(self, prompt: str, timeout_sec: int = 120, headless: bool = True) -> str:
+    def process_direct_prompt(
+        self,
+        prompt: str,
+        timeout_sec: int = 120,
+        headless: bool = True,
+        output_file: str | None = None,
+    ) -> str:
         """Process a direct text prompt string to chat.qwen.ai.
 
         Args:
             prompt: Direct text prompt to send to Qwen.
             timeout_sec: Maximum seconds to wait for assistant response (default: 120s).
             headless: Run browser headlessly (default: True).
+            output_file: Optional destination path for the AI response, matching
+                the CLI's ``prompt-direct -o FILE`` flag.
 
         Returns:
             JSON string containing success status, assistant response text, and metadata.
@@ -219,11 +258,15 @@ class McpToolCommand:
                 field="prompt",
             )
 
+        out_path = Path(output_file).expanduser().resolve() if output_file else None
         try:
             res = self._direct.process_direct_prompt(
-                PromptText(prompt), TimeoutSec(timeout_sec), headless=HeadlessFlag(headless)
+                PromptText(prompt),
+                TimeoutSec(timeout_sec),
+                output_file=out_path,
+                headless=HeadlessFlag(headless),
             )
-            return _format_success_payload(str(res))
+            return _format_success_payload(str(res), output_path=str(out_path) if out_path else None)
         except Exception as exc:
             return _format_error_payload(
                 code="EXECUTION_ERROR",
@@ -267,6 +310,7 @@ class McpToolCommand:
                 return json.dumps(
                     {
                         "success": True,
+                        "status": STATUS_ACCEPTED,
                         "job_id": record.job_id,
                         "latest_event": record.latest_event,
                         "completed": record.completed,
@@ -277,6 +321,8 @@ class McpToolCommand:
                     },
                     indent=2,
                 )
+            except RateLimitError as exc:
+                return _format_rate_limit_payload(exc)
             except Exception as exc:
                 return _format_error_payload(
                     code="JOB_SUBMIT_FAILED",
@@ -347,6 +393,7 @@ class McpToolCommand:
                 return json.dumps(
                     {
                         "success": True,
+                        "status": STATUS_ACCEPTED,
                         "job_id": record.job_id,
                         "latest_event": record.latest_event,
                         "completed": record.completed,
@@ -358,6 +405,8 @@ class McpToolCommand:
                     },
                     indent=2,
                 )
+            except RateLimitError as exc:
+                return _format_rate_limit_payload(exc)
             except Exception as exc:
                 return _format_error_payload(
                     code="JOB_SUBMIT_FAILED",
@@ -420,6 +469,7 @@ class McpToolCommand:
 
         payload: dict[str, Any] = {
             "success": True,
+            "status": _job_status(record),
             "job_id": record.job_id,
             "latest_event": record.latest_event,
             "completed": record.completed,
@@ -463,6 +513,7 @@ class McpToolCommand:
         items = [
             {
                 "job_id": rec.job_id,
+                "status": _job_status(rec),
                 "latest_event": rec.latest_event,
                 "completed": rec.completed,
                 "created_at": rec.created_at,
@@ -475,7 +526,10 @@ class McpToolCommand:
             }
             for rec in records
         ]
-        return json.dumps({"success": True, "total": len(items), "jobs": items}, indent=2)
+        return json.dumps(
+            {"success": True, "status": STATUS_SUCCESS, "total": len(items), "jobs": items},
+            indent=2,
+        )
 
     def check_session(self) -> str:
         """Check status and validity of saved browser session tokens.
