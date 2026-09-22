@@ -10,7 +10,7 @@ The CLI root (`modules/root_cli_main_entry.py`) owns the CLI lifecycle: parse ar
 
 ### FR-001: Subcommand Argument Parsing & Config Building
 
-The root parser reads `sys.argv` using a subcommand-based interface (`init`, `login`, `doctor`, `prompt-direct`, `prompt-only`, `prompt-with-attachment`, `mcp`).
+The root parser reads `sys.argv` using a subcommand-based interface (`init`, `login`, `doctor`, `prompt-direct`, `prompt-only`, `prompt-with-attachment`, `batch`, `watch`, `mcp`).
 
 | Subcommand | Signal | Result | Validation |
 |---|---|---|---|
@@ -20,6 +20,8 @@ The root parser reads `sys.argv` using a subcommand-based interface (`init`, `lo
 | `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
 | `prompt-only` | `qwen-web-arwaky prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
 | `prompt-with-attachment` | `qwen-web-arwaky prompt-with-attachment -i FILE -a FILE [--json]` | Attachment prompt | Prompt file and attachment file must exist. |
+| `batch` | `qwen-web-arwaky batch --input-dir DIR [--output-dir DIR] [--headless] [--json]` | Batch folder processing | Input directory exists and contains `.md` files; output defaults to XDG application output. |
+| `watch` | `qwen-web-arwaky watch --input-dir DIR [--output-dir DIR] --interval SEC [--headless] [--json]` | Continuous folder polling | Interval is at least 1 second; output defaults to XDG application output; SIGINT/SIGTERM stops cleanly. |
 | `mcp` | `qwen-web-arwaky mcp` | MCP Stdio Server | Hands off execution to MCP stdio server. |
 
 An invalid run input is rejected with a non-success exit code and a clear, actionable diagnostic on `stderr`.
@@ -30,7 +32,8 @@ The no-argument TTY fallback launches the **Obsidian Nebula Textual TUI App** (`
 
 1. **Dynamic Versioning**: Header displays package version dynamically via `importlib.metadata.version("qwen-web-arwaky")`.
 2. **Safe Default Attachment**: If candidate attachment files do not exist on disk, attachment input defaults to an empty string `""` so optional fields never fail validation.
-3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved.
+3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved. Existing files are never silently overwritten.
+   Invalid, unwritable, or conflicting paths produce an actionable validation error.
 4. **Destructive Action Safety**: Session reset actions present a modal confirmation screen (`ConfirmModal`) before wiping session tokens.
 5. **Non-TTY Rejection**: Running the interactive TUI in non-interactive environments (pipes/cron) prints a helpful, example-driven guidance message pointing to subcommands and `qwen-web-arwaky doctor`.
 

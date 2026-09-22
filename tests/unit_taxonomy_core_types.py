@@ -160,9 +160,6 @@ class TestAppConfigValidation:
             mode="batch",
             input_path=Path("/tmp/input"),
             output_path=Path("/tmp/output"),
-            done_path=Path("/tmp/done"),
-            failed_path=Path("/tmp/failed"),
-            proc_path=Path("/tmp/proc"),
             session_path=Path("/tmp/session"),
         )
         defaults.update(kwargs)

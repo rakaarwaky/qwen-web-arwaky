@@ -121,24 +121,6 @@ class TestShouldProcessFile:
         f.write_text("content")
         assert _should_process_file(f, tmp_path) is False
 
-    def test_done_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / "done" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
-    def test_failed_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / "failed" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
-    def test_processing_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / ".processing" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
     def test_not_role_prefix_skipped(self, tmp_path):
         f = tmp_path / "other-dir" / "task.md"
         f.parent.mkdir(parents=True)
@@ -173,12 +155,6 @@ class TestListInputFiles:
         files = _list_input_files(tmp_path)
         assert len(files) == 1
         assert files[0][1] == Path("role-dev/todo/a.md")
-
-    def test_excludes_done(self, tmp_path):
-        f = tmp_path / "role-dev" / "done" / "a.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("a")
-        assert _list_input_files(tmp_path) == []
 
     def test_excludes_prompt_md(self, tmp_path):
         f = tmp_path / "role-dev" / "todo" / "PROMPT.md"

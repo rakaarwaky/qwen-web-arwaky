@@ -23,7 +23,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 
 ## User Personas
 
-- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs batch markdown prompts locally without burning cash on API tokens, and needs reliable file routing (`input` → `.processing` → `done`/`failed`) and detailed JSONL audit logs.
+- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs timestamped batch markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
 - **AI Agent (via MCP)**: Interacts with the tool programmatically to send
   prompts, process files, and read audit logs without managing browser
   lifecycles or DOM selectors.
@@ -37,8 +37,10 @@ into spaghetti code, making AI-assisted maintenance unsafe.
   capabilities listed below, structured observability
   (structlog, OpenTelemetry, Sentry), and strict AES 7-layer architecture.
 - **Out of scope**: other LLM providers (ChatGPT, Claude, Gemini), official
-  REST API integrations, cloud-hosted SaaS deployments, and new product
-  features (the project is in **Maintenance & Stabilization Mode**).
+  REST API integrations, and cloud-hosted SaaS deployments. The project is in
+  **Stabilization + Targeted Enhancement Mode**; Swarm,
+  asynchronous Jobs, and self-update are approved in-scope enhancements under
+  change request CR-2026-004.
 
 Core functional specs live in [`modules/core/FRD.md`](modules/core/FRD.md)
 (exactly 8 FRs, one per capability + protocol). CLI and MCP surfaces have
@@ -69,6 +71,14 @@ compose these FRs, not additional core FRs.
 - [X]  **FR-004 Prompt Injector** — Prepare and inject prompt text via
   four-tier DOM strategy (React setter + synthetic `keyup` sync → ContentEditable → `fill` → `type`).
   *Accept*: empty text is rejected; React controlled state updates reliably without input text reset.
+
+### Reliability measurement
+
+One pipeline execution is one prompt file dispatched to a terminal success or
+explicit error envelope. The success rate is `successful_executions /
+total_executions` over a rolling 24-hour window. Persistent counters are stored
+in `metrics.json` under the application state directory. Emit WARNING below
+99.5% and CRITICAL below 99.0%.
 - [X]  **FR-005 Send Dispatcher** — Click Send (Enter fallback) only after
   document-parse gate; expose message count / latest text for the stream
   baseline.
@@ -99,8 +109,9 @@ compose these FRs, not additional core FRs.
   Single (one file), and raw `send_prompt` — all via `ICoreAggregate`.
 - [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
   first; only an invalid session opens a headed browser for CAPTCHA.
-- [X]  **Atomic file routing**: `input` → `.processing` → `done` / `failed`
-  with circuit breaker and rate limiter in the agent.
+- [X]  **Timestamped input processing**: input files are uniquely named by the
+  producer; success/failure status is recorded in JSONL logs and job metrics,
+  and input files remain in place.
 - [X]  **MCP server**: live tools for direct prompts, prompt files, attachments,
   session management, workspace initialization, and asynchronous job status.
 

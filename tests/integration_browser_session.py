@@ -19,9 +19,6 @@ class TestBrowserSession:
             mode="batch",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=True,
         )
@@ -50,9 +47,6 @@ class TestBrowserSession:
             mode="batch",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=True,
         )
@@ -79,9 +73,6 @@ class TestBrowserSession:
             mode="batch",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=True,
         )
@@ -103,9 +94,6 @@ class TestBrowserSession:
             mode="batch",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=True,
         )
@@ -126,9 +114,6 @@ class TestBrowserSession:
             mode="login",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=False,
         )
@@ -151,9 +136,6 @@ class TestBrowserSession:
             mode="batch",
             input_path=tmp_path / "in",
             output_path=tmp_path / "out",
-            done_path=tmp_path / "done",
-            failed_path=tmp_path / "failed",
-            proc_path=tmp_path / "proc",
             session_path=tmp_path / "session",
             headless=True,
         )

@@ -106,6 +106,15 @@ class FolderCompiler(IFolderCompileProtocol):
 
         try:
             markdown_content = compile_files_to_markdown(files, folder_path, origins=origins)
+            # Qwen Web rejects attachments larger than 100 MiB. Fail before
+            # writing an apparently usable artifact so callers can report a
+            # deterministic business validation error.
+            max_attachment_bytes = 100 * 1024 * 1024
+            encoded_size = len(markdown_content.encode("utf-8"))
+            if encoded_size > max_attachment_bytes:
+                raise FolderCompileError(
+                    f"Compiled attachment is {encoded_size} bytes; the 100 MiB attachment limit was exceeded."
+                )
             output_path.write_text(markdown_content, encoding="utf-8")
             log.info("Compiled markdown written to: %s", output_path)
             return output_path

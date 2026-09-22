@@ -304,7 +304,12 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  `start_span` is a no-op context manager when OTel is missing.
 - **Tests**: `tests/test_observability.py`, `tests/test_observability_extended.py`.
 
-## Capability Inventory (exactly 8)
+## Capability Inventory
+
+The product requirement inventory is 13 capabilities (one per P0 capability).
+This Core table lists the eight Core aggregate operations; the remaining five
+capabilities are implemented by the CLI, MCP, and shared infrastructure. The
+old heading “exactly 8” was an inventory error.
 
 Metrics counters and `status.json` writes are helper types inside
 `capabilities_observability_setup.py` (FR-009). Do not reintroduce them as
@@ -376,7 +381,8 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - [ ]  FR-008: process starts with empty `SENTRY_DSN` and no OTLP endpoint.
 - [ ]  Aggregate boundary: failed batch items report `Failed: 1`, failed single
   files return an error envelope, nested role routing is preserved, and a
-  supplied `AppConfig` reaches the browser session unchanged.
+  supplied `AppConfig` reaches the browser session unchanged. Input files stay
+  in place; status is represented by the error envelope and logs.
 
 ## Assumptions & Constraints
 
@@ -395,8 +401,6 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - **Persistent context**: Chromium user-data dir that keeps cookies/LocalStorage.
 - **Stability check**: N consecutive identical response snapshots plus
   generation-complete UI.
-- **Quarantine**: agent move of a failed file to `failed/` (orchestration,
-  not a capability FR).
 
 ## Reference
 
