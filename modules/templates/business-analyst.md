@@ -6,12 +6,9 @@ Issue Section Template
 - **Title**: \[BA\][{Severity}\] {concise issue title}
 - **Location Path**:
   {file or section reference}
-- **Description**: {detailed description of the issue, including the affected business actor and expected behavior}
-- **Business Benefit**: {specific value for users, stakeholders, delivery, risk reduction, or release confidence}
-- **Acceptance Criteria**: {measurable conditions that prove the issue is resolved}
-- **Verification**: {status: VERIFIED / PARTIALLY VERIFIED / NOT VERIFIED; evidence, source section, test/UAT scenario, or open question}
-- **Recommendation**: {actionable fix, clarification, or decision required}
-- **Dependencies / Impact**: {related requirements, roles, processes, risks, or "None"}
+- **Description**: {detailed description of the issue}
+- **Acceptance Criteria**: {how to verify the fix is done}
+- **Recommendation**: {actionable fix}
 - **Git Diff**:
 
 ```diff
@@ -51,27 +48,6 @@ FullTemplate
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 #### Issue BA-{SCOPE-NUMBER}-{ID}
-
-## BA Issue Register and Benefits
-Create a complete table containing every BA issue generated above. Do not omit issues or merge them silently. Use these columns:
-
-| Issue ID | Severity | Issue summary | Business benefit | Verification status | Evidence / next action |
-|---|---|---|---|---|---|
-| BA-{SCOPE-NUMBER}-{ID} | {CRITICAL/WARNING/INFO} | {short explanation} | {why resolving it helps us} | {VERIFIED/PARTIALLY VERIFIED/NOT VERIFIED} | {evidence or action} |
-
-After the table, explain in plain language:
-1. What each issue means for the business and who is affected.
-2. What benefit we get by resolving it, prioritised by CRITICAL, WARNING, then INFO.
-3. Which issues can be verified from the attached documents and which require stakeholder confirmation, implementation evidence, or UAT.
-4. Whether the requirements are ready for delivery, with a clear reason and a list of blockers.
-
-## Verification Summary
-- **Documents and sections reviewed**: {complete list}
-- **Issues verified**: {issue IDs and evidence}
-- **Issues partially verified**: {issue IDs and missing evidence, or "None"}
-- **Issues not verified**: {issue IDs and reason, or "None"}
-- **Recommended verification steps**: {numbered checks for stakeholder review, traceability, and UAT}
-- **Overall readiness**: {READY / READY WITH CONDITIONS / NOT READY}
 
 ## Open Questions
 {List or "None"}
