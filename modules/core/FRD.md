@@ -304,7 +304,12 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  `start_span` is a no-op context manager when OTel is missing.
 - **Tests**: `tests/test_observability.py`, `tests/test_observability_extended.py`.
 
-## Capability Inventory (exactly 8)
+## Capability Inventory
+
+The product requirement inventory is 13 capabilities (one per P0 capability).
+This Core table lists the eight Core aggregate operations; the remaining five
+capabilities are implemented by the CLI, MCP, and shared infrastructure. The
+old heading “exactly 8” was an inventory error.
 
 Metrics counters and `status.json` writes are helper types inside
 `capabilities_observability_setup.py` (FR-009). Do not reintroduce them as

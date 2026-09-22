@@ -17,3 +17,18 @@ Start `qwen-web-mcp`, list tools, and invoke `init`, `check_session`, and `list_
 ## Recovery operator
 
 Run `qwen-web-arwaky doctor` and `qwen-web-arwaky update --check`. Diagnostics must be readable without mutating the workspace.
+
+## BA verification scenarios
+
+The following deterministic scenarios are required for release sign-off:
+
+| ID | Scenario | Expected evidence |
+|---|---|---|
+| UAT-BA-001 | Run `batch` with two Markdown prompts | Each file moves through `.processing` to `done`; output files exist. |
+| UAT-BA-002 | Run `batch` with a failing prompt | The file is moved to `failed` and the other files continue. |
+| UAT-BA-003 | Run `watch --interval 1` and add a prompt | The new prompt is picked up without restarting the process. |
+| UAT-BA-004 | Compile an attachment above 100 MiB | Validation fails before browser interaction with the size limit. |
+| UAT-BA-005 | Inspect `metrics.json` after terminal outcomes | `total_executions`, `successful_executions`, and `success_rate` are persisted. |
+| UAT-BA-006 | Submit and age terminal/stale jobs | Cleanup removes terminal jobs after 24 hours and incomplete jobs after 7 days. |
+| UAT-BA-007 | Run MCP destructive session action without confirmation | The action is rejected and the session remains intact. |
+| UAT-BA-008 | Run async job lifecycle | Submit, poll, complete, and retrieve output are all represented in JSON. |

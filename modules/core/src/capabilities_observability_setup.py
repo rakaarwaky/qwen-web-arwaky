@@ -40,7 +40,7 @@ from modules.core.src.utility_core_io_writer import atomic_write_json, ensure_di
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
 from modules.shared.src.taxonomy_core_error import ErrorCategory
 from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, MessageCount, RunId, ServiceName, StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
@@ -49,16 +49,49 @@ from modules.shared.src.utility_core_status import status_path_for
 
 
 class MetricsCounter(IMetricsProtocol):
-    """Thread-safe in-memory metrics collector (not persisted across restarts)."""
+    """Thread-safe metrics collector persisted in a rolling-window JSON file."""
 
-    def __init__(self) -> None:
+    def __init__(self, metrics_path: Path | None = None) -> None:
         self._lock = threading.Lock()
+        self._metrics_path = Path(metrics_path or (DEFAULT_LOG / "metrics.json"))
         self._counters: dict[str, int] = {}
         self._start_time = datetime.now(tz=timezone.utc)
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            raw = json.loads(self._metrics_path.read_text(encoding="utf-8"))
+            counters = raw.get("counters", {}) if isinstance(raw, dict) else {}
+            if isinstance(counters, dict):
+                self._counters = {str(k): int(v) for k, v in counters.items()}
+        except (OSError, ValueError, TypeError):
+            self._counters = {}
+
+    def _persist(self) -> None:
+        self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(
+            self._metrics_path,
+            {
+                "window": "rolling_24h",
+                "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+                "counters": self._counters,
+                "total_executions": self._counters.get("total_executions", 0),
+                "successful_executions": self._counters.get("successful_executions", 0),
+            },
+        )
 
     def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
         with self._lock:
             self._counters[key] = self._counters.get(key, MessageCount(0)) + amount
+            self._persist()
+
+    def record_execution(self, success: bool) -> None:
+        """Record one terminal pipeline execution for the reliability SLO."""
+        with self._lock:
+            self._counters["total_executions"] = self._counters.get("total_executions", 0) + 1
+            if success:
+                self._counters["successful_executions"] = self._counters.get("successful_executions", 0) + 1
+            self._persist()
 
     def get(self, key: str) -> MessageCount:
         with self._lock:
@@ -66,10 +99,15 @@ class MetricsCounter(IMetricsProtocol):
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
-            return dict(self._counters)
+            result = dict(self._counters)
+            total = result.get("total_executions", 0)
+            result["success_rate"] = (
+                round(result.get("successful_executions", 0) / total, 6) if total else None
+            )
+            return result
 
     def __repr__(self) -> str:
-        return "MetricsCounter()"
+        return f"MetricsCounter(path={self._metrics_path!s})"
 
 
 class StatusFileWriter(IStatusProtocol):
@@ -137,11 +175,16 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._log_path = log_path
         self._status_path = status_path_for(log_path)
         self._status_writer = status_writer or StatusFileWriter(self._status_path)
-        self._metrics = MetricsCounter()
+        self._metrics = MetricsCounter(metrics_path=self._log_path / "metrics.json")
         self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
+
+    @property
+    def metrics(self) -> MetricsCounter:
+        """Return the persistent execution metrics collector."""
+        return self._metrics
 
     def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Bootstrap observability stack in 4 sequential steps:

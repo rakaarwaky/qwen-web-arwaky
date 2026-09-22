@@ -11,6 +11,8 @@ Usage:
   qwen-web-arwaky prompt-with-attachment \\
                                  --prompt-path FILE --attachment-path FILE \\
                                  [--output-path FILE] [--headless]
+  qwen-web-arwaky batch --input-dir DIR --output-dir DIR [--headless] [--json]
+  qwen-web-arwaky watch --input-dir DIR --interval SEC [--headless] [--json]
   qwen-web-arwaky mcp
 """
 
@@ -20,6 +22,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -129,6 +132,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p_attach.add_argument("--json", action="store_true", help="Format output as JSON")
 
+    # ── batch / watch ─────────────────────────────────────────────────────────
+    p_batch = sub.add_parser("batch", help="Process every Markdown prompt in a folder", parents=[parent])
+    p_batch.add_argument("--input-dir", required=True, help="Directory containing Markdown prompts")
+    p_batch.add_argument("--output-dir", required=True, help="Directory for generated outputs")
+    p_batch.add_argument("--headless", action=argparse.BooleanOptionalAction, default=True)
+    p_batch.add_argument("--json", action="store_true")
+
+    p_watch = sub.add_parser("watch", help="Continuously process new Markdown prompts", parents=[parent])
+    p_watch.add_argument("--input-dir", required=True, help="Directory to poll")
+    p_watch.add_argument("--interval", type=float, default=5.0, help="Polling interval in seconds (minimum 1)")
+    p_watch.add_argument("--headless", action=argparse.BooleanOptionalAction, default=True)
+    p_watch.add_argument("--json", action="store_true")
+
     # ── mcp ───────────────────────────────────────────────────────────────────
     sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
 
@@ -178,7 +194,15 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         if not file_p.exists():
             raise ValueError(f"Attachment file not found: {file_p}")
 
-    if raw_output:
+    if action in {"batch", "watch"}:
+        batch_dir = Path(getattr(args, "input_dir")).expanduser().resolve()
+        if not batch_dir.is_dir():
+            raise ValueError(f"Input directory not found: {batch_dir}")
+        if action == "watch" and float(getattr(args, "interval", 0)) < 1:
+            raise ValueError("Watch interval must be at least 1 second")
+        prompt_p = batch_dir
+        out_p = Path(getattr(args, "output_dir", batch_dir / "output")).expanduser().resolve()
+    elif raw_output:
         out_p = Path(raw_output)
     else:
         # Prefer the project-local .qwen-web/output when it is a symlink to the
@@ -204,6 +228,8 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         "prompt-direct": "direct",
         "prompt-only": "single",
         "prompt-with-attachment": "single",
+        "batch": "batch",
+        "watch": "watch",
         "init": "init",
         "mcp": "mcp",
     }
@@ -253,6 +279,53 @@ def _exit_code_for_result(result: dict[str, object]) -> int:
     if "AUTH_REQUIRED" in error or "not authenticated" in error.lower() or "session expired" in error.lower():
         return 2
     return 1
+
+
+def _run_folder_mode(
+    args: argparse.Namespace,
+    cfg: AppConfig,
+    file_only: object,
+    *,
+    watch: bool,
+) -> dict[str, object]:
+    """Process Markdown files with input -> .processing -> done/failed routing."""
+    input_dir = Path(cfg.input_path)
+    output_dir = Path(cfg.output_path)
+    processing = input_dir / ".processing"
+    done = input_dir / "done"
+    failed = input_dir / "failed"
+    for directory in (processing, done, failed, output_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    processed = 0
+    failures = 0
+    seen: set[str] = set()
+    while True:
+        candidates = [p for p in sorted(input_dir.glob("*.md")) if p.is_file() and p.name not in seen]
+        if not candidates and not watch:
+            break
+        for source in candidates:
+            working = processing / source.name
+            source.replace(working)
+            try:
+                result = file_only.process_prompt_file_only(
+                    prompt_file=working,
+                    output_file=output_dir / working.name,
+                    headless=bool(getattr(args, "headless", True)),
+                )
+                if "failed" in str(result).lower() or "error" in str(result).lower():
+                    raise RuntimeError(str(result))
+                working.replace(done / working.name)
+                processed += 1
+            except Exception:
+                failures += 1
+                if working.exists():
+                    working.replace(failed / working.name)
+            seen.add(source.name)
+        if not watch:
+            break
+        time.sleep(float(getattr(args, "interval", 5.0)))
+    return {"success": failures == 0, "processed": processed, "failed": failures}
 
 
 def _dispatch(
@@ -325,6 +398,15 @@ def _dispatch(
 
     resolved_log_path = cfg.log_path if cfg.log_path is not None else DEFAULT_LOG
     container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
+
+    if action in {"batch", "watch"}:
+        result = _run_folder_mode(
+            args,
+            cfg,
+            container.agent_prompt_file_orchestrator,
+            watch=action == "watch",
+        )
+        return _result_exit_code(result, json_output=json_output)
 
     args._cfg = cfg
     result = surface_cli_run_command.handle(

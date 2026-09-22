@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from modules.core.src.utility_core_io_writer import ATOMIC_TEMP_SUFFIX, atomic_write_text
@@ -35,6 +36,7 @@ class JobManager(IJobStorageProtocol):
     def __init__(self, storage_dir: Path | None = None) -> None:
         self.storage_dir = storage_dir or DEFAULT_JOBS_DIR
         self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.cleanup_stale_jobs()
 
     def _job_file_path(self, job_id: JobId | str) -> Path:
         """Map a job ID onto a filesystem-safe path inside the storage dir.
@@ -86,6 +88,33 @@ class JobManager(IJobStorageProtocol):
         except Exception as exc:
             log.error("job_read_failed", job_id=str(job_id), error=str(exc))
             return None
+
+    def cleanup_stale_jobs(
+        self,
+        *,
+        now: datetime | None = None,
+        terminal_ttl: timedelta = timedelta(hours=24),
+        incomplete_ttl: timedelta = timedelta(days=7),
+    ) -> int:
+        """Delete terminal jobs after 24h and abandoned jobs after 7 days.
+
+        Cleanup is explicit and deterministic so MCP startup/maintenance can
+        invoke it without changing the semantics of status reads.
+        """
+        reference = now or datetime.now(timezone.utc)
+        removed = 0
+        for path in self.storage_dir.glob("*.json"):
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                stamp = raw.get("completed_at") if raw.get("completed") else raw.get("created_at")
+                created = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                ttl = terminal_ttl if raw.get("completed") else incomplete_ttl
+                if reference - created > ttl:
+                    path.unlink(missing_ok=True)
+                    removed += 1
+            except (OSError, ValueError, TypeError, KeyError):
+                continue
+        return removed
 
     def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
         """List recently recorded jobs sorted newest to oldest.
