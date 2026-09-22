@@ -12,7 +12,12 @@ from modules.shared.src import (
     PIPELINE_EVENT_SEQUENCE,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleGate, LifecycleState
-from modules.shared.src.taxonomy_core_error import ErrorCategory, QwenCliError, ResponseDetectionTimeoutError
+from modules.shared.src.taxonomy_core_error import (
+    ErrorCategory,
+    QwenCliError,
+    ResponseDetectionTimeoutError,
+    StuckDetectedError,
+)
 from modules.shared.src.taxonomy_core_error import QwenCliError as CANONICAL_QWEN_CLI_ERROR
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DOCUMENT_PARSED,
@@ -116,3 +121,4 @@ def test_error_taxonomy_has_new_source_and_legacy_facade() -> None:
         ErrorCategory.categorize(ResponseDetectionTimeoutError("Response detection timeout after 10s"))
         == "response_timeout"
     )
+    assert ErrorCategory.categorize(StuckDetectedError("stuck: no forward event for 300s")) == "stuck"

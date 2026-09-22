@@ -322,6 +322,7 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
 
 # ─── Folder compiler defaults ───────────────────────────────────────────────
 MAX_FOLDER_DEPTH: int = 5
+MAX_IMPORT_DEPTH: int = 1
 
 CODE_EXTENSIONS: frozenset[str] = frozenset(
     {
@@ -379,7 +380,6 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
 )
 
 # ─── Saver defaults ─────────────────────────────────────────
-DEFAULT_INCLUDE_HEADER: bool = True
 DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
 

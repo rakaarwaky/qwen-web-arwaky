@@ -14,19 +14,17 @@ from modules.shared.src.contract_core_protocol import ISaverProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_ATOMIC_WRITE,
     DEFAULT_GENERATE_SIDECAR,
-    DEFAULT_INCLUDE_HEADER,
 )
 from modules.shared.src.taxonomy_core_error import OutputWriteError
 from modules.shared.src.taxonomy_core_vo import (
     AtomicWriteFlag,
     FilePath,
     GenerateSidecarFlag,
-    IncludeHeaderFlag,
     OutputChars,
     ResponseText,
     RunContext,
 )
-from modules.shared.src.utility_core_text import build_metadata_header, strip_ui_noise, utc_now_iso
+from modules.shared.src.utility_core_text import strip_ui_noise, utc_now_iso
 
 log = get_logger("capabilities_saver")
 
@@ -39,11 +37,9 @@ class Saver(ISaverProtocol):
 
     def __init__(
         self,
-        include_header: IncludeHeaderFlag = IncludeHeaderFlag(DEFAULT_INCLUDE_HEADER),
         generate_sidecar: GenerateSidecarFlag = GenerateSidecarFlag(DEFAULT_GENERATE_SIDECAR),
         atomic_write: AtomicWriteFlag = AtomicWriteFlag(DEFAULT_ATOMIC_WRITE),
     ) -> None:
-        self.include_header = include_header
         self.generate_sidecar = generate_sidecar
         self.atomic_write = atomic_write
 
@@ -59,29 +55,26 @@ class Saver(ISaverProtocol):
         output_chars: OutputChars | int,
         config: Any | None = None,
     ) -> None:
-        """Write processed output to disk with metadata traceability header in 4 sequential steps:
+        """Write processed output to disk with a JSON sidecar file:
 
-        Step 1: Resolve configuration & metadata header
+        Step 1: Resolve configuration & metadata
         Step 2: Ensure destination parent directory
         Step 3: Write main content file (atomic or direct)
         Step 4: Generate .meta.json sidecar file
         """
-        # Step 1: Resolve configuration & metadata header
+        # Step 1: Resolve configuration & metadata
         cfg = config or {}
         if not isinstance(cfg, dict):
             cfg = {
-                "include_header": getattr(cfg, "include_header", self.include_header),
                 "generate_sidecar": getattr(cfg, "generate_sidecar", self.generate_sidecar),
                 "atomic_write": getattr(cfg, "atomic_write", self.atomic_write),
             }
-        include_header = cfg.get("include_header", self.include_header)
         generate_sidecar = cfg.get("generate_sidecar", self.generate_sidecar)
         atomic_write = cfg.get("atomic_write", self.atomic_write)
         run_id = str(ctx.run_id)
         iso_timestamp = utc_now_iso()
 
-        header = build_metadata_header(ctx, str(src), dur, input_chars, output_chars) if include_header else ""
-        full_text = header + strip_ui_noise(content)
+        full_text = strip_ui_noise(content)
 
         # Step 2: Ensure destination parent directory
         try:
@@ -138,4 +131,4 @@ class Saver(ISaverProtocol):
 
     def __repr__(self) -> str:
         """Return string representation of Saver."""
-        return f"Saver(header={self.include_header}, sidecar={self.generate_sidecar}, atomic={self.atomic_write})"
+        return f"Saver(sidecar={self.generate_sidecar}, atomic={self.atomic_write})"
