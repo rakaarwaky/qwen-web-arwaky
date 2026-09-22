@@ -4,6 +4,7 @@ Issue Section Template
 #### Issue PE-{SCOPE-NUMBER}-{ID}
 
 - **Title**: \[PE\][{Severity}\] {concise issue title}
+- **Label**: {requirement|scope|priorities|metrics|user-value|severity-critical|severity-warning|severity-info}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
@@ -15,6 +16,8 @@ Issue Section Template
 - {old content or line}
 + {new content or line}
 ```
+
+- **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
 ```markdown
@@ -48,9 +51,6 @@ FullTemplate
 #### Issue PE-{SCOPE-NUMBER}-{ID}
 #### Issue PE-{SCOPE-NUMBER}-{ID}
 #### Issue PE-{SCOPE-NUMBER}-{ID}
-
-## Open Questions
-{List or "None"}
 
 ## Violations
 

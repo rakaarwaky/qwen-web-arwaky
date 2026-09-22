@@ -203,3 +203,107 @@ def test_swarm_id_from_manifest(tmp_path):
     run = _make_run(tmp_path, "backend-engineer", content, manifest="swarm_custom_123")
     issues = parse_swarm_run(run)
     assert "swarm_custom_123" in issues[0].body
+
+
+def test_parse_agent_output_explicit_labels_from_template(tmp_path):
+    # The template emits `- **Label**: {a|b|c}` — the parser splits the
+    # candidate list on pipes (and commas), so both forms are accepted.
+    content = (
+        "#### Issue FE-1-001\n"
+        "- **Title**: [FE][WARNING] UI lag\n"
+        "- **Label**: {ui|performance|severity-warning}\n"
+        "- **Description**: d\n"
+    )
+    run = _make_run(tmp_path, "frontend-engineer", content)
+    issues = parse_swarm_run(run)
+    assert len(issues) == 1
+    labels = issues[0].labels
+    # Role label is always first; concern labels preserve their order.
+    assert labels[0] == "swarm-frontend-engineer"
+    for lbl in ("ui", "performance", "severity-warning"):
+        assert lbl in labels
+
+
+def test_parse_agent_output_comma_separated_labels(tmp_path):
+    content = (
+        "#### Issue FE-1-001\n"
+        "- **Title**: [FE][INFO] polish\n"
+        "- **Label**: visual, a11y, severity-info\n"
+        "- **Description**: d\n"
+    )
+    run = _make_run(tmp_path, "frontend-engineer", content)
+    issues = parse_swarm_run(run)
+    for lbl in ("visual", "a11y", "severity-info", "swarm-frontend-engineer"):
+        assert lbl in issues[0].labels
+
+
+def test_parse_agent_output_no_explicit_labels_falls_back_to_severity(tmp_path):
+    # Legacy outputs without a Label field keep the old behaviour:
+    # role label + inferred severity label only.
+    content = "#### Issue BE-1-001\n- **Title**: [BE][CRITICAL] broken\n- **Description**: d\n"
+    run = _make_run(tmp_path, "backend-engineer", content)
+    issues = parse_swarm_run(run)
+    assert issues[0].labels == ["swarm-backend-engineer", "severity-critical"]
+
+
+def test_parse_agent_output_label_dedup_preserves_order(tmp_path):
+    content = (
+        "#### Issue FE-1-001\n"
+        "- **Title**: [FE][INFO] dup labels\n"
+        "- **Label**: {ui,ui|state, state|severity-info}\n"
+        "- **Description**: d\n"
+    )
+    run = _make_run(tmp_path, "frontend-engineer", content)
+    issues = parse_swarm_run(run)
+    labels = issues[0].labels
+    assert labels.count("ui") == 1
+    assert labels.count("state") == 1
+    assert labels[:3] == ["swarm-frontend-engineer", "ui", "state"]
+
+
+def test_parse_agent_output_open_questions_per_issue(tmp_path):
+    content = (
+        "#### Issue FE-1-001\n"
+        "- **Title**: [FE][INFO] q1\n"
+        "- **Description**: d\n"
+        "- **Open Questions**: Should this be lazy-loaded?\n"
+        "  Or kept in the critical path?\n"
+    )
+    run = _make_run(tmp_path, "frontend-engineer", content)
+    issues = parse_swarm_run(run)
+    body = issues[0].body
+    assert "## Open Questions" in body
+    assert "Should this be lazy-loaded?" in body
+    assert "Or kept in the critical path?" in body
+
+
+def test_parse_agent_output_open_questions_none_omitted(tmp_path):
+    content = "#### Issue FE-1-001\n- **Title**: [FE][INFO] none\n- **Description**: d\n- **Open Questions**: None\n"
+    run = _make_run(tmp_path, "frontend-engineer", content)
+    issues = parse_swarm_run(run)
+    assert "## Open Questions" not in issues[0].body
+
+
+def test_build_issue_body_open_questions_included():
+    body = build_issue_body(
+        role="frontend-engineer",
+        iid="FE-1-001",
+        description="desc",
+        plan_title="Plan: X",
+        swarm_id="swarm_abc",
+        open_questions="Is the cache TTL correct?",
+    )
+    assert "## Open Questions" in body
+    assert "Is the cache TTL correct?" in body
+
+
+def test_build_issue_body_open_questions_none_omitted():
+    body = build_issue_body(
+        role="frontend-engineer",
+        iid="FE-1-001",
+        description="desc",
+        plan_title="Plan: X",
+        swarm_id="swarm_abc",
+        open_questions="None",
+    )
+    assert "## Open Questions" not in body

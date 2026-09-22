@@ -4,6 +4,7 @@ Issue Section Template
 #### Issue DO-{SCOPE-NUMBER}-{ID}
 
 - **Title**: \[DO\][{Severity}\] {concise issue title}
+- **Label**: {ci|container|deploy|logging|config|severity-critical|severity-warning|severity-info}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
@@ -15,6 +16,8 @@ Issue Section Template
 - {old content or line}
 + {new content or line}
 ```
+
+- **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
 ```markdown
@@ -48,9 +51,6 @@ FullTemplate
 #### Issue DO-{SCOPE-NUMBER}-{ID}
 #### Issue DO-{SCOPE-NUMBER}-{ID}
 #### Issue DO-{SCOPE-NUMBER}-{ID}
-
-## Open Questions
-{List or "None"}
 
 ## Violations
 
