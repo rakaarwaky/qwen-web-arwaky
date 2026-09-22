@@ -315,3 +315,31 @@ def test_session_badge_survives_teardown_state() -> None:
             app._session_check_timeout()  # must not raise (also covers the render() read)
 
     asyncio.run(_run())
+
+
+def test_rich_log_copy_text_returns_all_lines() -> None:
+    """QwenTuiRichLog.copy_text returns every line's plain text joined by newlines."""
+    from modules.cli.src.surface_cli_tui_components import QwenTuiRichLog
+
+    log = QwenTuiRichLog()
+    log.write("line one")
+    log.write("line two")
+    text = log.copy_text()
+    lines = text.splitlines()
+    assert len(lines) == 2
+    assert "line one" in lines[0]
+    assert "line two" in lines[1]
+
+
+def test_rich_log_copy_plain_truncates_to_limit() -> None:
+    """QwenTuiRichLog.copy_plain(limit) returns only the last `limit` lines when truncated."""
+    from modules.cli.src.surface_cli_tui_components import QwenTuiRichLog
+
+    log = QwenTuiRichLog()
+    for i in range(5):
+        log.write(f"entry {i}")
+    tail = log.copy_plain(limit=2)
+    lines = tail.splitlines()
+    assert len(lines) == 2
+    assert "entry 3" in lines[0]
+    assert "entry 4" in lines[1]

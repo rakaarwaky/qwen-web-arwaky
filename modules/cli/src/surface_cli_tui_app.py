@@ -75,6 +75,7 @@ class QwenTuiApp(
         Binding("enter", "run_active_slot", "Run Slot"),
         Binding("ctrl+r", "run_active_slot", "Run"),
         Binding("ctrl+x", "cancel_active_slot", "Cancel Slot"),  # A8
+        Binding("ctrl+c", "copy_active_log", "Copy Log"),
         Binding("ctrl+l", "login_action", "Login"),
         Binding("ctrl+i", "init_action", "Init"),
         Binding("ctrl+q", "request_quit", "Quit"),
