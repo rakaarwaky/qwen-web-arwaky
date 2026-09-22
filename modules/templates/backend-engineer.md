@@ -4,6 +4,7 @@ Issue Section Template
 #### Issue BE-{SCOPE-NUMBER}-{ID}
 
 - **Title**: \[BE\][{Severity}\] {concise issue title}
+- **Label**: {api|database|business-rule|security|performance|test|severity-critical|severity-warning|severity-info}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
@@ -15,6 +16,8 @@ Issue Section Template
 - {old content or line}
 + {new content or line}
 ```
+
+- **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
 ```markdown
@@ -48,9 +51,6 @@ FullTemplate
 #### Issue BE-{SCOPE-NUMBER}-{ID}
 #### Issue BE-{SCOPE-NUMBER}-{ID}
 #### Issue BE-{SCOPE-NUMBER}-{ID}
-
-## Open Questions
-{List or "None"}
 
 ## Violations
 

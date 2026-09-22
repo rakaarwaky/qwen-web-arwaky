@@ -4,6 +4,7 @@ Issue Section Template
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 
 - **Title**: \[BA\][{Severity}\] {concise issue title}
+- **Label**: {business-rule|process|stakeholder|acceptance|compliance|severity-critical|severity-warning|severity-info}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
@@ -15,6 +16,8 @@ Issue Section Template
 - {old content or line}
 + {new content or line}
 ```
+
+- **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
 ```markdown
@@ -48,9 +51,6 @@ FullTemplate
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 #### Issue BA-{SCOPE-NUMBER}-{ID}
 #### Issue BA-{SCOPE-NUMBER}-{ID}
-
-## Open Questions
-{List or "None"}
 
 ## Severity Definitions
 - **CRITICAL**: Missing business requirement, wrong business flow, compliance risk, stakeholder conflict, or UAT blocker. Immediate fix.

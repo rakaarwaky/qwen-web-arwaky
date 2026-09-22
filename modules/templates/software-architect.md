@@ -4,6 +4,7 @@ Issue Section Template
 #### Issue ARCH-{SCOPE-NUMBER}-{ID}
 
 - **Title**: \[ARCH\][{Severity}\] {concise issue title}
+- **Label**: {layer|contract|module|dependency|design|severity-critical|severity-warning|severity-info}
 - **Location Path**:
   {file or section reference}
 - **Description**: {detailed description of the issue}
@@ -15,6 +16,8 @@ Issue Section Template
 - {old content or line}
 + {new content or line}
 ```
+
+- **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
 ```markdown
@@ -48,9 +51,6 @@ FullTemplate
 #### Issue ARCH-{SCOPE-NUMBER}-{ID}
 #### Issue ARCH-{SCOPE-NUMBER}-{ID}
 #### Issue ARCH-{SCOPE-NUMBER}-{ID}
-
-## Open Questions
-{List or "None"}
 
 ## Violations
 
