@@ -63,7 +63,6 @@ class ProcessingOutcome:
 
     status: ProcessingStatus
     error: str | None = None
-    failed_path: Path | None = None
 
 
 JobId = NewType("JobId", str)
@@ -481,9 +480,6 @@ class AppConfig:
 
     input_path: Path
     output_path: Path
-    done_path: Path
-    failed_path: Path
-    proc_path: Path
     session_path: Path
     log_path: Path | None = None
     mode: str = ""

@@ -247,9 +247,6 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         mode=mode_map.get(action, "direct"),
         input_path=prompt_p or dummy_path,
         output_path=out_p,
-        done_path=dummy_path,
-        failed_path=dummy_path,
-        proc_path=dummy_path,
         session_path=DEFAULT_SESSION,
         log_path=DEFAULT_LOG,
         headless=headless,
@@ -297,39 +294,29 @@ def _run_folder_mode(
     *,
     watch: bool,
 ) -> dict[str, object]:
-    """Process Markdown files with input -> .processing -> done/failed routing."""
+    """Process input files in place; status is recorded in logs and metrics."""
     input_dir = Path(cfg.input_path)
     output_dir = Path(cfg.output_path)
-    processing = input_dir / ".processing"
-    done = input_dir / "done"
-    failed = input_dir / "failed"
-    for directory in (processing, done, failed, output_dir):
-        directory.mkdir(parents=True, exist_ok=True)
-
+    output_dir.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = set()
     processed = 0
     failures = 0
-    seen: set[str] = set()
     while True:
         candidates = [p for p in sorted(input_dir.glob("*.md")) if p.is_file() and p.name not in seen]
         if not candidates and not watch:
             break
         for source in candidates:
-            working = processing / source.name
-            source.replace(working)
             try:
                 result = file_only.process_prompt_file_only(
-                    prompt_file=working,
-                    output_file=output_dir / working.name,
+                    prompt_file=source,
+                    output_file=output_dir / source.name,
                     headless=bool(getattr(args, "headless", True)),
                 )
                 if "failed" in str(result).lower() or "error" in str(result).lower():
                     raise RuntimeError(str(result))
-                working.replace(done / working.name)
                 processed += 1
             except Exception:
                 failures += 1
-                if working.exists():
-                    working.replace(failed / working.name)
             seen.add(source.name)
         if not watch:
             break

@@ -44,9 +44,6 @@ class TestRunManualLogin:
                 mode="login",
                 input_path=Path("/tmp/in"),
                 output_path=Path("/tmp/out"),
-                done_path=Path("/tmp/done"),
-                failed_path=Path("/tmp/failed"),
-                proc_path=Path("/tmp/proc"),
                 session_path=Path("/tmp/session"),
             )
             from modules.root_cli_main_entry import _run_manual_login
@@ -67,9 +64,6 @@ class TestRunManualLogin:
                 mode="login",
                 input_path=Path("/tmp/in"),
                 output_path=Path("/tmp/out"),
-                done_path=Path("/tmp/done"),
-                failed_path=Path("/tmp/failed"),
-                proc_path=Path("/tmp/proc"),
                 session_path=Path("/tmp/session"),
             )
             from modules.root_cli_main_entry import _run_manual_login
@@ -87,9 +81,6 @@ class TestRunManualLogin:
                 mode="login",
                 input_path=Path("/tmp/in"),
                 output_path=Path("/tmp/out"),
-                done_path=Path("/tmp/done"),
-                failed_path=Path("/tmp/failed"),
-                proc_path=Path("/tmp/proc"),
                 session_path=Path("/tmp/session"),
             )
             from modules.root_cli_main_entry import _run_manual_login

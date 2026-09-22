@@ -121,24 +121,6 @@ class TestShouldProcessFile:
         f.write_text("content")
         assert _should_process_file(f, tmp_path) is False
 
-    def test_done_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / "done" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
-    def test_failed_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / "failed" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
-    def test_processing_dir_skipped(self, tmp_path):
-        f = tmp_path / "role-architect" / ".processing" / "task.md"
-        f.parent.mkdir(parents=True)
-        f.write_text("content")
-        assert _should_process_file(f, tmp_path) is False
-
     def test_not_role_prefix_skipped(self, tmp_path):
         f = tmp_path / "other-dir" / "task.md"
         f.parent.mkdir(parents=True)

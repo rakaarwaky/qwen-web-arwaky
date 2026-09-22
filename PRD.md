@@ -23,7 +23,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 
 ## User Personas
 
-- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs batch markdown prompts locally without burning cash on API tokens, and needs reliable file routing (`input` → `.processing` → `done`/`failed`) and detailed JSONL audit logs.
+- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs timestamped batch markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
 - **AI Agent (via MCP)**: Interacts with the tool programmatically to send
   prompts, process files, and read audit logs without managing browser
   lifecycles or DOM selectors.
@@ -109,8 +109,9 @@ in `metrics.json` under the application state directory. Emit WARNING below
   Single (one file), and raw `send_prompt` — all via `ICoreAggregate`.
 - [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
   first; only an invalid session opens a headed browser for CAPTCHA.
-- [X]  **Atomic file routing**: `input` → `.processing` → `done` / `failed`
-  with circuit breaker and rate limiter in the agent.
+- [X]  **Timestamped input processing**: input files are uniquely named by the
+  producer; success/failure status is recorded in JSONL logs and job metrics,
+  and input files remain in place.
 - [X]  **MCP server**: live tools for direct prompts, prompt files, attachments,
   session management, workspace initialization, and asynchronous job status.
 

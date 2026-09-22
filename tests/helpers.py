@@ -118,9 +118,6 @@ def make_app_config(tmp_path: Path, **overrides) -> AppConfig:
         mode="batch",
         input_path=tmp_path / "input",
         output_path=tmp_path / "output",
-        done_path=tmp_path / "input" / "done",
-        failed_path=tmp_path / "input" / "failed",
-        proc_path=tmp_path / "input" / ".processing",
         session_path=tmp_path / "session",
     )
     defaults.update(overrides)

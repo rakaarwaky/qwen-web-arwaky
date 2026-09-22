@@ -144,9 +144,6 @@ def test_cli_login_passes_confirmation_callback_to_core(tmp_path: Path) -> None:
         mode="login",
         input_path=tmp_path / "input",
         output_path=tmp_path / "output",
-        done_path=tmp_path / "done",
-        failed_path=tmp_path / "failed",
-        proc_path=tmp_path / "proc",
         session_path=tmp_path / "session",
     )
     session = MagicMock()

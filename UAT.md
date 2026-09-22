@@ -24,8 +24,8 @@ The following deterministic scenarios are required for release sign-off:
 
 | ID | Scenario | Expected evidence |
 |---|---|---|
-| UAT-BA-001 | Run `batch` with two Markdown prompts | Each file moves through `.processing` to `done`; output files exist. |
-| UAT-BA-002 | Run `batch` with a failing prompt | The file is moved to `failed` and the other files continue. |
+| UAT-BA-001 | Run `batch` with two timestamped Markdown prompts | Input files remain in place; outputs and success status are recorded. |
+| UAT-BA-002 | Run `batch` with a failing prompt | Input remains in place; error status and message are recorded in logs. |
 | UAT-BA-003 | Run `watch --interval 1` and add a prompt | The new prompt is picked up without restarting the process. |
 | UAT-BA-004 | Compile an attachment above 100 MiB | Validation fails before browser interaction with the size limit. |
 | UAT-BA-005 | Inspect `metrics.json` after terminal outcomes | `total_executions`, `successful_executions`, and `success_rate` are persisted. |
@@ -36,4 +36,4 @@ The following deterministic scenarios are required for release sign-off:
 
 ## Isolated UAT setup
 
-Run `tests/uat/setup.sh` before deterministic UAT. It creates isolated input, processing, done, failed, output, and session directories without performing live authentication. Browser-backed scenarios may supply a session separately.
+Run `tests/uat/setup.sh` before deterministic UAT. It creates isolated input, output, and session directories without performing live authentication. Browser-backed scenarios may supply a session separately.
