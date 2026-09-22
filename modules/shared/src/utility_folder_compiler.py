@@ -626,10 +626,30 @@ def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None
     return None
 
 
+_WORKSPACE_ROOT_ENV = "QWEN_WORKSPACE_ROOT"
+
+
+def _resolve_boundary_root(folder_path: Path, boundary_root: Path | None) -> Path:
+    """Resolve the confinement boundary for import resolution.
+
+    Precedence: explicit ``boundary_root`` → ``QWEN_WORKSPACE_ROOT`` env var
+    (the same root the MCP surface validates attachment paths against) →
+    ``folder_path.parent`` (CLI default: sibling imports keep working).
+    """
+    if boundary_root is not None:
+        return Path(boundary_root).expanduser().resolve()
+    env_root = os.environ.get(_WORKSPACE_ROOT_ENV, "").strip()
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+    return folder_path.parent.resolve()
+
+
 def collect_folder_files_with_imports(
     folder_path: Path,
     max_depth: int = MAX_FOLDER_DEPTH,
     import_depth: int = MAX_IMPORT_DEPTH,
+    boundary_root: Path | None = None,
+    skipped: list[Path] | None = None,
 ) -> tuple[list[Path], dict[Path, tuple[str, ...]]]:
     """Collect in-folder files plus files they import from outside the folder.
 
@@ -638,6 +658,14 @@ def collect_folder_files_with_imports(
     wikilinks) and resolved relative to the importing file (and the folder
     root where the language allows). External dependencies are included
     recursively with cycle protection, up to ``import_depth`` hops.
+
+    Security (issue #342): the compiled output is uploaded to a third-party
+    service, and the MCP surface validates only the *initial* attachment
+    path against the workspace root — the import follower must enforce the
+    same boundary transitively. Every resolved import is confined to the
+    boundary resolved by :func:`_resolve_boundary_root`; paths outside it are
+    refused and reported through the optional ``skipped`` out-parameter so
+    the calling capability can log them.
 
     Returns:
         ``(files, origins)``: ordered list to compile and a mapping of each
@@ -649,6 +677,7 @@ def collect_folder_files_with_imports(
         FolderEmptyError: If the folder contains no compilable files.
     """
     folder_path = Path(folder_path).resolve()
+    boundary = _resolve_boundary_root(folder_path, boundary_root)
     base_files = validate_folder_for_compile(folder_path, max_depth=max_depth)
     files: list[Path] = list(base_files)
     origins: dict[Path, tuple[str, ...]] = {f: () for f in base_files}
@@ -666,6 +695,12 @@ def collect_folder_files_with_imports(
                 # External files: skip imports living inside excluded
                 # directories (node_modules, build, dist, venv, ...).
                 if any(part in EXCLUDED_DIR_NAMES for part in resolved.parts):
+                    continue
+                # Boundary enforcement: refuse paths escaping the workspace
+                # (also neutralises symlinks, which resolve() already unfold).
+                if not resolved.is_relative_to(boundary):
+                    if skipped is not None:
+                        skipped.append(resolved)
                     continue
                 seen.add(resolved)
                 next_frontier.append(resolved)

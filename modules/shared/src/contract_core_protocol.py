@@ -78,6 +78,8 @@ class IFolderCompileProtocol(ABC):
         output_path: Path | None = None,
         max_depth: int = MAX_FOLDER_DEPTH,
         import_depth: int = MAX_IMPORT_DEPTH,
+        include_imports: bool = True,
+        boundary_root: Path | None = None,
     ) -> Path:
         """Compile folder contents to a single markdown file.
 
@@ -90,6 +92,14 @@ class IFolderCompileProtocol(ABC):
                 folder.  With the default of 1, only files linked directly
                 from in-folder documents are included; transitive
                 (second-hop) links are not followed.
+            include_imports: Follow imports/links of folder files and include
+                external dependencies (cycle-safe, bounded hops).
+            boundary_root: Confinement boundary for import resolution.
+                Resolved imports outside this root are refused because the
+                compiled output is uploaded to a third-party service.
+                Defaults to the ``QWEN_WORKSPACE_ROOT`` env var when set
+                (matching the MCP workspace boundary), else the scanned
+                folder's parent.
 
         Returns:
             Path to the compiled markdown file.
