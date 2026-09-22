@@ -1,7 +1,7 @@
 As a Product Engineer agent, read all relevant attached documents, analyze the feature delivery status, and fill this plan using the Product Engineer scope below.
 
 Issue Section Template
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 - **Title**: \[PE\][{Severity}\] {concise issue title}
 - **Label**: {requirement|scope|priorities|metrics|user-value|severity-critical|severity-warning|severity-info}
@@ -28,29 +28,29 @@ FullTemplate
 
 ### Scope 1: Track the feature delivery progress
 <!-- Check engineering milestones, backend and frontend completion status, design handoff status, technical specification adherence, and timeline alignment -->
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 2: Map the cross-team dependencies
 <!-- Check blocking dependencies between backend and frontend, external team reliance, API contract readiness, and environment provisioning status -->
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 3: Identify blockers and specification gaps
 <!-- Check mismatches between business requirements and implementation, missing technical edge cases, unresolved architectural blockers, and unclarified technical assumptions -->
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 4: Coordinate the demo environment preparation
 <!-- Check test data availability, environment configuration status, feature toggle setup, cross-module integration status, and demo script readiness for stakeholders -->
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 5: Verify the release candidate completeness
 <!-- Check code freeze status, documentation updates, deployment artifact readiness, rollback plan availability, and release checklist sign-offs from all required roles -->
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
-#### Issue PE-{SCOPE-NUMBER}-{ID}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue PE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 ## Violations
 

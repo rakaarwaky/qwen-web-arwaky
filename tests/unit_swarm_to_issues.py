@@ -307,3 +307,23 @@ def test_build_issue_body_open_questions_none_omitted():
         open_questions="None",
     )
     assert "## Open Questions" not in body
+
+
+def test_parse_agent_output_timestamped_issue_id(tmp_path):
+    content = (
+        "#### Issue PE-1-001-20260922123045\n"
+        "- **Title**: [PE][WARNING] Timestamped issue\n"
+        "- **Description**: Description with timestamp ID.\n"
+        "#### Issue ARCH-2-005-1727000000\n"
+        "- **Title**: [ARCH][CRITICAL] Unix epoch timestamped issue\n"
+        "- **Description**: Description with epoch timestamp ID.\n"
+    )
+    run = _make_run(tmp_path, "product-engineer", content)
+    issues = parse_swarm_run(run)
+    assert len(issues) == 2
+    assert issues[0].issue_id == "PE-1-001-20260922123045"
+    assert issues[0].role == "product-engineer"
+    assert "imported `PE-1-001-20260922123045`" in issues[0].body
+    assert issues[1].issue_id == "ARCH-2-005-1727000000"
+    assert issues[1].role == "software-architect"
+    assert "imported `ARCH-2-005-1727000000`" in issues[1].body

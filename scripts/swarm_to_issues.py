@@ -176,7 +176,7 @@ def read_manifest(run: Path) -> dict:
 # Issue parser
 # ---------------------------------------------------------------------------
 
-ROLE_DETECT = re.compile(r"####\s+Issue\s+([A-Z]+-\d+-\d+)\s*$")
+ROLE_DETECT = re.compile(r"####\s+Issue\s+([A-Z]+-\d+-\d+(?:-[\w:.-]+)?)\s*$")
 
 
 def _strip_md_escapes(s: str) -> str:
