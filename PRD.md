@@ -40,7 +40,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
   REST API integrations, and cloud-hosted SaaS deployments. The project is in
   **Stabilization + Targeted Enhancement Mode**; Swarm,
   asynchronous Jobs, and self-update are approved in-scope enhancements under
-  change request CR-2026-004. See `docs/BA-DECISIONS.md`.
+  change request CR-2026-004.
 
 Core functional specs live in [`modules/core/FRD.md`](modules/core/FRD.md)
 (exactly 8 FRs, one per capability + protocol). CLI and MCP surfaces have
