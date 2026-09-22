@@ -53,8 +53,8 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  Session dir is `0o700` after `browser_session` enters.
   - [ ]  Login URL or visible password form raises `AuthRequiredError`.
   - [ ]  Media/font/image requests are aborted outside login mode.
-- **Tests**: `tests/test_browser.py`, `tests/test_browser_extended.py`,
-  `tests/test_browser_session.py`, `tests/test_login_session.py`.
+- **Tests**: `tests/unit_browser_adapter.py`,
+  `tests/integration_browser_session.py`, `tests/integration_surface_login.py`.
 
 ### FR-002: File Uploader
 
@@ -93,7 +93,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     → `True`.
   - [ ]  Transient timeout retries then returns `False` after max attempts.
   - [ ]  Upload is blocked when `web_loaded` is false.
-- **Tests**: `tests/test_file_uploader.py`, `tests/test_qwen_client_behavior.py`.
+- **Tests**: `tests/unit_capability_file_uploader.py`, `tests/contract_qwen_auto.py`.
 
 ### FR-003: Output Saver
 
@@ -122,7 +122,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     `duration_sec`, `input_chars`, `output_chars`.
   - [ ]  Crash mid-write does not leave a truncated destination when atomic.
   - [ ]  Sidecar I/O error still leaves the markdown file intact.
-- **Tests**: `tests/test_saver.py`, `tests/test_saver_extended.py`.
+- **Tests**: `tests/unit_capability_output_saver.py`.
 
 ### FR-004: Prompt Injector
 
@@ -156,9 +156,8 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  React setter path succeeds for a normal textarea.
   - [ ]  Empty prompt raises `PromptInjectionError` before any DOM write.
   - [ ]  All-tier failure raises `PromptInjectionError`.
-- **Tests**: `tests/test_prompt_injector.py`,
-  `tests/test_prompt_injector_extended.py`,
-  `tests/test_prompt_injector_final.py`, `tests/test_qwen_client_behavior.py`.
+- **Tests**: `tests/unit_capability_prompt_injector.py`,
+  `tests/unit_capability_prompt_injector_verify.py`, `tests/contract_qwen_auto.py`.
 
 ### FR-005: Send Dispatcher
 
@@ -192,8 +191,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     enabled by configuration.
   - [ ]  Disabled fallback never presses Enter and failed dispatch raises
     `SendDispatchError` without emitting `EVENT_SEND_CLICKED`.
-- **Tests**: `tests/test_sender.py`, `tests/test_sender_extended.py`,
-  `tests/test_qwen_client_behavior.py`.
+- **Tests**: `tests/unit_capability_send_dispatcher.py`, `tests/contract_qwen_auto.py`.
 
 ### FR-006: Stream Monitor
 
@@ -204,7 +202,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   the text is not a CAPTCHA or error page.
 - **Input**: `Page`, `timeout_sec`, `msg_count_before`, `LifecycleEmitter`,
   poll/stability/min-length knobs, `dispatch_acknowledged` gate.
-- **Output**: `ResponseText` or `None` on hard timeout with no text.
+- **Output**: `ResponseText` on the terminal generation event.
   Events: `EVENT_THINKING_STARTED`, `EVENT_STREAMING_GENERATION`,
   `EVENT_GENERATION_FINISHED`.
 - **Business Rules**:
@@ -213,28 +211,40 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - Generation is incomplete while Stop is visible, Send is disabled, or a
     typing/thinking indicator is visible.
   - A candidate is accepted only when it is a *new* response vs baseline,
-    meets min length, is stable for N checks, and generation is complete
-    (or timeout returns last non-empty text after validation).
+    meets min length, is stable for N checks, and generation is complete.
+  - `timeout_sec` is a **hard cutoff** (issue #372): overrunning it without
+    a terminal event raises `ResponseDetectionTimeoutError` (the dispatch
+    loop in the Agent layer retries per `MAX_ATTEMPTS`). The 30s periodic
+    cloud reload sync is recovery inside the budget, never a cutoff reset.
+  - The `safety_timeout_sec` circuit breaker is the absolute backstop for
+    pathological loops; it defaults to 4h and is operator-tunable via the
+    `QWEN_STREAM_SAFETY_TIMEOUT_SEC` environment variable (issue #330).
+  - Stall detection is event-driven: no forward lifecycle event (thinking,
+    streamed text change, completion) for `stall_timeout_sec` (default
+    300s) raises `StuckDetectedError`; slow-but-alive generations are never
+    misclassified while text keeps changing.
   - `validate_response_content` rejects empty text and challenge keywords
     (`just a moment`, `verify you are human`, 502/504, upload-still-parsing,
     etc.). CAPTCHA phrases become `AuthRequiredError`.
   - Poll cycle must stay under 300ms of blocking work (NFR).
 - **Edge Cases**: network drop mid-stream; UI noise ("Qwen3" tags); response
-  shorter than min length; timeout with partial text; timeout with no text;
-  Playwright IPC death.
+  shorter than min length; hard cutoff mid-stream; Playwright IPC death.
 - **Error Handling**:
-  - `NetworkTimeoutError` on Playwright timeout / IPC `Error`.
+  - `ResponseDetectionTimeoutError` on `timeout_sec` hard cutoff and on the
+    safety circuit breaker (propagated for orchestrator retry).
+  - `StuckDetectedError` on event-driven stall (retryable).
+  - Transient Playwright `TimeoutError` / `Error` trigger reload-based
+    recovery without failing the wait.
   - `OutputValidationError` / `AuthRequiredError` from content validation
     (propagated, not swallowed).
-  - Unexpected exceptions are logged and re-raised.
 - **Acceptance Criteria**:
   - [ ]  Wait is blocked when `dispatch_acknowledged` is false.
   - [ ]  Stable new text + complete generation returns `ResponseText`.
   - [ ]  CAPTCHA keyword in a short page raises `AuthRequiredError`.
   - [ ]  Server-error keyword raises `OutputValidationError`.
-  - [ ]  Hard timeout with no text returns `None`.
-- **Tests**: `tests/test_streamer.py`, `tests/test_streamer_extended.py`,
-  `tests/test_qwen_client_behavior.py`.
+  - [ ]  `timeout_sec` budget overrun raises `ResponseDetectionTimeoutError`.
+- **Tests**: `tests/unit_capability_stream_monitor.py`,
+  `tests/unit_capability_stream_resilience.py`, `tests/contract_qwen_auto.py`.
 
 ### FR-007: Workspace Provisioner
 
@@ -265,7 +275,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  `.qwen-web/input|output|log` point at XDG defaults when linking works.
   - [ ]  `.gitignore` contains `.qwen-web/` exactly once after repeated inits.
   - [ ]  XDG input/output/log directories exist after init.
-- **Tests**: `tests/test_init_cmd.py`.
+- **Tests**: `tests/integration_surface_init_cmd.py`.
 
 ### FR-008: Observability Setup
 
@@ -276,7 +286,7 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   (`MetricsCounter`) and `status.json` (`StatusFileWriter`) are helper types
   in this file — not standalone capabilities. The legacy `IMetricsProtocol`
   and `IStatusProtocol` contracts remain helper-level compatibility contracts
-  owned by FR-009; they do not represent additional FRs or capabilities.
+  owned by this FR-008; they do not represent additional FRs or capabilities.
 - **Input**: log `Path`; env `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
   `OTEL_SERVICE_NAME`, `ENVIRONMENT`.
 - **Output**: configured loggers (`stderr` + `app.jsonl`), optional OTLP
@@ -302,31 +312,87 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   - [ ]  Excepthook logs critical + exits 1 for a generic exception.
   - [ ]  KeyboardInterrupt path exits 130.
   - [ ]  `start_span` is a no-op context manager when OTel is missing.
-- **Tests**: `tests/test_observability.py`, `tests/test_observability_extended.py`.
+- **Tests**: `tests/unit_observability_stderr.py`,
+  `tests/unit_structlog_no_percent_interp.py`.
 
 ## Capability Inventory
 
-The product requirement inventory is 13 capabilities (one per P0 capability).
-This Core table lists the eight Core aggregate operations; the remaining five
-capabilities are implemented by the CLI, MCP, and shared infrastructure. The
-old heading “exactly 8” was an inventory error.
+The product requirement inventory is 13 capabilities (one per P0 capability,
+FR-001…FR-013 in `PRD.md`). FR-001…FR-008 are the browser-automation
+capabilities documented above; FR-009…FR-013 are the extended Core
+capabilities (folder compiler, folder-to-attachment adapter, job manager,
+TUI slot configuration, update manager) whose traceability rows are listed
+below. The old heading “exactly 8” was an inventory error.
 
 Metrics counters and `status.json` writes are helper types inside
-`capabilities_observability_setup.py` (FR-009). Do not reintroduce them as
+`capabilities_observability_setup.py` (FR-008). Do not reintroduce them as
 standalone capability files.
 
 ## API Contract
 
-`ICoreAggregate` (implemented by `CoreOrchestrator`) is the surface-facing
-API. It sequences FR-001…FR-008; it does not implement their business rules.
+There is no single `ICoreAggregate` facade (the old heading referred to a
+non-existent `CoreOrchestrator` API — issue #378). The surface-facing API is
+a set of small, purpose-focused aggregate contracts declared in
+`modules/shared/src/contract_core_aggregate.py`, each implemented by an
+agent-layer orchestrator (`agent_*_orchestrator.py`) and composed by
+`root_core_container.SharedContainer`. Each aggregate sequences the FR
+capabilities it needs; no aggregate re-implements capability business rules.
 
+| Aggregate contract | Implementation | Operations (key) |
+| -------------------- | ---------------- | ------------------ |
+| `IPromptFlowAggregate` | `agent_shared_flow_orchestrator.py` → `SharedFlowOrchestrator` | `dispatch_and_wait_for_response` (inject → send → wait, FR-004/005/006) |
+| `IDirectPromptAggregate` | `agent_direct_prompt_orchestrator.py` → `DirectPromptOrchestrator` | `process_direct_prompt` (inline text) |
+| `IPromptFileAggregate` | `agent_prompt_file_orchestrator.py` → `PromptFileOrchestrator` | `process_prompt_file_only` (+ contract `request_cancel`, issue #360) |
+| `IAttachmentPromptAggregate` | `agent_attachment_prompt_orchestrator.py` → `AttachmentPromptOrchestrator` | `process_prompt_with_attachment` (+ contract `request_cancel`, issue #360) |
+| `ISessionAggregate` | `agent_session_orchestrator.py` → `SessionOrchestrator` | `validate_session`, `delete_session` (FR-001) |
+| `ISetupAggregate` | `agent_setup_orchestrator.py` → `SetupOrchestrator` | `setup_session` (interactive login) |
+| `IJobManagerAggregate` | `agent_job_orchestrator.py` → `AgentJobOrchestrator` | `submit_file_job`, `submit_attachment_job`, `get_job_status`, `list_jobs`, `shutdown` (FR-011) |
 
-| Operation             | Input                                        | Output         | Description                                          |
-| ----------------------- | ---------------------------------------------- | ---------------- | ------------------------------------------------------ |
-| `process_single_file` | `input_file`, `output_file`, `headless`      | `ResponseText` | One file: attach → inject → send → save → audit. |
-| `send_prompt`         | `prompt`, `timeout_sec`, `headless`          | `ResponseText` | Raw text without durable file routing.               |
-| `setup_session`       | confirmation callback, optional session path | `ResponseText` | Validate saved session or headed login.              |
-| `init_workspace`      | `target_dir`                                 | `None`         | Provision skill + XDG links (FR-007).                |
+The Swarm orchestrator (`agent_swarm_orchestrator.py`) implements
+`ISwarmAggregate` from `modules/shared/src/contract_swarm_aggregate.py`
+(see “Swarm Orchestrator (CR-2026-004)” below) and composes
+`IAttachmentPromptAggregate` per agent — it is an aggregate consumer, not a
+capability of its own.
+
+## Swarm Orchestrator (CR-2026-004)
+
+The Swarm feature is approved product scope under change request CR-2026-004
+(see `PRD.md` Scope); this section is its FRD entry (issue #313).
+
+- **Aggregate**: `agent_swarm_orchestrator.py` → `SwarmOrchestrator`
+- **Contract**: `ISwarmAggregate` (`start`, `snapshot`, `cancel` in
+  `contract_swarm_aggregate.py`)
+- **Description**: Fan out every discovered role template
+  (`modules/templates/*.md`) as one agent over a shared attachment (file or
+  folder, the latter compiled via FR-009/FR-010), with bounded browser
+  concurrency and per-agent retry.
+- **Input**: `input_path` (file or folder), optional `output_root`,
+  `browser_concurrency` (default `DEFAULT_MAX_WORKERS`, hard-capped at 10),
+  `max_attempts` (default `MAX_ATTEMPTS`).
+- **Output**: immutable `SwarmSnapshot` reads (`queued → running →
+  completed|partial|failed|cancelled`), per-agent `SwarmAgentSnapshot`, and a
+  `manifest.json` rewritten on every transition under the swarm root.
+- **Business Rules**:
+  - One browser per active agent, never more than `browser_concurrency`.
+  - A retryable failure (rate limit, timeout/timed out, connection/network,
+    empty, stuck) is retried up to `max_attempts`; a non-retryable error
+    fails that agent immediately without touching siblings.
+  - Cancellation is per-agent via `threading.Event` passed as
+    `cancel_event` into `IAttachmentPromptAggregate`: cancelling the swarm
+    sets every agent event and calls the contract-level `request_cancel`
+    (issue #360), closing only in-flight browser contexts.
+  - Session expiry containment (issue #275): an expiring session surfaces as
+    a per-agent `AUTH_REQUIRED` failure for that agent only; sibling agents
+    keep their in-flight browsers; the swarm finishes as `partial`/`failed`
+    rather than aborting the whole fan-out. Recovery is re-login, then
+    re-run the swarm.
+- **Edge Cases**: empty template set (refused at start), input folder
+  without compilable files, cancel before first attempt, executor shutdown
+  while snapshots stream.
+- **Error Handling**: per-agent error recorded on the snapshot
+  (`error` field); swarm-level failures raise before the fan-out starts.
+- **Tests**: `tests/unit_agent_swarm_orchestrator.py` (discovery/format,
+  transient retry → partial, stuck retry, non-retryable → failed).
 
 ## Integration Points
 
@@ -334,24 +400,35 @@ API. It sequences FR-001…FR-008; it does not implement their business rules.
   HTTP, Sentry SDK.
 - **Internal**: `modules/shared` taxonomy VOs, domain errors, contracts,
   path/prompt/validation utilities. Surfaces (`modules/cli`, `modules/mcp`)
-  consume only `ICoreAggregate`.
-- **DI**: `root_core_container.SharedContainer` wires all eight capabilities.
+  consume only the aggregate contracts from
+  `modules/shared/src/contract_core_aggregate.py` (plus `ISwarmAggregate`
+  for the TUI swarm tab).
+- **DI**: `root_core_container.SharedContainer` wires all capabilities and
+  agent orchestrators.
 
 ## Traceability (FR → Code → Tests)
 
 
-| FR     | Protocol                 | Capability                              |
-| -------- | -------------------------- | ----------------------------------------- |
-| FR-001 | `IBrowserProtocol`       | `capabilities_browser_adapter.py`       |
-| FR-002 | `IUploadProtocol`        | `capabilities_file_uploader.py`         |
-| FR-003 | `ISaverProtocol`         | `capabilities_output_saver.py`          |
-| FR-004 | `IInjectionProtocol`     | `capabilities_prompt_injector.py`       |
-| FR-005 | `ISendProtocol`          | `capabilities_send_dispatcher.py`       |
-| FR-006 | `IStreamProtocol`        | `capabilities_stream_monitor.py`        |
-| FR-007 | `IWorkspaceProtocol`     | `capabilities_workspace_provisioner.py` |
-| FR-008 | `IObservabilityProtocol` | `capabilities_observability_setup.py`   |
+| FR     | Protocol                 | Capability                              | Tests |
+| -------- | -------------------------- | ----------------------------------------- | ------- |
+| FR-001 | `IBrowserProtocol`       | `capabilities_browser_adapter.py`       | `unit_browser_adapter.py`, `integration_browser_session.py` |
+| FR-002 | `IUploadProtocol`        | `capabilities_file_uploader.py`         | `unit_capability_file_uploader.py` |
+| FR-003 | `ISaverProtocol`         | `capabilities_output_saver.py`          | `unit_capability_output_saver.py` |
+| FR-004 | `IInjectionProtocol`     | `capabilities_prompt_injector.py`       | `unit_capability_prompt_injector.py`, `unit_capability_prompt_injector_verify.py` |
+| FR-005 | `ISendProtocol`          | `capabilities_send_dispatcher.py`       | `unit_capability_send_dispatcher.py` |
+| FR-006 | `IStreamProtocol`        | `capabilities_stream_monitor.py`        | `unit_capability_stream_monitor.py`, `unit_capability_stream_resilience.py` |
+| FR-007 | `IWorkspaceProtocol`     | `capabilities_workspace_provisioner.py` | `integration_surface_init_cmd.py` |
+| FR-008 | `IObservabilityProtocol` | `capabilities_observability_setup.py`   | `unit_observability_stderr.py`, `unit_structlog_no_percent_interp.py` |
+| FR-009 | `IFolderCompileProtocol` | `capabilities_folder_compiler.py`       | `unit_folder_compiler.py` |
+| FR-010 | `IFolderToAttachmentProtocol` | `capabilities_folder_to_attachment.py` | `unit_folder_compiler.py` (adapter paths) |
+| FR-011 | `IJobStorageProtocol`    | `capabilities_job_manager.py`           | `unit_capability_job_manager.py`, `integration_parallel_jobs.py` |
+| FR-012 | `ITuiSlotConfigProtocol` | `capabilities_tui_slot_config.py`       | `unit_surface_cli_tui_app.py` (slot planning) |
+| FR-013 | `IUpdateProtocol`        | `capabilities_update_manager.py`        | `unit_surface_cli_update_command.py` |
+| CR-2026-004 | `ISwarmAggregate`    | `agent_swarm_orchestrator.py`           | `unit_agent_swarm_orchestrator.py` |
 
-End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline.py` (manual/`e2e` mark).
+End-to-end locks: `tests/contract_qwen_auto.py` (behavior lock),
+`tests/integration_surface_cli_main.py`, `tests/integration_surface_mcp.py` (surface
+integration).
 
 ## Non-functional Requirements (Detailed)
 

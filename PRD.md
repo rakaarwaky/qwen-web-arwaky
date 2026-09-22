@@ -33,7 +33,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 ## Scope
 
 - **In scope**: `chat.qwen.ai` web automation, Playwright persistent sessions,
-  Single / Inline / Interactive / MCP modes, the eight core
+  Single / Inline / Interactive / MCP modes, the 13 core
   capabilities listed below, structured observability
   (structlog, OpenTelemetry, Sentry), and strict AES 7-layer architecture.
 - **Out of scope**: other LLM providers (ChatGPT, Claude, Gemini), official
@@ -43,7 +43,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
   change request CR-2026-004.
 
 Core functional specs live in [`modules/core/FRD.md`](modules/core/FRD.md)
-(exactly 8 FRs, one per capability + protocol). CLI and MCP surfaces have
+(FR-001…FR-013, one per capability + protocol). CLI and MCP surfaces have
 their own FRDs.
 
 ## Feature Requirements (Prioritized)
@@ -85,9 +85,11 @@ in `metrics.json` under the application state directory. Emit WARNING below
   *Accept*: send is blocked while attachment parsing is incomplete.
 - [X]  **FR-006 Stream Monitor** — Poll until N identical snapshots and
   generation UI is gone; proactive 30s cloud reload sync for network connection reset recovery;
-  900s max-duration ceiling for massive responses (40KB+); immediate exit on DOM completion;
-  reject CAPTCHA / error-page content.
-  *Accept*: stable response is returned instantly upon generation completion; long 15-minute streaming runs complete without network connection resets; challenge keywords raise `AuthRequiredError` / `OutputValidationError`.
+  `timeout_sec` hard cutoff per call (default surfaces: 120s; set higher for
+  massive responses), event-driven stall detection; immediate exit on DOM completion;
+  reject CAPTCHA / error-page content. The absolute safety breaker defaults
+  to 4h and is tunable via `QWEN_STREAM_SAFETY_TIMEOUT_SEC`.
+  *Accept*: stable response is returned instantly upon generation completion; long streaming runs complete without network connection resets when their `timeout_sec` budget allows; challenge keywords raise `AuthRequiredError` / `OutputValidationError`.
 - [X]  **FR-007 Workspace Provisioner** — First-run XDG dirs,
   `.agents/skills/qwen-web/SKILL.md`, `.qwen-web` symlinks (automatically replaces stale local directories with XDG symlinks), `.gitignore`.
   *Accept*: `qwen-web-arwaky init` is idempotent and maintains valid symlinks to XDG targets.
@@ -106,7 +108,9 @@ in `metrics.json` under the application state directory. Emit WARNING below
 ### P1 — Should Have (Surfaces)
 
 - [X]  **Multi-mode execution**: Single (one file), prompt-with-attachment,
-  inline direct, and raw `send_prompt` — all via `ICoreAggregate`.
+  inline direct, and raw prompt dispatch — all via the aggregate contracts
+  (`IPromptFileAggregate`, `IAttachmentPromptAggregate`,
+  `IDirectPromptAggregate`).
 - [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
   first; only an invalid session opens a headed browser for CAPTCHA.
 - [X]  **Timestamped input processing**: input files are uniquely named by the
@@ -114,6 +118,13 @@ in `metrics.json` under the application state directory. Emit WARNING below
   and input files remain in place.
 - [X]  **MCP server**: live tools for direct prompts, prompt files, attachments,
   session management, workspace initialization, and asynchronous job status.
+- [X]  **Session-expiry containment (business rule)**: a session that expires
+  mid-run during long-running Swarm or multi-slot TUI operations fails only
+  the affected agent/slot with a per-run `AUTH_REQUIRED` isolation — sibling
+  runs keep their in-flight browsers and complete; the surface reports an
+  overall partial/failed status with a re-login hint, never a global abort
+  of healthy sibling work. Recovery path: re-login, then retry the failed
+  slots/agents.
 
 ### P2 — Nice to Have
 
@@ -148,5 +159,6 @@ in `metrics.json` under the application state directory. Emit WARNING below
   - *Mitigation*: Manual `--login` solves CAPTCHA in a headed browser and
     saves persistent session state for subsequent headless runs.
 - **Risk**: Two processes sharing one Chromium profile corrupt the session.
-  - *Mitigation*: FR-010 single-instance lock on the CLI; MCP skips the lock
-    and must not launch a second headed browser against the same profile.
+  - *Mitigation*: single-instance lock on the CLI (see CLI FRD); MCP skips
+    the lock and must not launch a second headed browser against the same
+    profile.
