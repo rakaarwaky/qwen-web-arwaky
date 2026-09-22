@@ -137,7 +137,7 @@ Use to verify login status or authenticate a new browser session when cookies ex
 ---
 
 ### Use Case 6: Workspace Initialization
-Use when provisioning `.qwen-web/` workspace directories and sample configuration in a new project.
+Use when provisioning `.qwen-web/` workspace directories in a new project.
 
 **MCP:**
 ```json
