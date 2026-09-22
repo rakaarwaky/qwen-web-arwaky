@@ -243,6 +243,30 @@ and a preferred harness; when adding code, extend the matching pattern.
 
 ---
 
+## 7.6 Resilience Drills & Incident Post-Mortem Guidelines (Issue #301)
+
+The system embeds several fault-tolerance primitives (circuit breakers, token-bucket
+rate limiters, hard response cutoffs, stream safety breakers, and cancellation isolation).
+To validate these primitives against chaotic conditions, engineering teams conduct
+the following automated and manual drill scenarios:
+
+1. **Chromium Process Crash / Kill Drill**:
+   - **Simulation**: Trigger a long generation or Swarm run, identify the child Chromium PID via `pgrep -f chromium`, and execute `kill -9 <PID>`.
+   - **Expected Invariant**: The orchestrator must catch `TargetClosedError` or process loss, record the failure in `JobManager` with status `failed`, trigger retry if attempts remain, and cleanly decrement active worker counters without hanging the caller or crashing the parent process.
+2. **Upstream Gateway Rate-Limiting & HTTP 429/503 Drill**:
+   - **Simulation**: Mock the Playwright network response router or route `chat.qwen.ai` responses with HTTP status 429/503 or CAPTCHA triggers.
+   - **Expected Invariant**: The sliding-window `CircuitBreaker` must record sequential failures; once `threshold` failures occur within `window_sec`, subsequent calls must fail immediately with `CircuitBreakerOpenError` without initiating browser launches.
+3. **Stuck / Slow Generation Cutoff Drill**:
+   - **Simulation**: Set `timeout_sec=5` on `StreamMonitor` with a prompt that takes >10s.
+   - **Expected Invariant**: Exactly upon reaching the 5s cutoff without a terminal DOM event, `ResponseDetectionTimeoutError` is raised, releasing the worker immediately.
+4. **Post-Mortem Documentation Process**:
+   - In the event of an unhandled browser crash or hung job in production:
+     1. Collect per-run forensic logs from `.qwen-web/jobs/<job_id>.json`.
+     2. Collect metrics snapshot from `capabilities_observability_setup.py` (`metrics.json`).
+     3. Document the sequence of events, root cause (e.g. DOM selector mutation vs network cutoff), and create a reproduction test in `tests/unit_concurrency_guards.py` or `tests/unit_capability_stream_monitor.py`.
+
+---
+
 ## 8. Change Log
 
 | Date | Change | Author |

@@ -336,7 +336,7 @@ class IUpdateProtocol(ABC):
         """
 
     @abstractmethod
-    def rollback_to(self, previous_version: str) -> tuple[UpdateStepResult, ...]:
+    def rollback_to(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
         """Rollback to a previously installed package version."""
 
 

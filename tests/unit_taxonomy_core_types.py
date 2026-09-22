@@ -82,6 +82,22 @@ class TestLifecycleEmitter:
         after = time.time()
         assert before <= evt.timestamp <= after
 
+    def test_callback_error_is_recorded_and_logged(self):
+        logger = MagicMock()
+        emitter = LifecycleEmitter(logger=logger)
+
+        def failing_cb(evt):
+            raise ValueError("callback failed intentionally")
+
+        emitter.on("test", failing_cb)
+        evt = emitter.emit("test")
+        assert evt.name == "test"
+        assert len(emitter.callback_errors) == 1
+        assert emitter.callback_errors[0]["event"] == "test"
+        assert "callback failed intentionally" in emitter.callback_errors[0]["error"]
+        assert emitter.callback_errors[0]["type"] == "ValueError"
+        assert logger.error.called
+
 
 # ─── CircuitBreaker edge cases ─────────────────────────────────────────────
 

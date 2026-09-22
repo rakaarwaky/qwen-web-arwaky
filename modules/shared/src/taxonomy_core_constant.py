@@ -80,10 +80,16 @@ DEFAULT_VENV = XDG_DATA_HOME / "venv"
 DEFAULT_JOBS_DIR = XDG_STATE_HOME / "jobs"
 XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 
-# ─── Parallel job execution ─────────────────────────────────────────────────
+# ─── Parallel job execution & resource budgets (Issue #365) ───────────────────
 # Number of prompt jobs allowed to run concurrently. Each worker launches its
 # own Chromium browser instance with an ephemeral clone of the login session.
+# Resource note: each headless Chromium worker consumes ~150-300 MiB RAM.
+# Default limit of 10 workers bounds peak parallel footprint to ~2.5 GiB.
 DEFAULT_MAX_WORKERS = 10
+
+# Swarm-specific concurrency override env var and default cap (Issue #323).
+DEFAULT_SWARM_CONCURRENCY = 10
+SWARM_CONCURRENCY_ENV = "QWEN_SWARM_CONCURRENCY"
 
 CHAT_URL = "https://chat.qwen.ai/"
 

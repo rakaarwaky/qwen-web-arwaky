@@ -24,8 +24,8 @@ from modules.shared.src.taxonomy_core_event import EVENT_OUTPUT_COPIED
 ATOMIC_TEMP_SUFFIX = ".tmpwrite"
 
 
-def _atomic_write(target: Path, content: str) -> None:
-    """Write content to a file atomically via temp + replace.
+def _atomic_write(target: Path, content: str, mode: int = 0o600) -> None:
+    """Write content to a file atomically via temp + replace with secure file mode (Issue #353).
 
     Parameters
     ----------
@@ -33,12 +33,18 @@ def _atomic_write(target: Path, content: str) -> None:
         Destination file path.
     content : str
         Text content to write.
+    mode : int, optional
+        Filesystem permissions to enforce, by default 0o600 (owner read/write only).
 
     """
     tmp_path = target.with_name(target.name + ATOMIC_TEMP_SUFFIX)
     try:
         tmp_path.write_text(content, encoding="utf-8")
+        with suppress(OSError):
+            tmp_path.chmod(mode)
         tmp_path.replace(target)
+        with suppress(OSError):
+            target.chmod(mode)
     except OSError as err:
         if tmp_path.exists():
             with suppress(OSError):
@@ -54,13 +60,15 @@ def atomic_write_json(target: Path, payload: Mapping[str, Any]) -> None:
     _atomic_write(target, json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def write_json_file(target: Path, payload: Mapping[str, Any], atomic: bool = True) -> None:
-    """Write JSON to file, atomically or directly."""
+def write_json_file(target: Path, payload: Mapping[str, Any], atomic: bool = True, mode: int = 0o600) -> None:
+    """Write JSON to file, atomically or directly with confidentiality defaults (Issue #353)."""
     content = json.dumps(payload, ensure_ascii=False) + "\n"
     if atomic:
-        _atomic_write(target, content)
+        _atomic_write(target, content, mode=mode)
     else:
         target.write_text(content, encoding="utf-8")
+        with suppress(OSError):
+            target.chmod(mode)
 
 
 def ensure_dir(path: Path) -> Path:
