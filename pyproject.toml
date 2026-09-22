@@ -93,7 +93,13 @@ disallow_untyped_defs = false
 disallow_subclassing_any = false
 check_untyped_defs = false
 
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".git"]
+skips = ["B101", "B404", "B603"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "bandit>=1.8.0",
+    "pip-audit>=2.7.0",
 ]

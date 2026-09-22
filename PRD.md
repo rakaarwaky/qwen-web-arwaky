@@ -138,8 +138,11 @@ in `metrics.json` under the application state directory. Emit WARNING below
   traffic reduced by 40–60% via aggressive asset blocking (images, fonts,
   media) outside login mode.
 - **Security**: Session tokens stored locally in XDG-compliant directories
-  with `0o700`. No exfiltration of credentials. Strict prompt-injection
-  defense (scraped text is untrusted data, never agent instructions).
+  with `0o700`. Output files written with `0o600` owner confidentiality.
+  No exfiltration of credentials. Strict prompt-injection defense (scraped
+  text is untrusted data, never agent instructions). Supply chain integrity:
+  self-update pins release commit SHAs. SAST & dependency compliance scanning
+  supported via Bandit and pip-audit (Issue #350).
 - **Reliability**: Atomic file moves and atomic output writes to guarantee
   zero input/output loss. Graceful degradation on DOM changes via multi-tier
   selector fallbacks. Telemetry is best-effort.
@@ -162,3 +165,8 @@ in `metrics.json` under the application state directory. Emit WARNING below
   - *Mitigation*: single-instance lock on the CLI (see CLI FRD); MCP skips
     the lock and must not launch a second headed browser against the same
     profile.
+- **Risk**: Unbounded concurrent browser execution exhausting system memory (Issue #365).
+  - *Mitigation*: Global concurrency bounds (`DEFAULT_MAX_WORKERS=10`, `QWEN_WEB_MAX_WORKERS`,
+    `QWEN_SWARM_CONCURRENCY=10`). Ephemeral session cloning uses copy-on-write
+    storage to minimize disk footprint across workers.
+

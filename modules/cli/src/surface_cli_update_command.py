@@ -87,6 +87,12 @@ def _format_report(report: UpdateReport) -> str:
             lines.append(f"    {_step_icon(check)} {check.name}: {_step_detail(check)}")
     lines.append(_DIVIDER)
     lines.append(f"{'✅' if report.healthy else '⚠️'} {report.message}")
+    if report.healthy and report.changed:
+        lines.append("")
+        lines.append(
+            "💡 Note: If you have active MCP server or TUI sessions running in background, "
+            "please restart them to ensure the newly installed package and Playwright browser are active (Issue #295)."
+        )
     lines.append("")
     return "\n".join(lines)
 

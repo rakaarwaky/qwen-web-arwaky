@@ -297,6 +297,7 @@ class LifecycleEmitter:
         self._callbacks: CallbackRegistry = {}
         self._logger = logger or logging.getLogger("lifecycle")
         self._gate = gate
+        self.callback_errors: list[dict[str, str]] = []
 
     @property
     def completed(self) -> tuple[QwenEventType, ...]:
@@ -326,7 +327,16 @@ class LifecycleEmitter:
             try:
                 cb(evt)
             except Exception as exc:  # third-party callbacks may raise anything; must not break emission
-                self._log(EventMessage(f"lifecycle_callback_error event={key} error={exc}"))
+                err_dict = {
+                    "event": key,
+                    "error": f"{exc}",
+                    "type": f"{type(exc).__name__}",
+                }
+                self.callback_errors.append(err_dict)
+                if hasattr(self._logger, "error") and callable(self._logger.error):
+                    self._logger.error("lifecycle_callback_error event=%s error=%s", key, exc, exc_info=True)
+                else:
+                    self._log(EventMessage(f"lifecycle_callback_error event={key} error={exc}"))
         return evt
 
     def _log(self, message: EventMessage) -> None:
