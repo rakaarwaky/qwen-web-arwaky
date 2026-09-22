@@ -199,18 +199,14 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
             raise ValueError(f"Attachment file not found: {file_p}")
 
     if action in {"batch", "watch"}:
-        batch_dir = Path(getattr(args, "input_dir")).expanduser().resolve()
+        batch_dir = Path(args.input_dir).expanduser().resolve()
         if not batch_dir.is_dir():
             raise ValueError(f"Input directory not found: {batch_dir}")
         if action == "watch" and float(getattr(args, "interval", 0)) < 1:
             raise ValueError("Watch interval must be at least 1 second")
         prompt_p = batch_dir
         raw_batch_output = getattr(args, "output_dir", None)
-        out_p = (
-            Path(raw_batch_output).expanduser().resolve()
-            if raw_batch_output
-            else DEFAULT_OUTPUT
-        )
+        out_p = Path(raw_batch_output).expanduser().resolve() if raw_batch_output else DEFAULT_OUTPUT
     elif raw_output:
         out_p = Path(raw_output)
     else:

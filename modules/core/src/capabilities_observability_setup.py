@@ -109,9 +109,7 @@ class MetricsCounter(IMetricsProtocol):
     def record_execution(self, success: bool) -> None:
         """Record one terminal pipeline execution for the reliability SLO."""
         with self._lock:
-            self._execution_events.append(
-                {"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)}
-            )
+            self._execution_events.append({"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)})
             self._persist()
 
     def get(self, key: str) -> MessageCount:

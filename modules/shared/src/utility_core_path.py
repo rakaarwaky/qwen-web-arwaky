@@ -8,6 +8,7 @@ from pathlib import Path
 
 from modules.shared.src.taxonomy_core_vo import AppConfig
 
+
 def _compute_output_path(cfg: AppConfig, sub_path: Path) -> Path:
     """Resolve the output destination for a sub-path (single-file target or directory join)."""
     if cfg.mode == "single" and cfg.output_path.suffix:
