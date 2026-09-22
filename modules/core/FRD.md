@@ -381,7 +381,8 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - [ ]  FR-008: process starts with empty `SENTRY_DSN` and no OTLP endpoint.
 - [ ]  Aggregate boundary: failed batch items report `Failed: 1`, failed single
   files return an error envelope, nested role routing is preserved, and a
-  supplied `AppConfig` reaches the browser session unchanged.
+  supplied `AppConfig` reaches the browser session unchanged. Input files stay
+  in place; status is represented by the error envelope and logs.
 
 ## Assumptions & Constraints
 
@@ -400,8 +401,6 @@ End-to-end locks: `tests/test_qwen_client_behavior.py`, `tests/test_e2e_pipeline
 - **Persistent context**: Chromium user-data dir that keeps cookies/LocalStorage.
 - **Stability check**: N consecutive identical response snapshots plus
   generation-complete UI.
-- **Quarantine**: agent move of a failed file to `failed/` (orchestration,
-  not a capability FR).
 
 ## Reference
 
