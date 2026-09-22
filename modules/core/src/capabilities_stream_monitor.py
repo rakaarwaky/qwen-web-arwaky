@@ -6,6 +6,7 @@ Implements IStreamProtocol.
 from __future__ import annotations
 
 import contextlib
+import os
 import threading
 import time
 
@@ -48,6 +49,32 @@ DEFAULT_SAFETY_TIMEOUT_SEC = 4 * 60 * 60
 # classified stuck. Slow-but-alive generations keep emitting events and are
 # never misclassified. This is not a wall-clock cutoff for generation.
 DEFAULT_STALL_TIMEOUT_SEC = 300
+# Issue #330: the absolute backstop is operator-tunable without a code change
+# (a 4h hardcoded budget is untestable in staging and unusable where hosts
+# have tighter wall-clock limits).
+SAFETY_TIMEOUT_ENV = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
+
+
+def _resolve_safety_timeout(override: int | None) -> int:
+    """Resolve the safety circuit-breaker budget.
+
+    Precedence: explicit ``safety_timeout_sec`` constructor argument →
+    ``QWEN_STREAM_SAFETY_TIMEOUT_SEC`` env var → the 4-hour default.
+    Unparseable or non-positive env values fall back to the default with a
+    warning instead of crashing the pipeline boot.
+    """
+    if override is not None:
+        return int(override)
+    raw = os.environ.get(SAFETY_TIMEOUT_ENV, "").strip()
+    if raw:
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = 0
+        if parsed > 0:
+            return parsed
+        log.warning("Ignoring invalid %s=%r; using default %ds", SAFETY_TIMEOUT_ENV, raw, DEFAULT_SAFETY_TIMEOUT_SEC)
+    return DEFAULT_SAFETY_TIMEOUT_SEC
 
 
 # Block 1: Class Definition & Constructor
@@ -60,14 +87,15 @@ class StreamMonitor(IStreamProtocol):
         self,
         config: StreamerConfig | None = None,
         *,
-        safety_timeout_sec: int = DEFAULT_SAFETY_TIMEOUT_SEC,
+        safety_timeout_sec: int | None = None,
         stall_timeout_sec: int = DEFAULT_STALL_TIMEOUT_SEC,
     ) -> None:
-        if safety_timeout_sec <= 0:
+        resolved_safety = _resolve_safety_timeout(safety_timeout_sec)
+        if resolved_safety <= 0:
             raise ValueError("safety_timeout_sec must be greater than zero")
         if stall_timeout_sec <= 0:
             raise ValueError("stall_timeout_sec must be greater than zero")
-        self.safety_timeout_sec = int(safety_timeout_sec)
+        self.safety_timeout_sec = resolved_safety
         self.stall_timeout_sec = int(stall_timeout_sec)
         if config is not None:
             self.polling_interval_sec = PollIntervalSec(config.polling_interval_sec)

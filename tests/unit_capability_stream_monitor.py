@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.core.src.capabilities_stream_monitor import (
+    DEFAULT_SAFETY_TIMEOUT_SEC,
     StreamMonitor,
     validate_response_content,
 )
@@ -513,3 +514,32 @@ class TestHardResponseTimeout:
                     emitter=emitter,
                     polling_interval_sec=0,
                 )
+
+
+class TestSafetyTimeoutConfiguration:
+    """Issue #330: the 4h safety circuit breaker is operator-configurable."""
+
+    def test_default_is_four_hours(self, monkeypatch):
+        monkeypatch.delenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", raising=False)
+        assert StreamMonitor().safety_timeout_sec == DEFAULT_SAFETY_TIMEOUT_SEC == 4 * 60 * 60
+
+    def test_env_override_honored(self, monkeypatch):
+        monkeypatch.setenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", "42")
+        assert StreamMonitor().safety_timeout_sec == 42
+
+    def test_explicit_argument_beats_env(self, monkeypatch):
+        monkeypatch.setenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", "42")
+        assert StreamMonitor(safety_timeout_sec=99).safety_timeout_sec == 99
+
+    def test_invalid_env_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", "not-a-number")
+        assert StreamMonitor().safety_timeout_sec == DEFAULT_SAFETY_TIMEOUT_SEC
+
+    def test_non_positive_env_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", "0")
+        assert StreamMonitor().safety_timeout_sec == DEFAULT_SAFETY_TIMEOUT_SEC
+
+    def test_zero_explicit_still_raises(self, monkeypatch):
+        monkeypatch.delenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", raising=False)
+        with pytest.raises(ValueError, match="safety_timeout_sec"):
+            StreamMonitor(safety_timeout_sec=0)
