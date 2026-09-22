@@ -115,6 +115,8 @@ class Saver(ISaverProtocol):
     def _write_text_file(self, path: Path, content: str, atomic: bool) -> None:
         """Write *content* to *path*, atomically or directly.
 
+        Enforces 0o600 permissions for output artifact confidentiality (Issue #353).
+
         Raises
         ------
         OutputWriteError
@@ -125,6 +127,7 @@ class Saver(ISaverProtocol):
             return
         try:
             path.write_text(content, encoding="utf-8")
+            path.chmod(0o600)
         except OSError as e:
             log.error("Failed to write output file %s (I/O error): %s", path, e)
             raise OutputWriteError(f"Failed to write output file {path}: {e}") from e

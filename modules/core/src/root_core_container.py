@@ -55,6 +55,7 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
     DEFAULT_MAX_WORKERS,
+    SWARM_CONCURRENCY_ENV,
 )
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
@@ -148,10 +149,12 @@ class SharedContainer:
             circuit_breaker=self.cb,
             rate_limiter=self.rl,
         )
+        swarm_env = os.environ.get(SWARM_CONCURRENCY_ENV, "").strip()
+        swarm_workers = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else max_workers
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
             attachment=self.agent_attachment_prompt_orchestrator,
             folder_adapter=self.folder_adapter,
-            browser_concurrency=max_workers,
+            browser_concurrency=swarm_workers,
         )
 
     def wire(self) -> None:

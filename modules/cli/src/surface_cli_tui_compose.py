@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from typing import Any
 
 from textual.app import ComposeResult
@@ -102,9 +103,11 @@ class _TuiComposeMixin:
                     )
                     yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
                 with Horizontal(classes="toggle-row"):
+                    swarm_env = os.environ.get("QWEN_SWARM_CONCURRENCY", "").strip()
+                    swarm_max = min(10, max(1, int(swarm_env))) if swarm_env.isdigit() and int(swarm_env) > 0 else 10
                     yield Button("⚡ START SWARM", variant="primary", id="btn-swarm-start")
                     yield Button("✕ CANCEL SWARM", id="btn-swarm-cancel")
-                    yield Label("Adaptive templates · maximum 10 browsers", id="swarm-summary")
+                    yield Label(f"Adaptive templates · maximum {swarm_max} browsers", id="swarm-summary")
                 yield DataTable(id="swarm-table")
                 with Horizontal(classes="pane-title"):
                     yield Label("Swarm Log", classes="field-label")
