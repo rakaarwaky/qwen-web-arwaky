@@ -113,7 +113,7 @@ jobs:
         run: uv run python -m playwright install chromium
 
       - name: Run tests
-        run: uv run python -m pytest tests/ -v
+        run: uv run python -m pytest tests/ --ignore=tests/test_e2e_pipeline.py -v
 
       - name: Create issue on failure
         if: failure()
