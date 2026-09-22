@@ -131,6 +131,9 @@ class QwenTuiApp(
         self._metric_done: Any = None
         # U4: session-check timeout flag.
         self._session_check_timed_out: bool = False
+        # UX-4-2: last resolved session state (VALID/EXPIRED/TIMEOUT) or None
+        # while still checking.
+        self._last_session_state: str | None = None
         # P4: debounce metrics refresh — at most 4 updates/sec.
         self._metrics_pending: bool = False
         # A4: timestamp of last Escape press for double-escape quit guard.

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     pass
 
 # C1/V1: single source of truth for slot status — one value, one formatter.
-SlotStatus = Literal["IDLE", "RUNNING", "SUCCESS", "FAILED", "CANCELLED"]
+SlotStatus = Literal["IDLE", "RUNNING", "SUCCESS", "FAILED", "CANCELLED", "CANCELLING"]
 
 _STATUS_BADGE: dict[str, str] = {
     "IDLE": "● READY",
@@ -32,13 +32,15 @@ _STATUS_BADGE: dict[str, str] = {
     "SUCCESS": "✓ SUCCESS",
     "FAILED": "✕ FAILED",
     "CANCELLED": "■ CANCELLED",
+    "CANCELLING": "⚠ CANCELLING…",
 }
 _STATUS_TABLE: dict[str, str] = {
-    "IDLE": "IDLE 💤",
-    "RUNNING": "RUNNING ⏳",
-    "SUCCESS": "DONE ✅",
-    "FAILED": "FAILED ❌",
-    "CANCELLED": "CANCELLED ✕",
+    "IDLE": "IDLE ●",
+    "RUNNING": "RUNNING ▶",
+    "SUCCESS": "DONE ✓",
+    "FAILED": "FAILED ✕",
+    "CANCELLED": "CANCELLED ■",
+    "CANCELLING": "CANCELLING ⚠",
 }
 
 
@@ -97,6 +99,13 @@ class _TuiUtilsMixin:
                 ("Status", "swarm-status"),
                 ("Attempt", "swarm-attempt"),
                 ("Output", "swarm-output"),
+            )
+            table.add_row(
+                "—",
+                "IDLE",
+                "—",
+                "No active swarm — select an attachment above and click START SWARM",
+                key="swarm-empty",
             )
 
     def _render_swarm_snapshot(self, snapshot: Any) -> None:

@@ -51,6 +51,7 @@ class _TuiWorkersMixin:
     _swarm: Any
     _swarm_id: str | None
     _session_check_timed_out: bool
+    _last_session_state: str | None
     _login_in_flight: bool
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
@@ -78,6 +79,8 @@ class _TuiWorkersMixin:
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:
             self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Slot {slot_id} already running.", slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
 
         try:
@@ -114,7 +117,7 @@ class _TuiWorkersMixin:
         # never touches another slot's in-flight browser context.
         self._slot_cancel_events[slot_id] = threading.Event()
 
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ⏳")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(p_name)} ▶")
         with contextlib.suppress(NoMatches):
             self.query_one(f"#btn-retry-{slot_id}").display = False
         self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
@@ -165,8 +168,14 @@ class _TuiWorkersMixin:
         if worker is None:
             return
         # U1: show CANCELLING intermediate status while browser process stops
-        self._update_slot_status(slot_id, "⚠ CANCELLING…")
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id} ⚠")
+        self._update_slot_status(slot_id, self._format_status("CANCELLING", "badge"))
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id} {self._format_status('CANCELLING', 'badge')}")
+        self._update_table_row(
+            slot_id,
+            self._format_status("CANCELLING", "table"),
+            self._slot_stats[slot_id].get("file", "-"),
+            "stopping…",
+        )
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
         # AR-2/FE-1: cancel only this slot's run via its own cancel event.
         # Sibling slots' browser contexts are untouched.
@@ -180,7 +189,7 @@ class _TuiWorkersMixin:
         self._slot_workers[slot_id] = None
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
         self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
-        self._set_slot_tab_title(slot_id, f"Slot {slot_id} 💤")
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id} ●")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
         file_name = self._slot_stats[slot_id]["file"]
         self._update_table_row(slot_id, self._format_status("CANCELLED", "table"), file_name, "stopped")
@@ -203,7 +212,7 @@ class _TuiWorkersMixin:
         """
         if generation != self._slot_generation.get(slot_id, 0):
             return  # stale worker — slot was cancelled or restarted
-        icon = "✅" if ok else "❌"
+        icon = "✓" if ok else "✕"
         self._slot_workers[slot_id] = None
         # AR-2/FE-1: release the per-slot cancel event now the run is done.
         self._slot_cancel_events.pop(slot_id, None)
@@ -269,7 +278,7 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['accent']}]SWARM:[/] started {snapshot.swarm_id} with {len(snapshot.agents)} agents.",
+                f"[bold {THEME['accent_fg']}]SWARM:[/] started {snapshot.swarm_id} with {len(snapshot.agents)} agents.",
             )
             while True:
                 time.sleep(1.0)
@@ -302,7 +311,7 @@ class _TuiWorkersMixin:
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
         self.call_from_thread(
             self._log_msg,
-            f"[bold {THEME['accent']}]>>> [Slot {slot_id}] Starting browser for: {escape(prompt_name)}[/]",
+            f"[bold {THEME['accent_fg']}]>>> [Slot {slot_id}] Starting browser for: {escape(prompt_name)}[/]",
             slot_id,
         )
         start_t = time.perf_counter()
@@ -416,6 +425,7 @@ class _TuiWorkersMixin:
         if self._session_check_timed_out:
             return
         self._session_check_timed_out = True
+        self._last_session_state = "TIMEOUT"
         with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
             badge_text = str(badge.render() or "")
@@ -442,6 +452,7 @@ class _TuiWorkersMixin:
         self.call_from_thread(self._apply_session_badge, valid)
 
     def _apply_session_badge(self, valid: bool) -> None:
+        self._last_session_state = "VALID" if valid else "EXPIRED"
         try:
             badge = self.query_one("#session-badge", Label)
         except _BADGE_UNAVAILABLE:

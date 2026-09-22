@@ -56,6 +56,7 @@ class _TuiComposeMixin:
     set_timer: Any
     _log_msg: Any
     _refresh_session_badge: Any
+    _format_status: Any
 
     # ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ class _TuiComposeMixin:
                 )
 
             # ─── Tab 2: Adaptive Swarm ─────────────────────────
-            with TabPane("Swarm 🐝", id="tab-swarm"), Vertical(classes="overview-container"):
+            with TabPane("Swarm ◈", id="tab-swarm"), Vertical(classes="overview-container"):
                 yield Label("Attachment File or Folder", classes="field-label")
                 with Horizontal(classes="field-row"):
                     yield Input(
@@ -115,7 +116,7 @@ class _TuiComposeMixin:
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
             for s in range(1, self._NUM_SLOTS + 1):
-                with TabPane(f"Slot {s} 💤", id=f"tab-slot-{s}"), Horizontal(classes="slot-container"):
+                with TabPane(f"Slot {s} ●", id=f"tab-slot-{s}"), Horizontal(classes="slot-container"):
                     with ScrollableContainer(classes="left-pane"):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
@@ -172,7 +173,9 @@ class _TuiComposeMixin:
                     with Vertical(classes="right-pane"):
                         with Horizontal(classes="pane-title"):
                             yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
-                            yield Label("STATUS: READY", id=f"status-badge-{s}", classes="status-badge")
+                            yield Label(
+                                self._format_status("IDLE", "badge"), id=f"status-badge-{s}", classes="status-badge"
+                            )
                         yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")
                         yield RichLog(
                             id=f"log-view-{s}",
@@ -220,7 +223,9 @@ class _TuiComposeMixin:
         self._log_handler.setLevel(logging.INFO)
         root.addHandler(self._log_handler)
 
-        self._log_msg(f"[bold {THEME['accent']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]")
+        self._log_msg(
+            f"[bold {THEME['accent_fg']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]"
+        )
         self._log_msg(f"[{THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
 
         # U5: seed per-slot log views with an empty-state hint.
