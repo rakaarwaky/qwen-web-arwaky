@@ -18,10 +18,10 @@ class TestToErrorResponse:
     def test_subclass_keeps_stable_code(self) -> None:
         """A subclass must inherit the stable code (isinstance, not name compare)."""
 
-        class HeadlessAuthChallenge(AuthRequiredError):
+        class HeadlessAuthChallengeError(AuthRequiredError):
             pass
 
-        res = to_error_response(HeadlessAuthChallenge("captcha wall"))
+        res = to_error_response(HeadlessAuthChallengeError("captcha wall"))
         assert str(res).startswith("ERROR [AUTH_REQUIRED]:")
 
     def test_unknown_error_falls_back_to_class_name(self) -> None:

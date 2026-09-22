@@ -13,8 +13,8 @@ from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
-from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
+from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 
 
 def _make_app() -> QwenTuiApp:
@@ -396,7 +396,7 @@ def test_stale_confirm_modal_cannot_cancel_successor_run() -> None:
 
             captured_cb = None
 
-            def _capture(screen, cb=None):  # noqa: ANN001, ANN202
+            def _capture(screen, cb=None):
                 nonlocal captured_cb
                 captured_cb = cb
 

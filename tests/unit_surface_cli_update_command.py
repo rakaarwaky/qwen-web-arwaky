@@ -343,9 +343,7 @@ class TestUpdateManagerShaPinning(unittest.TestCase):
 
     @patch.object(UpdateManager, "_resolve_release_commit", return_value=None)
     @patch.object(UpdateManager, "_run_subprocess")
-    def test_upgrade_refuses_unpinnable_release_fail_closed(
-        self, mock_run: MagicMock, mock_resolve: MagicMock
-    ) -> None:
+    def test_upgrade_refuses_unpinnable_release_fail_closed(self, mock_run: MagicMock, mock_resolve: MagicMock) -> None:
         with patch.object(self.manager, "_editable_source_dir", return_value=None):
             step = self.manager.upgrade_package(target_version="6.4.0")
         self.assertFalse(step.success)
