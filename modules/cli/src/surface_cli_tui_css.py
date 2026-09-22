@@ -451,6 +451,20 @@ HelpScreen {
     background: $bg_base;
     color: $status_warn;
 }
+
+.btn-copy-log {
+    width: auto;
+    height: 1;
+    margin-left: 1;
+    background: $bg_base;
+    color: $fg_accent;
+    border: solid $border;
+}
+
+.btn-copy-log:hover {
+    background: $bg_raised;
+    color: $fg_accent;
+}
 """
 )
 

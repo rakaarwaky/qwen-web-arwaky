@@ -22,7 +22,6 @@ from textual.widgets import (
     Input,
     Label,
     LoadingIndicator,
-    RichLog,
     Select,
     Static,
     Switch,
@@ -30,7 +29,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 
@@ -74,8 +73,10 @@ class _TuiComposeMixin:
                 yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
                 yield DataTable(id="slots-table")
 
-                yield Label("System Event Log", classes="field-label")
-                yield RichLog(
+                with Horizontal(classes="pane-title"):
+                    yield Label("System Event Log", classes="field-label")
+                    yield Button("📋 Copy", id="btn-copy-log", classes="btn-copy-log", variant="default")
+                yield QwenTuiRichLog(
                     id="log-view-overview",
                     highlight=True,
                     markup=True,
@@ -105,7 +106,10 @@ class _TuiComposeMixin:
                     yield Button("✕ CANCEL SWARM", id="btn-swarm-cancel")
                     yield Label("Adaptive templates · maximum 10 browsers", id="swarm-summary")
                 yield DataTable(id="swarm-table")
-                yield RichLog(
+                with Horizontal(classes="pane-title"):
+                    yield Label("Swarm Log", classes="field-label")
+                    yield Button("📋 Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
+                yield QwenTuiRichLog(
                     id="log-view-swarm",
                     highlight=True,
                     markup=True,
@@ -176,8 +180,9 @@ class _TuiComposeMixin:
                             yield Label(
                                 self._format_status("IDLE", "badge"), id=f"status-badge-{s}", classes="status-badge"
                             )
+                            yield Button("📋", id=f"btn-copy-log-{s}", classes="btn-copy-log", tooltip="Copy slot log")
                         yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")
-                        yield RichLog(
+                        yield QwenTuiRichLog(
                             id=f"log-view-{s}",
                             highlight=True,
                             markup=True,
@@ -197,14 +202,14 @@ class _TuiComposeMixin:
         self._metric_done = self.query_one("#metric-done", Label)
 
         # P1: cache RichLog widget refs at mount time — hot render path.
-        self._log_views: dict[int, RichLog] = {}
+        self._log_views: dict[int, QwenTuiRichLog] = {}
         with contextlib.suppress(NoMatches):
-            self._log_views[0] = self.query_one("#log-view-overview", RichLog)
+            self._log_views[0] = self.query_one("#log-view-overview", QwenTuiRichLog)
         with contextlib.suppress(NoMatches):
-            self._log_views[-1] = self.query_one("#log-view-swarm", RichLog)
+            self._log_views[-1] = self.query_one("#log-view-swarm", QwenTuiRichLog)
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
-                self._log_views[s] = self.query_one(f"#log-view-{s}", RichLog)
+                self._log_views[s] = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
         self.set_timer(0.4, self._deferred_startup)
@@ -231,7 +236,7 @@ class _TuiComposeMixin:
         # U5: seed per-slot log views with an empty-state hint.
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
-                log_view = self.query_one(f"#log-view-{s}", RichLog)
+                log_view = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
                 log_view.auto_scroll = True
                 log_view.write(f"[{THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
 

@@ -18,7 +18,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, Input, Select, TabbedContent
 
 from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
-from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen
+from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
 
 
@@ -76,6 +76,13 @@ class _TuiHandlersMixin:
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
+        if button_id in ("btn-copy-log", "btn-copy-swarm-log"):
+            self._copy_log_by_id(button_id)
+            return
+        if button_id.startswith("btn-copy-log-"):
+            slot_id = int(button_id.removeprefix("btn-copy-log-"))
+            self._copy_slot_log(slot_id)
+            return
 
     def on_select_changed(self, event: Select.Changed) -> None:
         select_id = event.select.id or ""
@@ -154,6 +161,61 @@ class _TuiHandlersMixin:
     def action_cancel_active_slot(self) -> None:
         """A8: cancel the currently focused slot from the keyboard (ctrl+x)."""
         self._cancel_slot(self._get_active_slot_id())
+
+    def action_copy_active_log(self) -> None:
+        """Copy the currently visible log buffer to the system clipboard.
+
+        Targets whichever log view belongs to the active tab: the overview
+        log when the Overview tab is focused, the swarm log when the Swarm
+        tab is focused, or the per-slot log view when a slot tab is active.
+        """
+        active_view: QwenTuiRichLog | None = None
+        log_views: dict = getattr(self, "_log_views", {})
+        active_key = self._get_active_slot_id()
+        if active_key == 0:
+            active_view = log_views.get(0)
+        elif active_key == -1:
+            active_view = log_views.get(-1)
+        else:
+            active_view = log_views.get(active_key)
+
+        if active_view is None:
+            self._log_msg("[yellow]No log view available to copy.[/]")
+            return
+
+        text = active_view.copy_text()
+        if not text:
+            self._log_msg("[yellow]Log buffer is empty — nothing to copy.[/]")
+            return
+
+        self.copy_to_clipboard(text)
+        self.notify(f"Copied {len(text.splitlines())} log lines to clipboard", severity="information")
+
+    def _copy_log_by_id(self, button_id: str) -> None:
+        """Copy the log view associated with a copy button on the Overview/Swarm tab."""
+        log_views: dict = getattr(self, "_log_views", {})
+        view = log_views.get(0) if button_id == "btn-copy-log" else log_views.get(-1)
+        if view is None:
+            self._log_msg("[yellow]No log view available to copy.[/]")
+            return
+        self._copy_rich_log(view)
+
+    def _copy_slot_log(self, slot_id: int) -> None:
+        """Copy the per-slot log buffer identified by its slot number."""
+        log_views: dict = getattr(self, "_log_views", {})
+        view = log_views.get(slot_id)
+        if view is None:
+            self._log_msg(f"[yellow]Slot {slot_id} log view not found.[/]")
+            return
+        self._copy_rich_log(view)
+
+    def _copy_rich_log(self, view: QwenTuiRichLog) -> None:
+        text = view.copy_text()
+        if not text:
+            self._log_msg("[yellow]Log buffer is empty — nothing to copy.[/]")
+            return
+        self.copy_to_clipboard(text)
+        self.notify(f"Copied {len(text.splitlines())} log lines to clipboard", severity="information")
 
     def action_switch_tab_overview(self) -> None:
         with contextlib.suppress(Exception):

@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING, Any, Literal
 from rich.text import Text
 from textual.content import Content
 from textual.css.query import NoMatches
-from textual.widgets import DataTable, Label, RichLog, TabbedContent
+from textual.widgets import DataTable, Label, TabbedContent
 from textual.widgets._data_table import CellDoesNotExist
 
-from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 
 if TYPE_CHECKING:
     pass
@@ -54,7 +54,7 @@ class _TuiUtilsMixin:
     _metric_active: Any
     _metric_done: Any
     _log_handler: logging.Handler
-    _log_views: dict[int, RichLog]
+    _log_views: dict[int, QwenTuiRichLog]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     query_one: Any

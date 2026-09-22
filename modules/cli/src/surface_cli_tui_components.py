@@ -22,7 +22,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, DirectoryTree, Label, Static
+from textual.widgets import Button, DirectoryTree, Label, RichLog, Static
 
 from modules.cli.src.surface_cli_tui_css import THEME
 
@@ -116,6 +116,7 @@ class HelpScreen(ModalScreen[None]):
         lines += [
             "enter / ctrl+r   Run active slot",
             "ctrl+x           Cancel active slot",
+            "ctrl+c           Copy active log to clipboard",
             "ctrl+alt+s       Swarm tab",
             "ctrl+l           Login / session setup",
             "ctrl+i           Init workspace",
@@ -186,6 +187,39 @@ class ConfirmModal(ModalScreen[bool]):
 
     def action_dismiss_yes(self) -> None:
         self.dismiss(True)
+
+
+class QwenTuiRichLog(RichLog):
+    """RichLog with a copy helper used by the ctrl+c log-copy action."""
+
+    def copy_text(self) -> str:
+        """Return the plain text of all lines held in the widget's buffer.
+
+        Includes both rendered strips in ``self.lines`` and any pending
+        deferred renders queued before the widget was mounted (``write``
+        defers until ``_size_known`` is set on first layout).
+        """
+        parts: list[str] = []
+        for strip in self.lines:
+            text = strip.text
+            if text:
+                parts.append(text)
+        for deferred in getattr(self, "_deferred_renders", []):
+            content = deferred.content
+            parts.append(content.plain if hasattr(content, "plain") else str(content))
+        return "\n".join(parts)
+
+    def copy_plain(self, limit: int | None = None) -> str:
+        """Return the plain text, optionally truncated to the last `limit` lines.
+
+        A user can copy just the visible tail of a long log without pasting
+        thousands of lines into a terminal.
+        """
+        text = self.copy_text()
+        if limit is None:
+            return text
+        lines = text.splitlines()
+        return "\n".join(lines[-limit:]) if len(lines) > limit else text
 
 
 class QwenTuiLogHandler(logging.Handler):
