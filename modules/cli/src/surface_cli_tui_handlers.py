@@ -38,6 +38,7 @@ class _TuiHandlersMixin:
     _cancel_slot: Any
     query_one: Any
     _log_msg: Any
+    copy_to_clipboard: Any
     push_screen: Any
     _login_worker: Any
     _workspace: Any
@@ -170,7 +171,7 @@ class _TuiHandlersMixin:
         tab is focused, or the per-slot log view when a slot tab is active.
         """
         active_view: QwenTuiRichLog | None = None
-        log_views: dict = getattr(self, "_log_views", {})
+        log_views: dict[Any, Any] = getattr(self, "_log_views", {})
         active_key = self._get_active_slot_id()
         if active_key == 0:
             active_view = log_views.get(0)
@@ -193,7 +194,7 @@ class _TuiHandlersMixin:
 
     def _copy_log_by_id(self, button_id: str) -> None:
         """Copy the log view associated with a copy button on the Overview/Swarm tab."""
-        log_views: dict = getattr(self, "_log_views", {})
+        log_views: dict[Any, Any] = getattr(self, "_log_views", {})
         view = log_views.get(0) if button_id == "btn-copy-log" else log_views.get(-1)
         if view is None:
             self._log_msg("[yellow]No log view available to copy.[/]")
@@ -202,7 +203,7 @@ class _TuiHandlersMixin:
 
     def _copy_slot_log(self, slot_id: int) -> None:
         """Copy the per-slot log buffer identified by its slot number."""
-        log_views: dict = getattr(self, "_log_views", {})
+        log_views: dict[Any, Any] = getattr(self, "_log_views", {})
         view = log_views.get(slot_id)
         if view is None:
             self._log_msg(f"[yellow]Slot {slot_id} log view not found.[/]")
