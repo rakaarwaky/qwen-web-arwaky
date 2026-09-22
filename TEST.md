@@ -90,18 +90,28 @@ pytest tests/unit_browser_adapter.py --cov=modules --cov-report=term-missing
 
 ### Expected coverage boundary
 
-| Module | Target | Typical | Notes |
-|--------|--------|---------|-------|
-| `modules/shared/src/taxonomy_core_constant.py` | 100% | 100% | Selectors & constants — fully locked |
-| `modules/core/src/capabilities_prompt_injector.py` | 100% UI-behavior | ~72% | Uncovered: error branches, clipboard fallback edge cases |
-| `modules/core/src/capabilities_send_dispatcher.py` | 100% | ~90% | Uncovered: PlaywrightError fallback branches |
-| `modules/core/src/capabilities_stream_monitor.py` | 100% | ~85% | Uncovered: network timeout branches |
-| `modules/core/src/agent_shared_flow_orchestrator.py` | — | ~19% | Locked via `test_pipeline_fixtures.py` state management |
+Measured with `pytest tests/ --cov=modules` (2026-09-22, 46 test files):
+**total line coverage ≈ 75%** of `modules/`. The historical "<40% with four
+layers at 0%" estimate (issue #339) does not hold against measurement — no
+module layer sits at 0%. Representative numbers:
 
-The **72-85% coverage** is the expected steady state: the uncovered percentages
-are `except PlaywrightError`, `start_new_chat` network redirects,
-`_wait_for_auth` login detection, and other error-handling branches that
-require live network/auth and are tested separately via `test_e2e_pipeline.py`.
+| Module / layer | Measured | Notes |
+|----------------|----------|-------|
+| Total `modules/` | **75%** | Steady-state target for PRs: do not regress |
+| Shared contract/taxonomy layer | 93–100% | Contracts & constants — fully locked |
+| `capabilities_stream_monitor.py` | ~89% | Uncovered: live IPC recovery branches |
+| `capabilities_prompt_injector.py` | ~95% | Uncovered: error branches, clipboard fallback edges |
+| `capabilities_send_dispatcher.py` | ~80% | Uncovered: PlaywrightError fallback branches |
+| `capabilities_update_manager.py` | ~62% | Uncovered: real pip/git subprocess paths (mocked in unit tests) |
+| `agent_swarm_orchestrator.py` | ~76% | Uncovered: shutdown/executor races |
+| `agent_shared_flow_orchestrator.py` | ~29% | Lowest agent layer — dispatch retry matrix needs browser fakes |
+| TUI surface (`surface_cli_tui_*`) | 38–100% | Handlers/workers below compose/app — see strategy §7.5 |
+| MCP surface | ~70% | Tool handlers covered via `unit_mcp_hardening.py` |
+
+The uncovered percentages are `except PlaywrightError`, `start_new_chat`
+network redirects, `_wait_for_auth` login detection, real subprocess
+executions, and other error-handling branches that require live
+network/auth — validated manually (see §5 Manual Probe).
 
 ---
 
@@ -202,6 +212,33 @@ modules/
 ├── core/src/capabilities_stream_monitor.py
 └── core/src/agent_shared_flow_orchestrator.py
 ```
+
+---
+
+## 7.5 Test Strategy (per layer) — issue #328
+
+The suite is organised by AES layer. Each layer has an owner file pattern
+and a preferred harness; when adding code, extend the matching pattern.
+
+| Layer | Pattern | Harness | What to add when changing it |
+|-------|---------|---------|------------------------------|
+| Taxonomy / contracts | `tests/unit_taxonomy_*.py`, `tests/contract_*.py` | pure pytest, no browser | New VO/error/event: constructor + invariant tests; contract changes: method-presence checks (see `TestCancelContract`). |
+| Core capabilities | `tests/unit_capability_*.py`, `tests/unit_browser_adapter.py`, `tests/unit_folder_compiler.py` | pytest + `unittest.mock` Playwright fakes (`MagicMock` page/locator, patched DOM helpers and `time`) | New branch/edge: fake the signals (selector visibility, `time` side-effects) — never sleep real seconds. |
+| Agent orchestrators | `tests/unit_agent_*.py` | mocked capability protocols; thread-level races via `threading.Event` registries | State transitions (retry/partial/failed/cancelled) as snapshot assertions; cancellation isolation checks. |
+| TUI surface | `tests/unit_surface_cli_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
+| MCP surface | `tests/integration_surface_mcp.py`, `tests/unit_mcp_hardening.py`, `tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
+| CLI surface | `tests/integration_surface_*.py`, `tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
+| Update Manager | `tests/unit_surface_cli_update_command.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
+| Swarm | `tests/unit_agent_swarm_orchestrator.py` | fake `IAttachmentPromptAggregate`, real `ThreadPoolExecutor` on tmp dirs | New transition: manifest snapshot after each state change. |
+| End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/pipeline_fixtures.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |
+
+**Rules of thumb**
+
+- Unit tests must not sleep real time, launch real browsers, or touch the
+  network; patch `time`, Playwright objects, and subprocess boundaries.
+- A fix for a race/cancellation bug ships with a regression test capturing
+  the interleaving (see issues #331, #360).
+- CI runs `pytest tests/ -v` (see §3); keep the suite under ~2 minutes.
 
 ---
 
