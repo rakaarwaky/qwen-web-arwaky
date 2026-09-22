@@ -23,7 +23,7 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 
 ## User Personas
 
-- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs timestamped batch markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
+- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
 - **AI Agent (via MCP)**: Interacts with the tool programmatically to send
   prompts, process files, and read audit logs without managing browser
   lifecycles or DOM selectors.
