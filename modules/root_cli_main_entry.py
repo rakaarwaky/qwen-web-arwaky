@@ -32,8 +32,9 @@ import modules.cli.src.surface_cli_login_command as surface_cli_login_command
 import modules.cli.src.surface_cli_run_command as surface_cli_run_command
 import modules.cli.src.surface_cli_update_command as surface_cli_update_command
 from modules.core.src.root_core_container import SharedContainer
+from modules.shared.src.contract_core_aggregate import IPromptFileAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 _ERROR_PREFIX = "[ERROR]"
@@ -286,7 +287,7 @@ def _exit_code_for_result(result: dict[str, object]) -> int:
 def _run_folder_mode(
     args: argparse.Namespace,
     cfg: AppConfig,
-    file_only: object,
+    file_only: IPromptFileAggregate,
     *,
     watch: bool,
 ) -> dict[str, object]:
@@ -306,7 +307,7 @@ def _run_folder_mode(
                 result = file_only.process_prompt_file_only(
                     prompt_file=source,
                     output_file=output_dir / source.name,
-                    headless=bool(getattr(args, "headless", True)),
+                    headless=HeadlessFlag(bool(getattr(args, "headless", True))),
                 )
                 if "failed" in str(result).lower() or "error" in str(result).lower():
                     raise RuntimeError(str(result))

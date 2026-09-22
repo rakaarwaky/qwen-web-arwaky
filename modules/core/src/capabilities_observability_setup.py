@@ -119,7 +119,7 @@ class MetricsCounter(IMetricsProtocol):
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             self._prune_events()
-            result = dict(self._counters)
+            result: dict[str, Any] = dict(self._counters)
             total = len(self._execution_events)
             successful = sum(1 for event in self._execution_events if event.get("success") is True)
             result["total_executions"] = total
