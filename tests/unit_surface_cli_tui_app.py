@@ -55,7 +55,7 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             assert tabs.active == "tab-overview"
 
             # Test tab label update
-            app._set_slot_tab_title(1, "Slot 1: test.md ⏳")
+            app._set_slot_tab_title(1, "Slot 1: test.md ▶")
             tab1 = tabs.get_tab("tab-slot-1")
             assert "test.md" in str(tab1.label)
 
@@ -248,7 +248,7 @@ def test_active_tab_label_renders_on_screen() -> None:
             tabs = app.query_one(TabbedContent)
             tabs.active = "tab-slot-1"
             await pilot.pause()
-            app._set_slot_tab_title(1, "Slot 1: deep-review ⏳")
+            app._set_slot_tab_title(1, "Slot 1: deep-review ▶")
             await pilot.pause()
 
             strips = list(app.screen._compositor.render_strips())
