@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from modules.core.src.capabilities_folder_compiler import FolderCompiler
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files_with_imports,
@@ -15,6 +17,14 @@ def _write(path: Path, content: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path
+
+
+@pytest.fixture(autouse=True)
+def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep boundary tests hermetic: a stray QWEN_WORKSPACE_ROOT in the CI or
+    developer environment must not shrink the default boundary for the legacy
+    tests above (they rely on the folder-parent fallback)."""
+    monkeypatch.delenv("QWEN_WORKSPACE_ROOT", raising=False)
 
 
 class TestCollectFolderFilesWithImports:
@@ -333,3 +343,95 @@ class TestMarkdownLinkChain:
 
         files, _ = collect_folder_files_with_imports(target)
         assert [f.name for f in files].count("b.md") == 1
+
+
+class TestImportBoundaryConfinement:
+    """Issue #342: import resolution must not escape the workspace boundary.
+
+    The compiled markdown is uploaded to a third-party service; following an
+    import/reference outside the workspace would silently exfiltrate files.
+    """
+
+    def test_import_outside_explicit_boundary_refused(self, tmp_path: Path) -> None:
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        _write(target / "a.py", "from ...secrets.cfg import KEY\nprint(KEY)\n")
+        _write(tmp_path / "secrets" / "cfg.py", "KEY = 'hunter2'\n")
+
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(target, boundary_root=ws, skipped=skipped)
+        assert {f.name for f in files} == {"a.py"}
+        assert [p.name for p in skipped] == ["cfg.py"]
+
+    def test_import_inside_explicit_boundary_kept(self, tmp_path: Path) -> None:
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        _write(target / "a.py", "from utils.helper import run\nrun()\n")
+        _write(ws / "utils" / "helper.py", "def run(): pass\n")
+
+        files, origins = collect_folder_files_with_imports(target, boundary_root=ws)
+        helper = next(f for f in files if f.name == "helper.py")
+        assert origins[helper] == ("a.py",)
+
+    def test_env_workspace_root_confines_imports(self, tmp_path: Path, monkeypatch) -> None:
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        _write(target / "a.py", "from ...secrets.cfg import KEY\n")
+        _write(tmp_path / "secrets" / "cfg.py", "KEY = 'hunter2'\n")
+        monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(ws))
+
+        files, _ = collect_folder_files_with_imports(target)
+        assert {f.name for f in files} == {"a.py"}
+
+    def test_default_parent_boundary_blocks_far_escape(self, tmp_path: Path, monkeypatch) -> None:
+        """Without env/param the boundary is folder.parent: ../.. escapes are refused."""
+        monkeypatch.delenv("QWEN_WORKSPACE_ROOT", raising=False)
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        _write(target / "a.py", "from ...evil import payload\n")  # resolves to tmp_path/evil.py
+        _write(tmp_path / "evil.py", "payload = 1\n")
+
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(target, skipped=skipped)
+        assert {f.name for f in files} == {"a.py"}
+        assert [p.name for p in skipped] == ["evil.py"]
+
+    def test_markdown_exfiltration_link_refused(self, tmp_path: Path) -> None:
+        ws = tmp_path / "ws"
+        docs = ws / "docs"
+        _write(docs / "a.md", "See [config](../../secrets/deployment.yaml)\n")
+        _write(tmp_path / "secrets" / "deployment.yaml", "password: hunter2\n")
+
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(docs, boundary_root=ws, skipped=skipped)
+        assert {f.name for f in files} == {"a.md"}
+        assert [p.name for p in skipped] == ["deployment.yaml"]
+
+    def test_symlinked_import_resolves_out_of_boundary(self, tmp_path: Path) -> None:
+        """A candidate inside the boundary by name but symlinked outside is refused
+        (candidates are resolved before the boundary check)."""
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        _write(target / "a.py", "import linked\n")
+        outside = _write(tmp_path / "real_secret.py", "TOKEN = 'abc'\n")
+        link = ws / "linked.py"
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            pytest.skip("symlinks not supported on this platform")
+
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(target, boundary_root=ws, skipped=skipped)
+        assert "linked.py" not in {f.name for f in files}
+        assert "real_secret.py" not in {f.name for f in files}
+
+    def test_base_folder_files_never_refused(self, tmp_path: Path) -> None:
+        """The boundary only constrains *imported* files, not the scanned folder itself."""
+        ws = tmp_path / "ws"
+        target = ws / "target"
+        target.mkdir(parents=True)
+        _write(target / "a.py", "x = 1\n")
+        _write(target / "b.py", "y = 2\n")
+
+        files, _ = collect_folder_files_with_imports(target, boundary_root=target)
+        assert {f.name for f in files} == {"a.py", "b.py"}

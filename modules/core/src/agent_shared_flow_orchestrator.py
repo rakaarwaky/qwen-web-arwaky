@@ -154,11 +154,13 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
         if not state.dispatch_acknowledged:
             raise RuntimeError("Cannot wait for response: prompt dispatch is incomplete")
 
-        response_timeout_hint = timeout_sec
+        # timeout_sec is a hard response cutoff (issue #372), enforced by the
+        # stream monitor; a budget overrun surfaces as
+        # ResponseDetectionTimeoutError and this loop retries per MAX_ATTEMPTS.
         try:
             response = streamer.wait_for_response(
                 page,
-                TimeoutSec(response_timeout_hint),
+                TimeoutSec(timeout_sec),
                 msg_count_before,
                 emitter,
                 polling_interval_sec=PollIntervalSec(active_cfg.poll_interval),

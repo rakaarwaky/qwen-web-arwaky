@@ -146,7 +146,12 @@ class _TuiWorkersMixin:
         if elapsed > 30:
 
             def _on_confirm(confirmed: bool | None) -> None:
-                if confirmed:
+                # Issue #331: the modal can be confirmed after the original
+                # run already finished and a NEW run started in the same
+                # slot. Only cancel when the slot still belongs to the exact
+                # worker the modal was opened for (object identity), never a
+                # successor run the user did not intend to stop.
+                if confirmed and self._slot_workers.get(slot_id) is worker:
                     self._do_cancel_slot(slot_id)
 
             from modules.cli.src.surface_cli_tui_components import ConfirmModal
@@ -187,6 +192,11 @@ class _TuiWorkersMixin:
                 self._file_only.request_cancel(slot_event)
         worker.cancel()
         self._slot_workers[slot_id] = None
+        # Issue #331: release the per-slot cancel event entry. The cancelled
+        # worker holds its own reference to the same Event object; leaving
+        # the dict entry behind would leak one Event per cancelled run and
+        # could be mistaken for a live, cancellable run.
+        self._slot_cancel_events.pop(slot_id, None)
         self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
         self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ●")

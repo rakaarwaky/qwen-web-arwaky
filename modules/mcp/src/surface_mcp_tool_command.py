@@ -363,7 +363,10 @@ class McpToolCommand:
             prompt_file: Path to Markdown prompt file OR a built-in role template
                 name (any .md file in modules/templates/).
             attachment_file: Path to document attachment file (PDF, TXT, MD) or directory
-                (will be compiled to single markdown file).
+                (will be compiled to single markdown file). Directory compilation
+                follows imports/links, but only within the workspace boundary
+                (QWEN_WORKSPACE_ROOT or cwd): references resolving outside the
+                workspace are refused so files cannot be exfiltrated transitively.
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).

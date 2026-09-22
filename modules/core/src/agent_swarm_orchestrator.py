@@ -271,9 +271,10 @@ class SwarmOrchestrator(ISwarmAggregate):
         target.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def _request_attachment_cancel(self, event: threading.Event) -> None:
-        request_cancel = getattr(self._attachment, "request_cancel", None)
-        if callable(request_cancel):
-            request_cancel(event)
+        # ``request_cancel`` is part of IAttachmentPromptAggregate (cancel is a
+        # first-class contract operation), so a direct typed call replaces the
+        # former getattr() duck-typing hack.
+        self._attachment.request_cancel(event)
 
     @staticmethod
     def _is_retryable(message: str) -> bool:

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from textual.widgets import DataTable, Label, RichLog, TabbedContent
@@ -13,6 +14,7 @@ from textual.widgets._data_table import CellDoesNotExist
 from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
+from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 
 
 def _make_app() -> QwenTuiApp:
@@ -343,3 +345,81 @@ def test_rich_log_copy_plain_truncates_to_limit() -> None:
     assert len(lines) == 2
     assert "entry 3" in lines[0]
     assert "entry 4" in lines[1]
+
+
+def _prime_running_slot(app: QwenTuiApp, slot_id: int, elapsed_sec: float) -> MagicMock:
+    """Put a slot into RUNNING state with a live worker and cancel event."""
+    worker = MagicMock()
+    app._slot_workers[slot_id] = worker
+    app._slot_stats[slot_id] = {
+        "status": "RUNNING",
+        "file": "prompt.md",
+        "duration": 0.0,
+        "_start_perf": time.perf_counter() - elapsed_sec,
+    }
+    app._slot_cancel_events[slot_id] = threading.Event()
+    return worker
+
+
+def test_do_cancel_slot_releases_cancel_event_entry() -> None:
+    """Issue #331: a cancelled slot must not keep a stale cancel event entry."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)):
+            slot_id = 2
+            _prime_running_slot(app, slot_id, elapsed_sec=5)
+            assert slot_id in app._slot_cancel_events
+
+            app._do_cancel_slot(slot_id)
+
+            assert slot_id not in app._slot_cancel_events
+            assert app._slot_workers[slot_id] is None
+            assert app._slot_stats[slot_id]["status"] == "CANCELLED"
+
+    asyncio.run(_run())
+
+
+def test_stale_confirm_modal_cannot_cancel_successor_run() -> None:
+    """Issue #331: confirming an old cancel modal must not stop a NEW run.
+
+    Scenario: a >30s run is open → cancel modal is shown but not confirmed;
+    the run finishes and a NEW run starts in the same slot; the stale modal
+    is then confirmed. The successor run must survive.
+    """
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)):
+            slot_id = 1
+            _prime_running_slot(app, slot_id, elapsed_sec=31)
+
+            captured_cb = None
+
+            def _capture(screen, cb=None):
+                nonlocal captured_cb
+                captured_cb = cb
+
+            with (
+                patch.object(app, "push_screen", side_effect=_capture),
+                patch.object(_TuiWorkersMixin, "_do_cancel_slot", autospec=True) as spy,
+            ):
+                app._cancel_slot(slot_id)
+                assert captured_cb is not None
+
+                # Control case: same worker still running → confirm cancels.
+                captured_cb(True)
+                assert spy.called
+                spy.reset_mock()
+
+                # A successor worker took over the slot → stale confirm ignored.
+                app._slot_workers[slot_id] = MagicMock()
+                captured_cb(True)
+                assert not spy.called
+
+                # Declining the modal never cancels.
+                app._slot_workers[slot_id] = MagicMock()
+                captured_cb(False)
+                assert not spy.called
+
+    asyncio.run(_run())

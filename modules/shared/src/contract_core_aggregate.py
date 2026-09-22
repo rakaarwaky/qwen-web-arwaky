@@ -98,6 +98,17 @@ class IPromptFileAggregate(ABC):
     ) -> ResponseText:
         """Process a prompt file from disk without attachment."""
 
+    @abstractmethod
+    def request_cancel(self, cancel_event: Any) -> None:
+        """Register ``cancel_event`` (a ``threading.Event``) so setting it
+        stops the matching in-flight run.
+
+        Cancellation is part of the aggregate contract: surfaces and the
+        Swarm orchestrator rely on it for per-slot/per-agent stops and must
+        never reach for implementation-only methods via ``getattr``.
+        Registering an event must not start, join, or block on any run.
+        """
+
 
 class IAttachmentPromptAggregate(ABC):
     """Attachment prompt processing aggregate contract."""
@@ -114,6 +125,17 @@ class IAttachmentPromptAggregate(ABC):
         """Process a prompt file from disk with document attachment.
 
         ``cancel_event`` targets one browser run without affecting sibling jobs.
+        """
+
+    @abstractmethod
+    def request_cancel(self, cancel_event: Any) -> None:
+        """Register ``cancel_event`` (a ``threading.Event``) so setting it
+        stops the matching in-flight run.
+
+        Cancellation is part of the aggregate contract: surfaces and the
+        Swarm orchestrator rely on it for per-slot/per-agent stops and must
+        never reach for implementation-only methods via ``getattr``.
+        Registering an event must not start, join, or block on any run.
         """
 
 

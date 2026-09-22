@@ -44,6 +44,7 @@ class FolderCompiler(IFolderCompileProtocol):
         max_depth: int = MAX_FOLDER_DEPTH,
         import_depth: int = MAX_IMPORT_DEPTH,
         include_imports: bool = True,
+        boundary_root: Path | None = None,
     ) -> Path:
         """Compile folder contents to a single markdown file.
 
@@ -64,6 +65,12 @@ class FolderCompiler(IFolderCompileProtocol):
                 not followed.
             include_imports: Follow imports/links of folder files and include
                 external dependencies (cycle-safe, bounded hops).
+            boundary_root: Confinement boundary for import resolution
+                (issue #342). Resolved imports outside this root are refused
+                because the compiled output is uploaded to a third-party
+                service. Defaults to the ``QWEN_WORKSPACE_ROOT`` env var when
+                set (matching the MCP workspace boundary), else the scanned
+                folder's parent.
 
         Returns:
             Path to the compiled markdown file.
@@ -84,12 +91,21 @@ class FolderCompiler(IFolderCompileProtocol):
 
         try:
             if include_imports:
+                refused: list[Path] = []
                 files, origins = collect_folder_files_with_imports(
                     folder_path,
                     max_depth=max_depth,
                     import_depth=import_depth,
+                    boundary_root=boundary_root,
+                    skipped=refused,
                 )
                 log.info("Found %d files (%d imported)", len(files), sum(1 for o in origins.values() if o))
+                if refused:
+                    log.warning(
+                        "Refused %d import(s) outside the workspace boundary (not compiled): %s",
+                        len(refused),
+                        ", ".join(str(p) for p in refused[:5]),
+                    )
             else:
                 files = validate_folder_for_compile(folder_path, max_depth=max_depth)
                 origins = None
