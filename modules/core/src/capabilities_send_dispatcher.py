@@ -28,6 +28,13 @@ from modules.shared.src.taxonomy_core_vo import (
 
 log = get_logger("capabilities_send_dispatcher")
 
+#: Window during which parse-waiting stays maximally responsive.
+_PARSE_FAST_PHASE_SEC = 5.0
+#: Poll interval while inside the fast phase.
+_PARSE_POLL_FAST_MS = 500
+#: Backed-off poll interval for long document parses.
+_PARSE_POLL_SLOW_MS = 1000
+
 
 def _is_parse_toast_visible(page: Page) -> bool:
     """Safely check if Qwen's document parsing warning toast is visible."""
@@ -217,20 +224,29 @@ class SendDispatcher(ISendProtocol):
         return False
 
     def _wait_for_send_enabled(self, page: Page, timeout_ms: int = 5000) -> bool:
-        """Wait until send is safe: no file parsing in progress AND button is enabled."""
+        """Wait until send is safe: no file parsing in progress AND button is enabled.
+
+        The attachment pipeline raises ``click_timeout_ms`` to 120s so large
+        documents can finish parsing. Polling every 500ms for that long costs
+        thousands of Playwright round-trips during a phase where the state
+        provably cannot flip quickly, so the parse-wait interval backs off after
+        an initial responsive window and snaps back once the indicators clear.
+        """
         deadline = time.monotonic() + (timeout_ms / 1000)
+        fast_phase_deadline = time.monotonic() + _PARSE_FAST_PHASE_SEC
         while time.monotonic() < deadline:
             try:
+                parse_wait_ms = _PARSE_POLL_FAST_MS if time.monotonic() < fast_phase_deadline else _PARSE_POLL_SLOW_MS
                 # Proactive check: file card still shows "Parsing..." in DOM
                 if _is_file_card_parsing(page):
                     log.debug("File card still parsing — holding send.")
-                    page.wait_for_timeout(500)
+                    page.wait_for_timeout(parse_wait_ms)
                     continue
 
                 # Reactive check: toast appeared after a premature click attempt
                 if _is_parse_toast_visible(page):
                     log.debug("Parse toast visible — holding send.")
-                    page.wait_for_timeout(500)
+                    page.wait_for_timeout(parse_wait_ms)
                     continue
 
                 for selector in (

@@ -96,9 +96,10 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         self._flow = flow
         self._folder_adapter = folder_adapter
         # Registry: cancel_event -> _RunState for every active run.
-        # Keyed on the caller's threading.Event so the TUI worker can target
-        # one specific run without touching sibling runs.
-        self._run_registry: dict[int, _RunState] = {}
+        # Keyed on the caller's threading.Event object itself (not id(), whose
+        # address can be recycled once an Event is garbage collected) so the TUI
+        # worker can target one specific run without touching sibling runs.
+        self._run_registry: dict[threading.Event, _RunState] = {}
         self._registry_lock = threading.Lock()
 
     def request_cancel(self, cancel_event: threading.Event) -> None:
@@ -111,7 +112,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         different events are unaffected.
         """
         with self._registry_lock:
-            run_state = self._run_registry.get(id(cancel_event))
+            run_state = self._run_registry.get(cancel_event)
         if run_state is None:
             cancel_event.set()
             return
@@ -147,7 +148,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         ctx = RunContext()
         run_state = _make_run_state(cancel_event)
         with self._registry_lock:
-            self._run_registry[id(run_state.cancel_event)] = run_state
+            self._run_registry[run_state.cancel_event] = run_state
         try:
             p_path = Path(prompt_file).resolve()
             if not p_path.exists():
@@ -191,7 +192,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
             return to_error_response(exc)
         finally:
             with self._registry_lock:
-                self._run_registry.pop(id(run_state.cancel_event), None)
+                self._run_registry.pop(run_state.cancel_event, None)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 

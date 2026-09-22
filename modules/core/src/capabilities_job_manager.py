@@ -5,11 +5,13 @@ Implements IJobStorageProtocol.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from dataclasses import asdict
 from pathlib import Path
 
-from modules.core.src.utility_core_io_writer import atomic_write_text
+from modules.core.src.utility_core_io_writer import ATOMIC_TEMP_SUFFIX, atomic_write_text
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
@@ -21,6 +23,11 @@ from modules.shared.src.taxonomy_core_vo import (
 
 log = get_logger("capabilities_job_manager")
 
+#: Anything outside this set is replaced before a job ID touches the filesystem.
+_UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.\-]")
+#: Leaves room for the ``.json`` extension under a 255-byte NAME_MAX.
+_MAX_JOB_FILENAME_LEN = 200
+
 
 class JobManager(IJobStorageProtocol):
     """File-backed job state manager adhering to XDG state specification."""
@@ -30,7 +37,19 @@ class JobManager(IJobStorageProtocol):
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _job_file_path(self, job_id: JobId | str) -> Path:
-        clean_id = str(job_id).replace("/", "_").replace("\\", "_")
+        """Map a job ID onto a filesystem-safe path inside the storage dir.
+
+        Job IDs are generated internally, but ``get_job_status`` accepts one
+        straight from an MCP caller, so treat the value as untrusted: collapse
+        every character outside ``[A-Za-z0-9_.-]`` (covers path separators,
+        ``:*?"<>|`` on Windows, and control bytes) and cap the length well below
+        NAME_MAX, appending a digest so truncated IDs stay distinct.
+        """
+        raw = str(job_id)
+        clean_id = _UNSAFE_FILENAME_CHARS.sub("_", raw)
+        if len(clean_id) > _MAX_JOB_FILENAME_LEN:
+            digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+            clean_id = f"{clean_id[: _MAX_JOB_FILENAME_LEN - len(digest) - 1]}_{digest}"
         return self.storage_dir / f"{clean_id}.json"
 
     def save_job(self, record: JobRecord) -> None:
@@ -69,12 +88,20 @@ class JobManager(IJobStorageProtocol):
             return None
 
     def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
-        """List recently recorded jobs sorted newest to oldest."""
+        """List recently recorded jobs sorted newest to oldest.
+
+        Best-effort under concurrent writes. Records are persisted with
+        ``atomic_write_text``, whose ``os.replace`` is atomic on POSIX, so a
+        reader never observes a half-written file. A job deleted between the
+        directory scan and its read is simply skipped, which can make the result
+        shorter than ``limit``; callers must not treat the length as a count of
+        stored jobs.
+        """
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         records: list[JobRecord] = []
         candidate_files: list[tuple[float, Path]] = []
         for path in self.storage_dir.glob("*.json"):
-            if ".tmp_" in path.name:
+            if path.name.endswith(ATOMIC_TEMP_SUFFIX):
                 continue
             try:
                 candidate_files.append((path.stat().st_mtime, path))

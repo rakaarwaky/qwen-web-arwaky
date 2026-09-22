@@ -95,11 +95,11 @@ def test_discovery_picks_up_new_template_file(
     scratch = tmp_path_factory.mktemp("templates")
     (scratch / "security.md").write_text("# Plan: {feature} — Security\n\n## Summary\n\nBody\n", encoding="utf-8")
     monkeypatch.setattr(mod, "_TEMPLATE_DIR", scratch)
-    mod._discovered_roles.cache_clear()
+    mod.invalidate_template_cache()
     try:
         assert "security" in list_prompt_templates()
         assert is_prompt_role("security")
         assert "security" in prompt_template_manifest()
         assert load_prompt_template("security").startswith("# Plan:")
     finally:
-        mod._discovered_roles.cache_clear()
+        mod.invalidate_template_cache()

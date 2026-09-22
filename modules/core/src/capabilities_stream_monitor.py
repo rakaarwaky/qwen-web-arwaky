@@ -79,12 +79,23 @@ class StreamMonitor(IStreamProtocol):
             self.min_text_length = MinTextLength(1)
 
     # ─── Block 2: Public Contract (IStreamProtocol ONLY) ──
-    def is_generation_complete(self, page: Page) -> bool:
-        """Check if Qwen AI is done generating."""
+    def is_generation_complete(self, page: Page, *, thinking: bool | None = None) -> bool:
+        """Check if Qwen AI is done generating.
+
+        Args:
+            page: Active Playwright page.
+            thinking: Pre-computed ``is_thinking_active`` result for this poll
+                cycle. Pass it to avoid a second, redundant JS evaluation (and
+                Chromium IPC round-trip) per slot per cycle; omit it to have the
+                thinking state resolved on demand.
+
+        """
         try:
             if is_any_visible(page, STOP_BUTTON_SELECTORS):
                 return False
-            return not self.is_thinking_active(page)
+            if thinking is None:
+                thinking = self.is_thinking_active(page)
+            return not thinking
         except Exception:
             return False
 
@@ -193,7 +204,10 @@ class StreamMonitor(IStreamProtocol):
                 )
 
             is_thinking = self.is_thinking_active(page)
-            is_complete = self.is_generation_complete(page)
+            # Reuse the thinking probe already taken this cycle: the state cannot
+            # change within one iteration, so evaluating it twice only doubles
+            # Chromium IPC traffic across all concurrent slots.
+            is_complete = self.is_generation_complete(page, thinking=is_thinking)
             forward_event_this_iteration = False
 
             try:
