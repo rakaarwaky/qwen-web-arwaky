@@ -180,7 +180,22 @@ ROLE_DETECT = re.compile(r"####\s+Issue\s+([A-Z]+-\d+-\d+)\s*$")
 
 
 def _strip_md_escapes(s: str) -> str:
-    return re.sub(r"\\(\[\]`_*|\\)", r"\1", s)
+    """Strip markdown escape backslashes, iterating until stable."""
+    prev = None
+    while prev != s:
+        prev = s
+        out = []
+        i = 0
+        while i < len(s):
+            c = s[i]
+            if c == "\\" and i + 1 < len(s) and s[i + 1] in "[]`_*\\":
+                out.append(s[i + 1])
+                i += 2
+            else:
+                out.append(c)
+                i += 1
+        s = "".join(out)
+    return s
 
 
 def build_issue_body(
@@ -189,6 +204,7 @@ def build_issue_body(
     description: str,
     plan_title: str,
     swarm_id: str,
+    open_questions: str = "",
 ) -> str:
     parts = [
         f"## {ROLE_SCOPE_NOTE.get(role, 'Swarm review')}",
@@ -199,7 +215,10 @@ def build_issue_body(
     ]
     if plan_title:
         parts += ["", f"**Source Plan**: {plan_title}"]
-    parts += ["", f"**Issue ID**: `{iid}`", "", "---", "", description, "", "---", ""]
+    parts += ["", f"**Issue ID**: `{iid}`", "", "---", "", description]
+    if open_questions.strip().lower() not in ("", "none", "-"):
+        parts += ["", "## Open Questions", open_questions.strip()]
+    parts += ["", "---", ""]
     parts.append(f"*Auto-created from qwen-web-arwaky swarm run `{swarm_id}` (`{role}`); imported `{iid}`.*")
     return "\n".join(parts)
 
@@ -216,20 +235,28 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
 
     issues: list[SwarmIssue] = []
     cur: dict | None = None
-    collecting_desc = False
+    collecting_desc: str | None = None
     in_code = False
     code_lines: list[str] = []
 
-    def flush():
-        nonlocal cur
+    def flush() -> None:
+        nonlocal cur, collecting_desc, in_code
         if cur is not None:
             desc = "\n".join(cur["desc"]).strip()
+            open_q = "\n".join(cur["open_q"]).strip()
             if cur.get("title"):
-                body = build_issue_body(cur["role"], cur["id"], desc, plan_title, swarm_id)
-                labels = [cur["role_label"]]
-                for sev in SEVERITY_LABELS:
-                    if f"[{sev.upper()}]" in cur["title"]:
-                        labels.append(f"severity-{sev}")
+                body = build_issue_body(cur["role"], cur["id"], desc, plan_title, swarm_id, open_q)
+                # Labels: explicit list from the template first, else infer
+                # role + severity from the title.
+                if cur.get("explicit_labels"):
+                    labels: list[str] = [cur["role_label"]] + cur["explicit_labels"]
+                else:
+                    labels = [cur["role_label"]]
+                    for sev in SEVERITY_LABELS:
+                        if f"[{sev.upper()}]" in cur["title"]:
+                            labels.append(f"severity-{sev}")
+                seen_lbls: set[str] = set()
+                labels = [lbl for lbl in labels if not (lbl in seen_lbls or seen_lbls.add(lbl))]
                 issues.append(
                     SwarmIssue(
                         issue_id=cur["id"],
@@ -240,8 +267,7 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
                     )
                 )
         cur = None
-        nonlocal collecting_desc, in_code
-        collecting_desc = False
+        collecting_desc = None
         in_code = False
 
     for ln in text.splitlines():
@@ -260,8 +286,10 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
                 "role_label": ROLE_LABEL.get(role_by_prefix, "swarm-unknown"),
                 "title": "",
                 "desc": [],
+                "open_q": [],
+                "explicit_labels": [],
             }
-            collecting_desc = False
+            collecting_desc = None
             in_code = False
             code_lines = []
             continue
@@ -287,7 +315,31 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
         tm = re.match(r"^-\s*\*\*Title\*\*:\s*(.+)$", ln)
         if tm:
             cur["title"] = _strip_md_escapes(tm.group(1).strip())
-            collecting_desc = False
+            collecting_desc = None
+            continue
+
+        lml = re.match(r"^-\s*\*\*Label\*\*:\s*(.*)$", ln)
+        if lml:
+            raw = lml.group(1).strip()
+            # Accept a `{a|b|c}` candidate list (pipe-separated) or a plain
+            # comma-separated list; both are normalised to one label each.
+            if raw.startswith("{") and raw.endswith("}"):
+                raw = raw[1:-1]
+            if raw:
+                parts = re.split(r"[,|]", raw)
+                seen: set[str] = set()
+                cur["explicit_labels"] = [
+                    p.strip() for p in parts if p.strip() and not (p.strip() in seen or seen.add(p.strip()))
+                ]
+            collecting_desc = None
+            continue
+
+        om = re.match(r"^-\s*\*\*Open Questions\*\*:\s*(.*)$", ln)
+        if om:
+            rest = om.group(1).strip()
+            if rest:
+                cur["open_q"].append(rest)
+            collecting_desc = "open_q"
             continue
 
         lm = re.match(r"^-\s*\*\*Location Path\*\*:?\s*(.*)$", ln)
@@ -296,7 +348,7 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
             rest = lm.group(1).strip()
             if rest:
                 cur["desc"].append(rest)
-            collecting_desc = True
+            collecting_desc = "desc"
             continue
 
         dm = re.match(r"^-\s*\*\*(Description)\*\*:\s*(.*)$", ln)
@@ -304,7 +356,7 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
             cur["desc"].append("## Description")
             if dm.group(2).strip():
                 cur["desc"].append(dm.group(2).strip())
-            collecting_desc = True
+            collecting_desc = "desc"
             continue
 
         am = re.match(r"^-\s*\*\*(Acceptance Criteria)\*\*:\s*(.*)$", ln)
@@ -312,7 +364,7 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
             cur["desc"].append("## Acceptance Criteria")
             if am.group(2).strip():
                 cur["desc"].append(am.group(2).strip())
-            collecting_desc = False
+            collecting_desc = None
             continue
 
         rm = re.match(r"^-\s*\*\*(Recommendation)\*\*:\s*(.*)$", ln)
@@ -320,23 +372,28 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
             cur["desc"].append("## Recommendation")
             if rm.group(2).strip():
                 cur["desc"].append(rm.group(2).strip())
-            collecting_desc = False
+            collecting_desc = None
             continue
 
         gm = re.match(r"^-\s*\*\*(Git Diff)\*\*:\s*$", ln)
         if gm:
             cur["desc"].append("## Suggested Diff")
-            collecting_desc = False
+            collecting_desc = None
             continue
 
-        # Plain continuation lines while inside a description block
+        # Plain continuation lines while inside an active field block
         if collecting_desc and stripped and not stripped.startswith("- **"):
-            cur["desc"].append(ln.rstrip())
+            if collecting_desc == "open_q":
+                if stripped.lower() not in ("none", "-", "n/a"):
+                    cur["open_q"].append(ln.rstrip())
+            else:
+                cur["desc"].append(ln.rstrip())
             continue
 
         # Generic sub-bullets (e.g. "**Severity**: ...") — keep them
         if stripped.startswith("- **") and not re.match(
-            r"^-\s*\*\*(Title|Location Path|Description|Acceptance Criteria|Recommendation|Git Diff)\*\*",
+            r"^-\s*\*\*(Title|Label|Location Path|Description|Acceptance "
+            r"Criteria|Recommendation|Git Diff|Open Questions)\*\*",
             stripped,
         ):
             cur["desc"].append(stripped)
