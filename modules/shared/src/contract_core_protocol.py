@@ -335,6 +335,10 @@ class IUpdateProtocol(ABC):
         Sequence: version check → package upgrade → browser sync → health checks.
         """
 
+    @abstractmethod
+    def rollback_to(self, previous_version: str) -> tuple[UpdateStepResult, ...]:
+        """Rollback to a previously installed package version."""
+
 
 class IWorkspaceProtocol(ABC):
     """Workspace directory provisioning capability contract."""

@@ -156,3 +156,22 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
     assert architect.status == "failed"
     assert architect.attempt == 1
     assert "login" in str(architect.error).lower()
+
+
+def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
+    """Cancelling a swarm must stop executors and clean up internal dictionary state."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1)
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    orchestrator.cancel(initial.swarm_id)
+
+    assert initial.swarm_id not in orchestrator._executors
+    assert initial.swarm_id not in orchestrator._cancel_events
+    assert initial.swarm_id not in orchestrator._attachment_paths
+    snapshot = orchestrator.snapshot(initial.swarm_id)
+    assert snapshot is not None
+    assert snapshot.status == "cancelled"

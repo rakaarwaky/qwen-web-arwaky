@@ -14,7 +14,10 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.core.src.utility_core_config_factory import build_app_config
+from modules.core.src.utility_core_config_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.core.src.utility_core_error_mapping import to_error_response
 from modules.core.src.utility_core_io_writer import save_orchestrator_output
@@ -29,7 +32,6 @@ from modules.shared.src.contract_core_protocol import (
     IStreamProtocol,
     IUploadProtocol,
 )
-from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE
@@ -158,10 +160,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
             self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
 
             att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
-
-            out_path = Path(output_file).resolve() if output_file else DEFAULT_OUTPUT / p_path.name
-            if out_path.is_dir():
-                out_path = out_path / f"{p_path.stem}_output.md"
+            p_path, out_path = resolve_pipeline_output_path(p_path, output_file, attachment_path=att_path)
 
             cfg = build_app_config(
                 input_path=p_path,

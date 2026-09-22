@@ -183,6 +183,18 @@ qwen-web-mcp
 
 ---
 
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `QWEN_DEFAULT_MODEL` | `Qwen3.8-Max` | Chat model selected during session initialization. |
+| `QWEN_WORKSPACE_ROOT` | Current working directory | Root boundary path for MCP workspace validation and folder compilation. |
+| `QWEN_ENABLE_SANDBOX` | `0` (Sandbox disabled for container support) | Set to `1` / `true` to force Chromium OS sandboxing on desktop environments. |
+| `QWEN_DISABLE_SANDBOX` | `1` | Set to `0` / `false` to enable Chromium OS sandboxing. |
+| `QWEN_STREAM_SAFETY_TIMEOUT_SEC` | `14400` (4 hours) | Absolute backstop cutoff for stream response monitor. |
+
+---
+
 ## Architecture: AES 7-Layer Pattern
 
 This project strictly follows the **AES 7-Layer Architectural Spec** to ensure code modification safety for AI agents:

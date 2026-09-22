@@ -13,7 +13,8 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 - **Output**: One generated async MCP handler per specification entry.
 - **Business Rules**:
   - The tool table is the single source of truth for MCP registration.
-  - The `TOOLS` registry maps one-to-one with exposed capabilities: `process_direct_prompt`, `process_prompt_file_only`, `process_prompt_with_attachment`, `check_session`, `delete_session`, `setup_session`, and `init_workspace`.
+  - The `TOOLS` registry maps one-to-one with exposed capabilities: `process_direct_prompt`, `process_prompt_file_only`, `process_prompt_with_attachment`, `get_job_status`, `list_jobs`, `check_session`, `delete_session`, `setup_session`, and `init` (or `init_workspace`).
+  - Asynchronous background jobs delegate to `IJobManagerAggregate` (`AgentJobOrchestrator`) backed by `IJobStorageProtocol`.
   - Each parameter declares a supported type and default value.
 - **Error Handling**: Missing dependencies or execution errors return structured JSON error payloads containing `code`, `message`, and `hint`.
 
@@ -56,10 +57,12 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 | `process_direct_prompt` | `prompt`, `timeout_sec=120`, `headless=True`, `output_file=None` | `JSON str` | Processes a raw text prompt. `output_file` mirrors the CLI's `prompt-direct -o FILE`. |
 | `process_prompt_file_only` | `input_file`, `output_file=None`, `headless=True` | `JSON str` | Processes one Markdown file. |
 | `process_prompt_with_attachment` | `prompt_file`, `attachment_file`, `output_file=None`, `headless=True` | `JSON str` | Processes a Markdown file with a document attachment. |
+| `get_job_status` | `job_id` | `JSON str` | Queries state and progress of an asynchronous background job. |
+| `list_jobs` | `limit=10` | `JSON str` | Lists recently recorded background jobs sorted newest to oldest. |
 | `check_session` | None | `JSON str` | Checks validity of saved Chromium session tokens. |
 | `delete_session` | `confirm=False` | `JSON str` | Deletes saved browser session tokens. Requires `confirm=True`. |
 | `setup_session` | None | `JSON str` | Launches visible browser for manual login setup via `ISetupAggregate`. |
-| `init_workspace` | `target_dir="."` | `JSON str` | Initializes workspace directory structure and SKILL.md guide. |
+| `init_workspace` / `init` | `target_dir="."` | `JSON str` | Initializes workspace directory structure and SKILL.md guide. |
 
 ---
 

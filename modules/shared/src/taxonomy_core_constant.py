@@ -93,9 +93,10 @@ CHAT_URL = "https://chat.qwen.ai/"
 NAVIGATION_TIMEOUT_MS = 30_000
 NAVIGATION_LOAD_TIMEOUT_MS = 15_000
 
-# Hardcoded default model. Pipeline forces this on every chat session so the
+# Default model. Pipeline forces this on every chat session so the
 # user never has to pick a model manually (idempotent per-session).
-DEFAULT_MODEL = "Qwen3.8-Max"
+# Overridable via QWEN_DEFAULT_MODEL environment variable.
+DEFAULT_MODEL = os.environ.get("QWEN_DEFAULT_MODEL", "Qwen3.8-Max").strip() or "Qwen3.8-Max"
 
 # Accessible-name locators for the chat model picker.
 MODEL_SELECTOR_BUTTON = "Select Model"
@@ -376,6 +377,32 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
         ".qwen-web",
         "target",
         ".cache",
+    }
+)
+
+EXCLUDED_FILE_PATTERNS: frozenset[str] = frozenset(
+    {
+        ".env",
+        ".env.local",
+        ".env.production",
+        ".env.staging",
+        ".env.development",
+        "id_rsa",
+        "id_ed25519",
+        "id_ecdsa",
+        "id_dsa",
+    }
+)
+
+EXCLUDED_FILE_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".pem",
+        ".key",
+        ".pfx",
+        ".p12",
+        ".pkcs12",
+        ".kdbx",
+        ".secret",
     }
 )
 

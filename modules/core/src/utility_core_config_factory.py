@@ -42,6 +42,11 @@ def build_app_config(
 ) -> AppConfig:
     """Build a complete AppConfig while preserving every runtime override."""
     dummy_path = Path(os.devnull)
+    if disable_sandbox and (
+        os.environ.get("QWEN_ENABLE_SANDBOX", "").lower() in ("1", "true", "yes")
+        or os.environ.get("QWEN_DISABLE_SANDBOX", "").lower() in ("0", "false", "no")
+    ):
+        disable_sandbox = False
     return AppConfig(
         mode=mode,
         input_path=input_path or dummy_path,

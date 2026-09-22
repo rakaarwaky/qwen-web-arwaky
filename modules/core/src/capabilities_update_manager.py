@@ -588,6 +588,24 @@ class UpdateManager(IUpdateProtocol):
                 if not any(root == p or root in p.parents for root in allowed_roots):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
+        if not hasattr(os, "posix_spawn") or sys.platform == "win32":
+            import subprocess  # nosec B404
+
+            try:
+                proc = subprocess.run(  # nosec B603
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec,
+                    check=False,
+                )
+                return proc.returncode, str(proc.stdout or ""), str(proc.stderr or "")
+            except subprocess.TimeoutExpired as exc:
+                return 124, str(exc.stdout or ""), str(exc.stderr or "Subprocess execution timed out")
+            except FileNotFoundError as exc:
+                return 127, "", f"Executable not found: {exc}"
+            except Exception as exc:
+                return 1, "", f"Subprocess execution error: {exc}"
         try:
             executable, argv = self._approved_spawn_command(cmd)
             with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:

@@ -85,6 +85,8 @@ class JobRecord:
     attachment_file: str | None = None
     output_file: str | None = None
     prompt_text: str | None = None
+    owner_pid: int | None = None
+    heartbeat_at: str | None = None
     error: str | None = None
     result_preview: str | None = None
 

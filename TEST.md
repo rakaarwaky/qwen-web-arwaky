@@ -239,6 +239,7 @@ and a preferred harness; when adding code, extend the matching pattern.
 - A fix for a race/cancellation bug ships with a regression test capturing
   the interleaving (see issues #331, #360).
 - CI runs `pytest tests/ -v` (see §3); keep the suite under ~2 minutes.
+- **Parallel Browser / Swarm Execution Environment** (issue #329): Each concurrent Chromium instance requires ~300–500 MB RAM and adequate `/dev/shm` (minimum 2 GB recommended for a 10-worker Swarm). In containerized CI or Docker, ensure `--shm-size=2gb` or `--ipc=host` is allocated to prevent Chromium renderer crashes.
 
 ---
 

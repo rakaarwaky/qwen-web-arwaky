@@ -8,6 +8,7 @@ import pytest
 
 from modules.core.src.capabilities_folder_compiler import FolderCompiler
 from modules.shared.src.utility_folder_compiler import (
+    collect_folder_files,
     collect_folder_files_with_imports,
     compile_files_to_markdown,
 )
@@ -435,3 +436,16 @@ class TestImportBoundaryConfinement:
 
         files, _ = collect_folder_files_with_imports(target, boundary_root=target)
         assert {f.name for f in files} == {"a.py", "b.py"}
+
+    def test_secret_and_env_files_excluded_from_compilation(self, tmp_path: Path) -> None:
+        """Secret files (.env, .pem, .key) must be automatically excluded from compilation."""
+        target = tmp_path / "app"
+        target.mkdir(parents=True)
+        _write(target / "main.py", "import os\n")
+        _write(target / ".env", "SECRET=123\n")
+        _write(target / ".env.local", "SECRET=local\n")
+        _write(target / "cert.pem", "---CERT---\n")
+        _write(target / "id_rsa", "---KEY---\n")
+
+        files = collect_folder_files(target)
+        assert [f.name for f in files] == ["main.py"]

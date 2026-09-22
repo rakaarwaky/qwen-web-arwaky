@@ -7,6 +7,7 @@ browser automation to IPromptFileAggregate and IAttachmentPromptAggregate.
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -109,6 +110,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             completed=False,
             input_file=str(p_path),
             output_file=str(out_path) if out_path else None,
+            owner_pid=os.getpid(),
         )
         self._storage.save_job(record)
 
@@ -144,6 +146,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             input_file=str(p_path),
             attachment_file=str(a_path),
             output_file=str(out_path) if out_path else None,
+            owner_pid=os.getpid(),
         )
         self._storage.save_job(record)
 
