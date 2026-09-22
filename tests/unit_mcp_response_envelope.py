@@ -21,7 +21,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
     McpToolCommand,
 )
 from modules.shared.src.taxonomy_core_error import RateLimitError
-from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.taxonomy_core_vo import ErrorReason, JobRecord
 
 
 def _job_record(**overrides) -> JobRecord:
@@ -146,7 +146,7 @@ def test_list_jobs_annotates_every_entry(tools_and_mocks) -> None:
 def test_rate_limited_submission_returns_retry_hint(tools_and_mocks, tmp_path) -> None:
     """Throttling must surface as a retryable error, not a hung tool call."""
     tools, _, jobs = tools_and_mocks
-    jobs.submit_file_job.side_effect = RateLimitError("rate limit reached", retry_after_sec=12.34)
+    jobs.submit_file_job.side_effect = RateLimitError(ErrorReason("rate limit reached"), retry_after_sec=12.34)
 
     payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
 

@@ -23,7 +23,13 @@ from modules.shared.src.taxonomy_core_event import (
     LifecycleEvent,
     QwenEventType,
 )
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.taxonomy_core_vo import (
+    EventTimestamp,
+    FailureThreshold,
+    MaxPerMinute,
+    RetryWaitSec,
+    WindowSec,
+)
 
 log = logging.getLogger(__name__)
 
@@ -143,7 +149,7 @@ class RateLimiter:
         """Configured maximum requests per minute."""
         return int(self._max_per_minute)
 
-    def _try_reserve_locked(self, now: float) -> float | None:
+    def _try_reserve_locked(self, now: EventTimestamp) -> RetryWaitSec | None:
         """Reserve a slot if available; else return seconds until one frees.
 
         Callers must already hold ``self._lock``.
@@ -155,9 +161,9 @@ class RateLimiter:
             self._timestamps.append(now)
             return None
         oldest = self._timestamps[0]
-        return max(0.1, 60.0 - (now - oldest) + 0.1)
+        return RetryWaitSec(max(0.1, 60.0 - (now - oldest) + 0.1))
 
-    def try_acquire(self) -> float | None:
+    def try_acquire(self) -> RetryWaitSec | None:
         """Reserve a slot without blocking.
 
         Returns:

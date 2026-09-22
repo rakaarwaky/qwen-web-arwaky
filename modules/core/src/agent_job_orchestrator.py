@@ -28,6 +28,7 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
+    ErrorReason,
     FilePath,
     HeadlessFlag,
     JobId,
@@ -76,8 +77,10 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             wait_sec = self._rate_limiter.try_acquire()
             if wait_sec is not None:
                 raise RateLimitError(
-                    f"rate limit reached: at most {self._rate_limiter.max_per_minute} "
-                    f"job submissions per minute; retry in {wait_sec:.1f}s",
+                    ErrorReason(
+                        f"rate limit reached: at most {self._rate_limiter.max_per_minute} "
+                        f"job submissions per minute; retry in {wait_sec:.1f}s"
+                    ),
                     retry_after_sec=wait_sec,
                 )
 

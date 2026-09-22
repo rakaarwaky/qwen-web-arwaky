@@ -38,6 +38,8 @@ EventTimestamp: TypeAlias = float
 EventId: TypeAlias = str
 EventDetailsMapping: TypeAlias = Mapping[str, object]
 EventOrderMapping: TypeAlias = dict[object, int]
+RetryWaitSec = NewType("RetryWaitSec", float)
+ErrorReason = NewType("ErrorReason", str)
 
 
 class EventDetails(dict[str, object]):
@@ -562,6 +564,8 @@ __all__ = [
     "EventId",
     "EventDetailsMapping",
     "EventOrderMapping",
+    "RetryWaitSec",
+    "ErrorReason",
     "EventDetails",
     "EventOrderMap",
     "ProcessingStatus",

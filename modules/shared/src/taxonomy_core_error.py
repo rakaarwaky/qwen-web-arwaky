@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from modules.shared.src.taxonomy_core_vo import ErrorReason, RetryWaitSec
+
 
 class QwenCliError(RuntimeError):
     """Base exception for qwen-cli errors."""
@@ -28,7 +30,11 @@ class RateLimitError(QwenCliError):
 
     """
 
-    def __init__(self, message: str, retry_after_sec: float | None = None) -> None:
+    def __init__(
+        self,
+        message: ErrorReason,
+        retry_after_sec: RetryWaitSec | None = None,
+    ) -> None:
         """Store the human-readable reason plus an optional retry hint."""
         super().__init__(message)
         self.retry_after_sec = retry_after_sec
