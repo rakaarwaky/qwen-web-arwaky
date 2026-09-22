@@ -78,5 +78,6 @@ class TestCancelContract:
         from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
 
         src = inspect.getsource(SwarmOrchestrator._request_attachment_cancel)
-        assert "getattr" not in src
+        # direct typed contract call (no duck-typing escape hatch)
         assert "self._attachment.request_cancel(event)" in src
+        assert "callable(" not in src
