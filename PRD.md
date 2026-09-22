@@ -13,8 +13,8 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 
 ## Goals & Success Metrics
 
-- Goal 1: Achieve 99.9% successful end-to-end pipeline execution for batch
-  and watcher workloads on native Linux environments.
+- Goal 1: Achieve 99.9% successful end-to-end pipeline execution for prompt-file
+  and inline-text workloads on native Linux environments.
 - Goal 2: Maintain strict AES 7-layer architectural compliance so AI agents
   can safely modify, refactor, and maintain the codebase without introducing
   regressions.
@@ -23,17 +23,17 @@ into spaghetti code, making AI-assisted maintenance unsafe.
 
 ## User Personas
 
-- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs timestamped batch markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
+- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
 - **AI Agent (via MCP)**: Interacts with the tool programmatically to send
   prompts, process files, and read audit logs without managing browser
   lifecycles or DOM selectors.
-- **System Administrator**: Deploys watcher mode as a background service and
-  relies on structured JSON logs for aggregation.
+- **System Administrator**: Runs prompt automation jobs as scheduled
+  background tasks and relies on structured JSON logs for aggregation.
 
 ## Scope
 
 - **In scope**: `chat.qwen.ai` web automation, Playwright persistent sessions,
-  Batch / Watcher / Single / Interactive / MCP modes, the eight core
+  Single / Inline / Interactive / MCP modes, the eight core
   capabilities listed below, structured observability
   (structlog, OpenTelemetry, Sentry), and strict AES 7-layer architecture.
 - **Out of scope**: other LLM providers (ChatGPT, Claude, Gemini), official
@@ -49,7 +49,7 @@ their own FRDs.
 ## Feature Requirements (Prioritized)
 
 AES rule for Core: **1 FR = 1 capability file + 1 contract protocol**.
-Product modes (batch / watcher / single / login / MCP) are how surfaces
+Product modes (single / inline / login / MCP) are how surfaces
 compose these FRs, not additional core FRs.
 
 ### P0 — Must Have (Core, 13 capability FRs)
@@ -105,8 +105,8 @@ in `metrics.json` under the application state directory. Emit WARNING below
 
 ### P1 — Should Have (Surfaces)
 
-- [X]  **Multi-mode execution**: Batch (folder), Watcher (continuous poll),
-  Single (one file), and raw `send_prompt` — all via `ICoreAggregate`.
+- [X]  **Multi-mode execution**: Single (one file), prompt-with-attachment,
+  inline direct, and raw `send_prompt` — all via `ICoreAggregate`.
 - [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
   first; only an invalid session opens a headed browser for CAPTCHA.
 - [X]  **Timestamped input processing**: input files are uniquely named by the
