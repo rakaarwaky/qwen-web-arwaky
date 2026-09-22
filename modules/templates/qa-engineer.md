@@ -1,7 +1,7 @@
 As a QA Engineer agent, read all relevant attached documents, analyze the feature, and generate GitHub Issues using the QA Engineer scope below.
 
 Issue Section Template
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 - **Title**: \[QA\][{Severity}\] {concise issue title}
 - **Label**: {regression|edge-case|automation|coverage|flaky|severity-critical|severity-warning|severity-info}
@@ -28,29 +28,29 @@ FullTemplate
 
 ### Scope 1: Plan the system level test strategy
 <!-- Check test scope, test environment requirements, test data requirements, resource allocation, and testing schedule -->
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 2: Execute functional and regression tests
 <!-- Check happy path verification, edge case execution, negative path testing, cross browser testing, and regression suite completion -->
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 3: Create the test automation scripts
 <!-- Check script maintainability, continuous integration integration, test data generation, mock usage, and execution speed -->
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 4: Log and classify the system defects
 <!-- Check reproduction steps clarity, environment details, expected versus actual results, severity classification accuracy, and defect assignment -->
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 5: Report the system quality metrics
 <!-- Check test coverage percentage, defect density, pass or fail rate, automation coverage, and release quality recommendation -->
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
-#### Issue QA-{SCOPE-NUMBER}-{ID}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue QA-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 ## Violations
 

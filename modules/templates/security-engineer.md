@@ -1,7 +1,7 @@
 As a Security Engineer agent, read all relevant attached documents, analyze the feature, and generate GitHub Issues using the Security Engineer scope below.
 
 Issue Section Template
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 - **Title**: \[SE\][{Severity}\] {concise issue title}
 - **Label**: {vuln|auth|injection|secrets|hardening|severity-critical|severity-warning|severity-info}
@@ -28,29 +28,29 @@ FullTemplate
 
 ### Scope 1: Model the system threats and security requirements
 <!-- Check attack vectors, trust boundaries, threat mitigation strategies, spoofing risks, tampering risks, and information disclosure risks -->
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 2: Define the authentication and authorization standards
 <!-- Check identity provider integration, role based access control policies, session management rules, token expiration limits, and secret rotation procedures -->
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 3: Scan for vulnerabilities and audit software dependencies
 <!-- Check static application security testing results, dynamic application security testing results, known common vulnerability exposures, and third party library licensing -->
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 4: Enforce the data privacy and encryption standards
 <!-- Check personally identifiable information masking, data at rest encryption, data in transit protection, and cryptographic key management -->
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 5: Establish the security breach incident protocol
 <!-- Check security event logging, alerting thresholds, forensic data retention, breach notification procedures, and incident containment steps -->
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
-#### Issue SE-{SCOPE-NUMBER}-{ID}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+#### Issue SE-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 ## Violations
 
