@@ -32,3 +32,8 @@ The following deterministic scenarios are required for release sign-off:
 | UAT-BA-006 | Submit and age terminal/stale jobs | Cleanup removes terminal jobs after 24 hours and incomplete jobs after 7 days. |
 | UAT-BA-007 | Run MCP destructive session action without confirmation | The action is rejected and the session remains intact. |
 | UAT-BA-008 | Run async job lifecycle | Submit, poll, complete, and retrieve output are all represented in JSON. |
+
+
+## Isolated UAT setup
+
+Run `tests/uat/setup.sh` before deterministic UAT. It creates isolated input, processing, done, failed, output, and session directories without performing live authentication. Browser-backed scenarios may supply a session separately.
