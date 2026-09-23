@@ -8,7 +8,6 @@ from __future__ import annotations
 import time
 from html.parser import HTMLParser
 
-
 # Simple inline HTML fixture with 3 assistant messages
 FIXTURE_HTML = """
 <div id="chatLog">
