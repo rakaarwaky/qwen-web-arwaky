@@ -39,14 +39,14 @@ def bench_is_thinking_active(iterations: int = 1000) -> float:
     return elapsed / iterations * 1_000_000  # microseconds per call
 
 
-def test_bench_is_generation_complete():
+def test_bench_is_generation_complete() -> None:
     """Report benchmark results for generation detection."""
     micros = bench_is_generation_complete()
     print(f"\n[BENCHMARK] is_generation_complete: {micros:.2f} µs/call")
     assert micros > 0
 
 
-def test_bench_is_thinking_active():
+def test_bench_is_thinking_active() -> None:
     """Report benchmark results for thinking detection."""
     micros = bench_is_thinking_active()
     print(f"\n[BENCHMARK] is_thinking_active: {micros:.2f} µs/call")

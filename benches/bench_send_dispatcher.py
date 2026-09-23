@@ -22,7 +22,7 @@ def bench_click_send(iterations: int = 1000) -> float:
     start = time.perf_counter()
     for _ in range(iterations):
         with contextlib.suppress(Exception):
-            sender.click_send(page)
+            sender.click_send(page, MagicMock())
     elapsed = time.perf_counter() - start
     return elapsed / iterations * 1_000_000  # microseconds per call
 
@@ -44,14 +44,14 @@ def bench_count_messages(iterations: int = 1000) -> float:
     return elapsed / iterations * 1_000_000  # microseconds per call
 
 
-def test_bench_click_send():
+def test_bench_click_send() -> None:
     """Report benchmark results for click_send."""
     micros = bench_click_send()
     print(f"\n[BENCHMARK] click_send: {micros:.2f} µs/call")
     assert micros > 0
 
 
-def test_bench_count_messages():
+def test_bench_count_messages() -> None:
     """Report benchmark results for count_messages."""
     micros = bench_count_messages()
     print(f"\n[BENCHMARK] count_messages: {micros:.2f} µs/call")
