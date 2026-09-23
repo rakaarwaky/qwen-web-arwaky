@@ -58,8 +58,8 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
 
 
-def _run_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess[str]:
-    """Run CLI command and return result."""
+def _run_cli(args: list[str], timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+    """Run CLI command and return result. No timeout for real API calls."""
     return subprocess.run(
         [sys.executable, "-m", "modules.root_cli_main_entry"] + args,
         capture_output=True,
