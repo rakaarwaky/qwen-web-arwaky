@@ -164,14 +164,13 @@ class SendDispatcher(ISendProtocol):
         deadline = time.monotonic() + (effective_config.click_timeout_ms / 1000)
         while time.monotonic() < deadline:
             # Step 2: Wait for send button enabled & no active parse toast.
-            # When the caller already verified parse readiness
-            # (``document_parsed=True``) the card-spinner hold is skipped:
-            # Qwen's card spinner can stay visible well after parsing is
-            # complete, and holding the send on it blocks a valid dispatch.
+            # File card parsing must always be verified before dispatching;
+            # clicking send while a file is still parsing triggers Qwen's
+            # parsing toast or bot-verification rate limits.
             self._wait_for_send_enabled(
                 page,
                 timeout_ms=effective_config.click_timeout_ms,
-                hold_on_card_parsing=not document_parsed,
+                hold_on_card_parsing=True,
             )
             baseline_count = int(count_messages(page))
             baseline_text = latest_message_text(page)
@@ -184,7 +183,7 @@ class SendDispatcher(ISendProtocol):
             page.wait_for_timeout(300)
             if _is_parse_toast_visible(page):
                 log.info("Document parsing is still in progress (Qwen toast displayed). Waiting for completion...")
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(2000)
                 continue
 
             details: dict[str, object] = {"selector": "SendDispatcher"}
@@ -199,7 +198,7 @@ class SendDispatcher(ISendProtocol):
                 baseline_user_count=baseline_user_count,
             ):
                 if _is_parse_toast_visible(page):
-                    page.wait_for_timeout(1000)
+                    page.wait_for_timeout(2000)
                     continue
                 try:
                     textarea = page.locator(TEXTAREA_SELECTOR).first
@@ -215,7 +214,7 @@ class SendDispatcher(ISendProtocol):
                     baseline_user_count=baseline_user_count,
                 ):
                     if _is_parse_toast_visible(page):
-                        page.wait_for_timeout(1000)
+                        page.wait_for_timeout(2000)
                         continue
                     raise SendDispatchError("Send control was clicked but Qwen did not acknowledge the user turn")
             emitter.emit(EVENT_DISPATCH_ACKNOWLEDGED, details)

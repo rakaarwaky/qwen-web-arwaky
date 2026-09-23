@@ -157,10 +157,13 @@ class SharedContainer:
         )
         swarm_env = os.environ.get(SWARM_CONCURRENCY_ENV, "").strip()
         swarm_workers = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else max_workers
+        swarm_headless_env = os.environ.get("QWA_SWARM_HEADLESS", "").strip()
+        swarm_headless = swarm_headless_env != "0" and swarm_headless_env.casefold() != "false"
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
             attachment=self.agent_attachment_prompt_orchestrator,
             folder_adapter=self.folder_adapter,
             browser_concurrency=swarm_workers,
+            headless=swarm_headless,
         )
 
     def wire(self) -> None:
