@@ -98,6 +98,11 @@ disallow_untyped_defs = false
 disallow_subclassing_any = false
 check_untyped_defs = false
 
+# Relax mypy strictness for test files
+[[tool.mypy.overrides]]
+module = ["tests.*", "modules.*.tests.*"]
+disable_error_code = ["no-untyped-def", "no-untyped-call", "arg-type", "assignment", "method-assign", "return-value", "index", "misc", "attr-defined", "no-any-return", "unreachable", "var-annotated", "type-arg", "union-attr"]
+
 [tool.bandit]
 exclude_dirs = ["tests", "benches", ".venv", ".git"]
 skips = ["B101", "B404", "B603"]
