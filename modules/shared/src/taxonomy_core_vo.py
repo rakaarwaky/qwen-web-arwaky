@@ -67,7 +67,6 @@ class EventSequenceVO(tuple[object, ...]):
         return super().__new__(cls, (seq,))
 
 
-
 class ProcessingStatus(str, Enum):
     """Terminal status for one queue item."""
 

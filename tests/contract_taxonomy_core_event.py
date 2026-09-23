@@ -181,7 +181,6 @@ def test_lifecycle_gate_reset_rolls_back_a_started_attempt() -> None:
     gate.validate(QwenEventType.THINKING_STARTED)
 
 
-
 def test_lifecycle_gate_reset_rejects_invalid_prefix() -> None:
     gate = LifecycleGate(sequence=STANDARD_PROMPT_EVENTS)
     gate.validate(QwenEventType.WEB_LOADED)

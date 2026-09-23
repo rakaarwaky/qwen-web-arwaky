@@ -78,7 +78,6 @@ def format_event_label(event_name: str) -> str:
     return _STATUS_BADGE["RUNNING"]
 
 
-
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
 

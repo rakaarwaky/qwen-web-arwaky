@@ -132,6 +132,3 @@ def test_reset_rolls_back_a_started_attempt_full_sequence() -> None:
     for event in STANDARD_PROMPT_EVENTS[3:]:
         gate.validate(event)
     assert gate.completed == tuple(STANDARD_PROMPT_EVENTS)
-
-
-
