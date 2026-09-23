@@ -27,6 +27,7 @@ import modules.cli.src.surface_cli_init_command as surface_cli_init_command
 import modules.cli.src.surface_cli_interactive_controller as surface_cli_interactive_controller
 import modules.cli.src.surface_cli_login_command as surface_cli_login_command
 import modules.cli.src.surface_cli_run_command as surface_cli_run_command
+import modules.cli.src.surface_cli_sessions_command as surface_cli_sessions_command
 import modules.cli.src.surface_cli_update_command as surface_cli_update_command
 from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
@@ -315,6 +316,10 @@ def _dispatch(
     if action == "update":
         result = surface_cli_update_command.handle(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
+
+    if action == "sessions":
+        result = surface_cli_sessions_command.handle_sessions(args)
+        return result
 
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
