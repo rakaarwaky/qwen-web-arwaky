@@ -102,38 +102,76 @@ def cmd_list(manager: SessionManager) -> int:
 
 
 def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
-    """Add a new session."""
-    # Create profile directory
+    """Add a new session by launching a headed browser for manual login."""
+    import subprocess
+    import sys
+
     pool = manager.load_pool()
     next_num = len(pool.sessions) + 1
     session_id = f"session_{next_num}"
     profile_path = manager._base_dir / session_id
+    profile_path.mkdir(parents=True, exist_ok=True)
 
     print(f"\n🔐 Login to Qwen ({args.name})")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("Creating isolated browser profile...")
     print(f"Path: {profile_path}")
     print()
-    print("⏳ Please login manually in the browser window")
-    print("   (Scanner/QR code/password)")
+    print("⏳ Launching browser for manual login...")
+    print("   Login at chat.qwen.ai, then close the browser window when done.")
     print()
-    print("💡 Tip: Close browser when done, or press Enter here")
+    print("💡 Tip: Close the browser window to continue.")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("Waiting for login... (press Ctrl+C to cancel)")
-    print()
 
-    # TODO: Launch browser with isolated profile
-    # For now, simulate login
-    input("Press Enter after login...")
+    # Launch Playwright to open chat.qwen.ai with isolated profile
+    launch_script = f'''
+import asyncio
+from playwright.async_api import async_playwright
 
-    # Save session
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch_persistent_context(
+            "{profile_path}",
+            headless=False,
+            args=[
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
+        page = browser.pages[0] if browser.pages else await browser.new_page()
+        await page.goto("https://chat.qwen.ai")
+        # Wait until user closes the browser
+        try:
+            await browser.wait_for_event("close")
+        except Exception:
+            pass
+        await browser.close()
+
+asyncio.run(main())
+'''
+    proc = subprocess.Popen(
+        [sys.executable, "-c", launch_script],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        proc.terminate()
+        print("\nLogin cancelled.")
+        return 1
+
+    if not profile_path.exists():
+        print("❌ Profile was not created. Login may have failed.")
+        return 1
+
     info = manager.add_session(args.name, profile_path)
     print(f"\n✅ Session '{args.name}' saved!")
     print(f"   ID: {info.session_id}")
     print(f"   Path: {profile_path}")
     print()
 
-    # Ask to add more
     again = input("Add another session? [y/N]: ").strip().lower()
     if again in ("y", "yes"):
         return cmd_login(manager, args)
@@ -141,17 +179,13 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     return 0
 
 
-async def _simulate_health_check(session: object) -> bool:
-    """Simulate health check (replace with real ping)."""
+def cmd_health_check(manager: SessionManager) -> int:
+    """Health check all sessions using real ping test."""
     import asyncio
 
-    await asyncio.sleep(0.1)
-    # For demo, assume session_1 is healthy, others limited
-    return session.session_id == "session_1"  # type: ignore
+    from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
+    from modules.shared.src.taxonomy_session_vo import SessionInfo
 
-
-def cmd_health_check(manager: SessionManager) -> int:
-    """Health check all sessions."""
     sessions = manager.list_sessions()
 
     if not sessions:
@@ -161,23 +195,32 @@ def cmd_health_check(manager: SessionManager) -> int:
     print("\n🏥 Running health checks...")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Simulate health checks
-    import asyncio
+    checker = SessionHealthChecker(timeout_seconds=10)
 
-    for s in sessions:
-        is_healthy = asyncio.run(_simulate_health_check(s))
-        status = "✅ Healthy" if is_healthy else "❌ Limited"
+    async def _run_checks() -> list[tuple[SessionInfo, bool]]:
+        results: list[tuple[SessionInfo, bool]] = []
+        for s in sessions:
+            healthy = await checker.check_session(s)
+            results.append((s, healthy))
+        return results
+
+    try:
+        results = asyncio.run(_run_checks())
+    except Exception as exc:
+        print(f"❌ Health check failed: {exc}")
+        return 1
+
+    for s, healthy in results:
+        status = "✅ Healthy" if healthy else "❌ Limited"
         print(f"  {s.session_id:<12} {status}")
-
-        # Update manager
-        if is_healthy:
+        if healthy:
             manager.mark_healthy(s.session_id)
         else:
             manager.mark_limited(s.session_id)
 
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    healthy = sum(1 for s in sessions if s.is_healthy)
-    print(f"Result: {healthy}/{len(sessions)} sessions healthy")
+    healthy_count: int = sum(1 for _, h in results if h)
+    print(f"Result: {healthy_count}/{len(results)} sessions healthy")
     print()
 
     return 0

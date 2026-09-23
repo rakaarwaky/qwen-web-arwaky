@@ -51,7 +51,7 @@ class SessionInfo:
             return 0.0
         return self.failed_requests / self.total_requests
 
-    def with_status(self, status: SessionStatus) -> "SessionInfo":
+    def with_status(self, status: SessionStatus) -> SessionInfo:
         """Return a copy with updated status."""
         return SessionInfo(
             session_id=self.session_id,
@@ -64,7 +64,7 @@ class SessionInfo:
             created_at=self.created_at,
         )
 
-    def with_usage(self, success: bool) -> "SessionInfo":
+    def with_usage(self, success: bool) -> SessionInfo:
         """Return a copy with updated usage counters."""
         return SessionInfo(
             session_id=self.session_id,
@@ -86,7 +86,7 @@ class SessionPool:
     current_index: int = 0
 
     @classmethod
-    def empty(cls) -> "SessionPool":
+    def empty(cls) -> SessionPool:
         """Create an empty session pool."""
         return cls(sessions=[], current_index=0)
 

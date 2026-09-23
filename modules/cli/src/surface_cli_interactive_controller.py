@@ -19,6 +19,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.utility_core_response import error_response, safe_handle, success_response
@@ -38,6 +39,7 @@ class InteractiveController:
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
+        session_manager: ISessionManagerProtocol | None = None,
     ) -> None:
         """Inject the specialized pipeline orchestrators, workspace, and setup."""
         self._workspace = workspace
@@ -51,6 +53,7 @@ class InteractiveController:
         self._session = session
         self._jobs = jobs
         self._swarm = swarm
+        self._session_manager = session_manager
 
     @safe_handle
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
@@ -84,6 +87,7 @@ class InteractiveController:
                 self._session,
                 self._jobs,
                 self._swarm,
+                self._session_manager,
             )
             app.run()
             return success_response("TUI Session Closed.")

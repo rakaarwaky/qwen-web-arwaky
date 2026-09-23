@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -94,10 +95,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sessions_remove.add_argument("session_id", help="Session ID to remove")
     sessions_sub.add_parser("status", help="Show detailed session status")
 
-    # ── mcp ───────────────────────────────────────────────────────────────────
-    sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
-
-    return p.parse_args(argv)
+    # ── prompt-direct ─────────────────────────────────────────────────────────
     p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
     p_direct.add_argument("-t", "--text", required=True, help="Prompt text to send directly")
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
@@ -152,6 +150,33 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
 
     return p.parse_args(argv)
+
+
+def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedContainer) -> None:
+    """Resolve session path for prompt commands using rotation.
+
+    Only runs for prompt-direct / prompt-only / prompt-with-attachment when
+    multiple sessions exist. Picks a healthy session and overrides cfg.session_path.
+    """
+    action = getattr(args, "action", None)
+    if action not in ("prompt-direct", "prompt-only", "prompt-with-attachment"):
+        return
+
+    pool = container.session_manager.load_pool()
+    if pool.total_count <= 1:
+        return
+
+    async def _pick() -> Path | None:
+        session = await container.session_rotator.get_next_session()
+        return session.path if session else None
+
+    try:
+        session_path = asyncio.run(_pick())
+    except Exception:
+        session_path = None
+
+    if session_path is not None and session_path != DEFAULT_SESSION:
+        args._session_override = session_path
 
 
 def _build_config(args: argparse.Namespace) -> AppConfig:
@@ -227,11 +252,14 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         "mcp": "mcp",
     }
 
+    # Check for session path override from rotation
+    effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
+
     return AppConfig(
         mode=mode_map.get(action, "direct"),
         input_path=prompt_p or dummy_path,
         output_path=out_p,
-        session_path=DEFAULT_SESSION,
+        session_path=effective_session,
         log_path=DEFAULT_LOG,
         headless=headless,
         verbose=verbose,
@@ -311,6 +339,7 @@ def _dispatch(
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
+            container.session_manager,  # type: ignore[arg-type]
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -336,8 +365,7 @@ def _dispatch(
         return _result_exit_code(result, json_output=json_output)
 
     if action == "sessions":
-        result = surface_cli_sessions_command.handle_sessions(args)
-        return result
+        return surface_cli_sessions_command.handle_sessions(args)
 
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
@@ -347,6 +375,8 @@ def _dispatch(
     container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
 
     args._cfg = cfg
+    # Resolve session rotation before dispatch
+    _resolve_session_for_prompt(args, container)
     result = surface_cli_run_command.handle(
         args,
         cfg,
