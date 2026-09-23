@@ -5,6 +5,7 @@ Uses time.perf_counter for measuring performance without requiring pytest-benchm
 
 from __future__ import annotations
 
+import contextlib
 import time
 from unittest.mock import MagicMock
 
@@ -20,10 +21,8 @@ def bench_click_send(iterations: int = 1000) -> float:
 
     start = time.perf_counter()
     for _ in range(iterations):
-        try:
+        with contextlib.suppress(Exception):
             sender.click_send(page)
-        except Exception:
-            pass
     elapsed = time.perf_counter() - start
     return elapsed / iterations * 1_000_000  # microseconds per call
 
