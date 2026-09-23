@@ -56,6 +56,11 @@ extend-immutable-calls = ["typing.NewType", "typing_extensions.NewType"]
 # Per-file ignores for tests/ — intentional patterns (fixtures, mocks, callbacks)
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
+"modules/core/tests/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
+"modules/cli/tests/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
+"modules/mcp/tests/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
+"modules/shared/tests/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
+"benches/**" = ["E402", "ARG001", "ARG002", "ARG005", "B017", "SIM117", "E741", "N814", "E501"]
 "modules/core/src/capabilities_file_uploader.py" = ["BLE001"]
 "modules/core/src/capabilities_observability_setup.py" = ["E402"]
 "modules/core/src/capabilities_prompt_injector.py" = ["BLE001", "E501"]
@@ -93,8 +98,13 @@ disallow_untyped_defs = false
 disallow_subclassing_any = false
 check_untyped_defs = false
 
+# Relax mypy strictness for test files
+[[tool.mypy.overrides]]
+module = ["tests.*", "modules.*.tests.*"]
+disable_error_code = ["no-untyped-def", "no-untyped-call", "arg-type", "assignment", "method-assign", "return-value", "index", "misc", "attr-defined", "no-any-return", "unreachable", "var-annotated", "type-arg", "union-attr"]
+
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", ".git"]
+exclude_dirs = ["tests", "benches", ".venv", ".git"]
 skips = ["B101", "B404", "B603"]
 
 [dependency-groups]

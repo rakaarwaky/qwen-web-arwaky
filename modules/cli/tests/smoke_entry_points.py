@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,13 +10,16 @@ from pathlib import Path
 
 def test_cli_entry_runs_help() -> None:
     """Running the CLI entry point with --help must print usage and exit 0."""
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent.parent
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(root)
     result = subprocess.run(
         [sys.executable, "-m", "modules.root_cli_main_entry", "--help"],
         cwd=root,
         capture_output=True,
         text=True,
         timeout=30,
+        env=env,
     )
     assert result.returncode == 0
     assert "usage: qwen-web-arwaky" in result.stdout
