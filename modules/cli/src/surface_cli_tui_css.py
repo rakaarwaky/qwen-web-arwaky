@@ -465,6 +465,34 @@ HelpScreen {
     background: $bg_raised;
     color: $fg_accent;
 }
+
+.btn-sessions-refresh,
+.btn-sessions-login,
+.btn-sessions-health {
+    min-width: 12;
+    padding: 0 1;
+    background: $bg_raised;
+    color: $fg_primary;
+    border: solid $border;
+    text-style: bold;
+}
+
+.btn-sessions-refresh:hover,
+.btn-sessions-health:hover {
+    background: $bg_hover;
+    color: $fg_accent;
+}
+
+.btn-sessions-login {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+}
+
+.btn-sessions-login:hover {
+    background: $bg_base;
+    color: $accent;
+}
 """
 )
 
