@@ -52,10 +52,10 @@ jobs:
         run: uv pip install textual
 
       - name: Ruff check
-        run: uv run ruff check modules/ tests/
+        run: uv run ruff check modules/ tests/ modules/shared/benches/ modules/core/benches/
 
       - name: Mypy check
-        run: uv run mypy modules/
+        run: uv run mypy modules/ modules/shared/benches/ modules/core/benches/
 
   build:
     name: Build package
@@ -113,7 +113,7 @@ jobs:
         run: uv run python -m playwright install chromium
 
       - name: Run tests
-        run: uv run python -m pytest tests/ modules/shared/tests/ modules/core/tests/ modules/cli/tests/ modules/mcp/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
+        run: uv run python -m pytest tests/ modules/shared/tests/ modules/core/tests/ modules/cli/tests/ modules/mcp/tests/ modules/shared/benches/ modules/core/benches/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
 
       - name: Create issue on failure
         if: failure()
