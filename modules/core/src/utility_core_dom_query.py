@@ -16,6 +16,7 @@ from modules.shared.src.taxonomy_core_constant import (
     JS_COUNT_TURNS,
     JS_GET_RESPONSE_TEXT,
     RESPONSE_CONTENT_SELECTOR,
+    USER_COMBINED_SELECTOR,
 )
 from modules.shared.src.taxonomy_core_vo import MessageCount, ResponseText
 
@@ -45,6 +46,27 @@ def count_messages(page: Page) -> MessageCount:
         return MessageCount(page.locator(COMBINED_MESSAGE_SELECTOR).count())
     except Error:
         return MessageCount(0)
+
+
+def count_user_messages(page: Page) -> int:
+    """Count committed user turns via the user-bubble selectors.
+
+    Qwen renders the user bubble (``.chat-user-message`` /
+    ``.qwen-chat-message-user``) as soon as a turn is acknowledged,
+    well before the assistant response streams in. This lets the
+    dispatch-ACK stage detect a committed turn without waiting on the
+    response surface.
+
+    Returns
+    -------
+    int
+        Number of user-turn elements, 0 when none or on error.
+
+    """
+    try:
+        return int(page.locator(USER_COMBINED_SELECTOR).count())
+    except Error:
+        return 0
 
 
 def latest_message_text(page: Page) -> ResponseText | None:

@@ -290,7 +290,23 @@ class SwarmOrchestrator(ISwarmAggregate):
         lowered = message.lower()
         return any(
             token in lowered
-            for token in ("rate", "429", "timeout", "timed out", "connection", "network", "empty", "stuck")
+            for token in (
+                "rate",
+                "429",
+                "timeout",
+                "timed out",
+                "connection",
+                "network",
+                "empty",
+                "stuck",
+                # Lifecycle-gate rejections (e.g. "Lifecycle gate rejected
+                # EVENT_PROMPT_INJECTED: requires successful predecessor
+                # EVENT_DOCUMENT_PARSED") surface as gate-reject
+                # RuntimeErrors under concurrent attachment runs; a fresh
+                # browser session on retry re-runs the whole pipeline, so
+                # these are safe to retry.
+                "lifecycle gate rejected",
+            )
         )
 
     @staticmethod
