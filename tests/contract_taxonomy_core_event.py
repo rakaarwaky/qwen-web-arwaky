@@ -26,6 +26,7 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_SEND_CLICKED,
     EVENT_STREAMING_GENERATION,
     EVENT_THINKING_STARTED,
+    STANDARD_PROMPT_EVENTS,
     LifecycleEvent,
     QwenEventType,
 )
@@ -114,7 +115,92 @@ def test_lifecycle_gate_rejects_skipped_predecessors_and_records_reason() -> Non
         gate.validate(QwenEventType.PROMPT_INJECTED)
 
 
+def test_lifecycle_gate_reset_preserves_prefix_for_dispatch_retry() -> None:
+    """Regression: swarm retry re-emits PROMPT_INJECTED after the first attempt.
+
+    A full reset would clear the page-phase events (WEB_LOADED/LOGIN_VERIFIED/
+    MODEL_VERIFIED) that are NOT re-emitted on retry, so the gate must
+    re-seed the accepted prefix instead.
+    """
+    gate = LifecycleGate(sequence=STANDARD_PROMPT_EVENTS)
+    for event in (
+        QwenEventType.WEB_LOADED,
+        QwenEventType.LOGIN_VERIFIED,
+        QwenEventType.MODEL_VERIFIED,
+    ):
+        gate.validate(event)
+
+    gate.reset(completed_prefix=gate.completed)
+    assert gate.completed == (
+        QwenEventType.WEB_LOADED,
+        QwenEventType.LOGIN_VERIFIED,
+        QwenEventType.MODEL_VERIFIED,
+    )
+    assert gate.rejections == []
+
+    # The retried attempt re-emits the per-attempt events; the prefix
+    # must already satisfy the predecessor check.
+    gate.validate(QwenEventType.PROMPT_INJECTED)
+    gate.validate(QwenEventType.SEND_CLICKED)
+    gate.validate(QwenEventType.DISPATCH_ACKNOWLEDGED)
+    gate.validate(QwenEventType.THINKING_STARTED)
+    gate.validate(QwenEventType.STREAMING_GENERATION)
+    gate.validate(QwenEventType.GENERATION_FINISHED)
+
+
+def test_lifecycle_gate_reset_rolls_back_a_started_attempt() -> None:
+    """A timeout during THINKING_STARTED leaves that event in the gate;
+    reset with the pre-attempt prefix (up to MODEL_VERIFIED, i.e. the
+    standard-pipeline boundary index 3) must roll back the per-attempt
+    progress so the retry re-emits the prompt phase cleanly."""
+    gate = LifecycleGate(sequence=STANDARD_PROMPT_EVENTS)
+    for event in (
+        QwenEventType.WEB_LOADED,
+        QwenEventType.LOGIN_VERIFIED,
+        QwenEventType.MODEL_VERIFIED,
+        QwenEventType.PROMPT_INJECTED,
+        QwenEventType.SEND_CLICKED,
+        QwenEventType.DISPATCH_ACKNOWLEDGED,
+        QwenEventType.THINKING_STARTED,
+    ):
+        gate.validate(event)
+
+    # Boundary for the standard pipeline: index of PROMPT_INJECTED = 3
+    # (WEB_LOADED, LOGIN_VERIFIED, MODEL_VERIFIED kept; PROMPT_INJECTED
+    # and onward rolled back).
+    gate.reset(completed_prefix=gate.completed[:3])
+    assert gate.completed == (
+        QwenEventType.WEB_LOADED,
+        QwenEventType.LOGIN_VERIFIED,
+        QwenEventType.MODEL_VERIFIED,
+    )
+
+    gate.validate(QwenEventType.PROMPT_INJECTED)
+    gate.validate(QwenEventType.SEND_CLICKED)
+    gate.validate(QwenEventType.DISPATCH_ACKNOWLEDGED)
+    gate.validate(QwenEventType.THINKING_STARTED)
+
+
+def test_lifecycle_gate_reset_rejects_invalid_prefix() -> None:
+    gate = LifecycleGate(sequence=STANDARD_PROMPT_EVENTS)
+    gate.validate(QwenEventType.WEB_LOADED)
+    with pytest.raises(ValueError, match="invalid"):
+        gate.reset(completed_prefix=(QwenEventType.SEND_CLICKED,))
+
+
+def test_lifecycle_gate_reset_default_preserves_nothing() -> None:
+    gate = LifecycleGate(sequence=STANDARD_PROMPT_EVENTS)
+    gate.validate(QwenEventType.WEB_LOADED)
+    gate.validate(QwenEventType.LOGIN_VERIFIED)
+    gate.reset()
+    assert gate.completed == ()
+    gate.validate(QwenEventType.WEB_LOADED)
+    gate.validate(QwenEventType.LOGIN_VERIFIED)
+    gate.validate(QwenEventType.MODEL_VERIFIED)
+
+
 def test_error_taxonomy_has_new_source_and_legacy_facade() -> None:
+
     assert CANONICAL_QWEN_CLI_ERROR is QwenCliError
     assert ErrorCategory.categorize(RuntimeError("network timeout")) == "network"
     assert (

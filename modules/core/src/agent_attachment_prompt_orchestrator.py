@@ -30,6 +30,7 @@ from modules.shared.src.contract_core_protocol import (
     ISendProtocol,
     IStreamProtocol,
     IUploadProtocol,
+    LifecycleObserver,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
@@ -101,6 +102,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
         cancel_event: threading.Event | None = None,
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
         """Pipeline 3: Process a prompt file from disk with document attachment.
 
@@ -113,6 +115,10 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         closing sibling slots' browser contexts. When omitted (non-TUI
         callers), a private event is used internally and the run is not
         externally cancellable.
+
+        ``event_observer`` optionally receives every emitted lifecycle event
+        so a surface can render event-level status (thinking / streaming /
+        prompting) instead of only IDLE/RUNNING.
         """
         ctx = RunContext()
         run_state = new_run_state(cancel_event)
@@ -135,6 +141,8 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                 headless=headless,
             )
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
+            if event_observer is not None:
+                emitter.observe(event_observer)
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:

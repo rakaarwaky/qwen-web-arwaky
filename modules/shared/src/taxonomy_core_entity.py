@@ -24,6 +24,7 @@ from modules.shared.src.taxonomy_core_event import (
     QwenEventType,
 )
 from modules.shared.src.taxonomy_core_vo import (
+    EventSequenceVO,
     EventTimestamp,
     FailureThreshold,
     MaxPerMinute,
@@ -246,12 +247,18 @@ class LifecycleGate:
         self._completed: list[QwenEventType] = []
         self.rejections: list[dict[str, str]] = []
         ordered = sequence if sequence is not None else PIPELINE_EVENT_SEQUENCE
+        self._sequence: EventSequenceVO = EventSequenceVO(ordered)
         self._predecessor = {event: ordered[index - 1] for index, event in enumerate(ordered) if index > 0}
 
     @property
-    def completed(self) -> tuple[QwenEventType, ...]:
+    def sequence(self) -> EventSequenceVO:
+        """Return the configured event sequence this gate validates against."""
+        return self._sequence
+
+    @property
+    def completed(self) -> EventSequenceVO:
         """Return the accepted event sequence in emission order."""
-        return tuple(self._completed)
+        return EventSequenceVO(self._completed)
 
     def validate(self, event_name: QwenEventType | str) -> None:
         """Accept an event or raise with an auditable predecessor reason."""
@@ -275,6 +282,36 @@ class LifecycleGate:
         self.rejections.append(rejection)
         self._log(EventMessage(f"lifecycle_gate_rejected event={event} reason={reason}"))
         raise RuntimeError(f"Lifecycle gate rejected {event}: {reason}")
+
+    def reset(self, completed_prefix: EventSequenceVO | None = None) -> None:
+        """Roll back run-local progress so a dispatch retry can re-emit the
+        per-attempt events (prompt-injected onward) without tripping the
+        "already emitted" rejection.
+
+        Page-phase events are re-seeded from ``completed_prefix`` (an
+        accepted prefix of the configured sequence) because the page is
+        reused across attempts: the browser adapter does not re-emit
+        WEB_LOADED / LOGIN_VERIFIED / MODEL_VERIFIED, and neither does the
+        attachment pipeline re-emit FILE_UPLOADED / DOCUMENT_PARSED.
+        """
+        prefix = completed_prefix if completed_prefix is not None else ()
+        self._completed.clear()
+        self.rejections.clear()
+        for event in prefix:
+            typed_event = QwenEventType(event)
+            self._validate_prefix_event(typed_event)
+            self._completed.append(typed_event)
+
+    def _validate_prefix_event(self, event: QwenEventType) -> None:
+        """Accept a re-seeded prefix event or reject an invalid reset seed."""
+        predecessor = self._predecessor.get(event)
+        if predecessor is None or (self._completed and self._completed[-1] == predecessor):
+            return
+        raise ValueError(
+            f"Lifecycle gate reset prefix is invalid: {event} requires predecessor "
+            f"{predecessor}, but the last re-seeded event was "
+            f"{self._completed[-1] if self._completed else 'none'}"
+        )
 
     def _log(self, message: EventMessage) -> None:
         if self._logger is None:
@@ -300,14 +337,46 @@ class LifecycleEmitter:
         self.callback_errors: list[dict[str, str]] = []
 
     @property
-    def completed(self) -> tuple[QwenEventType, ...]:
+    def gate(self) -> LifecycleGate | None:
+        """Return the attached lifecycle gate, or None when ungated."""
+        return self._gate
+
+    @property
+    def completed(self) -> EventSequenceVO:
         """Return accepted events from the attached lifecycle gate."""
-        return self._gate.completed if self._gate is not None else ()
+        if self._gate is not None:
+            return self._gate.completed
+        return EventSequenceVO(())
+
+    @property
+    def sequence(self) -> EventSequenceVO:
+        """Return the configured event sequence this gate validates against."""
+        if self._gate is not None:
+            return self._gate.sequence
+        return EventSequenceVO(())
 
     def on(self, event_name: QwenEventType | str, callback: LifecycleCallback) -> None:
         """Register a callback for a named lifecycle event."""
         key = str(event_name)
         self._callbacks.setdefault(key, []).append(callback)
+
+    def observe(self, observer: Callable[[QwenEventType, LifecycleEvent], None]) -> None:
+        """Register a listener for every pipeline event emitted on this bus.
+
+        Surfaces use this to render event-level status (thinking,
+        streaming, prompting) instead of only IDLE/RUNNING. The observer
+        receives the ``QwenEventType`` and the structured ``LifecycleEvent``.
+        """
+
+        def _dispatch(event: LifecycleEvent) -> None:
+            try:
+                enum_member = QwenEventType(str(event.name))
+            except ValueError:
+                return
+            observer(enum_member, event)
+
+        for event_name in QwenEventType:
+            self.on(event_name, _dispatch)
 
     def emit(self, event_name: QwenEventType | str, details: EventDetails | None = None) -> LifecycleEvent:
         """Emit a lifecycle event to all registered callbacks."""

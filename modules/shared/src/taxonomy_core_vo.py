@@ -51,6 +51,22 @@ class EventOrderMap(dict[object, int]):
     """Concrete event-order mapping retained for legacy runtime behavior."""
 
 
+class EventSequenceVO(tuple[object, ...]):
+    """Ordered tuple of QwenEventType values.
+
+    Used by taxonomy entities to hold a configured event sequence without
+    leaking a raw ``tuple`` primitive (AES401).
+    """
+
+    def __new__(cls, seq: object) -> EventSequenceVO:
+        # ``tuple`` construction requires the iterable at creation time;
+        # the public type is deliberately ``object`` so callers in the
+        # entity layer can pass either a VO or a plain tuple/list.
+        if isinstance(seq, (list, tuple)):
+            return super().__new__(cls, seq)
+        return super().__new__(cls, (seq,))
+
+
 class ProcessingStatus(str, Enum):
     """Terminal status for one queue item."""
 
@@ -587,6 +603,7 @@ __all__ = [
     "ErrorReason",
     "EventDetails",
     "EventOrderMap",
+    "EventSequenceVO",
     "ProcessingStatus",
     "ProcessingOutcome",
     "TypingDelayMs",

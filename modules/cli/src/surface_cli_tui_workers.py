@@ -66,6 +66,7 @@ class _TuiWorkersMixin:
     _update_table_row: Any
     _refresh_metrics: Any
     _format_status: Any
+    _format_event_status: Any
     call_from_thread: Any
     set_timer: Any
     set_interval: Any
@@ -125,6 +126,7 @@ class _TuiWorkersMixin:
             "status": "RUNNING",
             "file": p_name,
             "duration": 0.0,
+            "event": "EVENT_WEB_LOADED",
             "_start_perf": time.perf_counter(),
         }
         self._update_table_row(slot_id, self._format_status("RUNNING", "table"), p_name, "running…")
@@ -243,11 +245,33 @@ class _TuiWorkersMixin:
             return
         elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
         label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
+        event = stats.get("event")
+        status_text = self._format_event_status(event, "table") if event else self._format_status("RUNNING", "table")
         self._update_table_row(
             slot_id,
-            self._format_status("RUNNING", "table"),
+            status_text,
             stats.get("file", "-"),
             label,
+        )
+
+    def _update_slot_event_status(self, slot_id: int, event_name: str) -> None:
+        """Render the current pipeline event on the slot badge and table.
+
+        Called from the worker thread via ``call_from_thread``; only updates
+        the UI while the slot is still RUNNING so a stale event cannot
+        overwrite the terminal SUCCESS/FAILED/CANCELLED state.
+        """
+        stats = self._slot_stats.get(slot_id)
+        if stats is None or stats.get("status") != "RUNNING":
+            return
+        elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
+        dur_label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
+        self._update_slot_status(slot_id, self._format_event_status(event_name, "badge"))
+        self._update_table_row(
+            slot_id,
+            self._format_event_status(event_name, "table"),
+            stats.get("file", "-"),
+            dur_label,
         )
 
     # ── Adaptive Swarm run / cancel ──────────────────────────────────────
@@ -335,6 +359,15 @@ class _TuiWorkersMixin:
             timer_holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
 
         self.call_from_thread(_create_timer)
+
+        def _on_event(_event_type: Any, _event: Any) -> None:
+            # Event-level status: render the actual pipeline event (thinking /
+            # streaming / prompting) in the slot badge and overview table so a
+            # running slot is never just "RUNNING".
+            event_name = str(_event.name)
+            self._slot_stats.setdefault(slot_id, {})["event"] = event_name
+            self.call_from_thread(self._update_slot_event_status, slot_id, event_name)
+
         try:
             if cfg.file_path:
                 res = self._attachment.process_prompt_with_attachment(
@@ -343,6 +376,7 @@ class _TuiWorkersMixin:
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
                     cancel_event=slot_cancel_event,
+                    event_observer=_on_event,
                 )
             else:
                 res = self._file_only.process_prompt_file_only(
@@ -350,6 +384,7 @@ class _TuiWorkersMixin:
                     output_file=cfg.output_path,
                     headless=HeadlessFlag(cfg.headless),
                     cancel_event=slot_cancel_event,
+                    event_observer=_on_event,
                 )
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
