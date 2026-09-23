@@ -36,10 +36,12 @@ class SwarmOrchestrator(ISwarmAggregate):
         output_root: Path = SWARM_OUTPUT_ROOT,
         browser_concurrency: int | None = None,
         max_attempts: int = MAX_ATTEMPTS,
+        headless: bool = True,
     ) -> None:
         self._attachment = attachment
         self._folder_adapter = folder_adapter
         self._output_root = Path(output_root)
+        self._headless = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get(SWARM_CONCURRENCY_ENV, "").strip()
             concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else DEFAULT_MAX_WORKERS
@@ -166,7 +168,7 @@ class SwarmOrchestrator(ISwarmAggregate):
                     prompt_file=prompt_file,
                     attachment_file=attachment_path,
                     output_file=output_path,
-                    headless=HeadlessFlag(True),
+                    headless=HeadlessFlag(self._headless),
                     cancel_event=event,
                 )
                 result_text = str(result)
