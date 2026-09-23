@@ -100,7 +100,7 @@ check_untyped_defs = false
 
 # Relax mypy strictness for test files
 [[tool.mypy.overrides]]
-module = ["tests.*", "modules.*.tests.*"]
+module = ["tests.*", "modules.*.tests.*", "benches.*"]
 disable_error_code = ["no-untyped-def", "no-untyped-call", "arg-type", "assignment", "method-assign", "return-value", "index", "misc", "attr-defined", "no-any-return", "unreachable", "var-annotated", "type-arg", "union-attr"]
 
 [tool.bandit]
@@ -112,4 +112,5 @@ dev = [
     "pytest>=9.1.1",
     "bandit>=1.8.0",
     "pip-audit>=2.7.0",
+    "pytest-benchmark>=4.0.0",
 ]
