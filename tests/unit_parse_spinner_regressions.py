@@ -8,6 +8,7 @@ visibility, so the send button stayed disabled indefinitely and the
 lifecycle gate rejected ``EVENT_PROMPT_INJECTED`` because
 ``EVENT_DOCUMENT_PARSED`` was never emitted.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -77,14 +78,17 @@ def _build_page(
     def page_locator_factory(sel: str) -> MagicMock:
         sel_l = sel.lower()
         # Narrow card selectors all resolve to the same card element
-        if any(k in sel_l for k in (
-            "message-input-column-file",
-            "file-card-list",
-            "fileitem",
-            "file-card",
-            "file-item",
-            "attachment",
-        )):
+        if any(
+            k in sel_l
+            for k in (
+                "message-input-column-file",
+                "file-card-list",
+                "fileitem",
+                "file-card",
+                "file-item",
+                "attachment",
+            )
+        ):
             loc = MagicMock()
             loc.count.return_value = 1
             loc.nth.return_value = card_elem
@@ -136,6 +140,7 @@ class TestIsFileCardParsingSpinnerVisibility:
         # The dispatcher must not consult [class*='composer'] or [class*='input']
         # because those match container divs, not the file card itself.
         import inspect
+
         src = inspect.getsource(sd._is_file_card_parsing)
         assert "[class*='composer']" not in src
         assert "[class*='input']" not in src
@@ -160,8 +165,10 @@ class TestWaitForSendEnabledHoldFlag:
         # With hold_on_card_parsing=False the parsing check must be skipped,
         # so _wait_for_send_enabled returns as soon as the send button is enabled.
         page = _build_page(card_text="attachment\n.md", spinner_visible=True)
-        with patch.object(sd, "_is_file_card_parsing", side_effect=fake_parsing), \
-             patch.object(sd, "_is_parse_toast_visible", return_value=False):
+        with (
+            patch.object(sd, "_is_file_card_parsing", side_effect=fake_parsing),
+            patch.object(sd, "_is_parse_toast_visible", return_value=False),
+        ):
             dispatcher._wait_for_send_enabled(page, timeout_ms=500, hold_on_card_parsing=False)
         assert call_log == [], f"_is_file_card_parsing called with hold=False: {call_log}"
 
@@ -176,8 +183,10 @@ class TestWaitForSendEnabledHoldFlag:
             return True  # card spinner still visible → keep holding
 
         page = _build_page(card_text="attachment\n.md", spinner_visible=True)
-        with patch.object(sd, "_is_file_card_parsing", side_effect=fake_parsing), \
-             patch.object(sd, "_is_parse_toast_visible", return_value=False):
+        with (
+            patch.object(sd, "_is_file_card_parsing", side_effect=fake_parsing),
+            patch.object(sd, "_is_parse_toast_visible", return_value=False),
+        ):
             # hold=True and spinner visible → the send is held; the deadline
             # (500ms) elapses and the method returns False.
             result = dispatcher._wait_for_send_enabled(page, timeout_ms=500, hold_on_card_parsing=True)
