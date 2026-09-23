@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from playwright.sync_api import ElementHandle, Page
 
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_event import EventMessage
+from modules.shared.src.taxonomy_core_event import EventMessage, LifecycleEvent, QwenEventType
 from modules.shared.src.taxonomy_core_vo import (
     ExitCode,
     FilePath,
@@ -49,6 +50,11 @@ from modules.shared.src.taxonomy_core_vo import (
     UpdateStepResult,
     VersionString,
 )
+
+# A lifecycle observer receives every emitted pipeline event; surfaces use
+# it to render event-level status (thinking / streaming / prompting) in the
+# TUI slot badge and overview table.
+LifecycleObserver = Callable[[QwenEventType, LifecycleEvent], None]
 
 
 class IUploadProtocol(ABC):
@@ -463,4 +469,5 @@ __all__ = [
     "IJobStorageProtocol",
     "ITuiSlotConfigProtocol",
     "IRunCancelProtocol",
+    "LifecycleObserver",
 ]

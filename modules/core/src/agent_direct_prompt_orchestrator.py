@@ -24,6 +24,7 @@ from modules.shared.src.contract_core_protocol import (
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
+    LifecycleObserver,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
@@ -67,8 +68,14 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
         timeout_sec: TimeoutSec | int = 120,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
-        """Pipeline 1: Process a direct text prompt string and return AI response."""
+        """Pipeline 1: Process a direct text prompt string and return AI response.
+
+        ``event_observer`` optionally receives every emitted lifecycle event
+        so a surface can render event-level status (thinking / streaming /
+        prompting) instead of only IDLE/RUNNING.
+        """
         ctx = RunContext()
         try:
             prompt_str = str(prompt)
@@ -86,6 +93,8 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
                 self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName("direct"))
                 self._observability.attach_run_log(job_name=JobName("direct"), run_id=RunId(ctx.run_id))
                 emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
+                if event_observer is not None:
+                    emitter.observe(event_observer)
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()

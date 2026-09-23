@@ -27,9 +27,10 @@ from modules.shared.src.taxonomy_core_error import (
     ResponseDetectionTimeoutError,
     RunCancelledError,
 )
-from modules.shared.src.taxonomy_core_event import EVENT_PROMPT_INJECTED
+from modules.shared.src.taxonomy_core_event import EVENT_PROMPT_INJECTED, QwenEventType
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
+    EventSequenceVO,
     HeadlessFlag,
     MessageCount,
     PollIntervalSec,
@@ -41,6 +42,36 @@ from modules.shared.src.taxonomy_core_vo import (
 
 class SharedFlowOrchestrator(IPromptFlowAggregate):
     """Orchestrates the shared prompt dispatch and response-wait flow."""
+
+    @staticmethod
+    def _attempt_boundary_index(emitter: LifecycleEmitter) -> int:
+        """Index of the last event belonging to the pre-attempt phase.
+
+        The dispatch loop re-emits events from the prompt-injection point
+        onward (and, for attachment pipelines, from the document-parse
+        point onward when that event is in the configured sequence).
+        Events before that boundary — page load, login, model, and file
+        upload when the attachment pipeline ran — are never re-emitted on
+        retry, so the gate keeps them accepted.
+
+        Returns ``0`` when the gate has no recorded progress (fresh run),
+        meaning nothing is re-seeded.
+        """
+        sequence = emitter.sequence
+        if not sequence:
+            return 0
+        # Find the first event the dispatch loop re-emits: PROMPT_INJECTED
+        # for standard pipelines, DOCUMENT_PARSED for attachment pipelines
+        # (the uploader emits it once, but the flow guard re-checks it
+        # via ``state.document_parsed`` on every attempt).
+        if QwenEventType.DOCUMENT_PARSED in sequence:
+            boundary = QwenEventType.DOCUMENT_PARSED
+        else:
+            boundary = QwenEventType.PROMPT_INJECTED
+        try:
+            return sequence.index(boundary)
+        except ValueError:
+            return 0
 
     def dispatch_and_wait_for_response(
         self,
@@ -105,6 +136,16 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
                     type(e).__name__,
                     delay,
                 )
+                gate = emitter.gate
+                if gate is not None:
+                    # Roll back only the events this attempt emitted (from
+                    # PROMPT_INJECTED onward, or from DOCUMENT_PARSED onward
+                    # for attachment pipelines). The page/attachment-phase
+                    # prefix stays accepted because it is not re-emitted on
+                    # retry: the browser and attachment pipeline run once,
+                    # before the dispatch loop.
+                    boundary = self._attempt_boundary_index(emitter)
+                    gate.reset(completed_prefix=EventSequenceVO(gate.completed[:boundary]))
                 time.sleep(delay)
             else:
                 return response

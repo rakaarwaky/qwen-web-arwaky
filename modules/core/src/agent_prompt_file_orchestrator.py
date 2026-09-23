@@ -27,6 +27,7 @@ from modules.shared.src.contract_core_protocol import (
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
+    LifecycleObserver,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError
@@ -91,6 +92,7 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
         cancel_event: threading.Event | None = None,
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
         """Pipeline 2: Process a prompt file from disk without attachment.
 
@@ -100,6 +102,10 @@ class PromptFileOrchestrator(IPromptFileAggregate):
         closing sibling slots' browser contexts. When omitted (non-TUI
         callers), a private event is used internally and the run is not
         externally cancellable.
+
+        ``event_observer`` optionally receives every emitted lifecycle event
+        so a surface can render event-level status (thinking / streaming /
+        prompting) instead of only IDLE/RUNNING.
         """
         ctx = RunContext()
         run_state = new_run_state(cancel_event)
@@ -114,6 +120,8 @@ class PromptFileOrchestrator(IPromptFileAggregate):
             self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName(p_path.stem))
             self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), STANDARD_PROMPT_EVENTS)
+            if event_observer is not None:
+                emitter.observe(event_observer)
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:

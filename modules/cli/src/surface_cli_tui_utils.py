@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from rich.text import Text
 from textual.content import Content
@@ -42,6 +42,41 @@ _STATUS_TABLE: dict[str, str] = {
     "CANCELLED": "CANCELLED ■",
     "CANCELLING": "CANCELLING ⚠",
 }
+
+# Event-level status: monospace glyphs + short label per pipeline event so the
+# slot badge/table can show the actual phase (thinking / streaming / prompting)
+# instead of only RUNNING. The key is the canonical QwenEventType name with
+# the leading "EVENT_" stripped.
+_EVENT_BADGE: dict[str, str] = {
+    "NETWORK_RECONNECTING": "⚠ RECONNECTING",
+    "WEB_LOADED": "◌ LOADING",
+    "FILE_UPLOADED": "⇪ UPLOADING",
+    "PROMPT_INJECTED": "✎ PROMPTING",
+    "DOCUMENT_PARSED": "⊞ PARSING",
+    "SEND_CLICKED": "→ SENDING",
+    "DISPATCH_ACKNOWLEDGED": "✓ SENT",
+    "THINKING_STARTED": "◔ THINKING",
+    "STREAMING_GENERATION": "≡ STREAMING",
+    "GENERATION_FINISHED": "✓ FINISHED",
+    "OUTPUT_COPIED": "✓ SAVED",
+    "LOGIN_VERIFIED": "✓ LOGGED IN",
+    "MODEL_VERIFIED": "✓ MODEL",
+    "FAILED": "✕ FAILED",
+}
+
+
+def format_event_label(event_name: str) -> str:
+    """Return a monospace badge for a lifecycle event name.
+
+    Accepts either the full ``QwenEventType`` name (e.g. ``EVENT_THINKING_STARTED``)
+    or the stripped form (``THINKING_STARTED``). Falls back to RUNNING when the
+    event is unknown.
+    """
+    key = event_name.removeprefix("EVENT_")
+    if key in _EVENT_BADGE:
+        return _EVENT_BADGE[key]
+    return _STATUS_BADGE["RUNNING"]
+
 
 
 class _TuiUtilsMixin:
@@ -148,9 +183,33 @@ class _TuiUtilsMixin:
     # ── Slot status / tab title ──────────────────────────────────────────
 
     def _format_status(self, status: SlotStatus, target: str) -> str:
-        """C1/V1: one status value, one formatter — badge/table never diverge."""
+        """C1/V1: one status value, one formatter — badge/table never diverge.
+
+        For RUNNING slots an optional event-level status can be shown via the
+        ``event_status`` parameter, which renders the current pipeline event
+        (thinking / streaming / prompting) instead of a generic RUNNING label.
+        """
         table = _STATUS_BADGE if target == "badge" else _STATUS_TABLE
         return table.get(status, status)
+
+    def _format_event_status(self, status: str | None, target: str) -> str:
+        """Render an event-level status for a RUNNING slot.
+
+        ``status`` is either a canonical ``QwenEventType`` name (with or
+        without the ``EVENT_`` prefix) or one of the base slot statuses.
+        A ``None`` value falls back to a plain RUNNING label. The result is
+        a monospace glyph + label suitable for a badge or a table cell.
+        """
+        if status is None:
+            return self._format_status("RUNNING", target)
+        if status in _STATUS_BADGE:
+            base: SlotStatus = cast(SlotStatus, status)
+            return self._format_status(base, target)
+        label = format_event_label(status)
+        if target == "badge":
+            return label
+        # Table cells keep the leading RUNNING marker for scanability.
+        return f"{_STATUS_TABLE['RUNNING']} · {label}"
 
     def _set_slot_tab_title(self, slot_id: int, title: str) -> None:
         with contextlib.suppress(LookupError, NoMatches):
@@ -193,4 +252,4 @@ class _TuiUtilsMixin:
             active.write(msg)
 
 
-__all__ = ["_TuiUtilsMixin"]
+__all__ = ["_TuiUtilsMixin", "SlotStatus", "format_event_label"]

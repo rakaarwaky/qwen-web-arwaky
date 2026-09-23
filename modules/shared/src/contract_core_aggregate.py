@@ -18,6 +18,7 @@ from modules.shared.src.contract_core_protocol import (
     IObservabilityProtocol,
     ISendProtocol,
     IStreamProtocol,
+    LifecycleObserver,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_vo import (
@@ -82,8 +83,14 @@ class IDirectPromptAggregate(ABC):
         timeout_sec: TimeoutSec = TimeoutSec(120),
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
-        """Process a direct text prompt string."""
+        """Process a direct text prompt string.
+
+        ``event_observer`` optionally receives every emitted lifecycle event
+        so a surface can render event-level status (thinking / streaming /
+        prompting) for the run.
+        """
 
 
 class IPromptFileAggregate(ABC):
@@ -95,8 +102,15 @@ class IPromptFileAggregate(ABC):
         prompt_file: Path | PromptPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
+        cancel_event: Any | None = None,
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
-        """Process a prompt file from disk without attachment."""
+        """Process a prompt file from disk without attachment.
+
+        ``event_observer`` optionally receives every emitted lifecycle event
+        so a surface can render event-level status (thinking / streaming /
+        prompting) for the run.
+        """
 
     @abstractmethod
     def request_cancel(self, cancel_event: Any) -> None:
@@ -121,10 +135,14 @@ class IAttachmentPromptAggregate(ABC):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag = HeadlessFlag(True),
         cancel_event: Any | None = None,
+        event_observer: LifecycleObserver | None = None,
     ) -> ResponseText:
         """Process a prompt file from disk with document attachment.
 
-        ``cancel_event`` targets one browser run without affecting sibling jobs.
+        ``cancel_event`` targets one browser run without affecting sibling
+        jobs. ``event_observer`` optionally receives every emitted lifecycle
+        event so a surface can render event-level status (thinking /
+        streaming / prompting) for the run.
         """
 
     @abstractmethod
