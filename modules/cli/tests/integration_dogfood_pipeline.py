@@ -58,8 +58,8 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
 
 
-def _run_cli(args: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
-    """Run CLI command and return result."""
+def _run_cli(args: list[str], timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+    """Run CLI command and return result. No timeout for real API calls."""
     return subprocess.run(
         [sys.executable, "-m", "modules.root_cli_main_entry"] + args,
         capture_output=True,
@@ -89,7 +89,7 @@ class TestPromptDirectPipeline:
             "-t", "Say: Dogfood test OK",
             "-o", str(output),
             "--headless",
-        ])
+        ], timeout=None)  # No timeout for real API calls
         # Exit code 0 = success, 1 = session/auth error (acceptable for testing pipeline)
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[DIRECT] Return code: {result.returncode}")
@@ -109,7 +109,7 @@ class TestPromptOnlyPipeline:
             "-i", str(PROMPT_FILE),
             "-o", str(output),
             "--headless",
-        ])
+        ], timeout=None)  # No timeout for real API calls
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[FILE-ONLY] Return code: {result.returncode}")
         if result.stdout:
@@ -129,7 +129,7 @@ class TestPromptWithAttachmentPipeline:
             "-a", str(ATTACHMENT_FILE),
             "-o", str(output),
             "--headless",
-        ], timeout=180)
+        ], timeout=None)  # No timeout for real API calls
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[ATTACHMENT] Return code: {result.returncode}")
         if result.stdout:
