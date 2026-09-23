@@ -9,6 +9,8 @@ from . import (
     surface_cli_interactive_controller,
     surface_cli_login_command,
     surface_cli_run_command,
+    surface_cli_sessions_command,
+    surface_cli_update_command,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "surface_cli_interactive_controller",
     "surface_cli_login_command",
     "surface_cli_run_command",
+    "surface_cli_sessions_command",
+    "surface_cli_update_command",
 ]
