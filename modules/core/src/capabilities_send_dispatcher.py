@@ -74,7 +74,14 @@ def _is_parse_toast_visible(page: Page) -> bool:
 
 
 def _is_file_card_parsing(page: Page) -> bool:
-    """Return True if any file card in the composer input area still shows a Parsing indicator or spinner."""
+    """Return True if any file card in the composer input area still shows a Parsing indicator or spinner.
+
+    Only narrow file-card selectors are consulted. The broad ``composer`` and
+    ``input``-area selectors matched container divs that wrap the file card;
+    their text scan produced false positives on unrelated UI chrome, and any
+    spinner inside the whole container kept the send held even after parse
+    completed.
+    """
     card_selectors = (
         ".message-input-column-file",
         ".file-card-list",
@@ -82,8 +89,6 @@ def _is_file_card_parsing(page: Page) -> bool:
         "[class*='file-card']",
         "[class*='file-item']",
         "[class*='attachment']",
-        "[class*='composer']",
-        "[class*='input']",
     )
     for sel in card_selectors:
         try:
@@ -101,8 +106,11 @@ def _is_file_card_parsing(page: Page) -> bool:
                 spinners = item.locator(
                     "svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='loading'], [class*='parsing'], [class*='spin']"
                 )
-                if spinners.count() > 0 and spinners.first.is_visible(timeout=100):
-                    return True
+                # Only a *visible* spinner blocks the send; the loading icon
+                # stays in the DOM after parsing completes (hidden via CSS).
+                for spin_idx in range(spinners.count()):
+                    if spinners.nth(spin_idx).is_visible(timeout=100):
+                        return True
         except Exception:
             pass
     return False
@@ -150,8 +158,16 @@ class SendDispatcher(ISendProtocol):
 
         deadline = time.monotonic() + (effective_config.click_timeout_ms / 1000)
         while time.monotonic() < deadline:
-            # Step 2: Wait for send button enabled & no active parse toast
-            self._wait_for_send_enabled(page, timeout_ms=effective_config.click_timeout_ms)
+            # Step 2: Wait for send button enabled & no active parse toast.
+            # When the caller already verified parse readiness
+            # (``document_parsed=True``) the card-spinner hold is skipped:
+            # Qwen's card spinner can stay visible well after parsing is
+            # complete, and holding the send on it blocks a valid dispatch.
+            self._wait_for_send_enabled(
+                page,
+                timeout_ms=effective_config.click_timeout_ms,
+                hold_on_card_parsing=not document_parsed,
+            )
             baseline_count = int(count_messages(page))
             baseline_text = latest_message_text(page)
 
@@ -223,7 +239,12 @@ class SendDispatcher(ISendProtocol):
             page.wait_for_timeout(100)
         return False
 
-    def _wait_for_send_enabled(self, page: Page, timeout_ms: int = 5000) -> bool:
+    def _wait_for_send_enabled(
+        self,
+        page: Page,
+        timeout_ms: int = 5000,
+        hold_on_card_parsing: bool = True,
+    ) -> bool:
         """Wait until send is safe: no file parsing in progress AND button is enabled.
 
         The attachment pipeline raises ``click_timeout_ms`` to 120s so large
@@ -231,6 +252,11 @@ class SendDispatcher(ISendProtocol):
         thousands of Playwright round-trips during a phase where the state
         provably cannot flip quickly, so the parse-wait interval backs off after
         an initial responsive window and snaps back once the indicators clear.
+
+        ``hold_on_card_parsing`` disables the file-card spinner hold when the
+        caller has already verified parse readiness. Qwen's card spinner can
+        stay visible indefinitely after parsing completes, so blocking on it
+        would prevent a valid dispatch.
         """
         deadline = time.monotonic() + (timeout_ms / 1000)
         fast_phase_deadline = time.monotonic() + _PARSE_FAST_PHASE_SEC
@@ -238,7 +264,7 @@ class SendDispatcher(ISendProtocol):
             try:
                 parse_wait_ms = _PARSE_POLL_FAST_MS if time.monotonic() < fast_phase_deadline else _PARSE_POLL_SLOW_MS
                 # Proactive check: file card still shows "Parsing..." in DOM
-                if _is_file_card_parsing(page):
+                if hold_on_card_parsing and _is_file_card_parsing(page):
                     log.debug("File card still parsing — holding send.")
                     page.wait_for_timeout(parse_wait_ms)
                     continue

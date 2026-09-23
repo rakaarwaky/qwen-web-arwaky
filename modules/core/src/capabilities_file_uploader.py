@@ -321,8 +321,10 @@ class FileUploader(IUploadProtocol):
                     card.locator(selector).count() > 0 and card.locator(selector).first.is_visible(timeout=100)
                     for selector in self.config.parse_pending_selectors
                 )
-                spinners_visible = (
-                    card.locator("svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='spin']").count() > 0
+                spinners = card.locator("svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='spin']")
+                spinners_visible = any(
+                    spinners.nth(index).is_visible(timeout=100)
+                    for index in range(spinners.count())
                 )
 
                 is_ready = (
