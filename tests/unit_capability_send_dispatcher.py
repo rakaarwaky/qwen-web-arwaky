@@ -237,6 +237,7 @@ def test_per_call_sender_config_overrides_instance_fallback():
     page.keyboard.press.assert_not_called()
     emitter.emit.assert_not_called()
 
+
 # ── ACK-stage regression (user-turn observation + narrowed toast) ─────────────
 
 
@@ -245,12 +246,10 @@ def test_ack_observed_via_user_bubble_count():
     the dispatch even when count_messages and latest_message_text are
     unchanged (assistant has not started streaming yet)."""
     page = MagicMock()
-    with patch(
-        "modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1
-    ), patch(
-        "modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=1
-    ), patch(
-        "modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None
+    with (
+        patch("modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1),
+        patch("modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=1),
+        patch("modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
     ):
         dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(50))
         assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=50, baseline_user_count=0) is True
@@ -265,12 +264,10 @@ def test_ack_not_observed_without_user_bubble_growth():
     loc = MagicMock()
     loc.count.return_value = 0
     page.locator.return_value = loc
-    with patch(
-        "modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1
-    ), patch(
-        "modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=0
-    ), patch(
-        "modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None
+    with (
+        patch("modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1),
+        patch("modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=0),
+        patch("modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
     ):
         dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(100))
         assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=100, baseline_user_count=0) is False
