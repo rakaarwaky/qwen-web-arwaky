@@ -112,7 +112,7 @@ def test_browser_adapter_has_no_percent_style_structlog_calls() -> None:
 
     Locks the source so a future edit cannot reintroduce the defect.
     """
-    src = Path(__file__).resolve().parents[1] / "modules" / "core" / "src" / "capabilities_browser_adapter.py"
+    src = Path(__file__).resolve().parents[1] / "src" / "capabilities_browser_adapter.py"
     text = src.read_text(encoding="utf-8")
     offenders = [m.group(0) for m in _PERCENT_IN_LOG_CALL_RE.finditer(text)]
     assert not offenders, "%-style structlog log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)

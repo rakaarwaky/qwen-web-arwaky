@@ -59,12 +59,14 @@ dependencies:
 tests:
   - changed-files:
       - any-glob-to-any-file: tests/**
+      - any-glob-to-any-file: modules/*/tests/**/*.py
 
 # Fixtures (test inputs / recorded artifacts)
 fixtures:
   - changed-files:
       - any-glob-to-any-file: tests/fixtures/**
       - any-glob-to-any-file: tests/artifacts/**
+      - any-glob-to-any-file: modules/*/tests/fixtures/**
 
 # Deployment / ops
 deployment:
