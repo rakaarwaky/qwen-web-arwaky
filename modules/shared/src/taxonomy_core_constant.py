@@ -167,6 +167,18 @@ MESSAGE_SELECTORS: tuple[str, ...] = (
 COMBINED_MESSAGE_SELECTOR: str = ", ".join(MESSAGE_SELECTORS)
 RESPONSE_CONTENT_SELECTOR: str = ".qwen-markdown, .markdown-body, .response-message-content, .qwen-markdown-text"
 
+#: Selectors matching a committed user turn in Qwen's live chat DOM.
+#: The user bubble renders immediately when a turn is acknowledged,
+#: long before the assistant response streams in, so these let the
+#: dispatch-ACK stage observe the user turn without waiting on the
+#: response surface.
+USER_MESSAGE_SELECTORS: tuple[str, ...] = (
+    ".qwen-chat-message-user",
+    ".chat-user-message",
+    "[class*='user-message-content']",
+)
+USER_COMBINED_SELECTOR: str = ", ".join(USER_MESSAGE_SELECTORS)
+
 STOP_BUTTON_SELECTORS: str = (
     "button[aria-label*='Stop' i], .message-input-right-button-send button:has(svg rect), "
     "[class*='stop-btn'], [class*='icon-stop'], [class*='stopButton']"

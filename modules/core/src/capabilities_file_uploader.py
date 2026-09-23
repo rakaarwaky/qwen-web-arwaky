@@ -294,8 +294,8 @@ class FileUploader(IUploadProtocol):
                         ".ant-message",
                         "[role='alert']",
                         "[class*='toast']",
-                        "[class*='notification']",
-                        "body",
+                        "[class*='message-notice']",
+                        "[class*='ant-notification']",
                     ):
                         loc = page.locator(sel)
                         if loc.count() > 0:

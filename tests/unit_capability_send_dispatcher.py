@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
 from playwright.sync_api import Error
 
+import modules.core.src.capabilities_send_dispatcher as sd
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.utility_core_dom_query import count_messages, latest_message_text
 from modules.shared.src import LifecycleEmitter, SendDispatchError
@@ -234,3 +236,83 @@ def test_per_call_sender_config_overrides_instance_fallback():
 
     page.keyboard.press.assert_not_called()
     emitter.emit.assert_not_called()
+
+# ── ACK-stage regression (user-turn observation + narrowed toast) ─────────────
+
+
+def test_ack_observed_via_user_bubble_count():
+    """A new committed user turn (count_user_messages increase) acknowledges
+    the dispatch even when count_messages and latest_message_text are
+    unchanged (assistant has not started streaming yet)."""
+    page = MagicMock()
+    with patch(
+        "modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1
+    ), patch(
+        "modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=1
+    ), patch(
+        "modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None
+    ):
+        dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(50))
+        assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=50, baseline_user_count=0) is True
+
+
+def test_ack_not_observed_without_user_bubble_growth():
+    """When the user-turn count stays at the baseline and neither the
+    message count nor the latest text changes, the ACK wait times out."""
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock()
+    page.evaluate.side_effect = lambda *_a, **_k: ""
+    loc = MagicMock()
+    loc.count.return_value = 0
+    page.locator.return_value = loc
+    with patch(
+        "modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1
+    ), patch(
+        "modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=0
+    ), patch(
+        "modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None
+    ):
+        dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(100))
+        assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=100, baseline_user_count=0) is False
+
+
+def test_toast_scan_ignores_body_and_broad_containers():
+    """_is_parse_toast_visible must not scan <body> or broad
+    [class*='alert'] / [class*='notification'] containers: in Qwen's live
+    chat those match the whole conversation history and the composer chrome,
+    producing persistent false positives that kept the send loop re-clicking.
+    Only real toast/notification components (ant-message / role=alert /
+    toast / message-notice / ant-notification) may trigger the hold."""
+    src = inspect.getsource(sd._is_parse_toast_visible)
+    active_body = src.split("toast_selectors = (")[1]
+    active_body = active_body[: active_body.index("    )")]
+    active_keywords = src.split("parse_keywords = (")[1]
+    active_keywords = active_keywords[: active_keywords.index("    )")]
+    assert "'body'" not in active_body
+    assert "[class*='alert']" not in active_body
+    assert "[class*='notification']" not in active_body
+    assert ".ant-message" in active_body
+    assert "[role='alert']" in active_body
+    assert "'uploading'" not in active_keywords
+
+
+def test_toast_real_container_still_detected():
+    """A genuine .ant-message toast carrying a parse warning still holds the
+    send loop — narrowing the selectors must not suppress real toasts."""
+    page = MagicMock()
+    toast = MagicMock()
+    toast.is_visible.return_value = True
+    toast.inner_text.return_value = "Document is currently parsing, please wait until upload completes"
+
+    def locator_factory(sel):
+        if sel == ".ant-message":
+            loc = MagicMock()
+            loc.count.return_value = 1
+            loc.nth.return_value = toast
+            return loc
+        loc = MagicMock()
+        loc.count.return_value = 0
+        return loc
+
+    page.locator.side_effect = locator_factory
+    assert sd._is_parse_toast_visible(page) is True

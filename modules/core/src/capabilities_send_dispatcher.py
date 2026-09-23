@@ -11,7 +11,7 @@ import time
 from playwright.sync_api import Error, Page
 
 from modules.core.src.utility_core_dom_helper import click_send as _dom_click_send
-from modules.core.src.utility_core_dom_query import count_messages, latest_message_text
+from modules.core.src.utility_core_dom_query import count_messages, count_user_messages, latest_message_text
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import ISendProtocol
 from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
@@ -37,15 +37,20 @@ _PARSE_POLL_SLOW_MS = 1000
 
 
 def _is_parse_toast_visible(page: Page) -> bool:
-    """Safely check if Qwen's document parsing warning toast is visible."""
+    """Safely check if Qwen's document parsing warning toast is visible.
+
+    Only real toast/notification containers are consulted. The legacy
+    implementation also scanned ``body`` and broad ``[class*='alert']``
+    / ``[class*='notification']`` nodes, which in Qwen's live chat matched
+    the entire conversation history and the composer chrome, producing
+    persistent false positives that kept the send loop re-clicking.
+    """
     toast_selectors = (
         ".ant-message",
         "[role='alert']",
         "[class*='toast']",
-        "[class*='notification']",
         "[class*='message-notice']",
-        "[class*='alert']",
-        "body",
+        "[class*='ant-notification']",
     )
     parse_keywords = (
         "still uploading",
@@ -170,6 +175,7 @@ class SendDispatcher(ISendProtocol):
             )
             baseline_count = int(count_messages(page))
             baseline_text = latest_message_text(page)
+            baseline_user_count = count_user_messages(page)
 
             # Step 3: Trigger DOM send click
             if not _dom_click_send(page, _config=effective_config):
@@ -186,7 +192,11 @@ class SendDispatcher(ISendProtocol):
 
             # Step 4: Verify dispatch acknowledgment (with Enter fallback if needed)
             if not self._wait_for_dispatch_ack(
-                page, baseline_count, baseline_text, timeout_ms=int(effective_config.click_timeout_ms)
+                page,
+                baseline_count,
+                baseline_text,
+                timeout_ms=int(effective_config.click_timeout_ms),
+                baseline_user_count=baseline_user_count,
             ):
                 if _is_parse_toast_visible(page):
                     page.wait_for_timeout(1000)
@@ -198,7 +208,11 @@ class SendDispatcher(ISendProtocol):
                     with contextlib.suppress(Error, TimeoutError):
                         page.keyboard.press("Enter")
                 if not self._wait_for_dispatch_ack(
-                    page, baseline_count, baseline_text, timeout_ms=int(effective_config.click_timeout_ms)
+                    page,
+                    baseline_count,
+                    baseline_text,
+                    timeout_ms=int(effective_config.click_timeout_ms),
+                    baseline_user_count=baseline_user_count,
                 ):
                     if _is_parse_toast_visible(page):
                         page.wait_for_timeout(1000)
@@ -215,6 +229,7 @@ class SendDispatcher(ISendProtocol):
         baseline_count: int,
         baseline_text: ResponseText | None,
         timeout_ms: int | None = None,
+        baseline_user_count: int | None = None,
     ) -> bool:
         """Verify that the click produced a real new user turn.
 
@@ -222,14 +237,24 @@ class SendDispatcher(ISendProtocol):
         Qwen can reset either control before the user turn is committed. The
         acknowledgment must come from a new turn count or a changed message
         surface so the response monitor cannot wait on a false dispatch.
+
+        ``baseline_user_count`` is the committed-user-turn count observed
+        before the click; when the user bubble appears the turn is
+        acknowledged even while the assistant response has not yet
+        started, which matters for large attachments whose parsing makes
+        the first response slow.
         """
         from modules.core.src.utility_core_dom_query import latest_message_text as _latest_message_text
 
         effective_timeout = timeout_ms if timeout_ms is not None else int(self.click_timeout_ms)
         deadline = time.monotonic() + (effective_timeout / 1000)
+        if baseline_user_count is None:
+            baseline_user_count = count_user_messages(page)
         while time.monotonic() < deadline:
             try:
                 if int(count_messages(page)) > baseline_count:
+                    return True
+                if count_user_messages(page) > baseline_user_count:
                     return True
                 current_text = _latest_message_text(page)
                 if current_text is not None and str(current_text).strip() and current_text != baseline_text:

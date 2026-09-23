@@ -158,6 +158,43 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
     assert "login" in str(architect.error).lower()
 
 
+def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> None:
+    """A lifecycle-gate rejection (concurrent attachment runs miss
+    DOCUMENT_PARSED on the first attempt) is retryable: the swarm retries
+    with a fresh browser session up to max_attempts, then fails with the
+    gate error recorded."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate({"architect": 3, "security-reviewer": 3})
+
+    gate_error = "ERROR [RuntimeError] Lifecycle gate rejected EVENT_PROMPT_INJECTED: requires successful predecessor EVENT_DOCUMENT_PARSED"
+    original_process = aggregate.process_prompt_with_attachment
+
+    def process_with_gate_rejection(prompt_file, attachment_file, output_file, headless, cancel_event=None):
+        role = Path(prompt_file).stem
+        remaining = aggregate.failures.get(role, 0)
+        if remaining > 0:
+            aggregate.failures[role] = remaining - 1
+            return gate_error
+        return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
+
+    aggregate.process_prompt_with_attachment = process_with_gate_rejection
+
+    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    # Both agents hit the gate rejection on every attempt (3 each) and are
+    # retried up to max_attempts=3 before failing — proving the gate path
+    # is treated as retryable, not terminal on attempt 1.
+    for agent in final.agents:
+        assert agent.status == "failed"
+        assert agent.attempt == 3
+        assert "lifecycle gate rejected" in str(agent.error).lower()
+
+
 def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
     """Cancelling a swarm must stop executors and clean up internal dictionary state."""
     _patch_templates(monkeypatch, tmp_path)
