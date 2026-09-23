@@ -1,2 +1,0 @@
-This is a test attachment for dogfood pipeline validation.
-Line 2.
