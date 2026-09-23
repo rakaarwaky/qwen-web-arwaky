@@ -79,7 +79,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Reinstall package and browser binaries even when already up to date",
     )
 
-    # ── prompt-direct ─────────────────────────────────────────────────────────
+    # ── sessions ────────────────────────────────────────────────────────────
+    p_sessions = sub.add_parser(
+        "sessions", help="Manage Qwen login sessions", parents=[parent]
+    )
+    sessions_sub = p_sessions.add_subparsers(dest="session_command")
+    sessions_sub.add_parser("list", help="List all sessions")
+    sessions_login = sessions_sub.add_parser("login", help="Add a new session")
+    sessions_login.add_argument(
+        "--name", required=True, help="Session name (e.g., personal, work)"
+    )
+    sessions_sub.add_parser("health-check", help="Check health of all sessions")
+    sessions_remove = sessions_sub.add_parser("remove", help="Remove a session")
+    sessions_remove.add_argument("session_id", help="Session ID to remove")
+    sessions_sub.add_parser("status", help="Show detailed session status")
+
+    # ── mcp ───────────────────────────────────────────────────────────────────
+    sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
+
+    return p.parse_args(argv)
     p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
     p_direct.add_argument("-t", "--text", required=True, help="Prompt text to send directly")
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
