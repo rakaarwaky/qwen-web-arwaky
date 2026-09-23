@@ -65,13 +65,21 @@ class SharedFlowOrchestrator(IPromptFlowAggregate):
         # (the uploader emits it once, but the flow guard re-checks it
         # via ``state.document_parsed`` on every attempt).
         if QwenEventType.DOCUMENT_PARSED in sequence:
+            # DOCUMENT_PARSED is emitted once by the uploader before the
+            # dispatch loop and is NOT re-emitted on retry. Preserve it in the
+            # gate by returning index+1 so the slice `completed[:boundary]`
+            # includes it.
             boundary = QwenEventType.DOCUMENT_PARSED
+            try:
+                return sequence.index(boundary) + 1
+            except ValueError:
+                return 0
         else:
             boundary = QwenEventType.PROMPT_INJECTED
-        try:
-            return sequence.index(boundary)
-        except ValueError:
-            return 0
+            try:
+                return sequence.index(boundary)
+            except ValueError:
+                return 0
 
     def dispatch_and_wait_for_response(
         self,
