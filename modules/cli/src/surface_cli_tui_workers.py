@@ -17,7 +17,7 @@ from rich.markup import escape
 from textual import work
 from textual.app import ScreenStackError
 from textual.css.query import NoMatches
-from textual.widgets import Input, Label, LoadingIndicator, Switch
+from textual.widgets import DataTable, Input, Label, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
@@ -510,6 +510,101 @@ class _TuiWorkersMixin:
         if hasattr(self, "_session_check_timer") and self._session_check_timer is not None:
             self._session_check_timer.stop()
             self._session_check_timer = None
+
+    # ── Session Pool Management ────────────────────────────────────────
+
+    @work(thread=True)
+    def _refresh_sessions_table(self) -> None:
+        """Load and display all sessions in the Sessions tab table."""
+        if not hasattr(self, '_session_manager') or self._session_manager is None:
+            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
+            return
+        try:
+            pool = self._session_manager.load_pool()
+            sessions = pool.sessions
+
+            def _update() -> None:
+                with contextlib.suppress(NoMatches):
+                    table = self.query_one("#sessions-table", DataTable)
+                    table.clear()
+                    table.add_columns("ID", "Name", "Status", "Last Used", "Path")
+                    for s in sessions:
+                        last_used = s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never"
+                        table.add_row(s.session_id, s.name, s.status.value, last_used, str(s.path))
+                    # Update metrics
+                    total = pool.total_count
+                    healthy = sum(1 for s in sessions if s.is_healthy)
+                    limited = sum(1 for s in sessions if s.is_limited)
+                    with contextlib.suppress(NoMatches):
+                        self.query_one("#session-total", Label).update(f"TOTAL: {total}")
+                        self.query_one("#session-healthy", Label).update(f"HEALTHY: {healthy}")
+                        self.query_one("#session-limited", Label).update(f"LIMITED: {limited}")
+                    self.call_from_thread(
+                        self._log_msg,
+                        f"[bold {THEME['ok']}]SESSIONS:[/] Loaded {total} sessions "
+                        f"({healthy} healthy, {limited} limited).",
+                    )
+
+            self.call_from_thread(_update)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {THEME['err']}]SESSION LOAD ERROR:[/] {escape(str(exc))}",
+            )
+
+    @work(thread=True)
+    def _run_session_health_check(self) -> None:
+        """Run health checks on all sessions."""
+        if not hasattr(self, '_session_manager') or self._session_manager is None:
+            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
+            return
+        try:
+            from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
+            checker = SessionHealthChecker(timeout_seconds=10)
+            pool = self._session_manager.load_pool()
+            sessions = pool.sessions
+
+            async def _check_all() -> list[tuple[object, bool]]:
+                results = []
+                for s in sessions:
+                    healthy = await checker.check_session(s)
+                    results.append((s, healthy))
+                    if healthy:
+                        self._session_manager.mark_healthy(s.session_id)
+                    else:
+                        self._session_manager.mark_limited(s.session_id)
+                return results
+
+            import asyncio
+            results = asyncio.run(_check_all())
+
+            def _update() -> None:
+                healthy_count = sum(1 for _, h in results if h)
+                self.call_from_thread(
+                    self._log_msg,
+                    f"[bold {THEME['ok']}]HEALTH CHECK:[/] {healthy_count}/{len(results)} sessions healthy.",
+                )
+                # Refresh the table
+                self._refresh_sessions_table()
+
+            self.call_from_thread(_update)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {THEME['err']}]HEALTH CHECK ERROR:[/] {escape(str(exc))}",
+            )
+
+    def _session_login_action(self) -> None:
+        """Trigger session login flow."""
+        if not hasattr(self, '_session_manager') or self._session_manager is None:
+            self._log_msg("[yellow]Session manager not available.[/]")
+            return
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Opening session login dialog...[/]")
+        # For now, log that login would be triggered; the actual flow uses subprocess
+        self.notify(
+            "Use 'qwen-web-arwaky sessions login --name <name>' command",
+            title="Session Login", severity="information"
+        )
 
 
 __all__ = ["_TuiWorkersMixin"]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from modules.shared.src.taxonomy_session_vo import SessionId, SessionInfo, SessionPool
+from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool
 
 
 class ISessionManagerProtocol(ABC):

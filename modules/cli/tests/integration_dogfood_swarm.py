@@ -13,7 +13,6 @@ Requirements:
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import pytest
@@ -74,26 +73,8 @@ class TestSwarmWithRealSession:
 
     def test_swarm_start_and_monitor(self, tmp_path: Path):
         """Start a swarm and verify it initializes correctly."""
-        from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-        from modules.core.src.capabilities_prompt_injector import PromptInjector
-        from modules.core.src.capabilities_send_dispatcher import SendDispatcher
-        from modules.core.src.capabilities_stream_monitor import StreamMonitor
-        from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-        from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentPromptOrchestrator
-        from modules.shared.src.taxonomy_core_vo import AppConfig
-
         # Create orchestrator components
         input_file = _create_test_input(tmp_path)
-
-        # Build config
-        cfg = AppConfig(
-            mode="single",
-            input_path=input_file,
-            output_path=tmp_path / "output",
-            session_path=Path.home() / ".local" / "share" / "qwen-web" / "qwen_session",
-            headless=True,
-            timeout=120,
-        )
 
         print(f"\n[SWARM-TEST] Input: {input_file}")
         print(f"[SWARM-TEST] Output root: {tmp_path}")
@@ -104,7 +85,6 @@ class TestSwarmWithRealSession:
 
     def test_swarm_output_structure(self, tmp_path: Path):
         """Verify swarm would create expected output structure."""
-        input_file = _create_test_input(tmp_path)
         swarm_id = "dogfood_test_123"
         output_root = tmp_path / swarm_id
 
@@ -117,10 +97,9 @@ class TestSwarmWithRealSession:
 
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency configuration."""
-        import os
         # Default should be 10
         assert hasattr(__import__('modules.core.src.agent_swarm_orchestrator', fromlist=['DEFAULT_MAX_WORKERS']), 'DEFAULT_MAX_WORKERS')
-        print(f"\n[SWARM-TEST] Concurrency config verified")
+        print("\n[SWARM-TEST] Concurrency config verified")
 
 
 class TestSwarmIntegration:
