@@ -1,14 +1,13 @@
-"""Dogfood swarm pipeline tests — real end-to-end validation of swarm orchestration.
+"""Dogfood swarm pipeline tests — structure validation for swarm orchestration.
 
-These tests verify the swarm pipeline works with a live Qwen session:
-1. Start a swarm with real role templates
-2. Verify all roles get processed
-3. Check output files are created correctly
+These tests verify the swarm pipeline structure and templates:
+1. SwarmOrchestrator can be imported
+2. Role templates are discoverable
+3. Input files are valid
+4. Output structure is correct
 
-Run with: pytest modules/cli/tests/integration_dogfood_swarm.py -v
-
-Requirements:
-- Must have a valid Qwen session (run 'qwen-web-arwaky login' first)
+NEVER RUNS API CALLS — structure tests only.
+Real API validation: run pytest --run-dogfood with live Qwen session.
 """
 
 from __future__ import annotations
@@ -18,21 +17,6 @@ from pathlib import Path
 import pytest
 
 from modules.shared.src.utility_core_prompt_template import list_prompt_templates
-
-
-def _has_valid_session() -> bool:
-    """Check if a valid Qwen session exists."""
-    session_dir = Path.home() / ".local" / "share" / "qwen-web" / "qwen_session"
-    if not session_dir.exists():
-        return False
-    return (session_dir / "component_crx_cache").exists()
-
-
-# Skip if no valid session
-pytestmark = pytest.mark.skipif(
-    not _has_valid_session(),
-    reason="Skip swarm dogfood tests: No valid Qwen session found (run 'qwen-web-arwaky login' first)",
-)
 
 
 def _create_test_input(tmp_path: Path) -> Path:
@@ -68,20 +52,8 @@ class TestSwarmPipelineStructure:
         assert input_file.read_text().startswith("#")
 
 
-class TestSwarmWithRealSession:
-    """Test swarm with real Qwen session (requires login)."""
-
-    def test_swarm_start_and_monitor(self, tmp_path: Path):
-        """Start a swarm and verify it initializes correctly."""
-        # Create orchestrator components
-        input_file = _create_test_input(tmp_path)
-
-        print(f"\n[SWARM-TEST] Input: {input_file}")
-        print(f"[SWARM-TEST] Output root: {tmp_path}")
-
-        # Verify we can create the orchestrator
-        assert input_file.exists()
-        assert input_file.read_text()  # Has content
+class TestSwarmOutputStructure:
+    """Test that swarm output structure is valid."""
 
     def test_swarm_output_structure(self, tmp_path: Path):
         """Verify swarm would create expected output structure."""
@@ -90,41 +62,21 @@ class TestSwarmWithRealSession:
 
         # Simulate expected output structure
         output_root.mkdir()
-
-        # Check that output root is created
         assert output_root.exists()
         assert output_root.is_dir()
 
+        # Verify subdirectories would be created
+        for subdir in ["logs", "outputs"]:
+            sub = output_root / subdir
+            sub.mkdir(exist_ok=True)
+            assert sub.is_dir()
+
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency configuration."""
-        # Default should be 10
-        assert hasattr(__import__('modules.core.src.agent_swarm_orchestrator', fromlist=['DEFAULT_MAX_WORKERS']), 'DEFAULT_MAX_WORKERS')
-        print("\n[SWARM-TEST] Concurrency config verified")
-
-
-class TestSwarmIntegration:
-    """Integration tests for swarm with real components."""
-
-    def test_swarm_list_templates(self):
-        """Test that swarm can list available templates."""
-        templates = list_prompt_templates()
-        assert isinstance(templates, tuple)
-        assert len(templates) >= 2  # Should have at least architect, security-reviewer
-        print(f"\n[SWARM-INTEGRATION] Templates: {templates}")
-
-    def test_swarm_input_validation(self, tmp_path: Path):
-        """Test swarm input file validation."""
-        # Valid input
-        valid_input = tmp_path / "valid.md"
-        valid_input.write_text("# Valid Test\n\nContent here.")
-        assert valid_input.exists()
-        assert valid_input.read_text().strip() != ""
-
-        # Invalid input (non-existent)
-        invalid_input = tmp_path / "nonexistent.md"
-        assert not invalid_input.exists()
+        from modules.core.src.agent_swarm_orchestrator import DEFAULT_MAX_WORKERS
+        assert DEFAULT_MAX_WORKERS == 10
+        print(f"\n[SWARM-TEST] Concurrency: DEFAULT_MAX_WORKERS = {DEFAULT_MAX_WORKERS}")
 
 
 if __name__ == "__main__":
-    # Run with: python modules/cli/tests/integration_dogfood_swarm.py
     pytest.main([__file__, "-v"])
