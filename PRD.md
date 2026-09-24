@@ -43,8 +43,12 @@ into spaghetti code, making AI-assisted maintenance unsafe.
   change request CR-2026-004.
 
 Core functional specs live in [`modules/core/FRD.md`](modules/core/FRD.md)
-(FR-001…FR-013, one per capability + protocol). CLI and MCP surfaces have
-their own FRDs.
+(FR-001…FR-013, one per capability + protocol) and current evidence lives in
+[`modules/core/BACKLOG.md`](modules/core/BACKLOG.md). Core is the only feature
+folder because it contains agent orchestrators. CLI and MCP are surface
+members, not feature folders, so their product requirements remain in this PRD
+and they carry neither an FRD nor a backlog. Shared state and evidence policy
+live in [`ROADMAP.md`](ROADMAP.md).
 
 ## Feature Requirements (Prioritized)
 
@@ -125,6 +129,38 @@ in `metrics.json` under the application state directory. Emit WARNING below
   overall partial/failed status with a re-login hint, never a global abort
   of healthy sibling work. Recovery path: re-login, then retry the failed
   slots/agents.
+
+### CLI Surface Requirements
+
+- **CLI-SR-001 — Commands and validation**: expose `init`, `login`, `doctor`,
+  `prompt-direct`, `prompt-only`, `prompt-with-attachment`, `update`, and `mcp`;
+  reject invalid paths or arguments with a non-success exit and an actionable
+  diagnostic on stderr. Prompt commands support machine-readable JSON output.
+- **CLI-SR-002 — Interactive TUI**: no-argument TTY execution launches the
+  Textual dashboard with dynamic package versioning, optional empty attachment
+  input, timestamped output names for directory destinations, and explicit
+  confirmation before session deletion. Non-TTY execution returns subcommand
+  guidance instead of trying to launch the dashboard.
+- **CLI-SR-003 — Session setup**: login validates a saved profile first and
+  delegates invalid-session recovery to the headed Core setup aggregate.
+- **CLI-SR-004 — Diagnostics**: `doctor` reports Python, Playwright browser,
+  workspace, saved-session, and output-permission health, with an optional JSON
+  representation.
+
+### MCP Surface Requirements
+
+- **MCP-SR-001 — Declarative tools**: one registry defines prompt, file,
+  attachment, async job, session, and workspace tools and delegates each call
+  to a Core aggregate.
+- **MCP-SR-002 — Response envelopes**: every success carries `success: true`,
+  a `status` discriminator, and either `result` or `job_id`; every failure
+  carries a stable code, message, hint, and retryability flag. Submission
+  throttling returns `RATE_LIMITED` with retry guidance rather than blocking.
+- **MCP-SR-003 — Session safety**: session deletion requires explicit
+  confirmation; session checks and headed setup use the Core session
+  aggregates.
+- **MCP-SR-004 — Path handling**: tool paths expand user-relative syntax and
+  resolve before execution; path failures return structured errors.
 
 ### P2 — Nice to Have
 

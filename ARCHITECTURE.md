@@ -42,6 +42,11 @@ groups files by feature, with layers as filenames, not directories.
 
 #### Features member
 
+A workspace member is a feature only when its tree contains an
+`agent_*_orchestrator` file. Every such member carries sibling `FRD.md` and
+`BACKLOG.md` documents at the member root. Members without an orchestrator —
+including surface-only and shared members — carry neither document.
+
 _Example feature crate `crates|packages|modules/<name-features>/`_
 
 ```text
@@ -102,9 +107,9 @@ project-root/                             <- Project workspace root
 │   │       ├── root_<feature-b>_container.rs/py/ts             <- Root
 │   │       └── lib.rs
 │   │
-│   ├── <feature-c>/                      <- FEATURE: <feature-c description>
+│   ├── <surface-c>/                      <- NON-FEATURE: surface-only member
 │   │   └── src/
-│   │       ├── surface_<feature-c>_<role>.rs/py/ts             <- Surface
+│   │       ├── surface_<surface-c>_<role>.rs/py/ts             <- Surface
 │   │       └── lib.rs
 │   │
 │   └── ...

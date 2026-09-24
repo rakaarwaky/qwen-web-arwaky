@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/gates.sh — Local quality gates mirror CI for qwen-web-arwaky.
 # Usage: bash scripts/gates.sh
-#   Runs all 5 gates: Ruff (lint + format), Mypy, Bandit, AES self-lint, and Pytest.
+#   Runs 6 gates: docs, Ruff (lint + format), Mypy, Bandit, AES self-lint, and Pytest.
 #   Mirrors .github/workflows/ci.yml (uv-based). Bandit is always enforced (not optional).
 set -euo pipefail
 
@@ -38,8 +38,18 @@ uv run python -m playwright install chromium >/dev/null 2>&1 || true
 # ─── Gates ──────────────────────────────────────────────────────────────────
 FAILURES=0
 
-# Gate 1: Ruff lint + format check
-info "Gate 1/5 — Ruff lint & format..."
+# Gate 1: Product and feature documentation contract
+info "Gate 1/6 — Documentation contract..."
+if python scripts/check_docs.py . >/tmp/gates_docs.log 2>&1; then
+    ok "Documentation contract clean"
+else
+    warn "Documentation contract found issues"
+    cat /tmp/gates_docs.log
+    FAILURES=$((FAILURES + 1))
+fi
+
+# Gate 2: Ruff lint + format check
+info "Gate 2/6 — Ruff lint & format..."
 if uv run ruff format --check modules/ tests/ >/dev/null 2>&1 && \
    uv run ruff check modules/ tests/ 2>&1 | grep -q "All checks passed"; then
     ok "Ruff clean"
@@ -48,8 +58,8 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# Gate 2: Mypy type checking
-info "Gate 2/5 — Mypy type check..."
+# Gate 3: Mypy type checking
+info "Gate 3/6 — Mypy type check..."
 if uv run mypy modules/ --ignore-missing-imports >/tmp/gates_mypy.log 2>&1; then
     ok "Mypy clean"
 else
@@ -58,8 +68,8 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# Gate 3: Bandit security scan (source code only, exclude tests) — always runs (not optional)
-info "Gate 3/5 — Bandit security scan..."
+# Gate 4: Bandit security scan (source code only, exclude tests) — always runs (not optional)
+info "Gate 4/6 — Bandit security scan..."
 if uv run bandit -r modules/ -s B110,B112 2>&1 | grep -q "No issues"; then
     ok "Bandit clean"
 else
@@ -68,8 +78,8 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# Gate 4: AES architecture self-lint (lint-arwaky-cli)
-info "Gate 4/5 — AES architecture self-lint..."
+# Gate 5: AES architecture self-lint (lint-arwaky-cli)
+info "Gate 5/6 — AES architecture self-lint..."
 if command -v lint-arwaky-cli &>/dev/null; then
     output=$(lint-arwaky-cli scan . 2>&1) || true
     echo "$output" | tail -5
@@ -85,9 +95,9 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# Gate 4b: AD-05 template hygiene — modules/templates/*.md must not contain
+# Gate 5b: AD-05 template hygiene — modules/templates/*.md must not contain
 # HTML-escaped tokens that leak into the TUI/MCP/CLI role-template path.
-info "Gate 4b/5 — Template hygiene (AD-05)..."
+info "Gate 5b/6 — Template hygiene (AD-05)..."
 if grep -rEl '&lt;|&gt;' modules/templates/ 2>/dev/null; then
     warn "HTML-escaped tokens found in modules/templates/*.md"
     FAILURES=$((FAILURES + 1))
@@ -95,8 +105,8 @@ else
     ok "Template hygiene clean"
 fi
 
-# Gate 5: Pytest test suite
-info "Gate 5/5 — Running pytest..."
+# Gate 6: Pytest test suite
+info "Gate 6/6 — Running pytest..."
 # Live-network / auth-session tests are gated by the `e2e` marker in
 # pytest.ini; skip them in local and CI gates, run them explicitly with
 # `uv run python -m pytest tests/ -m e2e` when a session is available.
