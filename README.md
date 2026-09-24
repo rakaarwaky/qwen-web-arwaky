@@ -1,262 +1,160 @@
-# Qwen AI Web Automation CLI & MCP Server
+# Qwen Web Arwaky
 
-> Unlimited Qwen 3.8-Max Intelligence — Zero API Keys. Zero Rate Limits. 100% Uninterrupted.
+> A Python CLI and MCP server for developers and AI agents that automate `chat.qwen.ai` through a persistent Playwright browser session, without an API key.
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.62%2B-2EAD33?style=flat-square&logo=playwright&logoColor=white)](https://playwright.dev/python/)
-[![MCP Protocol](https://img.shields.io/badge/MCP-2.0%2B-7C3AED?style=flat-square&logo=anthropic&logoColor=white)](https://modelcontextprotocol.io/)
-[![AES Architecture](https://img.shields.io/badge/AES_Architecture-7--Layer-2563EB?style=flat-square&logo=architecture&logoColor=white)](#architecture-aes-7-layer-pattern)
-[![Tests](https://img.shields.io/badge/Tests-227%20passed-22C55E?style=flat-square&logo=pytest&logoColor=white)](#testing--quality)
-[![License](https://img.shields.io/badge/License-MIT-F59E0B?style=flat-square)](LICENSE)
+## Prerequisites
 
----
+- Git 2.39 or newer.
+- Python 3.10 or newer (CI runs Python 3.12 and 3.13).
+- Internet access to download Python packages and Playwright Chromium, and to reach `chat.qwen.ai`.
+- A Qwen account for the one-time interactive login.
 
-**Qwen AI Web Automation CLI & MCP Server** turns `chat.qwen.ai` into a production-grade local automation engine. Send massive Markdown prompt files, attach documents, or stream deep-reasoning reports directly into your local codebase — without touching an API key.
+No Node.js installation or Qwen API key is required.
 
----
+## Quick Start
 
-<p align="center">
-  <img src="docs/qwen_web_demo.webp" alt="Qwen Web Automation Demo" width="100%">
-</p>
-
----
-
-## Why Developers & AI Agents Choose This
-
-> **Zero-Budget AI Freedom**: Built for indie developers, frugal engineers, students, and autonomous AI agents who refuse to burn cash on expensive API tokens.
-
-
-| The Problem                           | How We Solve It                                              | Your Value                                                         |
-| :-------------------------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------- |
-| **Expensive API Costs & Rate Limits** | Automates official`chat.qwen.ai` web interface               | **$0 API Costs**, unlimited model access                           |
-| **Connection Drops Mid-Stream**       | Proactive**30s Cloud Reload Sync** prevents SSE timeouts     | **100% Completion** on long 15-minute runs                         |
-| **Brittle DOM Scripts & Frozen UI**   | Multi-tier prompt injection with React`keyup` state sync     | **Zero Input Loss**, handles multi-line inputs seamlessly          |
-| **Stale Chat Cross-Pollution**        | Automatic thread isolation (`_start_new_chat` resets `/c/*`) | **Clean Slate Guarantee** for every execution                      |
-| **Hard to Integrate with AI Agents**  | Native 1:1**MCP Server over stdio**                          | **Instant Integration** with Claude, Cursor, Gemini, & Antigravity |
-
----
-
-## What's New in v6.0.0
-
-- **Import-aware folder compilation** — compile an entire folder of prompt files into a single Markdown document, with tsconfig path alias (TS/JS), `crate::` (Rust), and Markdown link / reference-definition / Obsidian `[[wikilink]]` resolution.
-- **Async MCP job dispatch** — background prompt jobs (`async_run` → `job_id`) with `get_job_status` / `list_jobs` tools; no more MCP stdio timeouts on long runs.
-- **Per-job JSONL logging + TUI observability** — track parallel and long-running jobs with run-in-progress guards and live status.
-- **Standardized role prompt templates** — 10 SDLC roles (business-analyst, system-analyst, ui-ux-designer, software-architect, backend-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, devops-engineer).
-- **Container support** — official `Containerfile` + `scripts/podman.sh` for containerized execution.
-- **XDG-compliant uninstall** — `scripts/uninstall.sh` removes the venv and all launchers cleanly.
-- ⚠️ **Breaking**: legacy `qwen-web-cli` / `qwc` commands removed — use `qwen-web-arwaky` / `qwa` only.
-
----
-
-## Quick Start in 60 Seconds
-
-### 1. Installation (Cross-Platform)
-
-#### Automated Setup (Recommended)
-
-- **Linux / macOS**:
-
-  ```bash
-  git clone https://github.com/rakaarwaky/qwen-web.git
-  cd qwen-web
-  ./scripts/install.sh
-  ```
-- **Windows (PowerShell)**:
-
-  ```powershell
-  git clone https://github.com/rakaarwaky/qwen-web.git
-  cd qwen-web
-  .\scripts\install.ps1
-  ```
-- **Universal Python Installer**:
-
-  ```bash
-  python3 scripts/install.py  # (or `python scripts/install.py` on Windows)
-  ```
-
-#### Manual Setup
+The commands below use an isolated virtual environment and work on Linux and macOS:
 
 ```bash
-pip install -e .
-python3 -m playwright install chromium
+git clone https://github.com/rakaarwaky/qwen-web-arwaky.git && cd qwen-web-arwaky
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install -e .
+python -m playwright install chromium
+qwen-web-arwaky --help
 ```
 
-### 2. Workspace Provisioning
+Success looks like this:
 
-Initialize standard XDG directory structures and local symlinks with one command:
+- `pip` ends with `Successfully installed ... qwen-web-arwaky`.
+- Playwright reports that Chromium was downloaded or is already installed.
+- The final command prints `Automate chat.qwen.ai without an API key.` and lists actions such as `doctor`, `init`, and `login`.
+
+On Windows PowerShell, create and activate the environment with:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Then run the remaining `python ...` and `qwen-web-arwaky --help` commands from the Quick Start.
+
+Provision a working directory and authenticate once before sending prompts:
 
 ```bash
 qwen-web-arwaky init
-```
-
-### 3. One-Time Login Setup
-
-Authenticate your session once. Persistent session tokens are saved securely under `~/.local/share/qwen-web/qwen_session` with `0o700` restricted permissions:
-
-```bash
 qwen-web-arwaky login
 ```
 
----
+`init` succeeds when it reports the workspace paths it created. `login` succeeds after the browser opens, authentication completes, and the CLI confirms that the persistent session was saved.
 
-## Usage & Subcommands
-
-### Interactive Terminal UI (TUI)
-
-Run `qwen-web-arwaky` without arguments to launch the Textual TUI dashboard:
+To verify the saved session and local environment:
 
 ```bash
-qwen-web-arwaky
+qwen-web-arwaky doctor
 ```
 
-![Qwen Web TUI Dashboard](design/tui_dashboard.svg)
+The command prints the diagnostic checks and exits successfully when required components are healthy.
 
----
-
-### Direct Inline Prompt
-
-Send a quick prompt string directly from your terminal or shell script:
-
-```bash
-qwen-web-arwaky prompt-direct -t "Explain quantum computing in 3 bullet points" -o output/result.md --headless
-```
-
-### Single Prompt File Processing
-
-Process a Markdown prompt file:
-
-```bash
-qwen-web-arwaky prompt-only -i input/prompt.md -o output/audit_report.md --headless
-```
-
-### Prompt File Processing with Document Attachment
-
-Send a prompt file along with a local PDF, Markdown, or text attachment:
-
-```bash
-qwen-web-arwaky prompt-with-attachment -i input/review_prompt.md -a input/spec.pdf -o output/review_result.md --headless
-```
-
----
-
-## Model Context Protocol (MCP) Server
-
-Connect your local AI agent (Claude Desktop, Cursor, Gemini, or custom agents) directly to Qwen Web via MCP:
-
-### MCP Server Command
-
-```bash
-qwen-web-mcp
-```
-
-### Example `claude_desktop_config.json` Configuration:
-
-```json
-{
-  "mcpServers": {
-    "qwen-web": {
-      "command": "qwen-web-mcp",
-      "args": []
-    }
-  }
-}
-```
-
-### Available MCP Tools:
-
-- `process_direct_prompt`: Process inline text prompts with configurable timeouts up to 900s.
-- `process_prompt_file_only`: Process input Markdown prompt files and output results locally.
-- `process_prompt_with_attachment`: Send prompt files together with document attachments.
-- `setup_session`: Trigger an interactive browser session for manual re-authentication if session tokens expire.
-- `get_job_status` / `list_jobs`: Poll and list asynchronous background jobs (v6.0.0+).
-
-> **Async mode (v6.0.0+)**: all `process_*` tools accept `async_run: true` and return a `job_id` immediately; poll with `get_job_status` — ideal for long generations that would otherwise exceed MCP stdio timeouts.
-
----
-
-## Reliability & Self-Healing Engine
-
-- **30s Proactive Cloud Reload Sync**: Long deep-thinking prompts (e.g. 40KB+ enterprise reports) often trigger HTTP/2 SSE connection resets on `chat.qwen.ai`. Our engine automatically refreshes page state every 30s while Qwen is actively generating, pulling cloud snapshots without losing progress.
-- **Instant DOM-Stable Completion Exit**: As soon as Qwen completes generation (Send button restored to active state), the monitor detects stability within 2-4 seconds and exits immediately -- no 120s timeout delay.
-- **React Controlled Component State Sync**: Prompt injection uses a multi-tier strategy (React native value setter + synthetic `keyup` event + ContentEditable fallback) to prevent controlled textareas from wiping injected text upon submission.
-- **XDG Symlink Maintenance**: Local `.qwen-web/` directories automatically map via symlinks to standard XDG data (`~/.local/share/qwen-web/output`) and state paths.
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `QWEN_DEFAULT_MODEL` | `Qwen3.8-Max` | Chat model selected during session initialization. |
-| `QWEN_WORKSPACE_ROOT` | Current working directory | Root boundary path for MCP workspace validation and folder compilation. |
-| `QWEN_ENABLE_SANDBOX` | `0` (Sandbox disabled for container support) | Set to `1` / `true` to force Chromium OS sandboxing on desktop environments. |
-| `QWEN_DISABLE_SANDBOX` | `1` | Set to `0` / `false` to enable Chromium OS sandboxing. |
-| `QWEN_STREAM_SAFETY_TIMEOUT_SEC` | `14400` (4 hours) | Absolute backstop cutoff for stream response monitor. |
-
----
-
-## Architecture: AES 7-Layer Pattern
-
-This project strictly follows the **AES 7-Layer Architectural Spec** to ensure code modification safety for AI agents:
+## Project Structure
 
 ```text
-Layer 1: Taxonomy     (VOs, entities, errors, events, constants)
-Layer 2: Utility      (Stateless pure functions, no protocol impls)
-Layer 3: Contract     (Protocol ABCs, aggregates, domain interfaces)
-Layer 4: Capabilities (Business logic + Playwright adaptation, max 3 types/file)
-Layer 5: Agent        (Orchestration via protocols only, zero direct I/O)
-Layer 6: Surface      (CLI / MCP boundary handlers)
-Layer 7: Root         (DI composition container & main entry points)
+.
+├── modules/
+│   ├── cli/                 # CLI commands and Textual terminal UI
+│   ├── core/                # Browser automation and orchestration
+│   ├── mcp/                 # MCP tool surface
+│   ├── shared/              # Contracts, domain types, constants, utilities
+│   ├── templates/           # Built-in SDLC role prompt templates
+│   ├── root_cli_main_entry.py
+│   └── root_mcp_main_entry.py
+├── tests/                   # Cross-module and pipeline tests
+├── benches/                 # Performance benchmarks
+├── scripts/                 # Install, quality-gate, release, and utility scripts
+├── deploy/                  # Deployment and alert configuration
+├── design/                  # Product design sources and screenshots
+├── docs/                    # README media
+├── pyproject.toml           # Package metadata, dependencies, and tool settings
+├── uv.lock                  # Reproducible dependency lockfile
+├── ARCHITECTURE.md          # Layer rules and design decisions
+└── TEST.md                  # Test strategy and regression-lock documentation
 ```
 
-Enforced automatically by `lint-arwaky-cli` with **0 architectural layer violations**.
+Feature requirements live in `modules/*/FRD.md`; repository-level product requirements live in `PRD.md`. Start in `modules/root_cli_main_entry.py` for CLI composition or `modules/root_mcp_main_entry.py` for MCP composition.
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'secondaryColor': '#f4f4f4', 'tertiaryColor': '#ffffff', 'clusterBkg': '#ffffff', 'clusterBorder': '#000000', 'titleColor': '#000000', 'edgeLabelBackground': '#ffffff'}}}%%
-flowchart TD
-    subgraph Client ["Client Interfaces"]
-        CLI["qwen-web-arwaky (TUI / Subcommands)"]
-        MCP["qwen-web-mcp (Stdio Server)"]
-    end
+## Architecture
 
-    subgraph Core ["AES 7-Layer Core Engine"]
-        Agent["Agent Orchestrator"]
-        Capabilities["Capabilities (Monitor, Injector, Saver, Adapter)"]
-        Contract["Contract Protocols & Aggregate Interfaces"]
-        Taxonomy["Taxonomy (VOs, Entities, Events)"]
-    end
+See [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-    subgraph Browser ["Playwright Automation"]
-        Chromium["Persistent Chromium Session (~/.local/share/qwen-web)"]
-        Web["Qwen AI Web UI (chat.qwen.ai)"]
-    end
+At a high level, both the CLI and MCP surfaces call agent orchestrators. Agents coordinate capability implementations through shared contracts; capabilities adapt Playwright, filesystem, and observability I/O. Shared taxonomy and utility modules contain stable types and reusable pure logic. Root entry points compose these layers.
 
-    CLI --> Agent
-    MCP --> Agent
-    Agent --> Capabilities
-    Capabilities --> Contract
-    Contract --> Taxonomy
-    Capabilities --> Chromium
-    Chromium <--> Web
+```text
+CLI / MCP surfaces
+        |
+        v
+Agent orchestrators
+        |
+        v
+Capabilities -----> Playwright / filesystem / telemetry
+        |
+        v
+Shared contracts, taxonomy, and utilities
 ```
 
----
+## Available Scripts
 
-## Testing & Quality
+Run application commands inside the activated virtual environment.
 
-- **227 Unit & Integration Tests**: 100% passing test suite covering contract protocols, DOM querying, prompt injection, and stream resilience.
-- **Zero Lint Violations**: Rigorous MyPy (strict), Ruff, Bandit, and `lint-arwaky-cli` quality gates.
+| Command | Purpose | How to confirm success |
+| --- | --- | --- |
+| `qwen-web-arwaky` | Open the terminal dashboard. | The Textual dashboard renders. |
+| `qwen-web-arwaky --help` | List the supported CLI actions. | Help includes `doctor`, `init`, and `login`. |
+| `qwen-web-arwaky doctor` | Check browser, session, and environment health. | Diagnostics print and the process exits with status 0. |
+| `qwen-web-arwaky init` | Create workspace skills and runtime links. | Created or existing workspace paths are reported. |
+| `qwen-web-arwaky login` | Open the interactive one-time Qwen login. | The CLI confirms that the session was saved. |
+| `qwen-web-arwaky prompt-direct -t "Explain this repository" -o output.md` | Send an inline prompt and save the response. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky prompt-only -i prompt.md -o output.md` | Send a Markdown prompt file. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky prompt-with-attachment -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
+| `qwen-web-mcp` | Start the MCP server over standard input/output. | An MCP client can initialize the server; silence while waiting for input is normal. |
+| `python -m pytest tests/ modules/shared/tests/ modules/core/tests/ modules/cli/tests/ modules/mcp/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v` | Run the same test selection as CI. | Pytest ends with a passed summary and status 0. |
+| `bash scripts/gates.sh` | Run local lint, type, security, architecture, and test gates. | The script ends with `All gates passed`. |
+| `python -m build` | Build a source archive and wheel. | Package files appear under `dist/`. |
+
+Use `qwa` as the short alias for `qwen-web-arwaky`. Use `--no-headless` on prompt commands to watch browser automation, and `--json` where supported for machine-readable output.
+
+For MCP client configuration, use the checked-in [`mcp.local.json`](mcp.local.json) as the minimal example.
+
+## Configuration
+
+The application recognizes these environment variable names:
+
+- `QWEN_DEFAULT_MODEL`
+- `QWEN_WORKSPACE_ROOT`
+- `QWEN_ENABLE_SANDBOX`
+- `QWEN_DISABLE_SANDBOX`
+- `QWEN_STREAM_SAFETY_TIMEOUT_SEC`
+- `QWEN_SWARM_CONCURRENCY`
+- `QWEN_WEB_MAX_WORKERS`
+- `QWEN_WEB_GITHUB_REPO`
+- `QWEN_DOCTOR_DEEP`
+
+MCP client configuration examples are in `mcp.local.json` and `.mcp.json`. Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
+
+## Testing
+
+See [`TEST.md`](TEST.md) for test tiers, browser fixtures, regression locks, and the TDD workflow.
+
+A quick smoke test is:
 
 ```bash
-# Run unit test suite
-pytest tests/ -v -m "not slow and not e2e"
-
-# Run AES architectural compliance scan
-lint-arwaky-cli scan modules/
+python -m pytest tests/unit_swarm_to_issues.py -q
 ```
 
----
+Success is a progress line ending in `[100%]` and a zero exit status.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+MIT. See [`LICENSE`](LICENSE).
