@@ -70,7 +70,7 @@ None. Manual and gap scenarios reduce evidence completeness but do not block the
 |---|---|---|
 | Tests | Done | `PYTHON=.venv/bin/python bash scripts/verify_core_backlog.sh` → 50 passed at `d8a9b60` on 2026-09-24. |
 | Scenario evidence | In Progress | 12 automated/proxy mappings, 2 manual mappings, and 1 explicit gap for the Core FR scenarios. |
-| Docs | In Progress | `python scripts/check_docs.py .` passes in the working tree; move to Done after the documentation changes have a commit hash. |
+| Docs | Done | `python scripts/check_docs.py .` → passed at `32e30f1` on 2026-09-24. |
 
 ## Deferred
 
