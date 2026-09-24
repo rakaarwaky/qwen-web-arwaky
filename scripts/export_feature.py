@@ -913,6 +913,7 @@ def export_module(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for module selection and output path."""
     parser = argparse.ArgumentParser(description="Export a module into a single consolidated Markdown file.")
     parser.add_argument(
         "--module",
@@ -928,6 +929,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Export a module to Markdown, interactively or from CLI arguments."""
     args = parse_args()
 
     workspace_root, modules_dir = resolve_workspace()

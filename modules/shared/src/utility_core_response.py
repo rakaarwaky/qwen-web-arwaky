@@ -38,6 +38,7 @@ def safe_handle(
 
     @wraps(fn)
     def wrapper(*args: object, **kwargs: object) -> dict[str, object]:
+        """Invoke the handler, converting any exception into an error envelope."""
         try:
             return fn(*args, **kwargs)
         except Exception as exc:  # documented contract: catch all exceptions into an error envelope

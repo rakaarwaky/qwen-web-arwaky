@@ -54,6 +54,7 @@ class _TuiHandlersMixin:
     # ── Widget event callbacks ───────────────────────────────────────────
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dispatch button presses to slot, swarm, picker, and log-copy handlers."""
         button_id = event.button.id or ""
         if button_id == "btn-swarm-start":
             self._run_swarm()
@@ -99,6 +100,7 @@ class _TuiHandlersMixin:
             return
 
     def on_select_changed(self, event: Select.Changed) -> None:
+        """Fill a slot's prompt input from the chosen role template."""
         select_id = event.select.id or ""
         if not select_id.startswith("select-template-"):
             return
@@ -170,6 +172,7 @@ class _TuiHandlersMixin:
     # ── Keyboard actions ─────────────────────────────────────────────────
 
     def action_run_active_slot(self) -> None:
+        """Run the currently focused slot from the keyboard (enter / ctrl+r)."""
         self._run_slot(self._get_active_slot_id())
 
     def action_cancel_active_slot(self) -> None:
@@ -232,10 +235,12 @@ class _TuiHandlersMixin:
         self.notify(f"Copied {len(text.splitlines())} log lines to clipboard", severity="information")
 
     def action_switch_tab_overview(self) -> None:
+        """Switch to the Overview tab (alt+0)."""
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-overview"
 
     def action_switch_tab_swarm(self) -> None:
+        """Switch to the Swarm tab (ctrl+alt+s)."""
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-swarm"
 
@@ -244,6 +249,7 @@ class _TuiHandlersMixin:
             self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
+        """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""
         self._switch_to_slot(int(slot_id))
 
     def action_prev_slot(self) -> None:
@@ -263,6 +269,7 @@ class _TuiHandlersMixin:
         self.push_screen(HelpScreen(self._NUM_SLOTS))
 
     def action_login_action(self) -> None:
+        """Open the session-setup submenu guarding the destructive login flow."""
         # U3: re-entrancy guard — one login flow at a time.
         if getattr(self, "_login_in_flight", False):
             self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Login already in progress.")
@@ -347,6 +354,7 @@ class _TuiHandlersMixin:
             )
 
     def action_request_quit(self) -> None:
+        """Quit, requiring confirmation when jobs run or a double-Esc when idle."""
         import time
 
         active = [s for s, w in self._slot_workers.items() if w is not None]

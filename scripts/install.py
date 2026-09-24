@@ -17,10 +17,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def log(msg: str) -> None:
+    """Print an install progress message, flushing immediately."""
     print(msg, flush=True)
 
 
 def get_venv_dir() -> Path:
+    """Return the XDG/platform-conventional directory for the managed venv."""
     if os.environ.get("XDG_DATA_HOME"):
         return Path(os.environ["XDG_DATA_HOME"]) / "qwen-web" / "venv"
     if sys.platform == "win32":
@@ -32,18 +34,21 @@ def get_venv_dir() -> Path:
 
 
 def get_venv_python(venv_dir: Path) -> Path:
+    """Return the python executable path inside *venv_dir*."""
     if sys.platform == "win32":
         return venv_dir / "Scripts" / "python.exe"
     return venv_dir / "bin" / "python"
 
 
 def get_venv_pip(venv_dir: Path) -> Path:
+    """Return the pip executable path inside *venv_dir*."""
     if sys.platform == "win32":
         return venv_dir / "Scripts" / "pip.exe"
     return venv_dir / "bin" / "pip"
 
 
 def ensure_venv() -> Path:
+    """Create the managed venv when missing and return its python executable."""
     venv_dir = get_venv_dir()
 
     # If the current executable is already inside the target XDG venv, use it directly.
@@ -68,6 +73,7 @@ def ensure_venv() -> Path:
 
 
 def get_local_bin_dir() -> Path:
+    """Return the directory where CLI entry-point symlinks are placed."""
     if os.environ.get("XDG_BIN_HOME"):
         return Path(os.environ["XDG_BIN_HOME"])
     return Path.home() / ".local" / "bin"
@@ -99,6 +105,7 @@ def setup_project_venv_symlink(venv_dir: Path) -> None:
 
 
 def uninstall_previous(python_bin: Path) -> None:
+    """Remove earlier package installs, entry-point links, and venv symlinks."""
     log("🧹 [install] Removing any previous qwen-web installation...")
     subprocess.run(
         [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli", "qwen-web-arwaky"],
@@ -120,6 +127,7 @@ def uninstall_previous(python_bin: Path) -> None:
 
 
 def install_package(python_bin: Path) -> None:
+    """Pip-install the project into the managed venv and clean build artifacts."""
     log("📦 [install] Installing Python package (immutable mode)...")
     subprocess.run([str(python_bin), "-m", "pip", "install", str(PROJECT_ROOT)], check=True)
     # Cleanup build artifacts
@@ -129,11 +137,13 @@ def install_package(python_bin: Path) -> None:
 
 
 def install_playwright(python_bin: Path) -> None:
+    """Download the Playwright Chromium binary into the venv cache."""
     log("🌐 [install] Installing Playwright Chromium browser binary...")
     subprocess.run([str(python_bin), "-m", "playwright", "install", "chromium"], check=True)
 
 
 def setup_xdg_directories(python_bin: Path) -> None:
+    """Create the runtime data directories and seed the SKILL.md template."""
     log("📁 [install] Creating default runtime directories...")
     is_win = sys.platform == "win32"
 
@@ -193,6 +203,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
 
 
 def setup_bin_links(python_bin: Path) -> None:
+    """Symlink CLI entry points into the local bin dir and extend PATH."""
     if sys.platform == "win32":
         return
 
@@ -222,6 +233,7 @@ def setup_bin_links(python_bin: Path) -> None:
 
 
 def main() -> None:
+    """Run the full install pipeline: venv, package, browser, dirs, links."""
     log("🚀 [install] Setting up qwen-web-arwaky environment (Cross-Platform)...")
     os.chdir(PROJECT_ROOT)
 

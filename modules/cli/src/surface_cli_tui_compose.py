@@ -61,6 +61,7 @@ class _TuiComposeMixin:
     # ── Lifecycle ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
+        """Build the tabbed layout: overview, swarm, and one pane per slot."""
         yield Header(show_clock=True)
         with TabbedContent(id="main-tabs"):
             # ─── Tab 1: Overview ────────────────────────────────
@@ -219,6 +220,7 @@ class _TuiComposeMixin:
         yield Footer()
 
     def on_mount(self) -> None:
+        """Initialise tables, cache widget refs, and defer log startup."""
         self._init_table()
         self._init_swarm_table()
 
@@ -268,6 +270,7 @@ class _TuiComposeMixin:
         self._refresh_session_badge()
 
     def on_unmount(self) -> None:
+        """Detach the TUI log handler and cancel running slot workers."""
         if hasattr(self, "_log_handler"):
             logging.getLogger().removeHandler(self._log_handler)
         # U2: best-effort cancellation of running slot workers on exit.

@@ -174,6 +174,11 @@ CI also fails if `modules/templates/` contains HTML-escaped tokens
 (`&lt;`, `&gt;`, escaped `[`), which leak into the TUI file picker, the MCP
 role-template path, and `--prompt-role`.
 
+- `lint-arwaky-cli`: 24+ rules. Capabilities never import capabilities; Agent depends on Contract protocols; no primitives in contracts (VOs only); ≤3 types/agent file; ≤30 funcs/capability.
+- **Tests are regression locks**: pinned DOM selectors; must pass before merge.
+- Quality: Ruff, MyPy (strict), Bandit, Codacy (`tests/**` excluded in cloud).
+- **Doc comments**: every public module/class/function carries a PEP 257 docstring explaining *what* and *why* (never *how*, never status claims). Full rules: `.agents/skills/python-doc-comments/SKILL.md`.
+
 ## Run
 
 ```bash

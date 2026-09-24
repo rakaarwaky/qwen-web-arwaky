@@ -76,9 +76,11 @@ def _async_tool(name: str) -> Callable[..., Awaitable[Sequence[str]]]:
     """Wrap a sync core method as an async MCP tool handler."""
 
     async def handler(*args: Any, **kwargs: Any) -> Sequence[str]:
+        """Run the mapped core method in a worker thread and return its output."""
         method_name = _TOOL_METHOD_MAP.get(name, name)
 
         def invoke() -> str:
+            """Call the core tool method synchronously."""
             tools = _get_tools()
             return str(getattr(tools, method_name)(*args, **kwargs))
 
@@ -285,6 +287,7 @@ def run_mcp_server() -> None:
     ObservabilitySetup(DEFAULT_LOG).setup_observability(log_path=DEFAULT_LOG)
 
     async def serve() -> None:
+        """Register request handlers and serve MCP over stdio until shutdown."""
         async with stdio_server() as (read_stream, write_stream):
             capabilities = ServerCapabilities(tools=ToolsCapability())
             init_opts = InitializationOptions(
@@ -297,9 +300,11 @@ def run_mcp_server() -> None:
             async def handle_list_tools(
                 context: Any, params: types.PaginatedRequestParams | None = None
             ) -> types.ListToolsResult:
+                """Return the static tool catalogue."""
                 return types.ListToolsResult(tools=TOOLS)
 
             async def handle_call_tool(context: Any, params: types.CallToolRequestParams) -> types.CallToolResult:
+                """Dispatch a tool call and wrap the result or error as text content."""
                 handler = TOOL_HANDLERS.get(params.name)
                 if handler is None:
                     raise ValueError(f"Unknown tool: {params.name}")
@@ -320,11 +325,13 @@ def run_mcp_server() -> None:
             async def handle_list_resources(
                 context: Any, params: types.PaginatedRequestParams | None = None
             ) -> types.ListResourcesResult:
+                """Return an empty resource list; this server exposes tools only."""
                 return types.ListResourcesResult(resources=[])
 
             async def handle_read_resource(
                 context: Any, params: types.ReadResourceRequestParams
             ) -> types.ReadResourceResult:
+                """Return empty contents; this server exposes tools only."""
                 return types.ReadResourceResult(contents=[])
 
             server.add_request_handler("tools/list", types.PaginatedRequestParams, handle_list_tools)
