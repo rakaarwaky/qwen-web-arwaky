@@ -1,172 +1,83 @@
-# PRD — qwen-web
+# PRD — qwen-web-arwaky
+
+> Product Requirements Document. Describes WHAT this project does and WHY.
+> Audience: Stakeholders, PM, Design, Engineering leads.
+> Condition: [Core FRD](modules/core/FRD.md), [CLI FRD](modules/cli/FRD.md), and [MCP FRD](modules/mcp/FRD.md).
+> This file is specification only.
 
 ## Problem Statement
 
-Power users, system administrators, and local AI agents need to process large
-volumes of prompts through `chat.qwen.ai` without relying on official,
-rate-limited, or unavailable REST APIs. Manual interaction is slow,
-un-auditable, and prone to human error. Existing browser automation scripts
-are often brittle, lack observability, and fail to handle edge cases like
-CAPTCHAs, network timeouts, or dynamic UI changes gracefully. Furthermore,
-maintaining these scripts over time becomes a liability as codebases degrade
-into spaghetti code, making AI-assisted maintenance unsafe.
+Developers, local automation operators, and AI agents need to submit substantial prompts and documents to `chat.qwen.ai` without repeatedly operating the website by hand or depending on a paid API. Manual runs are slow to reproduce, difficult to audit, and vulnerable to lost output when authentication expires, the site changes, or a long response is interrupted. Without a reliable local product boundary, unattended workflows cannot determine whether work completed, where the result was saved, or what action is required after failure.
 
 ## Goals & Success Metrics
 
-- Goal 1: Achieve 99.9% successful end-to-end pipeline execution for prompt-file
-  and inline-text workloads on native Linux environments.
-- Goal 2: Maintain strict AES 7-layer architectural compliance so AI agents
-  can safely modify, refactor, and maintain the codebase without introducing
-  regressions.
-- Goal 3: Provide seamless 1:1 feature parity between CLI and MCP interfaces
-  for local AI agent integration.
+| # | Goal | Measurement | Target |
+|---|------|-------------|--------|
+| 1 | Complete prompt workflows reliably under controlled service availability | A 100-run acceptance exercise covering direct text, prompt files, and prompt-plus-document runs | At least 99 successful terminal outcomes out of 100 runs, with every failure reported explicitly |
+| 2 | Preserve every accepted result and its audit trail | Compare terminally successful runs with readable result files and corresponding run records | 100% of successful runs have both artifacts |
+| 3 | Give command-line and agent clients equivalent access to the primary prompt workflows | Cross-surface acceptance matrix for direct text, prompt files, and prompt-plus-document runs | 3 of 3 workflows produce the same success, failure, and result-location information on both surfaces |
+| 4 | Keep asynchronous agent calls responsive during long generations | Measure elapsed time from accepted submission to receipt of a tracking identifier in 30 queued-run trials | p95 at or below 2 seconds |
+| 5 | Prevent one failed parallel run from terminating unrelated work | Ten-run isolation exercise with one forced authentication or generation failure | All 9 unaffected runs reach their own terminal outcome |
 
 ## User Personas
 
-- **Indie Developer / Frugal Engineer**: Wants $0 API costs, runs markdown prompts locally without burning cash on API tokens, and needs detailed JSONL audit logs.
-- **AI Agent (via MCP)**: Interacts with the tool programmatically to send
-  prompts, process files, and read audit logs without managing browser
-  lifecycles or DOM selectors.
-- **System Administrator**: Runs prompt automation jobs as scheduled
-  background tasks and relies on structured JSON logs for aggregation.
+- **Independent developer working without an API budget**: needs to send large local prompts and documents at no API cost, cannot supervise every browser interaction, and considers the job done when a complete response is stored at a known location with a traceable run record.
+- **AI coding agent operating through a local tool connection**: needs predictable machine-readable acceptance, progress, success, and failure responses; it cannot solve interactive challenges or infer state from a visible browser.
+- **Automation operator running unattended jobs overnight**: needs isolated runs, bounded waiting, and actionable diagnostics; they cannot inspect each open session and consider the system successful when every submitted job reaches an auditable terminal state.
+- **Developer maintaining automation after an upstream website change**: needs failures to be explicit and reproducible rather than silently producing partial content; done means a regression can be demonstrated without risking user data.
 
 ## Scope
 
-- **In scope**: `chat.qwen.ai` web automation, Playwright persistent sessions,
-  Single / Inline / Interactive / MCP modes, the 13 core
-  capabilities listed below, structured observability
-  (structlog, OpenTelemetry, Sentry), and strict AES 7-layer architecture.
-- **Out of scope**: other LLM providers (ChatGPT, Claude, Gemini), official
-  REST API integrations, and cloud-hosted SaaS deployments. The project is in
-  **Stabilization + Targeted Enhancement Mode**; Swarm,
-  asynchronous Jobs, and self-update are approved in-scope enhancements under
-  change request CR-2026-004.
+- **In scope**: local automation of authenticated `chat.qwen.ai` prompt workflows; direct-text, prompt-file, and prompt-with-document inputs; local result persistence; command-line, interactive terminal, and local agent-tool access; synchronous and asynchronous execution; workspace preparation; folder-to-document preparation; session health and recovery guidance; concurrent-run isolation; diagnostics and run observability.
+- **Out of scope**: automation of other model providers; official model API clients; hosted multi-tenant service operation; bypassing CAPTCHAs, access controls, subscriptions, or provider limits; account creation or credential management; evaluating the factual quality of model answers; editing a user's source files from model output; guaranteeing availability when `chat.qwen.ai` is unavailable.
 
-Core functional specs live in [`modules/core/FRD.md`](modules/core/FRD.md)
-(FR-001…FR-013, one per capability + protocol). CLI and MCP surfaces have
-their own FRDs.
+## Feature Requirements
 
-## Feature Requirements (Prioritized)
+### P0 — Must Have
 
-AES rule for Core: **1 FR = 1 capability file + 1 contract protocol**.
-Product modes (single / inline / login / MCP) are how surfaces
-compose these FRs, not additional core FRs.
+- **F-001 — Direct prompt execution**: A user can submit non-empty text and receive one terminal success or explicit failure outcome. Acceptance: a direct-text acceptance run returns a complete result location on success and a reason plus recovery action on failure.
+- **F-002 — Prompt-file execution**: A user can submit a readable local prompt file without manually copying its contents into the website. Acceptance: the accepted file's full prompt is represented in the completed run, while a missing or unreadable file is rejected before submission.
+- **F-003 — Prompt with document execution**: A user can submit one prompt together with one supported local document. Acceptance: the run does not send the prompt until the document is reported ready, and an unusable document produces an explicit failure.
+- **F-004 — Authenticated session handling**: A user can establish, check, and reuse a local authenticated session without exposing its contents in normal output. Acceptance: a valid saved session permits a headless acceptance run, while an invalid session returns an authentication-required outcome with a login action.
+- **F-005 — Isolated conversation context**: Every new run starts without prior conversation content affecting its request. Acceptance: two sequential acceptance runs with contradictory context produce run records showing that each began in a new conversation.
+- **F-006 — Complete response detection**: A run waits for a terminal response rather than treating partial streaming text as complete. Acceptance: a fixture that pauses mid-response yields no success until generation ends, and a run exceeding its time budget yields an explicit timeout.
+- **F-007 — Durable local results**: A successful run stores the complete response and a traceable run record without leaving a partial destination after interrupted persistence. Acceptance: forced interruption during saving leaves either the prior complete destination or the new complete destination, never a truncated success artifact.
+- **F-008 — Safe local path boundaries**: Agent-initiated file work remains within the operator-approved workspace. Acceptance: an input or output path resolving outside that workspace is rejected before any external submission or local write.
 
-### P0 — Must Have (Core, 13 capability FRs)
+### P1 — Should Have
 
-- [X]  **FR-001 Browser Adapter** — Persistent Chromium/Playwright context,
-  stale-lock cleanup, `0o700` session dir, asset blocking, auth
-  triple-check (URL + login form + chat textarea), and guaranteed thread isolation
-  (`_start_new_chat` auto-navigates away from `/c/*` thread URLs).
-  *Accept*: headless run reuses a `login` profile; login page raises
-  `AuthRequiredError`; existing thread URLs auto-reset to a clean chat.
-- [X]  **FR-002 File Uploader** — Local-file pre-flight (exists, readable,
-  ≤100 MB) and Qwen UI attach with retry/backoff; degrade to text-only on
-  failure.
-  *Accept*: oversized file never opens the chooser; successful attach shows
-  a file card.
-- [X]  **FR-003 Output Saver** — Atomic UTF-8 write of the AI response plus
-  metadata header and `.meta.json` sidecar.
-  *Accept*: crash mid-write does not leave a truncated destination file.
-- [X]  **FR-004 Prompt Injector** — Prepare and inject prompt text via
-  four-tier DOM strategy (React setter + synthetic `keyup` sync → ContentEditable → `fill` → `type`).
-  *Accept*: empty text is rejected; React controlled state updates reliably without input text reset.
-
-### Reliability measurement
-
-One pipeline execution is one prompt file dispatched to a terminal success or
-explicit error envelope. The success rate is `successful_executions /
-total_executions` over a rolling 24-hour window. Persistent counters are stored
-in `metrics.json` under the application state directory. Emit WARNING below
-99.5% and CRITICAL below 99.0%.
-- [X]  **FR-005 Send Dispatcher** — Click Send (Enter fallback) only after
-  document-parse gate; expose message count / latest text for the stream
-  baseline.
-  *Accept*: send is blocked while attachment parsing is incomplete.
-- [X]  **FR-006 Stream Monitor** — Poll until N identical snapshots and
-  generation UI is gone; proactive 30s cloud reload sync for network connection reset recovery;
-  `timeout_sec` hard cutoff per call (default surfaces: 120s; set higher for
-  massive responses), event-driven stall detection; immediate exit on DOM completion;
-  reject CAPTCHA / error-page content. The absolute safety breaker defaults
-  to 4h and is tunable via `QWEN_STREAM_SAFETY_TIMEOUT_SEC`.
-  *Accept*: stable response is returned instantly upon generation completion; long streaming runs complete without network connection resets when their `timeout_sec` budget allows; challenge keywords raise `AuthRequiredError` / `OutputValidationError`.
-- [X]  **FR-007 Workspace Provisioner** — First-run XDG dirs,
-  `.agents/skills/qwen-web/SKILL.md`, `.qwen-web` symlinks (automatically replaces stale local directories with XDG symlinks), `.gitignore`.
-  *Accept*: `qwen-web-arwaky init` is idempotent and maintains valid symlinks to XDG targets.
-- [X]  **FR-008 Observability Setup** — structlog + optional OTLP traces +
-  optional Sentry + process excepthooks; missing telemetry must not block
-  start.
-  Owns in-process metrics counters and `status.json` writes (merged helpers,
-  not extra capabilities).
-  *Accept*: process boots with empty `SENTRY_DSN` and no OTLP endpoint.
-- [X] **FR-009 Folder Compiler** — Import-aware folder and Markdown compilation.
-- [X] **FR-010 Folder-to-Attachment Adapter** — Convert compiled folders into uploadable attachments.
-- [X] **FR-011 Job Manager** — Persist and poll asynchronous MCP jobs with bounded worker execution.
-- [X] **FR-012 TUI Slot Configuration** — Resolve validated per-slot prompt, attachment, and output plans.
-- [X] **FR-013 Update Manager** — Check package releases, synchronize Chromium, and report health.
-
-### P1 — Should Have (Surfaces)
-
-- [X]  **Multi-mode execution**: Single (one file), prompt-with-attachment,
-  inline direct, and raw prompt dispatch — all via the aggregate contracts
-  (`IPromptFileAggregate`, `IAttachmentPromptAggregate`,
-  `IDirectPromptAggregate`).
-- [X]  **Persistent session login**: `qwen-web-arwaky login` validates a saved profile
-  first; only an invalid session opens a headed browser for CAPTCHA.
-- [X]  **Timestamped input processing**: input files are uniquely named by the
-  producer; success/failure status is recorded in JSONL logs and job metrics,
-  and input files remain in place.
-- [X]  **MCP server**: live tools for direct prompts, prompt files, attachments,
-  session management, workspace initialization, and asynchronous job status.
-- [X]  **Session-expiry containment (business rule)**: a session that expires
-  mid-run during long-running Swarm or multi-slot TUI operations fails only
-  the affected agent/slot with a per-run `AUTH_REQUIRED` isolation — sibling
-  runs keep their in-flight browsers and complete; the surface reports an
-  overall partial/failed status with a re-login hint, never a global abort
-  of healthy sibling work. Recovery path: re-login, then retry the failed
-  slots/agents.
+- **F-009 — Asynchronous job control**: An agent can queue a long-running prompt, receive a tracking identifier, and later retrieve a terminal state. Acceptance: a queued acceptance run returns its identifier within the Goal 4 target and polling eventually returns completed or failed.
+- **F-010 — Concurrent-run isolation**: Multiple accepted runs progress independently within configured resource limits. Acceptance: the Goal 5 isolation exercise completes every unaffected run despite one forced failure.
+- **F-011 — Folder prompt preparation**: A user can turn a supported local folder into one ordered prompt document while preserving resolvable local references. Acceptance: a fixture folder compiles deterministically and reports every unresolved or out-of-bound reference.
+- **F-012 — Workspace readiness diagnostics**: A user can check whether local prerequisites, authentication, workspace access, and output access are ready before starting work. Acceptance: each deliberately missing prerequisite is reported separately with one corrective action and a non-success outcome.
+- **F-013 — Interactive terminal operation**: A person at a terminal can configure and monitor multiple prompt runs without memorizing command syntax. Acceptance: the operator can start, distinguish, and review the terminal state of at least two runs using only the interactive interface.
 
 ### P2 — Nice to Have
 
-- [X]  **Interactive TUI menu** when the CLI is launched with no args on a TTY.
-- [X]  **OpenTelemetry tracing** (optional OTLP HTTP export; part of FR-008).
-- [X]  **Sentry error capture** (optional; part of FR-008).
+- **F-014 — Optional external observability**: An operator can forward run health and failure information to a configured monitoring destination without making that destination mandatory. Acceptance: a configured acceptance run emits monitoring data, while an unavailable destination does not prevent the run from reaching its own terminal outcome.
+- **F-015 — Guided product updates**: An operator can check for an available release and preview the proposed change before approving it. Acceptance: a preview reports the current and proposed versions without changing installed files.
+- **F-016 — Machine-readable diagnostics**: Automated clients can consume readiness and failure reports without parsing human prose. Acceptance: every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action.
 
 ## Non-functional Requirements (High-level)
 
-- **Performance**: Polling overhead must remain <300 ms/cycle. Network
-  traffic reduced by 40–60% via aggressive asset blocking (images, fonts,
-  media) outside login mode.
-- **Security**: Session tokens stored locally in XDG-compliant directories
-  with `0o700`. Output files written with `0o600` owner confidentiality.
-  No exfiltration of credentials. Strict prompt-injection defense (scraped
-  text is untrusted data, never agent instructions). Supply chain integrity:
-  self-update pins release commit SHAs. SAST & dependency compliance scanning
-  supported via Bandit and pip-audit (Issue #350).
-- **Reliability**: Atomic file moves and atomic output writes to guarantee
-  zero input/output loss. Graceful degradation on DOM changes via multi-tier
-  selector fallbacks. Telemetry is best-effort.
-- **Maintainability**: Strict AES 7-Layer Pattern (Taxonomy → Utility →
-  Contract → Capabilities → Agent → Surface → Root) enforced by custom
-  linting. Core inventory is **13 capability FRs**; keep one FR per capability and do not
-  merge independently testable capabilities back into bundled requirements.
+| Category | Commitment | Detail lives in |
+|----------|------------|-----------------|
+| Reliability | Accepted work reaches one explicit terminal outcome, and unrelated runs remain isolated | [Core FRD](modules/core/FRD.md) for F-005–F-007 and F-010 |
+| Performance | User-facing submission and monitoring remain responsive during long work | [Core FRD](modules/core/FRD.md) for F-006 and F-009 |
+| Security & privacy | Sessions and generated artifacts remain local by default, sensitive values are not emitted, and workspace boundaries are enforced | [Core FRD](modules/core/FRD.md) for F-004, F-007, and F-008 |
+| Compatibility | Primary workflows expose equivalent outcomes to people and local agent clients | [CLI FRD](modules/cli/FRD.md) and [MCP FRD](modules/mcp/FRD.md) |
+| Maintainability | Upstream website changes fail explicitly and can be reproduced with controlled acceptance scenarios | [Core FRD](modules/core/FRD.md) for F-003 and F-006 |
+| Accessibility | Interactive operation remains understandable without color-only status or memorized commands | [CLI FRD](modules/cli/FRD.md) for F-013 |
 
 ## Open Questions / Risks
 
-- **Risk**: `chat.qwen.ai` UI DOM changes frequently, breaking Playwright
-  selectors.
-  - *Mitigation*: Multi-tier fallback selectors and JS extraction that
-    relies on structural heuristics. Behavior locked by
-    `tests/fixtures/qwen_fixture.html`.
-- **Risk**: Cloudflare/CAPTCHA challenges in headless mode.
-  - *Mitigation*: Manual `--login` solves CAPTCHA in a headed browser and
-    saves persistent session state for subsequent headless runs.
-- **Risk**: Two processes sharing one Chromium profile corrupt the session.
-  - *Mitigation*: single-instance lock on the CLI (see CLI FRD); MCP skips
-    the lock and must not launch a second headed browser against the same
-    profile.
-- **Risk**: Unbounded concurrent browser execution exhausting system memory (Issue #365).
-  - *Mitigation*: Global concurrency bounds (`DEFAULT_MAX_WORKERS=10`, `QWEN_WEB_MAX_WORKERS`,
-    `QWEN_SWARM_CONCURRENCY=10`). Ephemeral session cloning uses copy-on-write
-    storage to minimize disk footprint across workers.
-
+| # | Question / Risk | Owner | Deadline | Status |
+|---|-----------------|-------|----------|--------|
+| 1 | Which `chat.qwen.ai` account tiers and regional variants are part of the supported acceptance environment? | Product | Before the next release scope is approved | open |
+| 2 | Which document types and maximum document sizes form the supported F-003 contract? | Product | Before the next F-003 acceptance review | open |
+| 3 | What controlled-service conditions must hold before the Goal 1 reliability sample is considered valid? | QA | Before the next reliability report | open |
+| 4 | What is the minimum supported machine profile and safe default concurrency for F-010? | Engineering | Before concurrent-run defaults are approved | open |
+| 5 | How long must run records and generated results be retained by default? | Product / Security | Before retention behavior is changed | open |
+| 6 | Upstream UI, authentication, or policy changes may interrupt all automation without notice. | Product / Engineering | Review before every release | open |
+| 7 | Provider terms may restrict some automated usage patterns even when the product is technically able to perform them. | Legal / Product | Before public distribution decisions | open |
+| 8 | Which accessibility standard and terminal environments define acceptance for F-013? | Design | Before the next interactive-interface review | open |
