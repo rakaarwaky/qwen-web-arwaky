@@ -165,8 +165,12 @@ class ISessionAggregate(ABC):
         """Return session validity and a human-readable status message."""
 
     @abstractmethod
-    def delete_session(self, session_path: Path | None = None) -> ResponseText:
-        """Delete the persistent login session at ``session_path``."""
+    def delete_session(self, session_path: Path | None = None, *, force: bool = False) -> ResponseText:
+        """Delete the persistent login session at ``session_path``.
+
+        ``force`` bypasses the no-backup guard that protects the master profile
+        from accidental deletion (issue #300).
+        """
 
 
 class ISetupAggregate(ABC):

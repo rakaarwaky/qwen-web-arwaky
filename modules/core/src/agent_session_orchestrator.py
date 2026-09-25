@@ -19,6 +19,7 @@ from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
+from modules.shared.src.utility_core_session_backup import refuse_delete_without_backup
 
 
 class SessionOrchestrator(ISessionAggregate):
@@ -47,7 +48,7 @@ class SessionOrchestrator(ISessionAggregate):
             return True, "Saved Qwen session is valid and ready to use."
         return False, "Saved Qwen session is invalid or expired. Please log in again."
 
-    def delete_session(self, session_path: Path | None = None) -> ResponseText:
+    def delete_session(self, session_path: Path | None = None, *, force: bool = False) -> ResponseText:
         """Delete persistent session profile from disk after path safety checks.
 
         The target must be an existing directory that clears every rule in
@@ -56,7 +57,9 @@ class SessionOrchestrator(ISessionAggregate):
         and either the application session directory or a safe session name
         under the user's home. Everything else is refused before ``rmtree``
         is ever reached, so no path-traversal or Windows drive-root delete is
-        possible.
+        possible. The master profile is the only credential for every
+        unattended workload, so deletion is refused while no backup generation
+        is retained unless the caller passes ``force=True`` (issue #300).
         """
         cfg = build_app_config(
             mode="session-check",
@@ -73,6 +76,11 @@ class SessionOrchestrator(ISessionAggregate):
         # non-directories, home itself, and any path outside the allow-list.
         if not is_safe_session_target(target):
             raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
+
+        try:
+            refuse_delete_without_backup(target, force=force)
+        except PermissionError as exc:
+            raise QwenCliError(str(exc)) from exc
 
         try:
             shutil.rmtree(target)

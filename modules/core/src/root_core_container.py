@@ -8,6 +8,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Root is the composition layer, so it wires the functional doctor gate into
+# the updater: after an upgrade the pipeline re-runs the operator diagnostics
+# and rolls back when they fail (issue #294). The gate itself lives in the
+# doctor Surface; Capabilities only ever sees an injected callable.
+from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+
 # agent_attachment_prompt_orchestrator
 from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentPromptOrchestrator
 
@@ -58,11 +64,11 @@ from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
-    DEFAULT_MAX_WORKERS,
     SWARM_CONCURRENCY_ENV,
 )
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.utility_core_capacity import recommended_max_workers
 
 
 class SharedContainer:
@@ -78,7 +84,8 @@ class SharedContainer:
     ) -> None:
         log = Path(log_path) if log_path else DEFAULT_LOG
         if max_workers is None:
-            max_workers = int(os.environ.get("QWEN_WEB_MAX_WORKERS", str(DEFAULT_MAX_WORKERS)))
+            env_workers = os.environ.get("QWEN_WEB_MAX_WORKERS")
+            max_workers = int(env_workers) if env_workers and env_workers.isdigit() else recommended_max_workers()
 
         self.cb = CircuitBreaker(
             FailureThreshold(circuit_breaker_threshold),
@@ -94,7 +101,7 @@ class SharedContainer:
         self.saver = Saver()
         self.observability = ObservabilitySetup(log)
         self.workspace = WorkspaceProvisioner()
-        self.updater: IUpdateProtocol = UpdateManager()
+        self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the

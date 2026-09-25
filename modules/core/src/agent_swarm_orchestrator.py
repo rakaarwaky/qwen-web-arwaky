@@ -15,13 +15,13 @@ from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregat
 from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
-    DEFAULT_MAX_WORKERS,
     MAX_ATTEMPTS,
     SWARM_CONCURRENCY_ENV,
     SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.taxonomy_core_vo import HeadlessFlag
 from modules.shared.src.taxonomy_swarm_vo import AgentStatus, SwarmAgentSnapshot, SwarmId, SwarmSnapshot, SwarmStatus
+from modules.shared.src.utility_core_capacity import recommended_max_workers
 from modules.shared.src.utility_core_prompt_template import list_prompt_templates, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
 
@@ -44,10 +44,12 @@ class SwarmOrchestrator(ISwarmAggregate):
         self._headless = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get(SWARM_CONCURRENCY_ENV, "").strip()
-            concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else DEFAULT_MAX_WORKERS
+            concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
         else:
             concurrency = int(browser_concurrency)
-        self._browser_concurrency = min(10, max(1, concurrency))
+        # Host capacity is the ceiling for a fan-out: an explicit request above
+        # it is clamped so a Swarm cannot OOM the runner (issue #291).
+        self._browser_concurrency = min(recommended_max_workers(), max(1, concurrency))
         self._max_attempts = max(1, int(max_attempts))
         self._lock = threading.RLock()
         self._snapshots: dict[SwarmId, SwarmSnapshot] = {}

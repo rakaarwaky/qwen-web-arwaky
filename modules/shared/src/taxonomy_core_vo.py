@@ -535,7 +535,10 @@ class AppConfig:
 
     chrome_profile: str = "qwen-cli-profile"
     storage_state_file: Path | None = None
-    disable_sandbox: bool = True
+    # Least-privilege default: Chromium keeps its OS sandbox. It is dropped only
+    # by an explicit opt-in (QWEN_DISABLE_SANDBOX=1) or by a detected
+    # container that cannot provide user namespaces (issue #290).
+    disable_sandbox: bool = False
 
     request_timeout: int = 120
     poll_interval: float = 1.0

@@ -198,6 +198,10 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     fake_default = tmp_path / "share" / "qwen_session"
     fake_default.mkdir(parents=True)
     (fake_default / "Cookies").write_text("token", encoding="utf-8")
+    # A retained generation lets the delete go through the normal path instead
+    # of hitting the no-backup refusal (#300).
+    backups_dir = fake_default / ".backups" / "20250101T000000Z"
+    backups_dir.mkdir(parents=True)
     with (
         patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default),
         patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
@@ -213,6 +217,8 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     orch = _orchestrator()
     fake_default = tmp_path / "share" / "qwen_session"
     fake_default.mkdir(parents=True)
+    # Seed a generation so the no-backup guard does not short-circuit.
+    (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     with (
         patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default),
         patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,

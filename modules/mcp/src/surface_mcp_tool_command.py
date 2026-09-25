@@ -580,11 +580,13 @@ class McpToolCommand:
                 hint="Call setup_session to log in manually.",
             )
 
-    def delete_session(self, confirm: bool = False) -> str:
+    def delete_session(self, confirm: bool = False, force: bool = False) -> str:
         """Delete saved browser session tokens. Requires confirm=True.
 
         Args:
             confirm: Must be explicitly set to True to confirm session deletion.
+            force: Bypass the backup-guard that prevents deleting the master
+                session when no snapshot is retained (issue #300).
 
         Returns:
             JSON string confirming deletion or warning if confirm=False.
@@ -597,7 +599,7 @@ class McpToolCommand:
             )
 
         try:
-            self._session.delete_session()
+            self._session.delete_session(force=bool(force))
             return json.dumps(
                 {
                     "success": True,

@@ -87,6 +87,15 @@ XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 # Default limit of 10 workers bounds peak parallel footprint to ~2.5 GiB.
 DEFAULT_MAX_WORKERS = 10
 
+# Per-browser memory budget (issue #291). A headless Chromium worker plus its
+# ephemeral session clone is budgeted at 700 MiB so a fan-out keeps real
+# headroom instead of driving the host into the OOM killer on a small runner.
+MIN_MEMORY_PER_WORKER_BYTES = 700 * 1024 * 1024
+
+# Share of total memory withheld from the browser fleet when only total RAM is
+# measurable; the rest stays with the OS, the agent process, and the user.
+MEMORY_RESERVED_FRACTION = 0.25
+
 # Swarm-specific concurrency override env var and default cap (Issue #323).
 DEFAULT_SWARM_CONCURRENCY = 10
 SWARM_CONCURRENCY_ENV = "QWEN_SWARM_CONCURRENCY"

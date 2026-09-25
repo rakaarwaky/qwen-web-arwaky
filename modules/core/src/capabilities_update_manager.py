@@ -3,10 +3,13 @@
 Implements IUpdateProtocol.
 Orchestrates the full self-update pipeline in chronological steps:
   Step 1: Remote version discovery via GitHub Releases API.
-  Step 2: Package upgrade via `git pull` (dev repos) or `pip install git+https://...`.
-  Step 3: Playwright Chromium binary synchronization (`playwright install chromium`),
+  Step 2: Pre-upgrade dependency snapshot (`pip freeze`) so a rollback can
+          restore the environment, not just the package code.
+  Step 3: Package upgrade via `git pull` (dev repos) or `pip install git+https://...`.
+  Step 4: Playwright Chromium binary synchronization (`playwright install chromium`),
           with forced cache purge when --force is requested.
-  Step 4: Post-flight installation-integrity health checks.
+  Step 5: Post-flight installation-integrity health checks plus a functional
+          smoke gate that re-runs the `doctor` checks as a library.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from urllib.parse import unquote, urlparse
 
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.taxonomy_core_constant import XDG_STATE_HOME
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
@@ -87,6 +91,19 @@ def _decode_output(data: bytes) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def _smoke_gate_unavailable(reason: str) -> tuple[UpdateStepResult, ...]:
+    """Return the failing health check emitted when the smoke gate itself errored."""
+    log.warning("doctor_smoke_gate_unavailable reason=%s", reason)
+    return (
+        UpdateStepResult(
+            name="smoke:doctor_gate",
+            executed=True,
+            success=False,
+            detail=f"functional doctor gate could not run: {reason}",
+        ),
+    )
+
+
 # Block 1: Class Definition & Constructor
 class UpdateManager(IUpdateProtocol):
     """Self-update pipeline: discovery → pip upgrade → browser sync → health checks."""
@@ -98,12 +115,21 @@ class UpdateManager(IUpdateProtocol):
         http_timeout_sec: float = 15.0,
         pip_timeout_sec: float = 600.0,
         browser_timeout_sec: float = 900.0,
+        smoke_gate: Any = None,
     ) -> None:
-        """Initialize with package identity and subprocess timeout budgets."""
+        """Initialize with package identity and subprocess timeout budgets.
+
+        ``smoke_gate`` is an optional callable that returns a tuple of
+        :class:`~modules.shared.src.taxonomy_core_vo.UpdateStepResult`; the
+        pipeline runs it after every successful upgrade as a functional smoke
+        gate (issue #294). When omitted the pipeline falls back to a no-op gate
+        that always passes.
+        """
         self.package_name = package_name
         self.http_timeout_sec = http_timeout_sec
         self.pip_timeout_sec = pip_timeout_sec
         self.browser_timeout_sec = browser_timeout_sec
+        self._smoke_gate = smoke_gate or (lambda: ())
 
     # ─── Block 2: Public Contract (IUpdateProtocol ONLY) ──
     def current_version(self) -> VersionString:
@@ -243,11 +269,30 @@ class UpdateManager(IUpdateProtocol):
         )
 
     def rollback_to(self, previous_version: str) -> tuple[UpdateStepResult, ...]:
-        """Best-effort reinstall of the previous release and browser assets."""
+        """Reinstall the previous release and reconcile the pre-upgrade dependency snapshot.
+
+        Restoring package code alone leaves a partial rollback when the failed
+        upgrade pulled in newer transitive dependencies, so ``--no-deps`` is
+        not used: pip resolves the pinned release's own dependency constraints,
+        and a ``pip freeze`` snapshot taken before the upgrade is then
+        reconciled so the environment matches what the previous version
+        actually ran with (issue #293).
+        """
         if not previous_version or previous_version == "unknown":
             return (UpdateStepResult("rollback", False, False, "previous version is unknown"),)
-        if self._editable_source_dir() is not None:
-            return (UpdateStepResult("rollback", False, False, "rollback is skipped for editable installations"),)
+        editable = self._editable_source_dir()
+        if editable is not None:
+            return (
+                UpdateStepResult(
+                    "rollback",
+                    False,
+                    False,
+                    f"rollback is not automated for editable installations; revert the checkout manually: "
+                    f"cd {editable} && git checkout -- . && git pull --ff-only "
+                    "(then reconcile dependencies from the snapshot with "
+                    f"{self._snapshot_path()})",
+                ),
+            )
         repo_url = self._github_pinned_url(previous_version)
         if repo_url is None:
             step = self._refuse_unverified_install(previous_version, "rollback")
@@ -260,7 +305,6 @@ class UpdateManager(IUpdateProtocol):
             "--no-input",
             "--disable-pip-version-check",
             "--force-reinstall",
-            "--no-deps",
             repo_url,
         ]
         try:
@@ -271,8 +315,13 @@ class UpdateManager(IUpdateProtocol):
                 rc == 0,
                 "reinstalled " + previous_version if rc == 0 else _tail(err or out),
             )
+            if rc != 0:
+                return (package,)
+            reconcile = self._reconcile_dependency_snapshot()
+            steps = [package, *reconcile]
             browser = self.sync_browser(ForceFlag(True))
-            return (package, UpdateStepResult("rollback:browser", browser.executed, browser.success, browser.detail))
+            steps.append(UpdateStepResult("rollback:browser", browser.executed, browser.success, browser.detail))
+            return tuple(steps)
         except Exception as exc:
             return (UpdateStepResult("rollback", True, False, str(exc)),)
 
@@ -321,6 +370,11 @@ class UpdateManager(IUpdateProtocol):
                 message=message,
             )
         steps: list[UpdateStepResult] = []
+        # Capture the current environment so a rollback can reconcile more than
+        # just the package code (issue #293). The snapshot lives under the XDG
+        # state dir and is named after the release being left.
+        snapshot = self._capture_environment_snapshot(previous)
+        steps.append(snapshot)
         pkg_step = self.upgrade_package(ForceFlag(forced), target_version=check.latest_version)
         steps.append(pkg_step)
         importlib.invalidate_caches()
@@ -328,6 +382,10 @@ class UpdateManager(IUpdateProtocol):
         steps.append(browser_step)
         post_version = self._resolve_installed_version(prefer_metadata=True)
         health_checks = self._postflight_health_checks()
+        # Functional smoke gate (issue #294): the static checks above pass for a
+        # release that still cannot launch a browser, so the operator
+        # diagnostics run again here through the gate Root injected.
+        health_checks = (*health_checks, *self._run_smoke_gate())
         if check.latest_version is not None:
             target_ok = (
                 str(post_version) != "unknown" and compare_versions(str(post_version), check.latest_version) >= 0
@@ -386,6 +444,115 @@ class UpdateManager(IUpdateProtocol):
         )
 
     # ─── Block 3: Private Helpers ──
+    def _snapshot_dir(self) -> Path:
+        """Return the directory holding pre-upgrade environment snapshots."""
+        return XDG_STATE_HOME / "update-snapshots"
+
+    def _snapshot_path(self) -> Path:
+        """Return the path of the most recent environment snapshot."""
+        return self._snapshot_dir() / "pip-freeze.txt"
+
+    def _capture_environment_snapshot(self, previous_version: VersionString) -> UpdateStepResult:
+        """Persist a ``pip freeze`` snapshot of the current environment.
+
+        Captured before any upgrade so rollback can restore the dependency tree
+        the previous version actually ran with, not just its package code
+        (issue #293).
+        """
+        rc, out, err = self._run_subprocess(
+            [sys.executable, "-m", "pip", "freeze", "--all"],
+            timeout_sec=120.0,
+        )
+        if rc != 0 or not out.strip():
+            return UpdateStepResult(
+                name="snapshot:environment",
+                executed=True,
+                success=False,
+                detail=f"pip freeze failed (rc={rc}): {_tail(err or out)}",
+            )
+        target = self._snapshot_path()
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(out, encoding="utf-8")
+        except OSError as exc:
+            return UpdateStepResult(
+                name="snapshot:environment",
+                executed=True,
+                success=False,
+                detail=f"could not write snapshot to {target}: {exc}",
+            )
+        pinned = {
+            line.split("==", 1)[0].strip().lower()
+            for line in out.splitlines()
+            if "==" in line and line.split("==", 1)[0].strip().lower() == self.package_name.lower()
+        }
+        if pinned:
+            with contextlib.suppress(OSError):
+                (target.parent / "pip-freeze.meta.json").write_text(
+                    json.dumps({"version": str(previous_version), "package": self.package_name}),
+                    encoding="utf-8",
+                )
+        return UpdateStepResult(
+            name="snapshot:environment",
+            executed=True,
+            success=True,
+            detail=f"pip freeze snapshot written to {target}",
+        )
+
+    def _reconcile_dependency_snapshot(self) -> tuple[UpdateStepResult, ...]:
+        """Reinstall the snapshot's dependency tree so rollback is not partial.
+
+        Runs ``pip install -r <snapshot>`` after the previous package is
+        reinstalled, pinning transitive dependencies back to the versions the
+        pre-upgrade environment carried (issue #293).
+        """
+        snapshot = self._snapshot_path()
+        if not snapshot.is_file():
+            return (
+                UpdateStepResult(
+                    "rollback:dependencies",
+                    False,
+                    True,
+                    "no pre-upgrade snapshot available; dependencies were resolved from the "
+                    "pinned release metadata instead",
+                ),
+            )
+        rc, out, err = self._run_subprocess(
+            [sys.executable, "-m", "pip", "install", "--no-input", "--disable-pip-version-check", "-r", str(snapshot)],
+            timeout_sec=self.pip_timeout_sec,
+        )
+        return (
+            UpdateStepResult(
+                "rollback:dependencies",
+                True,
+                rc == 0,
+                f"reconciled dependencies from {snapshot}"
+                if rc == 0
+                else f"dependency reconcile failed (rc={rc}): {_tail(err or out)}",
+            ),
+        )
+
+    def _run_smoke_gate(self) -> tuple[UpdateStepResult, ...]:
+        """Run the injected functional smoke gate and normalize its results.
+
+        The gate yields ``(name, passed, detail)`` triples (see
+        ``utility_core_doctor.build_smoke_gate``); failures of the gate itself
+        become a failing health check so the update pipeline still rolls back.
+        """
+        try:
+            gate_results = self._smoke_gate()
+            return tuple(
+                UpdateStepResult(
+                    name=f"smoke:{name}",
+                    executed=True,
+                    success=bool(passed),
+                    detail=detail,
+                )
+                for name, passed, detail in gate_results
+            )
+        except Exception as exc:
+            return _smoke_gate_unavailable(str(exc))
+
     def _resolve_installed_version(self, *, prefer_metadata: bool = False) -> VersionString:
         """Resolve installed version from package metadata, source, or pip as a fallback."""
         if prefer_metadata:

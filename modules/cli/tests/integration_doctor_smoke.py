@@ -74,11 +74,12 @@ def test_smoke_without_session_injection_fails_cleanly(capsys) -> None:
 
 
 def test_smoke_disabled_keeps_five_checks(capsys) -> None:
-    """Without --smoke the classic 5-check report is unchanged (regression lock)."""
+    """Without --smoke the report runs but the Browser Smoke Test check is absent."""
     session = MagicMock()
     run_doctor(json_output=True, smoke=False, session=session)
     session.validate_session.assert_not_called()
-    assert len(json.loads(capsys.readouterr().out)["checks"]) == 5
+    names = [c["name"] for c in json.loads(capsys.readouterr().out)["checks"]]
+    assert "Browser Smoke Test" not in names
 
 
 def test_root_dispatch_passes_session_aggregate() -> None:

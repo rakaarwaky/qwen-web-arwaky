@@ -125,17 +125,29 @@ For MCP client configuration, use the checked-in [`mcp.local.json`](mcp.local.js
 
 ## Configuration
 
-The application recognizes these environment variable names:
+[`.env.example`](.env.example) is the committed environment variable contract: every
+recognized variable with its purpose, default, and sensitivity. Copy it to `.env` and
+review each value. `qwen-web-arwaky doctor --json` echoes the effective configuration with
+secret values masked, and reports any `QWEN_*` / `QWA_*` variable set but not in the
+registry — a typo otherwise changes runtime behaviour silently.
 
-- `QWEN_DEFAULT_MODEL`
-- `QWEN_WORKSPACE_ROOT`
-- `QWEN_ENABLE_SANDBOX`
-- `QWEN_DISABLE_SANDBOX`
-- `QWEN_STREAM_SAFETY_TIMEOUT_SEC`
-- `QWEN_SWARM_CONCURRENCY`
-- `QWEN_WEB_MAX_WORKERS`
-- `QWEN_WEB_GITHUB_REPO`
-- `QWEN_DOCTOR_DEEP`
+Behaviour switches worth knowing:
+
+- `QWEN_ENABLE_SANDBOX` / `QWEN_DISABLE_SANDBOX` — Chromium runs with its OS sandbox by
+  default; `QWEN_DISABLE_SANDBOX` is the explicit opt-out for hosts that cannot provide
+  seccomp or user namespaces.
+- `QWEN_WEB_MAX_WORKERS` / `QWEN_SWARM_CONCURRENCY` — browser fan-out. Unset derives the
+  worker count from available host memory (~700 MiB per Chromium); set explicitly to
+  override, clamped to the derived capacity.
+- `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` — error tracking and tracing. With
+  `ENVIRONMENT=production` and neither set, `doctor` reports a warning.
+- `QWEN_DOCTOR_DEEP` — enable the slow Playwright cold-start probe in `doctor`.
+
+Operator runbooks for each `ErrorCategory` live in [`docs/runbooks/`](docs/runbooks/);
+`doctor` failure messages link to them.
+
+A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker count is in
+[`deploy/qwen-web-arwaky.service`](deploy/qwen-web-arwaky.service).
 
 MCP client configuration examples are in `mcp.local.json` and `.mcp.json`. Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
 
