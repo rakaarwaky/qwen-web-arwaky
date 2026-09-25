@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool
+from modules.shared.src.taxonomy_session_vo import SessionId, SessionInfo, SessionName, SessionPool
 
 
 class ISessionManagerProtocol(ABC):
@@ -20,16 +20,24 @@ class ISessionManagerProtocol(ABC):
         """Persist session pool to disk."""
 
     @abstractmethod
-    def add_session(self, name: str, profile_path: Path) -> SessionInfo:
+    def add_session(self, name: SessionName, profile_path: Path) -> SessionInfo:
         """Create and save a new session."""
 
     @abstractmethod
-    def remove_session(self, session_id: str) -> bool:
+    def remove_session(self, session_id: SessionId) -> bool:
         """Remove a session by ID."""
 
     @abstractmethod
     def list_sessions(self) -> list[SessionInfo]:
         """List all sessions."""
+
+    @abstractmethod
+    def mark_healthy(self, session_id: SessionId) -> None:
+        """Mark session as healthy."""
+
+    @abstractmethod
+    def mark_limited(self, session_id: SessionId) -> None:
+        """Mark session as rate-limited."""
 
 
 class ISessionHealthCheckerProtocol(ABC):
@@ -52,11 +60,11 @@ class ISessionRotatorProtocol(ABC):
         """Get next healthy session."""
 
     @abstractmethod
-    async def mark_limited(self, session_id: str) -> None:
+    async def mark_limited(self, session_id: SessionId) -> None:
         """Mark session as rate-limited."""
 
     @abstractmethod
-    async def mark_healthy(self, session_id: str) -> None:
+    async def mark_healthy(self, session_id: SessionId) -> None:
         """Mark session as healthy."""
 
 
@@ -64,4 +72,21 @@ __all__ = [
     "ISessionManagerProtocol",
     "ISessionHealthCheckerProtocol",
     "ISessionRotatorProtocol",
+    "ISessionRotatorAggregate",
 ]
+
+
+class ISessionRotatorAggregate(ABC):
+    """Session rotator aggregate contract."""
+
+    @abstractmethod
+    async def get_next_session(self) -> SessionInfo | None:
+        """Get next healthy session."""
+
+    @abstractmethod
+    async def mark_limited(self, session_id: SessionId) -> None:
+        """Mark session as rate-limited."""
+
+    @abstractmethod
+    async def mark_healthy(self, session_id: SessionId) -> None:
+        """Mark session as healthy."""

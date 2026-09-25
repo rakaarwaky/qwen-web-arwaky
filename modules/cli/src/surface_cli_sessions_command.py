@@ -24,9 +24,7 @@ def register_sessions_subparser(subparsers: Any) -> None:
     sessions_sub.add_parser("list", help="List all sessions")
 
     # Login command
-    login_parser = sessions_sub.add_parser(
-        "login", help="Add a new session"
-    )
+    login_parser = sessions_sub.add_parser("login", help="Add a new session")
     login_parser.add_argument(
         "--name",
         required=True,
@@ -34,23 +32,17 @@ def register_sessions_subparser(subparsers: Any) -> None:
     )
 
     # Health check command
-    sessions_sub.add_parser(
-        "health-check", help="Check health of all sessions"
-    )
+    sessions_sub.add_parser("health-check", help="Check health of all sessions")
 
     # Remove command
-    remove_parser = sessions_sub.add_parser(
-        "remove", help="Remove a session"
-    )
+    remove_parser = sessions_sub.add_parser("remove", help="Remove a session")
     remove_parser.add_argument(
         "session_id",
         help="Session ID to remove (e.g., session_1)",
     )
 
     # Status command
-    sessions_sub.add_parser(
-        "status", help="Show detailed session status"
-    )
+    sessions_sub.add_parser("status", help="Show detailed session status")
 
 
 def handle_sessions(args: argparse.Namespace) -> int:
@@ -87,9 +79,7 @@ def cmd_list(manager: SessionManager) -> int:
 
     for s in sessions:
         status_icon = _status_icon(s.status)
-        last_used = (
-            s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never"
-        )
+        last_used = s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never"
         print(f"{s.session_id:<12} {s.name:<15} {status_icon} {s.status.value:<8} {last_used}")
 
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

@@ -190,7 +190,6 @@ class _TuiWorkersMixin:
         if slot_event is not None:
             with contextlib.suppress(Exception):
                 self._attachment.request_cancel(slot_event)
-            with contextlib.suppress(Exception):
                 self._file_only.request_cancel(slot_event)
         worker.cancel()
         self._slot_workers[slot_id] = None
@@ -426,11 +425,9 @@ class _TuiWorkersMixin:
     def _login_worker(self) -> None:
         self._ensure_log_handler()
         # U5: update session badge to show login in progress
-        try:
+        with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
             badge.update("SESSION: LOGGING IN…")
-        except _BADGE_UNAVAILABLE:
-            pass
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
@@ -451,18 +448,16 @@ class _TuiWorkersMixin:
     # ── Session badge ────────────────────────────────────────────────────
 
     def _refresh_session_badge(self) -> None:
-        try:
+        with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-        except _BADGE_UNAVAILABLE:
-            return
-        if self._session is None:
-            badge.update("SESSION: N/A")
-            return
-        badge.update("SESSION: CHECKING…")
+            if getattr(self, "_session", None) is None:
+                badge.update("SESSION: N/A")
+            else:
+                badge.update("SESSION: CHECKING…")
         self._session_check_timed_out = False
-        # P4: cancel prior timer if exists to prevent stacking
-        if hasattr(self, "_session_check_timer") and self._session_check_timer is not None:
-            self._session_check_timer.stop()
+        timer = getattr(self, "_session_check_timer", None)
+        if timer is not None:
+            timer.stop()
         self._session_check_timer = self.set_timer(15.0, self._session_check_timeout)
         self._session_check_worker()
 
@@ -471,16 +466,14 @@ class _TuiWorkersMixin:
             return
         self._session_check_timed_out = True
         self._last_session_state = "TIMEOUT"
+        msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
         with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-            badge_text = str(badge.render() or "")
             # Only show TIMEOUT if the badge is still in CHECKING state.
-            # If the worker already completed and set VALID/EXPIRED, do not overwrite.
-            if "CHECKING" not in badge_text:
+            if "CHECKING" not in str(badge.render() or ""):
                 return
             badge.update("⚠ SESSION: TIMEOUT")
             badge.set_classes("invalid")
-        msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
         self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] {msg}")
         with contextlib.suppress(Exception):
             self.notify(msg, severity="warning", title="Session")
@@ -498,12 +491,10 @@ class _TuiWorkersMixin:
 
     def _apply_session_badge(self, valid: bool) -> None:
         self._last_session_state = "VALID" if valid else "EXPIRED"
-        try:
+        with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-        except _BADGE_UNAVAILABLE:
-            return
-        badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
-        badge.set_classes("invalid" if not valid else "")
+            badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
+            badge.set_classes("invalid" if not valid else "")
         # BUG FIX: cancel the timeout timer when the worker completes.
         # Without this, a 15s timer can fire AFTER the badge is already
         # set to VALID, overwriting it with "TIMEOUT".
@@ -516,7 +507,7 @@ class _TuiWorkersMixin:
     @work(thread=True)
     def _refresh_sessions_table(self) -> None:
         """Load and display all sessions in the Sessions tab table."""
-        if not hasattr(self, '_session_manager') or self._session_manager is None:
+        if not hasattr(self, "_session_manager") or self._session_manager is None:
             self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
             return
         try:
@@ -524,26 +515,30 @@ class _TuiWorkersMixin:
             sessions = pool.sessions
 
             def _update() -> None:
-                with contextlib.suppress(NoMatches):
-                    table = self.query_one("#sessions-table", DataTable)
-                    table.clear()
-                    table.add_columns("ID", "Name", "Status", "Last Used", "Path")
-                    for s in sessions:
-                        last_used = s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never"
-                        table.add_row(s.session_id, s.name, s.status.value, last_used, str(s.path))
-                    # Update metrics
-                    total = pool.total_count
-                    healthy = sum(1 for s in sessions if s.is_healthy)
-                    limited = sum(1 for s in sessions if s.is_limited)
-                    with contextlib.suppress(NoMatches):
-                        self.query_one("#session-total", Label).update(f"TOTAL: {total}")
-                        self.query_one("#session-healthy", Label).update(f"HEALTHY: {healthy}")
-                        self.query_one("#session-limited", Label).update(f"LIMITED: {limited}")
-                    self.call_from_thread(
-                        self._log_msg,
-                        f"[bold {THEME['ok']}]SESSIONS:[/] Loaded {total} sessions "
-                        f"({healthy} healthy, {limited} limited).",
+                table = self.query_one("#sessions-table", DataTable)
+                table.clear()
+                table.add_columns("ID", "Name", "Status", "Last Used", "Path")
+                table.add_rows(
+                    (
+                        s.session_id,
+                        s.name,
+                        s.status.value,
+                        s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never",
+                        str(s.path),
                     )
+                    for s in sessions
+                )
+                total = pool.total_count
+                healthy = sum(1 for s in sessions if s.is_healthy)
+                limited = sum(1 for s in sessions if s.is_limited)
+                with contextlib.suppress(NoMatches):
+                    self.query_one("#session-total", Label).update(f"TOTAL: {total}")
+                    self.query_one("#session-healthy", Label).update(f"HEALTHY: {healthy}")
+                    self.query_one("#session-limited", Label).update(f"LIMITED: {limited}")
+                self.call_from_thread(
+                    self._log_msg,
+                    f"[bold {THEME['ok']}]SESSIONS:[/] Loaded {total} sessions ({healthy} healthy, {limited} limited).",
+                )
 
             self.call_from_thread(_update)
         except Exception as exc:
@@ -555,39 +550,22 @@ class _TuiWorkersMixin:
     @work(thread=True)
     def _run_session_health_check(self) -> None:
         """Run health checks on all sessions."""
-        if not hasattr(self, '_session_manager') or self._session_manager is None:
+        if not hasattr(self, "_session_manager") or self._session_manager is None:
             self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
             return
         try:
             from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
-            checker = SessionHealthChecker(timeout_seconds=10)
-            pool = self._session_manager.load_pool()
-            sessions = pool.sessions
 
-            async def _check_all() -> list[tuple[object, bool]]:
-                results = []
-                for s in sessions:
-                    healthy = await checker.check_session(s)
-                    results.append((s, healthy))
-                    if healthy:
-                        self._session_manager.mark_healthy(s.session_id)
-                    else:
-                        self._session_manager.mark_limited(s.session_id)
-                return results
-
-            import asyncio
-            results = asyncio.run(_check_all())
-
-            def _update() -> None:
-                healthy_count = sum(1 for _, h in results if h)
-                self.call_from_thread(
-                    self._log_msg,
-                    f"[bold {THEME['ok']}]HEALTH CHECK:[/] {healthy_count}/{len(results)} sessions healthy.",
-                )
-                # Refresh the table
-                self._refresh_sessions_table()
-
-            self.call_from_thread(_update)
+            results = SessionHealthChecker(timeout_seconds=10).check_pool_sync(
+                self._session_manager.load_pool(),
+                self._session_manager,
+            )
+            healthy_count = sum(1 for _, h in results if h)
+            self.call_from_thread(
+                self._log_msg,
+                f"[bold {THEME['ok']}]HEALTH CHECK:[/] {healthy_count}/{len(results)} sessions healthy.",
+            )
+            self.call_from_thread(self._refresh_sessions_table)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
@@ -596,14 +574,15 @@ class _TuiWorkersMixin:
 
     def _session_login_action(self) -> None:
         """Trigger session login flow."""
-        if not hasattr(self, '_session_manager') or self._session_manager is None:
+        if getattr(self, "_session_manager", None) is None:
             self._log_msg("[yellow]Session manager not available.[/]")
             return
         self._log_msg(f"[bold {THEME['accent_fg']}]>>> Opening session login dialog...[/]")
         # For now, log that login would be triggered; the actual flow uses subprocess
         self.notify(
             "Use 'qwen-web-arwaky sessions login --name <name>' command",
-            title="Session Login", severity="information"
+            title="Session Login",
+            severity="information",
         )
 
 

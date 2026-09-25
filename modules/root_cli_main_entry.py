@@ -81,15 +81,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     # ── sessions ────────────────────────────────────────────────────────────
-    p_sessions = sub.add_parser(
-        "sessions", help="Manage Qwen login sessions", parents=[parent]
-    )
+    p_sessions = sub.add_parser("sessions", help="Manage Qwen login sessions", parents=[parent])
     sessions_sub = p_sessions.add_subparsers(dest="session_command")
     sessions_sub.add_parser("list", help="List all sessions")
     sessions_login = sessions_sub.add_parser("login", help="Add a new session")
-    sessions_login.add_argument(
-        "--name", required=True, help="Session name (e.g., personal, work)"
-    )
+    sessions_login.add_argument("--name", required=True, help="Session name (e.g., personal, work)")
     sessions_sub.add_parser("health-check", help="Check health of all sessions")
     sessions_remove = sessions_sub.add_parser("remove", help="Remove a session")
     sessions_remove.add_argument("session_id", help="Session ID to remove")
@@ -339,7 +335,7 @@ def _dispatch(
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
-            container.session_manager,  # type: ignore[arg-type]
+            container.session_manager,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 

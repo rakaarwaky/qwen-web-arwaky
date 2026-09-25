@@ -6,6 +6,7 @@ import asyncio
 import re
 from typing import TYPE_CHECKING
 
+from modules.shared.src.contract_session_aggregate import ISessionHealthCheckerProtocol, ISessionManagerProtocol
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ RATE_LIMIT_PATTERNS = [
 _COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
 
 
-class SessionHealthChecker:
+class SessionHealthChecker(ISessionHealthCheckerProtocol):
     """Checks session health via ping test."""
 
     PING_MESSAGE = "Reply with just: pong"
@@ -60,6 +61,27 @@ class SessionHealthChecker:
             updated.append(session.with_status(new_status))
 
         return SessionPool(sessions=updated, current_index=pool.current_index)
+
+    def check_pool_sync(
+        self,
+        pool: SessionPool,
+        session_manager: ISessionManagerProtocol,
+    ) -> list[tuple[SessionInfo, bool]]:
+        """Synchronous convenience wrapper: check all sessions and update manager state."""
+        import asyncio as _asyncio
+
+        async def _run() -> list[tuple[SessionInfo, bool]]:
+            results: list[tuple[SessionInfo, bool]] = []
+            for s in pool.sessions:
+                healthy = await self.check_session(s)
+                results.append((s, healthy))
+                if healthy:
+                    session_manager.mark_healthy(s.session_id)
+                else:
+                    session_manager.mark_limited(s.session_id)
+            return results
+
+        return _asyncio.run(_run())
 
     async def _send_ping(self, _session: SessionInfo) -> str:
         """Send ping message and get response.

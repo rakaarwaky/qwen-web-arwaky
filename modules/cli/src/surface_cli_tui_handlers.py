@@ -305,18 +305,17 @@ class _TuiHandlersMixin:
 
     def _session_login_action(self) -> None:
         """Handle session login button click."""
-        if not hasattr(self, '_session_manager') or self._session_manager is None:
+        if not hasattr(self, "_session_manager") or self._session_manager is None:
             self._log_msg("[yellow]Session manager not available.[/]")
             return
         self.push_screen(
             SessionSetupScreen(
                 status_text="Session Login",
-                on_login=lambda confirmed: self._run_session_login(confirmed),  # type: ignore[arg-type]
+                on_login=lambda confirmed: self._run_session_login(confirmed),
                 on_back=lambda: self._log_msg("[dim]Login cancelled.[/]"),
             )
         )
 
-    @work(thread=True)
     def _run_session_login(self, confirmed: bool) -> None:
         """Run the session login process."""
         if not confirmed:
@@ -324,8 +323,7 @@ class _TuiHandlersMixin:
         self._log_msg(f"[bold {THEME['accent_fg']}]>>> Starting session login...[/]")
         # This will be handled by the CLI sessions login command via subprocess
         self.notify(
-            "Use 'qwen-web-arwaky sessions login --name <name>' to add a session",
-            title="Info", severity="information"
+            "Use 'qwen-web-arwaky sessions login --name <name>' to add a session", title="Info", severity="information"
         )
         self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
         self._init_worker()

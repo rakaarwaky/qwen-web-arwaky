@@ -53,6 +53,7 @@ class TestSwarmPipelineStructure:
     def test_swarm_orchestrator_exists(self):
         """Verify SwarmOrchestrator can be imported."""
         from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+
         assert SwarmOrchestrator is not None
 
     def test_swarm_templates_discoverable(self):
@@ -98,7 +99,10 @@ class TestSwarmWithRealSession:
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency configuration."""
         # Default should be 10
-        assert hasattr(__import__('modules.core.src.agent_swarm_orchestrator', fromlist=['DEFAULT_MAX_WORKERS']), 'DEFAULT_MAX_WORKERS')
+        assert hasattr(
+            __import__("modules.core.src.agent_swarm_orchestrator", fromlist=["DEFAULT_MAX_WORKERS"]),
+            "DEFAULT_MAX_WORKERS",
+        )
         print("\n[SWARM-TEST] Concurrency config verified")
 
 

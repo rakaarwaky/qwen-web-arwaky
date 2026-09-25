@@ -53,7 +53,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
-from modules.shared.src.contract_session_aggregate import ISessionRotatorProtocol
+from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
@@ -146,11 +146,11 @@ class SharedContainer:
         )
 
         # Session rotation infrastructure
-        self.session_manager = SessionManager()
+        self.session_manager: ISessionManagerProtocol = SessionManager()
         self.session_health_checker = SessionHealthChecker()
-        from modules.core.src.agent_session_rotator import SessionRotator
+        from modules.core.src.agent_session_rotation_orchestrator import SessionRotator
 
-        self.session_rotator: ISessionRotatorProtocol = SessionRotator(
+        self.session_rotator: ISessionRotatorAggregate = SessionRotator(
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )

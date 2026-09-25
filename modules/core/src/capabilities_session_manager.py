@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ POOL_FILE = SESSIONS_DIR / "sessions.json"
 PROFILE_DIR_NAME = "Default"
 
 
-class SessionManager:
+class SessionManager(ISessionManagerProtocol):
     """Manages Qwen session storage and CRUD operations."""
 
     def __init__(self, base_dir: Path | None = None) -> None:

@@ -1,14 +1,16 @@
-"""Session rotator — transparent session rotation for API calls."""
+"""Session rotation orchestrator — transparent session rotation for API calls."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
-from modules.core.src.capabilities_session_manager import SessionManager
-from modules.shared.src.contract_session_aggregate import ISessionRotatorProtocol
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool
+from modules.shared.src.contract_session_aggregate import (
+    ISessionHealthCheckerProtocol,
+    ISessionManagerProtocol,
+    ISessionRotatorAggregate,
+)
+from modules.shared.src.taxonomy_session_vo import SessionId, SessionInfo, SessionPool
 
 if TYPE_CHECKING:
     pass
@@ -30,22 +32,27 @@ class AllSessionsLimitedError(Exception):
     def __init__(self, pool: SessionPool) -> None:
         self.pool = pool
         super().__init__(
-            f"All {pool.total_count} sessions are rate-limited. "
-            f"Please wait until tomorrow or add more sessions."
+            f"All {pool.total_count} sessions are rate-limited. Please wait until tomorrow or add more sessions."
         )
 
 
-class SessionRotator(ISessionRotatorProtocol):
+class SessionRotator(ISessionRotatorAggregate):
     """Transparent session rotation with health checking."""
 
     def __init__(
         self,
-        session_manager: SessionManager,
-        health_checker: SessionHealthChecker | None = None,
+        session_manager: ISessionManagerProtocol,
+        health_checker: ISessionHealthCheckerProtocol | None = None,
     ) -> None:
         self._manager = session_manager
-        self._checker = health_checker or SessionHealthChecker()
+        self._checker: ISessionHealthCheckerProtocol | None = health_checker
         self._metrics = RotationMetrics()
+
+    def _ensure_checker(self) -> ISessionHealthCheckerProtocol:
+        """Return the health checker, raising if not configured."""
+        if self._checker is None:
+            raise RuntimeError("Health checker not configured — pass one to SessionRotator()")
+        return self._checker
 
     async def get_next_session(self) -> SessionInfo | None:
         """Get next healthy session with fallback."""
@@ -55,7 +62,8 @@ class SessionRotator(ISessionRotatorProtocol):
         session = pool.get_next_session()
         if session:
             # Verify health
-            is_healthy = await self._checker.check_session(session)
+            checker = self._ensure_checker()
+            is_healthy = await checker.check_session(session)
             if is_healthy:
                 self._manager.mark_healthy(session.session_id)
                 self._metrics.successful_rotations += 1
@@ -64,8 +72,9 @@ class SessionRotator(ISessionRotatorProtocol):
                 self._manager.mark_limited(session.session_id)
 
         # Try all sessions
+        checker = self._ensure_checker()
         for s in pool.sessions:
-            is_healthy = await self._checker.check_session(s)
+            is_healthy = await checker.check_session(s)
             if is_healthy:
                 self._manager.mark_healthy(s.session_id)
                 self._metrics.successful_rotations += 1
@@ -77,11 +86,11 @@ class SessionRotator(ISessionRotatorProtocol):
         self._metrics.sessions_exhausted += 1
         return None
 
-    async def mark_limited(self, session_id: str) -> None:
+    async def mark_limited(self, session_id: SessionId) -> None:
         """Mark session as rate-limited."""
         self._manager.mark_limited(session_id)
 
-    async def mark_healthy(self, session_id: str) -> None:
+    async def mark_healthy(self, session_id: SessionId) -> None:
         """Mark session as healthy."""
         self._manager.mark_healthy(session_id)
 
@@ -107,10 +116,7 @@ class SessionRotator(ISessionRotatorProtocol):
         # Track usage
         pool = self._manager.load_pool()
         updated = session.with_usage(success=True)
-        pool.sessions = [
-            updated if s.session_id == session.session_id else s
-            for s in pool.sessions
-        ]
+        pool.sessions = [updated if s.session_id == session.session_id else s for s in pool.sessions]
         self._manager.save_pool(pool)
 
         return response, session

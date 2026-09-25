@@ -86,11 +86,17 @@ class TestPromptDirectPipeline:
     def test_prompt_direct_runs(self, test_files, tmp_path):
         """Verify prompt-direct command executes without crash."""
         output = tmp_path / "direct_output.md"
-        result = _run_cli([
-            "prompt-direct",
-            "-t", "Say: Dogfood test OK",
-            "-o", str(output),
-        ], timeout=None, headless=False)  # No timeout, show browser
+        result = _run_cli(
+            [
+                "prompt-direct",
+                "-t",
+                "Say: Dogfood test OK",
+                "-o",
+                str(output),
+            ],
+            timeout=None,
+            headless=False,
+        )  # No timeout, show browser
         # Exit code 0 = success, 1 = session/auth error (acceptable for testing pipeline)
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[DIRECT] Return code: {result.returncode}")
@@ -105,11 +111,17 @@ class TestPromptOnlyPipeline:
     def test_prompt_only_processes_file(self, test_files, tmp_path):
         """Verify prompt-only command executes without crash."""
         output = tmp_path / "file_output.md"
-        result = _run_cli([
-            "prompt-only",
-            "-i", str(PROMPT_FILE),
-            "-o", str(output),
-        ], timeout=None, headless=False)  # No timeout, show browser
+        result = _run_cli(
+            [
+                "prompt-only",
+                "-i",
+                str(PROMPT_FILE),
+                "-o",
+                str(output),
+            ],
+            timeout=None,
+            headless=False,
+        )  # No timeout, show browser
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[FILE-ONLY] Return code: {result.returncode}")
         if result.stdout:
@@ -123,12 +135,19 @@ class TestPromptWithAttachmentPipeline:
     def test_prompt_with_attachment_works(self, test_files, tmp_path):
         """Verify prompt-with-attachment command executes without crash."""
         output = tmp_path / "attachment_output.md"
-        result = _run_cli([
-            "prompt-with-attachment",
-            "-i", str(PROMPT_FILE),
-            "-a", str(ATTACHMENT_FILE),
-            "-o", str(output),
-        ], timeout=None, headless=False)  # No timeout, show browser
+        result = _run_cli(
+            [
+                "prompt-with-attachment",
+                "-i",
+                str(PROMPT_FILE),
+                "-a",
+                str(ATTACHMENT_FILE),
+                "-o",
+                str(output),
+            ],
+            timeout=None,
+            headless=False,
+        )  # No timeout, show browser
         assert result.returncode in (0, 1), f"CLI crashed: {result.stderr[:500]}"
         print(f"\n[ATTACHMENT] Return code: {result.returncode}")
         if result.stdout:
