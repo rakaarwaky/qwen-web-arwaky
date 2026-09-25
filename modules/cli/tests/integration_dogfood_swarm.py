@@ -37,6 +37,7 @@ class TestSwarmPipelineStructure:
     def test_swarm_orchestrator_exists(self):
         """Verify SwarmOrchestrator can be imported."""
         from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+
         assert SwarmOrchestrator is not None
 
     def test_swarm_templates_discoverable(self):
@@ -74,6 +75,7 @@ class TestSwarmOutputStructure:
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency configuration."""
         from modules.core.src.agent_swarm_orchestrator import DEFAULT_MAX_WORKERS
+
         assert DEFAULT_MAX_WORKERS == 10
         print(f"\n[SWARM-TEST] Concurrency: DEFAULT_MAX_WORKERS = {DEFAULT_MAX_WORKERS}")
 
