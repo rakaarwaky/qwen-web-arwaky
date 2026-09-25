@@ -55,6 +55,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── doctor ────────────────────────────────────────────────────────────────
     p_doctor = sub.add_parser("doctor", help="Run system environment and health diagnostics", parents=[parent])
     p_doctor.add_argument("--json", action="store_true", help="Format diagnostic output as JSON")
+    p_doctor.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run headless browser smoke test (requires valid saved session)",
+    )
 
     # ── init ──────────────────────────────────────────────────────────────────
     p_init = sub.add_parser("init", help="Initialize workspace (.agents/skills + .qwen-web symlinks)", parents=[parent])
@@ -344,7 +349,11 @@ def _dispatch(
     if action == "doctor":
         from modules.cli.src.surface_cli_doctor_command import run_doctor
 
-        return run_doctor(json_output=bool(getattr(args, "json", False)))
+        return run_doctor(
+            json_output=bool(getattr(args, "json", False)),
+            smoke=bool(getattr(args, "smoke", False)),
+            session=container.agent_session_orchestrator,
+        )
 
     if action == "login":
         if cfg is None:

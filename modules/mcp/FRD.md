@@ -48,6 +48,23 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 - **`delete_session`**: Deletes saved session tokens when `confirm=True` is explicitly passed.
 - **`setup_session`**: Delegates to `ISetupAggregate` to launch a headed browser for manual user authentication.
 
+### FR-004: Asynchronous Execution via the Job Manager Aggregate
+
+- **Description**: The two file-based prompt tools depend on the Core Job Manager aggregate (`IJobManagerAggregate`, implemented by `agent_job_orchestrator.py` → `AgentJobOrchestrator` backed by `IJobStorageProtocol`) to run long prompts outside the MCP request/response window. The surface owns no worker pool, no job storage, and no retry logic.
+- **Input**: `async_run: bool` on `process_prompt_file_only` and `process_prompt_with_attachment` (default `True`).
+- **Output**: `ACCEPTED` envelope carrying `job_id`; poll results come from `get_job_status` as `RUNNING`, `COMPLETED`, or `FAILED`.
+- **Business Rules**:
+  - `async_run=True` (default) submits to `IJobManagerAggregate` and returns immediately with `job_id`; `async_run=False` runs the aggregate synchronously and returns a `SUCCESS` envelope with `result`.
+  - Polling: submit → receive `job_id` → poll `get_job_status(job_id)` until `completed=true`, then read `result_preview` (or `error` on failure). `list_jobs(limit)` is the recovery path when a `job_id` was lost.
+  - When the job manager is not configured, the tools return `SERVICE_UNAVAILABLE` rather than silently degrading to a blocking call.
+  - Submission throttling returns `RATE_LIMITED` with `retryable: true` and `retry_after_sec`; the caller retries the submit, never the poll.
+  - `JOB_NOT_FOUND` means the `job_id` is unknown or its storage record expired; use `list_jobs` to recover.
+- **Error Handling**: `JOB_SUBMIT_FAILED` (retryable), `JOB_NOT_FOUND`, `SERVICE_UNAVAILABLE`, `RATE_LIMITED` — all as structured error envelopes.
+- **Acceptance Criteria**:
+  - [ ]  `async_run=True` returns `ACCEPTED` with a `job_id` and no `result`.
+  - [ ]  `async_run=False` returns `SUCCESS` with a synchronous `result`.
+  - [ ]  `get_job_status` on a queued job returns `RUNNING` until `completed=true`, then `COMPLETED` or `FAILED`.
+
 ---
 
 ## API Contract
@@ -55,8 +72,8 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 | Operation | Input | Output | Description |
 |-----------|-------|--------|-------------|
 | `process_direct_prompt` | `prompt`, `timeout_sec=120`, `headless=True`, `output_file=None` | `JSON str` | Processes a raw text prompt. `output_file` mirrors the CLI's `prompt-direct -o FILE`. |
-| `process_prompt_file_only` | `input_file`, `output_file=None`, `headless=True` | `JSON str` | Processes one Markdown file. |
-| `process_prompt_with_attachment` | `prompt_file`, `attachment_file`, `output_file=None`, `headless=True` | `JSON str` | Processes a Markdown file with a document attachment. |
+| `process_prompt_file_only` | `input_file`, `output_file=None`, `headless=True`, `async_run=True` | `JSON str` | Processes one Markdown file. `async_run=True` submits to `IJobManagerAggregate` and returns `ACCEPTED` + `job_id`. |
+| `process_prompt_with_attachment` | `prompt_file`, `attachment_file`, `output_file=None`, `headless=True`, `async_run=True` | `JSON str` | Processes a Markdown file with a document attachment. `async_run=True` submits to `IJobManagerAggregate` and returns `ACCEPTED` + `job_id`. |
 | `get_job_status` | `job_id` | `JSON str` | Queries state and progress of an asynchronous background job. |
 | `list_jobs` | `limit=10` | `JSON str` | Lists recently recorded background jobs sorted newest to oldest. |
 | `check_session` | None | `JSON str` | Checks validity of saved Chromium session tokens. |

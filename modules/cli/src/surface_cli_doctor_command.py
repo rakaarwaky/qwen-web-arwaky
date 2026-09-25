@@ -1,7 +1,9 @@
 """CLI surface: doctor command — system diagnostic checks (AES406).
 
 Audits environment health: Python version, Playwright browser, workspace initialization,
-session token directory, and output directory write permissions.
+session token directory, and output directory write permissions. With --smoke, a
+sixth check runs a headless browser round-trip on the saved session to verify the
+full pipeline end-to-end (issue #322).
 """
 
 from __future__ import annotations
@@ -10,13 +12,36 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT, DEFAULT_SESSION
 
+if TYPE_CHECKING:
+    from modules.shared.src.contract_core_aggregate import ISessionAggregate
 
-def run_doctor(json_output: bool = False) -> int:
-    """Perform system health diagnostics and print formatted report or JSON summary."""
+
+def _smoke_check(session: ISessionAggregate | None) -> tuple[bool, str]:
+    """Run a headless browser round-trip against the saved session (issue #322).
+
+    Delegates to ISessionAggregate.validate_session() so the surface reuses the
+    Core launch → navigate → textarea-check → close pipeline with no new
+    capability code. AR-1: the aggregate is injected by the Root container.
+    """
+    if session is None:
+        return False, "Smoke test requires a session aggregate; run it through `qwen-web-arwaky doctor --smoke`."
+    try:
+        valid, message = session.validate_session()
+        return bool(valid), message or "Session validation returned no detail."
+    except Exception as exc:
+        return False, f"Smoke test failed: {exc}"
+
+
+def run_doctor(json_output: bool = False, smoke: bool = False, session: ISessionAggregate | None = None) -> int:
+    """Perform system health diagnostics and print formatted report or JSON summary.
+
+    With *smoke* enabled, a sixth check runs a headless browser session round-trip
+    through the injected session aggregate; it needs a saved session and Chromium.
+    """
     checks: list[dict[str, Any]] = []
 
     # Check 1: Python version
@@ -76,8 +101,10 @@ def run_doctor(json_output: bool = False) -> int:
     )
 
     # Check 3: Workspace initialization
+    # The provisioner creates log/output symlinks under .qwen-web/; verify
+    # that at least one is present so init was actually run in this directory.
     dot_qwen = Path.cwd() / ".qwen-web"
-    ws_ok = dot_qwen.exists() and (dot_qwen / "input").exists() and (dot_qwen / "output").exists()
+    ws_ok = dot_qwen.exists() and any((dot_qwen / link).exists() for link in ("log", "output"))
     checks.append(
         {
             "name": "Workspace Initialization",
@@ -123,6 +150,17 @@ def run_doctor(json_output: bool = False) -> int:
             "detail": out_detail,
         }
     )
+
+    # Check 6 (opt-in): headless browser smoke test (issue #322)
+    if smoke:
+        smoke_ok, smoke_detail = _smoke_check(session)
+        checks.append(
+            {
+                "name": "Browser Smoke Test",
+                "passed": smoke_ok,
+                "detail": smoke_detail,
+            }
+        )
 
     all_passed = all(c["passed"] for c in checks)
 
