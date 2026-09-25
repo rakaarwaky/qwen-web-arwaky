@@ -516,6 +516,83 @@ class TestHardResponseTimeout:
                 )
 
 
+class TestReloadGatedOnProgress:
+    """Issue #382: the 30s periodic reload is suppressed while the stream
+    continues making forward progress, so a long generation cannot be starved
+    out of the stability condition.
+
+    The tests run on the real (unpatched) clock: a reload requires 30s of
+    wall time, so an iteration that still has forward progress completes in
+    microseconds and the loop exits long before the first reload window can
+    elapse.
+    """
+
+    def test_stable_text_still_stabilizes_with_real_clock(self) -> None:
+        """Forward-progress text across a 30s boundary would have reset
+        ``stable_count`` indefinitely before the fix; with the gate in place
+        the stream is untouched and stabilizes in a handful of polls."""
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        texts = iter(
+            [
+                "first word",
+                "first word second",
+                "first word second third",
+                "first word second third fourth",
+                "first word second third fourth",
+                "first word second third fourth",
+                "first word second third fourth",
+                "first word second third fourth",
+                "first word second third fourth",
+            ]
+        )
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=lambda *_: next(texts)),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+        ):
+            result = StreamMonitor().wait_for_response(
+                page,
+                timeout_sec=60,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=4,
+                baseline_text="prior",
+            )
+
+        assert str(result) == "first word second third fourth"
+        # Streaming text made forward progress every poll, so no reload may
+        # have fired — this is exactly the starvation loop the fix removes.
+        assert page.reload.call_count == 0
+
+    def test_stable_response_returns_text(self) -> None:
+        """A fully stable, complete response returns immediately on the real
+        clock (well under the 30s reload window)."""
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+        response = "a stable final answer"
+
+        with (
+            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=response),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+        ):
+            result = StreamMonitor().wait_for_response(
+                page,
+                timeout_sec=60,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                baseline_text="prior",
+            )
+
+        assert str(result) == response
+        assert page.reload.call_count == 0
+
+
 class TestSafetyTimeoutConfiguration:
     """Issue #330: the 4h safety circuit breaker is operator-configurable."""
 

@@ -38,6 +38,14 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     `textarea.message-input-textarea`.
   - `check_session` is stricter than `check_auth`: page must be ready, chat
     textarea present, and no login form.
+  - Default-model policy (issue #374): `ensure_default_model` is best-effort
+    and never blocks the pipeline; `_verify_default_model` then confirms the
+    active model. If a *different* model label is readable — a rename,
+    regional substitution, or picker DOM drift — the pipeline **proceeds with
+    the active model** and `EVENT_MODEL_VERIFIED` carries the detected name
+    with `fallback: true`. Only an unreadable picker raises
+    `ModelSwitchError`, because the active model is then unknowable. This is
+    the specified fallback: availability outranks exact-name matching.
 - **Edge Cases**: stale profile after crash; missing execute bit on an
   existing session dir; concurrent Chromium instances; headed login vs
   headless prompt-only; user closes the page mid-navigation; load-state wait times
@@ -216,6 +224,11 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     a terminal event raises `ResponseDetectionTimeoutError` (the dispatch
     loop in the Agent layer retries per `MAX_ATTEMPTS`). The 30s periodic
     cloud reload sync is recovery inside the budget, never a cutoff reset.
+  - The 30s periodic cloud reload fires only when there is **no forward
+    progress** — the committed response text is unchanged since the last reload
+    (issue #382). Reloading mid-stream would reset the stability counter and
+    could starve a long generation out of the stability condition, so a stream
+    whose text keeps growing across the window suppresses the reload entirely.
   - The `safety_timeout_sec` circuit breaker is the absolute backstop for
     pathological loops; it defaults to 4h and is operator-tunable via the
     `QWEN_STREAM_SAFETY_TIMEOUT_SEC` environment variable (issue #330).
@@ -228,7 +241,9 @@ It implements the AES Capabilities and Agent layers: Playwright browser
     etc.). CAPTCHA phrases become `AuthRequiredError`.
   - Poll cycle must stay under 300ms of blocking work (NFR).
 - **Edge Cases**: network drop mid-stream; UI noise ("Qwen3" tags); response
-  shorter than min length; hard cutoff mid-stream; Playwright IPC death.
+  shorter than min length; hard cutoff mid-stream; Playwright IPC death;
+  long streaming generation still growing when the 30s reload window elapses
+  (reload suppressed, stability counter preserved).
 - **Error Handling**:
   - `ResponseDetectionTimeoutError` on `timeout_sec` hard cutoff and on the
     safety circuit breaker (propagated for orchestrator retry).

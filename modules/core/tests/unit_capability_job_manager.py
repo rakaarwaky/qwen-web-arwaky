@@ -1,12 +1,15 @@
 """Unit tests for JobManager capability and AgentJobOrchestrator."""
 
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
 from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.core.src.capabilities_job_manager import JobManager
+from modules.shared.src.taxonomy_core_entity import RateLimiter
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,
@@ -15,6 +18,7 @@ from modules.shared.src.taxonomy_core_vo import (
     HeadlessFlag,
     JobId,
     JobRecord,
+    MaxPerMinute,
     ResponseText,
 )
 
@@ -122,6 +126,102 @@ class TestAgentJobOrchestrator(unittest.TestCase):
         self.assertEqual(final_rec.latest_event, EVENT_GENERATION_FINISHED.value)
         self.assertTrue(final_rec.completed)
         self.assertIn("Test response", final_rec.result_preview or "")
+
+    def test_submit_record_carries_owner_pid(self) -> None:
+        """Issue #376: submit must set ``owner_pid`` so zombies are identifiable."""
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("Test")
+
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+
+        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        self.assertEqual(rec.owner_pid, os.getpid())
+        self.orchestrator._executor.shutdown(wait=True)
+
+
+class TestJobOwnershipPreserved(unittest.TestCase):
+    """Issue #376: ``owner_pid`` and ``heartbeat_at`` must survive every save
+    transition so zombie reconciliation can claim orphaned records."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage = JobManager(storage_dir=Path(self.temp_dir.name))
+        self.mock_file_only = MagicMock()
+        self.mock_attachment = MagicMock()
+        self.orchestrator = AgentJobOrchestrator(
+            storage=self.storage,
+            file_only=self.mock_file_only,
+            attachment=self.mock_attachment,
+            max_workers=1,
+        )
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_owner_pid_and_heartbeat_at_survive_save_started(self) -> None:
+        """``_save_started`` must preserve the submitted record's ownership."""
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+
+        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        pid = rec.owner_pid
+        self.assertIsNotNone(pid)
+
+        # The worker thread is already running; let it save a terminal state.
+        self.orchestrator._executor.shutdown(wait=True)
+
+        saved = self.orchestrator.get_job_status(JobId(rec.job_id))
+        self.assertIsNotNone(saved)
+        assert saved is not None
+        self.assertEqual(saved.owner_pid, pid)
+
+    def test_job_status_preserves_owner_pid_through_terminal(self) -> None:
+        """A completed job keeps its ``owner_pid`` so zombie reconciliation
+        correctly skips it (alive owner = not a zombie)."""
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+
+        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        pid = rec.owner_pid
+
+        self.orchestrator._executor.shutdown(wait=True)
+
+        loaded = self.orchestrator.get_job_status(JobId(rec.job_id))
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertTrue(loaded.completed)
+        self.assertEqual(loaded.owner_pid, pid)
+
+    def test_submit_is_non_blocking_even_when_rate_limiter_would_starve(self) -> None:
+        """Issue #383: ``submit_file_job`` must return a JobRecord within
+        bounded time. Rate limiting is applied at worker dispatch, not on the
+        caller thread; a saturating limiter should NOT block submit.
+        """
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+
+        # 1 request per minute — exhausting the limiter should NOT stall submit.
+        throttled_limiter = RateLimiter(MaxPerMinute(1))
+        throttled_limiter.acquire()  # consume the single slot
+        throttled = AgentJobOrchestrator(
+            storage=self.storage,
+            file_only=self.mock_file_only,
+            attachment=self.mock_attachment,
+            max_workers=1,
+            rate_limiter=throttled_limiter,
+        )
+
+        start = time.perf_counter()
+        rec = throttled.submit_file_job(prompt_file=prompt_file)
+        elapsed = time.perf_counter() - start
+
+        self.assertLess(elapsed, 0.5, f"submit took {elapsed:.2f}s — must be sub-500ms when rate-limited")
+        self.assertFalse(rec.completed)
+        self.assertTrue(rec.job_id.startswith("file_"))
+        throttled._executor.shutdown(wait=True)
 
 
 if __name__ == "__main__":

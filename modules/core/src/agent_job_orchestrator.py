@@ -21,7 +21,7 @@ from modules.shared.src.contract_core_aggregate import (
 )
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, RateLimitError
+from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_FAILED,
@@ -29,7 +29,6 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
-    ErrorReason,
     FilePath,
     HeadlessFlag,
     JobId,
@@ -64,26 +63,27 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         self._rate_limiter = rate_limiter
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="qwen_job_worker")
 
-    def _guard_dispatch(self) -> None:
-        """Apply shared throughput and failure guards before submitting work.
+    def _guard_submit(self) -> None:
+        """Fast submit-time guard: reject when the circuit breaker is open.
 
-        Job submission must stay responsive: instead of blocking the calling
-        thread until a rate-limit slot frees up (which makes MCP clients hang
-        with no explanation), raise ``RateLimitError`` carrying a retry hint so
-        the caller can back off deliberately.
+        The submit path must return a ``JobRecord`` in bounded time — it runs
+        synchronously on the MCP tool caller's thread, so it must never sleep.
+        Throttle the rate limit at dispatch time instead: the worker body calls
+        ``_guard_dispatch`` to acquire a slot before browser work begins.
         """
         if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
             raise CircuitBreakerOpenError("circuit open: too many recent job failures")
+
+    def _guard_dispatch(self) -> None:
+        """Worker-time guard: block until a rate-limit slot is available.
+
+        Runs on the job worker thread (``_run_file_job`` /
+        ``_run_attachment_job``), not on the submit caller, so a stall here
+        only defers this one job — the submit already returned its
+        ``job_id`` and the MCP client keeps polling.
+        """
         if self._rate_limiter is not None:
-            wait_sec = self._rate_limiter.try_acquire()
-            if wait_sec is not None:
-                raise RateLimitError(
-                    ErrorReason(
-                        f"rate limit reached: at most {self._rate_limiter.max_per_minute} "
-                        f"job submissions per minute; retry in {wait_sec:.1f}s"
-                    ),
-                    retry_after_sec=wait_sec,
-                )
+            self._rate_limiter.acquire()
 
     def _generate_job_id(self, prefix: str = "job") -> JobId:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -99,7 +99,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         """Submit a prompt file job for asynchronous background processing."""
         p_path = Path(prompt_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
-        self._guard_dispatch()
+        self._guard_submit()
         job_id = self._generate_job_id("file")
         now = _utc_now_iso()
 
@@ -134,7 +134,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         p_path = Path(prompt_file).expanduser().resolve()
         a_path = Path(attachment_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
-        self._guard_dispatch()
+        self._guard_submit()
         job_id = self._generate_job_id("att")
         now = _utc_now_iso()
 
@@ -163,7 +163,12 @@ class AgentJobOrchestrator(IJobManagerAggregate):
     def _save_started(
         self, record: JobRecord | None, started_at: str, *, attachment_path: Path | None = None
     ) -> JobRecord | None:
-        """Persist the common in-progress state for either job kind."""
+        """Persist the common in-progress state for either job kind.
+
+        ``owner_pid`` is carried over from the submit record and ``heartbeat_at``
+        is stamped to ``started_at`` so a crashed process leaves an owned,
+        reclaimable record that ``JobManager.reconcile_zombies`` can detect.
+        """
         if record is None:
             return None
         self._storage.save_job(
@@ -176,6 +181,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 input_file=record.input_file,
                 attachment_file=str(attachment_path) if attachment_path else record.attachment_file,
                 output_file=record.output_file,
+                owner_pid=record.owner_pid,
+                heartbeat_at=started_at,
             )
         )
         return record
@@ -205,6 +212,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 input_file=str(input_path),
                 attachment_file=str(attachment_path) if attachment_path else None,
                 output_file=str(output_path) if output_path else None,
+                owner_pid=record.owner_pid if record else None,
+                heartbeat_at=_utc_now_iso(),
                 error=error,
             )
         )
@@ -236,6 +245,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 input_file=str(input_path),
                 attachment_file=str(attachment_path) if attachment_path else None,
                 output_file=str(output_path) if output_path else None,
+                owner_pid=record.owner_pid if record else None,
+                heartbeat_at=_utc_now_iso(),
                 result_preview=preview,
             )
         )
@@ -262,6 +273,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
         record = self._storage.get_job(job_id)
+        self._guard_dispatch()
         self._save_started(record, started_at)
         try:
             result = self._file_only.process_prompt_file_only(
@@ -313,6 +325,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
         record = self._storage.get_job(job_id)
+        self._guard_dispatch()
         self._save_started(record, started_at, attachment_path=attachment_path)
         try:
             result = self._attachment.process_prompt_with_attachment(

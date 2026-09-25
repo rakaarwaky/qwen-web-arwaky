@@ -220,6 +220,7 @@ class StreamMonitor(IStreamProtocol):
         stable_count = 0
         last_reload_time = start
         last_forward_event_time = start
+        text_at_last_reload: str | None = None
 
         # Poll DOM for event signals and content stability until a terminal event.
         while True:
@@ -300,10 +301,14 @@ class StreamMonitor(IStreamProtocol):
                             f"(stall threshold {self.stall_timeout_sec}s)"
                         )
 
-                # Periodic cloud sync is recovery, not a response timeout. It runs
-                # while waiting so a long-running Qwen generation can continue past
-                # any configured hint without being cut off.
-                if (now - last_reload_time) >= 30.0:
+                # Periodic cloud sync is recovery, not a response timeout.
+                # Reload only when there is no forward progress: reloading
+                # mid-stream resets ``stable_count`` and can starve long
+                # generations out of the stability condition (FRD FR-006,
+                # issue #382). Track the committed text at last reload so a
+                # steadily-growing stream suppresses the reload even across
+                # the 30-second window.
+                if (now - last_reload_time) >= 30.0 and last_text == text_at_last_reload:
                     log.info(
                         "Periodic 30s cloud reload sync: refreshing page to pull Qwen Cloud state (elapsed: %ds)...",
                         int(elapsed),
@@ -312,6 +317,7 @@ class StreamMonitor(IStreamProtocol):
                     with contextlib.suppress(Exception):
                         page.reload(wait_until="domcontentloaded", timeout=15_000)
                         page.wait_for_timeout(2000)
+                        text_at_last_reload = last_text
                         continue
 
                 time.sleep(active_poll)
