@@ -53,6 +53,11 @@ from modules.shared.src.taxonomy_core_error import ErrorCategory
 from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, MessageCount, RunId, ServiceName, StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
 
+#: Version of the ``status.json`` document contract. Bumped when a field is
+#: added or its meaning changes, so external monitors can branch on it
+#: (issue #296).
+STATUS_SCHEMA_VERSION = 2
+
 # Block 1: Class Definition & Constructor
 
 
@@ -179,12 +184,28 @@ class StatusFileWriter(IStatusProtocol):
     def write(self, **kwargs: Any) -> None:
         """Atomically write the status JSON from keyword fields.
 
-        ``failure_categories`` is an optional mapping of
-        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` values to
-        occurrence counts, letting monitoring tools answer "which capability is
-        most defective?" without parsing ``app.jsonl`` by hand.
+        When a ``metrics`` mapping is supplied it is embedded under
+        ``metrics``, so an external monitor reading ``status.json`` sees the
+        same counters the process keeps alive in memory (issue #296). The
+        document is also stamped with ``schema_version`` and ``updated_at``
+        so a monitor can parse it without guessing. Field contract:
+
+        - ``schema_version``: int, currently 2.
+        - ``updated_at``: ISO-8601 UTC timestamp of the write.
+        - ``status`` / ``mode`` / ``headless`` / ``run_id``: run identity.
+        - ``files_processed`` / ``files_failed`` / ``cpu_sec``: run totals.
+        - ``failure_categories``: optional mapping of
+          :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` values
+          to occurrence counts, letting monitoring tools answer "which
+          capability is most defective?" without parsing ``app.jsonl`` by hand.
+        - ``metrics``: counters plus ``total_executions``,
+          ``successful_executions``, and ``success_rate`` over a rolling 24 h
+          window (``None`` when no execution has been recorded).
+        - ``error``: present only when the run failed.
         """
         rec: dict[str, Any] = {
+            "schema_version": STATUS_SCHEMA_VERSION,
+            "updated_at": datetime.now(tz=timezone.utc).isoformat(),
             "status": kwargs.get("status", "unknown"),
             "mode": kwargs.get("mode", "unknown"),
             "headless": kwargs.get("headless", False),
@@ -193,6 +214,9 @@ class StatusFileWriter(IStatusProtocol):
             "files_failed": kwargs.get("files_failed", 0),
             "failure_categories": _normalise_categories(kwargs.get("failure_categories")),
         }
+        metrics = kwargs.get("metrics")
+        if isinstance(metrics, dict):
+            rec["metrics"] = metrics
         if kwargs.get("cpu_sec") is not None:
             rec["cpu_sec"] = round(kwargs["cpu_sec"], 2)
         if kwargs.get("error"):
@@ -201,8 +225,13 @@ class StatusFileWriter(IStatusProtocol):
         with suppress(OSError):
             atomic_write_json(self._status_path, rec)
 
-    def write_record(self, record: StatusRecordVO) -> None:
-        """Write the status JSON from a typed status record."""
+    def write_record(self, record: StatusRecordVO, *, metrics: dict[str, Any] | None = None) -> None:
+        """Write the status JSON from a typed status record.
+
+        ``metrics`` carries the persisted counter snapshot so a monitor reading
+        only ``status.json`` still sees the rolling-24h execution totals
+        (issue #296).
+        """
         self.write(
             status=record.status,
             mode=record.mode,
@@ -212,6 +241,7 @@ class StatusFileWriter(IStatusProtocol):
             cpu_sec=record.cpu_sec,
             files_processed=record.files_processed,
             files_failed=record.files_failed,
+            metrics=metrics,
         )
 
     def read(self) -> dict[str, Any] | None:
@@ -288,51 +318,103 @@ class ObservabilitySetup(IObservabilityProtocol):
         # Step 4: Install global process excepthooks
         install_excepthooks()
 
+        # Step 5: Record the effective telemetry mode so a production host that
+        # silently lost error tracking says so in the log at startup (#297).
+        mode = effective_telemetry_mode()
+        if mode == "file_only":
+            log.warning(
+                "observability_mode mode=%s environment=%s detail=no Sentry DSN and no OTLP endpoint; "
+                "failures reach the file log only",
+                mode,
+                os.getenv("ENVIRONMENT", "production"),
+            )
+        else:
+            log.info(
+                "observability_mode mode=%s environment=%s",
+                mode,
+                os.getenv("ENVIRONMENT", "production"),
+            )
+
     def _configure_sentry(self) -> None:
-        """Configure Sentry with a scrubbing hook on all outbound events.
+        """Configure Sentry and log an explicit degraded event when it is off.
 
         Security (issue #352): the ``before_send`` hook redacts host paths and
         prompt-derived fields so no local data leaves the host unless an
         operator explicitly opted in with ``SENTRY_DSN``. An empty DSN is a
         hard no-op.
+
+        Missing DSN or missing ``sentry_sdk`` is a no-op by design for local
+        development. On a production host it means errors are only in file
+        logs, so an operator-visible event names exactly what is off
+        (issue #297).
         """
+        environment = os.getenv("ENVIRONMENT", "production")
         if sentry_sdk is None:
+            log.info(
+                "observability_degraded reason=%s environment=%s",
+                "sentry_sdk not installed",
+                environment,
+            )
             return
         dsn = os.getenv("SENTRY_DSN", "")
         if not dsn:
+            log.info(
+                "observability_degraded reason=%s environment=%s hint=%s",
+                "SENTRY_DSN empty — error tracking is off",
+                environment,
+                "Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning"
+                if environment != "development"
+                else "development mode is expected to run without Sentry",
+            )
             return
         with suppress(Exception):
             sentry_sdk.init(
                 dsn=dsn,
-                environment=os.getenv("ENVIRONMENT", "production"),
+                environment=environment,
                 traces_sample_rate=1.0,
                 before_send=scrub_telemetry_event,
             )
+        log.info("sentry_ready environment=%s", environment)
 
     def _configure_tracing(self) -> None:
         """Configure OpenTelemetry tracing with span-attribute scrubbing.
 
         Security (issue #352): OTLP egress is opt-in; when an endpoint is set,
         span attributes are scrubbed so local home paths never leave the host.
+        Logs a degraded event when tracing is off (issue #297).
         """
+        environment = os.getenv("ENVIRONMENT", "production")
         if otel_trace is None or OTelResource is None or OTelTracerProvider is None:
+            log.info(
+                "observability_degraded reason=%s environment=%s",
+                "OpenTelemetry not installed — tracing is off",
+                environment,
+            )
             return
         try:
             resource = OTelResource.create({"service.name": os.getenv("OTEL_SERVICE_NAME", ServiceName("qwen-web"))})
             provider = OTelTracerProvider(resource=resource)
             endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+            otlp_exporter: Any = None
             try:
                 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
                 if endpoint and OTelBatchSpanProcessor is not None:
-                    provider.add_span_processor(
-                        OTelBatchSpanProcessor(_make_scrubbed_exporter(OTLPSpanExporter(endpoint=endpoint)))
-                    )
+                    otlp_exporter = OTLPSpanExporter(endpoint=endpoint)
+                    provider.add_span_processor(OTelBatchSpanProcessor(_make_scrubbed_exporter(otlp_exporter)))
             except ImportError:
                 pass
             otel_trace.set_tracer_provider(provider)
+            if endpoint:
+                log.info("tracing_ready environment=%s exporter=otlp", environment)
+            else:
+                log.info(
+                    "observability_degraded reason=%s environment=%s",
+                    "OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only",
+                    environment,
+                )
         except (ImportError, RuntimeError):
-            pass
+            log.info("observability_degraded reason=%s environment=%s", "OTel init failed", environment)
 
     def _configure_logging(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
         """Configure structlog/stdlib logging (private helper)."""
@@ -471,9 +553,36 @@ class ObservabilitySetup(IObservabilityProtocol):
         """Map an exception to the process exit code contract."""
         return ExitCode(utility_core_exit.exit_code_for(exc))
 
-    def write_status(self, status: str, mode: str, headless: bool, run_id: str | None = None) -> None:
-        """Write status.json via the owned (or injected) status writer."""
-        self._status_writer.write(status=status, mode=mode, headless=headless, run_id=run_id)
+    def write_status(
+        self,
+        status: str,
+        mode: str,
+        headless: bool,
+        run_id: str | None = None,
+        *,
+        files_processed: int = 0,
+        files_failed: int = 0,
+        cpu_sec: float | None = None,
+        error: str | None = None,
+    ) -> None:
+        """Write status.json, persisting the live metrics snapshot alongside the run.
+
+        Including :py:meth:`MetricsCounter.snapshot` in every write means
+        external monitors reading ``status.json`` see the rolling-window
+        execution counters without needing to scrape ``metrics.json``
+        separately (issue #296).
+        """
+        self._status_writer.write(
+            status=status,
+            mode=mode,
+            headless=headless,
+            run_id=run_id,
+            files_processed=files_processed,
+            files_failed=files_failed,
+            cpu_sec=cpu_sec,
+            error=error,
+            metrics=self._metrics.snapshot(),
+        )
 
     def install_excepthooks(self) -> None:
         """Install global exception handlers (delegates to module-level function)."""
@@ -601,6 +710,25 @@ def _start_span(name: str) -> Any:
     if tracer is None:
         return nullcontext()
     return tracer.start_as_current_span(name)
+
+
+def effective_telemetry_mode() -> str:
+    """Return the effective telemetry mode: ``full``, ``sentry``, ``otlp``, or ``file_only``.
+
+    ``file_only`` means neither Sentry nor OTLP export is configured, so
+    failures reach only the rotating file log (issue #297). Callers use this
+    to warn an operator that a production host is running without external
+    error tracking.
+    """
+    has_sentry = sentry_sdk is not None and bool(os.getenv("SENTRY_DSN", "").strip())
+    has_otlp = bool(os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip())
+    if has_sentry and has_otlp:
+        return "full"
+    if has_sentry:
+        return "sentry"
+    if has_otlp:
+        return "otlp"
+    return "file_only"
 
 
 def _json_format(record: logging.LogRecord) -> str:

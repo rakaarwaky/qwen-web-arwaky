@@ -1,0 +1,64 @@
+# Reference systemd unit for unattended qwen-web-arwaky workloads.
+#
+# Install:
+#   sudo install -m 0644 deploy/qwen-web-arwaky.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now qwen-web-arwaky
+#
+# Replace the ExecStart path and WorkingDirectory with the paths of the
+# virtualenv on the target host before enabling.
+#
+# MemoryMax / TasksMax bound the browser fleet (issue #291). Each Chromium
+# worker is budgeted at ~700 MiB, so MemoryMax below defaults to 6 workers
+# worth of RAM; raise it in step with QWEN_WEB_MAX_WORKERS / QWEN_SWARM_CONCURRENCY.
+# TasksMax caps Chromium's process count (zygote, renderers, GPU) so a fan-out
+# cannot exhaust the host's PID table.
+
+[Unit]
+Description=qwen-web-arwaky prompt watcher
+Documentation=https://github.com/rakaarwaky/qwen-web-arwaky
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qwen
+Group=qwen
+WorkingDirectory=/opt/qwen-web-arwaky
+Environment=ENVIRONMENT=production
+# Behaviour switches. See .env.example for the full contract.
+Environment=QWEN_WEB_MAX_WORKERS=4
+Environment=QWEN_SWARM_CONCURRENCY=4
+# Error tracking stays off until SENTRY_DSN is provisioned; doctor reports the
+# degraded telemetry mode as a WARNING while ENVIRONMENT=production (issue #297).
+# EnvironmentFile=/etc/qwen-web-arwaky/env
+ExecStart=/opt/qwen-web-arwaky/.venv/bin/qwen-web-arwaky prompt-only --watch -i /opt/qwen-web-arwaky/prompts
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=60
+KillMode=mixed
+
+# Resource ceilings for the browser fleet.
+MemoryMax=4G
+MemoryHigh=3G
+TasksMax=2048
+LimitNOFILE=8192
+
+# Hardening: the browser is sandboxed by default (issue #290); these keep the
+# unit itself from re-granting capabilities the service does not need.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/qwen-web-arwaky %h/.local/state/qwen-web-arwaky %h/.cache
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=qwen-web-arwaky
+
+[Install]
+WantedBy=multi-user.target

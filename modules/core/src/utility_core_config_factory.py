@@ -6,6 +6,7 @@ Stateless functions consumed by Agent orchestrator and StatusFileWriter.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from modules.shared.src.taxonomy_core_constant import (
@@ -14,6 +15,43 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_SESSION,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig
+
+_TRUE_VALUES = frozenset({"1", "true", "yes"})
+
+
+def sandbox_unavailable() -> bool:
+    """Return True when the Linux host cannot host Chromium's OS sandbox.
+
+    The sandbox needs seccomp-bpf and/or unprivileged user namespaces. A
+    container or a hardened host can lack either; in that case Chromium
+    refuses to start unless ``--no-sandbox`` is passed (issue #290).
+    """
+    if sys.platform != "linux":
+        return False
+    try:
+        status = Path("/proc/self/status").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    seccomp: int | None = None
+    for line in status.splitlines():
+        if line.startswith("Seccomp:"):
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                seccomp = int(parts[1])
+            break
+    if seccomp is None or seccomp == 0:
+        # Field missing or seccomp filter disabled: no seccomp sandbox support.
+        return True
+    for sysctl in (
+        Path("/proc/sys/kernel/unprivileged_userns_clone"),
+        Path("/proc/sys/user/max_user_namespaces"),
+    ):
+        try:
+            if sysctl.exists() and sysctl.read_text(encoding="utf-8").strip() == "0":
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def build_app_config(
@@ -31,7 +69,7 @@ def build_app_config(
     file_path: Path | None = None,
     chrome_profile: str = "qwen-cli-profile",
     storage_state_file: Path | None = None,
-    disable_sandbox: bool = True,
+    disable_sandbox: bool = False,
     request_timeout: int = 120,
     poll_interval: float = 1.0,
     streaming_timeout: int = 180,
@@ -41,13 +79,21 @@ def build_app_config(
     retry_failed: bool = False,
     model: str = "",
 ) -> AppConfig:
-    """Build a complete AppConfig while preserving every runtime override."""
+    """Build a complete AppConfig while preserving every runtime override.
+
+    The Chromium OS sandbox stays enabled by default (issue #290). It is
+    dropped only when the caller passes ``disable_sandbox=True``, an explicit
+    env switch is set, or the Linux host is detected as unable to support the
+    sandbox. ``QWEN_ENABLE_SANDBOX`` forces the sandbox on;
+    ``QWEN_DISABLE_SANDBOX`` forces it off.
+    """
     dummy_path = Path(os.devnull)
-    if disable_sandbox and (
-        os.environ.get("QWEN_ENABLE_SANDBOX", "").lower() in ("1", "true", "yes")
-        or os.environ.get("QWEN_DISABLE_SANDBOX", "").lower() in ("0", "false", "no")
-    ):
+    if os.environ.get("QWEN_DISABLE_SANDBOX", "").lower() in _TRUE_VALUES:
+        disable_sandbox = True
+    elif os.environ.get("QWEN_ENABLE_SANDBOX", "").lower() in _TRUE_VALUES:
         disable_sandbox = False
+    elif not disable_sandbox and sandbox_unavailable():
+        disable_sandbox = True
     return AppConfig(
         mode=mode,
         input_path=input_path or dummy_path,

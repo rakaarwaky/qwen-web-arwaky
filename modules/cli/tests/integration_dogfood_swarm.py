@@ -13,6 +13,7 @@ Real API validation: run pytest --run-dogfood with live Qwen session.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -73,11 +74,18 @@ class TestSwarmOutputStructure:
             assert sub.is_dir()
 
     def test_swarm_concurrency_config(self):
-        """Verify swarm concurrency configuration."""
-        from modules.core.src.agent_swarm_orchestrator import DEFAULT_MAX_WORKERS
+        """Verify swarm concurrency is capacity-derived and capped (issue #291)."""
+        from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+        from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
+        from modules.shared.src.utility_core_capacity import recommended_max_workers
 
         assert DEFAULT_MAX_WORKERS == 10
-        print(f"\n[SWARM-TEST] Concurrency: DEFAULT_MAX_WORKERS = {DEFAULT_MAX_WORKERS}")
+        capacity = recommended_max_workers()
+        assert 1 <= capacity <= DEFAULT_MAX_WORKERS
+        print(f"\n[SWARM-TEST] Concurrency: capacity {capacity} / cap {DEFAULT_MAX_WORKERS}")
+
+        orchestrator = SwarmOrchestrator(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
+        assert orchestrator._browser_concurrency <= capacity
 
 
 if __name__ == "__main__":

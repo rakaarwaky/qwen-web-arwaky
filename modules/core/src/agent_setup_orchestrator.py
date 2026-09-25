@@ -18,6 +18,7 @@ from modules.shared.src.contract_core_protocol import (
 from modules.shared.src.taxonomy_core_constant import CHAT_URL, DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
+from modules.shared.src.utility_core_session_backup import take_snapshot
 
 
 class SetupOrchestrator(ISetupAggregate):
@@ -72,6 +73,12 @@ class SetupOrchestrator(ISetupAggregate):
                     break
 
         if self._validate_saved_session(cfg):
+            try:
+                take_snapshot(cfg.session_path)
+            except Exception as exc:
+                self._observability.get_logger().warning(
+                    "session_backup_failed", error=str(exc), session_path=str(cfg.session_path)
+                )
             return ResponseText("Manual login completed successfully. The Qwen session is valid for headless tasks.")
 
         return ResponseText(

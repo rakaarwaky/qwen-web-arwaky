@@ -180,6 +180,8 @@ def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
     fake_default = tmp_path / "share" / "qwen_session"
     fake_default.mkdir(parents=True)
     (fake_default / "Cookies").write_text("token", encoding="utf-8")
+    # A retained generation keeps the no-backup guard from short-circuiting.
+    (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     orchestrator = _orchestrator()
     with (
         patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default),

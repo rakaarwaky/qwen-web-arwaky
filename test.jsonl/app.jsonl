@@ -1,0 +1,80 @@
+{"event": "observability_mode mode=file_only environment=production detail=no Sentry DSN and no OTLP endpoint; failures reach the file log only", "level": "warning", "timestamp": "2026-09-25T19:48:54.525621Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-216/test_compile_folder_include_im0/target (max_depth=5, import_depth=1, include_imports=True)", "level": "info", "timestamp": "2026-09-25T19:48:54.555170Z"}
+{"event": "Found 2 files (1 imported)", "level": "info", "timestamp": "2026-09-25T19:48:54.555497Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-216/test_compile_folder_include_im0/out/target_20260925-194854.md", "level": "info", "timestamp": "2026-09-25T19:48:54.555915Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-216/test_compile_folder_without_im0/target (max_depth=5, import_depth=1, include_imports=False)", "level": "info", "timestamp": "2026-09-25T19:48:54.556980Z"}
+{"event": "Found 1 compilable files", "level": "info", "timestamp": "2026-09-25T19:48:54.557195Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-216/test_compile_folder_without_im0/out/target_20260925-194854.md", "level": "info", "timestamp": "2026-09-25T19:48:54.557413Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-216/test_compile_folder_follows_ma0/docs_pack (max_depth=5, import_depth=1, include_imports=True)", "level": "info", "timestamp": "2026-09-25T19:48:54.558481Z"}
+{"event": "Found 2 files (1 imported)", "level": "info", "timestamp": "2026-09-25T19:48:54.558861Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-216/test_compile_folder_follows_ma0/out/docs_pack_20260925-194854.md", "level": "info", "timestamp": "2026-09-25T19:48:54.559169Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:54.588494Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:48:54.588956Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:48:54.589031Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:54.590278Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:48:54.590593Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:48:54.590663Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:54.592068Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:48:54.592425Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:48:54.592516Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:54.594253Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:48:54.594573Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:48:54.594644Z"}
+{"event": "browser_binary_rejected_untrusted_permissions", "level": "warning", "timestamp": "2026-09-25T19:48:55.772963Z"}
+{"event": "browser_binary_rejected_untrusted_permissions", "level": "warning", "timestamp": "2026-09-25T19:48:55.774102Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:55.791880Z"}
+{"event": "sentry_ready environment=production", "level": "info", "timestamp": "2026-09-25T19:48:55.792894Z"}
+{"event_name": "security.audit", "event_category": "auth", "recent_failures": 1, "event": "auth_or_challenge_failure", "level": "warning", "timestamp": "2026-09-25T19:48:55.793584Z"}
+{"event_name": "security.audit", "event_category": "auth", "recent_failures": 1, "event": "auth_or_challenge_failure", "level": "warning", "timestamp": "2026-09-25T19:48:55.794705Z"}
+{"detail": "value", "event": "some_event", "level": "warning", "timestamp": "2026-09-25T19:48:55.797260Z"}
+{"positional_args": ["TimeoutError('x')"], "event": "Load state wait failed, proceeding: %s", "level": "warning", "timestamp": "2026-09-25T19:48:55.797840Z"}
+{"err": "TimeoutError('x')", "event": "load_state_wait_failed_proceeding", "level": "warning", "timestamp": "2026-09-25T19:48:55.797993Z"}
+{"err": "TimeoutError('15000ms exceeded')", "event": "load_state_wait_failed_proceeding", "level": "warning", "timestamp": "2026-09-25T19:48:55.799103Z"}
+{"event": "install_refused_unverified target=6.4.0 mode=rollback", "level": "error", "timestamp": "2026-09-25T19:48:55.843216Z"}
+{"event": "subprocess_rejected_argument arg='-C;/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.844031Z"}
+{"event": "subprocess_rejected_argument arg='-C&/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.844683Z"}
+{"event": "subprocess_rejected_argument arg='-C|/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.845312Z"}
+{"event": "subprocess_rejected_argument arg='-C$/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.845983Z"}
+{"event": "subprocess_rejected_argument arg='-C`/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.846613Z"}
+{"event": "subprocess_rejected_argument arg='-C>/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.847218Z"}
+{"event": "subprocess_rejected_argument arg='-C</tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.847811Z"}
+{"event": "subprocess_rejected_argument arg='-C\\n/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.848458Z"}
+{"event": "subprocess_rejected_argument arg='-C\\r/tmp/evil'", "level": "error", "timestamp": "2026-09-25T19:48:55.849050Z"}
+{"event": "subprocess_rejected_argument arg='/tmp/ev\\x00il'", "level": "error", "timestamp": "2026-09-25T19:48:55.849588Z"}
+{"event": "subprocess_rejected_path arg='/etc/passwd'", "level": "error", "timestamp": "2026-09-25T19:48:55.851022Z"}
+{"event": "output_file_written: result.md", "level": "info", "timestamp": "2026-09-25T19:48:56.407329Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:48:56.408415Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:48:56.409594Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:48:56.409718Z"}
+{"event": "observability_mode mode=file_only environment=production detail=no Sentry DSN and no OTLP endpoint; failures reach the file log only", "level": "warning", "timestamp": "2026-09-25T19:59:25.299721Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-221/test_compile_folder_include_im0/target (max_depth=5, import_depth=1, include_imports=True)", "level": "info", "timestamp": "2026-09-25T19:59:25.328744Z"}
+{"event": "Found 2 files (1 imported)", "level": "info", "timestamp": "2026-09-25T19:59:25.329048Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-221/test_compile_folder_include_im0/out/target_20260925-195925.md", "level": "info", "timestamp": "2026-09-25T19:59:25.329464Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-221/test_compile_folder_without_im0/target (max_depth=5, import_depth=1, include_imports=False)", "level": "info", "timestamp": "2026-09-25T19:59:25.330467Z"}
+{"event": "Found 1 compilable files", "level": "info", "timestamp": "2026-09-25T19:59:25.330666Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-221/test_compile_folder_without_im0/out/target_20260925-195925.md", "level": "info", "timestamp": "2026-09-25T19:59:25.330870Z"}
+{"event": "Compiling folder: /tmp/pytest-of-raka/pytest-221/test_compile_folder_follows_ma0/docs_pack (max_depth=5, import_depth=1, include_imports=True)", "level": "info", "timestamp": "2026-09-25T19:59:25.331865Z"}
+{"event": "Found 2 files (1 imported)", "level": "info", "timestamp": "2026-09-25T19:59:25.332248Z"}
+{"event": "Compiled markdown written to: /tmp/pytest-of-raka/pytest-221/test_compile_folder_follows_ma0/out/docs_pack_20260925-195925.md", "level": "info", "timestamp": "2026-09-25T19:59:25.332525Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:59:25.360196Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:59:25.360634Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:59:25.360703Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:59:25.361854Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:59:25.362126Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:59:25.362207Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:59:25.363316Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:59:25.363595Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:59:25.363660Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:59:25.365019Z"}
+{"event": "Overriding of current TracerProvider is not allowed", "level": "warning", "timestamp": "2026-09-25T19:59:25.365425Z"}
+{"event": "observability_degraded reason=OTEL_EXPORTER_OTLP_ENDPOINT empty — traces are collected in-process only environment=production", "level": "info", "timestamp": "2026-09-25T19:59:25.365494Z"}
+{"event": "browser_binary_rejected_untrusted_permissions", "level": "warning", "timestamp": "2026-09-25T19:59:26.409627Z"}
+{"event": "browser_binary_rejected_untrusted_permissions", "level": "warning", "timestamp": "2026-09-25T19:59:26.410673Z"}
+{"event": "observability_degraded reason=SENTRY_DSN empty — error tracking is off environment=production hint=Set SENTRY_DSN or set ENVIRONMENT=development to silence this warning", "level": "info", "timestamp": "2026-09-25T19:59:26.429436Z"}
+{"event": "sentry_ready environment=production", "level": "info", "timestamp": "2026-09-25T19:59:26.430134Z"}
+{"event_name": "security.audit", "event_category": "auth", "recent_failures": 1, "event": "auth_or_challenge_failure", "level": "warning", "timestamp": "2026-09-25T19:59:26.430661Z"}
+{"event_name": "security.audit", "event_category": "auth", "recent_failures": 1, "event": "auth_or_challenge_failure", "level": "warning", "timestamp": "2026-09-25T19:59:26.431716Z"}
+{"detail": "value", "event": "some_event", "level": "warning", "timestamp": "2026-09-25T19:59:26.434397Z"}
+{"positional_args": ["TimeoutError('x')"], "event": "Load state wait failed, proceeding: %s", "level": "warning", "timestamp": "2026-09-25T19:59:26.435079Z"}
+{"err": "TimeoutError('x')", "event": "load_state_wait_failed_proceeding", "level": "warning", "timestamp": "2026-09-25T19:59:26.435295Z"}
+{"err": "TimeoutError('15000ms exceeded')", "event": "load_state_wait_failed_proceeding", "level": "warning", "timestamp": "2026-09-25T19:59:26.436492Z"}

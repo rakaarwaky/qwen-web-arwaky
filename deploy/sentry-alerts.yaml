@@ -1,19 +1,113 @@
-version: 1
+version: 2
 service: qwen-web-arwaky
-# Starter policy. Configure notification targets in the Sentry project.
+# Alerting contract. Configure notification targets in the Sentry project.
+#
+# Every rule maps to an operator runbook so an alert can be actioned without
+# reading source: `runbook` is the file under docs/runbooks/ that covers the
+# incident. Rules with `error_type` fire on the matching exception; rules with
+# `category` fire on the ErrorCategory emitted with the structured log event.
+#
+# Because observability degrades to file_only when neither SENTRY_DSN nor
+# OTEL_EXPORTER_OTLP_ENDPOINT is set (issue #297), a production host with no
+# error tracking configured raises no alert at all. `qwen-web-arwaky doctor`
+# reports that as a WARNING; provision SENTRY_DSN on every production host
+# before relying on these rules.
+
 alerts:
   - name: session-expiry-critical
     error_type: AuthRequiredError
+    runbook: docs/runbooks/auth-expiry.md
     threshold: 2
     window: 10m
     severity: critical
+    detail: >-
+      Unattended jobs are blocked by an expired or revoked Qwen session.
+      Recovery needs an interactive CAPTCHA, so page the on-call.
+
   - name: browser-launch-failure
     error_type: BrowserLaunchError
+    runbook: docs/runbooks/browser-launch.md
     threshold: 3
     window: 5m
     severity: critical
+    detail: >-
+      Chromium is failing to launch. Check the Playwright cache, the sandbox
+      mode reported by doctor, and host memory (issue #291).
+
   - name: rate-limit-warning
     error_type: RateLimitError
+    runbook: docs/runbooks/rate-limit.md
     threshold: 10
     window: 15m
     severity: warning
+    detail: >-
+      Qwen is throttling. Lower QWEN_WEB_MAX_WORKERS / QWEN_SWARM_CONCURRENCY
+      or back off the schedule.
+
+  - name: categorized-error-backlog
+    category: other
+    runbook: docs/runbooks/other.md
+    threshold: 5
+    window: 15m
+    severity: warning
+    detail: >-
+      Errors that fall into no known ErrorCategory are accumulating. Triage
+      with `doctor`, then classify the new failure mode.
+
+  - name: network-failures
+    category: network
+    runbook: docs/runbooks/network.md
+    threshold: 5
+    window: 10m
+    severity: warning
+    detail: Host or upstream network failure. Verify egress before retrying jobs.
+
+  - name: response-timeouts
+    category: response_timeout
+    runbook: docs/runbooks/response-timeout.md
+    threshold: 3
+    window: 15m
+    severity: warning
+    detail: >-
+      Dispatches are not producing a detectable response. Check for a DOM
+      change on chat.qwen.ai before escalating.
+
+  - name: stuck-runs
+    category: stuck
+    runbook: docs/runbooks/stuck.md
+    threshold: 3
+    window: 15m
+    severity: warning
+    detail: >-
+      Runs are stalling with no forward progress. Consider raising
+      QWEN_STREAM_SAFETY_TIMEOUT_SEC after confirming the model is responding.
+
+  - name: disk-pressure
+    category: file_io
+    runbook: docs/runbooks/disk-exhaustion.md
+    threshold: 3
+    window: 10m
+    severity: critical
+    detail: >-
+      Writes are failing on the XDG state partition. Free space, then prune
+      rotated logs and per-run job logs.
+
+  - name: session-corruption
+    category: session
+    runbook: docs/runbooks/session-corruption.md
+    threshold: 1
+    window: 60m
+    severity: critical
+    detail: >-
+      The master session profile failed validation. Restore the newest
+      generation under qwen_session/.backups before attempting a new login.
+
+  - name: update-failure
+    category: update
+    runbook: docs/runbooks/update-failure.md
+    threshold: 1
+    window: 24h
+    severity: warning
+    detail: >-
+      A self-update failed postflight and rolled back. Pin the host to the
+      last known-good version until the release is re-examined.
