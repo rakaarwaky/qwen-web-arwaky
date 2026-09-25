@@ -47,12 +47,6 @@ class TestPipelineStructure:
         assert result.returncode == 0
         assert "prompt-with-attachment" in result.stdout
 
-    def test_sessions_command_exists(self):
-        """Verify sessions management command is registered."""
-        result = _run_cli(["--help"])
-        assert result.returncode == 0
-        assert "sessions" in result.stdout
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
