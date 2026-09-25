@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import threading
+import time
 import types
 from contextlib import nullcontext, suppress
 from datetime import datetime, timezone
@@ -38,6 +39,12 @@ with suppress(ImportError):
 
 from modules.core.src.utility_core_io_writer import atomic_write_json, ensure_dir
 from modules.core.src.utility_core_logger_factory import get_logger
+from modules.core.src.utility_telemetry_scrubber import (
+    harden_private_dir,
+    harden_private_file,
+    scrub_span_attributes,
+    scrub_telemetry_event,
+)
 from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
@@ -100,6 +107,7 @@ class MetricsCounter(IMetricsProtocol):
                 "successful_executions": successful,
             },
         )
+        harden_private_file(self._metrics_path)
 
     def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
         """Add *amount* to the counter *key* and persist the metrics file."""
@@ -230,9 +238,11 @@ class ObservabilitySetup(IObservabilityProtocol):
             run on their own threads and emit log records that would otherwise
             be written straight to the terminal, corrupting the TUI canvas.
         """
-        # Step 1: Ensure log target directory
+        # Step 1: Ensure log target directory. Log records carry local paths
+        # and run metadata, so the directory is created with owner-only
+        # permissions regardless of the process umask (issue #352).
         target_path = log_path or self._log_path
-        target_path.mkdir(parents=True, exist_ok=True)
+        harden_private_dir(target_path)
 
         # Step 2: Configure error tracking & tracing
         self._configure_sentry()
@@ -245,7 +255,13 @@ class ObservabilitySetup(IObservabilityProtocol):
         install_excepthooks()
 
     def _configure_sentry(self) -> None:
-        """Configure Sentry (private helper)."""
+        """Configure Sentry with a scrubbing hook on all outbound events.
+
+        Security (issue #352): the ``before_send`` hook redacts host paths and
+        prompt-derived fields so no local data leaves the host unless an
+        operator explicitly opted in with ``SENTRY_DSN``. An empty DSN is a
+        hard no-op.
+        """
         if sentry_sdk is None:
             return
         dsn = os.getenv("SENTRY_DSN", "")
@@ -256,10 +272,15 @@ class ObservabilitySetup(IObservabilityProtocol):
                 dsn=dsn,
                 environment=os.getenv("ENVIRONMENT", "production"),
                 traces_sample_rate=1.0,
+                before_send=scrub_telemetry_event,
             )
 
     def _configure_tracing(self) -> None:
-        """Configure OpenTelemetry tracing (private helper)."""
+        """Configure OpenTelemetry tracing with span-attribute scrubbing.
+
+        Security (issue #352): OTLP egress is opt-in; when an endpoint is set,
+        span attributes are scrubbed so local home paths never leave the host.
+        """
         if otel_trace is None or OTelResource is None or OTelTracerProvider is None:
             return
         try:
@@ -270,7 +291,9 @@ class ObservabilitySetup(IObservabilityProtocol):
                 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
                 if endpoint and OTelBatchSpanProcessor is not None:
-                    provider.add_span_processor(OTelBatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+                    provider.add_span_processor(
+                        OTelBatchSpanProcessor(_make_scrubbed_exporter(OTLPSpanExporter(endpoint=endpoint)))
+                    )
             except ImportError:
                 pass
             otel_trace.set_tracer_provider(provider)
@@ -296,6 +319,7 @@ class ObservabilitySetup(IObservabilityProtocol):
                 )
                 file_handler.setFormatter(self._formatter)
                 root.addHandler(file_handler)
+                harden_private_file(log_path / "app.jsonl")
             except OSError:
                 pass
             return
@@ -348,6 +372,7 @@ class ObservabilitySetup(IObservabilityProtocol):
             )
             file_handler.setFormatter(formatter)
             root.addHandler(file_handler)
+            harden_private_file(log_path / "app.jsonl")
         except OSError:
             pass
 
@@ -381,13 +406,16 @@ class ObservabilitySetup(IObservabilityProtocol):
         """
         jobs_dir = DEFAULT_JOBS_DIR
         try:
-            jobs_dir.mkdir(parents=True, exist_ok=True)
+            # Per-run JSONL artifacts carry local paths and run metadata, so the
+            # jobs directory and every file in it are owner-only (issue #352).
+            harden_private_dir(jobs_dir)
             safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", job_name).strip("._") or "run"
             ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
             path = jobs_dir / f"{safe_name}_{ts}_{run_id}.jsonl"
             if self._formatter is not None:
                 handler = RotatingFileHandler(path, maxBytes=10 * 1024 * 1024, backupCount=2, encoding="utf-8")
                 handler.setFormatter(self._formatter)
+                harden_private_file(path)
                 # Keep only records whose bound run_id matches this run so
                 # overlapping runs never leak records into each other's log.
                 handler.addFilter(_make_run_id_filter(str(run_id)))
@@ -525,16 +553,122 @@ def _thread_excepthook(args: Any) -> None:
     _report_critical(logger, args.exc_value, "unhandled_exception_in_thread")
 
 
+# ─── Security audit channel (issue #354) ───────────────────────────────────
+# Authentication failures and CAPTCHA challenges are security signals: they can
+# indicate a session-hijack attempt, account lockout, or automation abuse. The
+# audit logger records every event on the ``security.audit`` channel so an
+# operator aggregating ``app.jsonl`` can distinguish a single cookie-expiry
+# from a burst of bot challenges. The rolling-window counter lets SIEM tools
+# alert on repeated challenges without a second state store.
+
+_security_audit_logger = _get_logger("security.audit")
+
+# A window longer than this makes the counter useless for live incident
+# response; shorter windows would need more state than the process can justify.
+_AUTH_FAILURE_WINDOW_SEC = 60.0
+_ALERT_THRESHOLD = 5
+_auth_failure_events: list[tuple[float, str]] = []
+_auth_failure_lock = threading.Lock()
+
+
+def _record_auth_failure(event_category: str) -> None:
+    """Record one auth/challenge failure and log it on the security.audit channel.
+
+    The event is emitted at warning level so it is visible in default logging
+    configuration; the structured fields (``event_name``, ``event_category``,
+    ``recent_failures``) are what SIEM ingestion keys on. Sustained failures
+    escalate to ``security_alert`` at error level.
+    """
+    now = time.time()
+    with _auth_failure_lock:
+        # Prune events outside the window so the counter stays bounded.
+        _auth_failure_events[:] = [(ts, cat) for ts, cat in _auth_failure_events if now - ts < _AUTH_FAILURE_WINDOW_SEC]
+        _auth_failure_events.append((now, event_category))
+        recent_count = len(_auth_failure_events)
+
+    _security_audit_logger.warning(
+        "auth_or_challenge_failure",
+        event_name="security.audit",
+        event_category=event_category,
+        recent_failures=recent_count,
+    )
+    if recent_count >= _ALERT_THRESHOLD:
+        _security_audit_logger.error(
+            "security_alert",
+            event_name="security.audit",
+            alert="auth_failure_threshold_exceeded",
+            threshold=_ALERT_THRESHOLD,
+            recent_failures=recent_count,
+            window_sec=_AUTH_FAILURE_WINDOW_SEC,
+        )
+
+
+def auth_failure_count(window_sec: float = _AUTH_FAILURE_WINDOW_SEC) -> int:
+    """Return the number of auth/challenge failures recorded in *window_sec*.
+
+    Exposed so ``MetricsCounter.snapshot()`` or a custom exporter can surface
+    the same value as a metric without duplicating the counter state.
+    """
+    with _auth_failure_lock:
+        now = time.time()
+        cutoff = now - window_sec
+        return sum(1 for ts, _cat in _auth_failure_events if ts >= cutoff)
+
+
 def _report_critical(logger: Any, exc_value: BaseException, event_name: str) -> None:
-    """Log a critical exception and attempt Sentry capture."""
+    """Log a critical exception and attempt Sentry capture.
+
+    Security (issue #354): auth-class exceptions are additionally routed to
+    the ``security.audit`` channel so operators can track repeated challenges.
+    """
+    category = ErrorCategory.categorize(exc_value)
+    if category in ("auth", "rate_limit"):
+        _record_auth_failure(category)
     logger.critical(
         event_name,
         exc_info=(type(exc_value), exc_value, exc_value.__traceback__),
         exc_type=type(exc_value).__name__,
-        category=ErrorCategory.categorize(exc_value),
+        category=category,
     )
     if sentry_sdk is not None:
         sentry_sdk.capture_exception(exc_value)
+
+
+# ─── OTel span scrubber (issue #352) ────────────────────────────────────────
+
+
+def _make_scrubbed_exporter(exporter: Any) -> Any:
+    """Wrap an OTel span exporter so every batch has host paths scrubbed first.
+
+    The wrapper implements ``export(spans, ...)`` with the same signature,
+    scrubbing each span's attributes in place before delegating to the
+    original exporter. This keeps scrubbing transparent to all span
+    producers without requiring changes at each call site.
+    """
+
+    def _scrub_spans(spans: Any) -> None:
+        for span in spans:
+            attrs = getattr(span, "attributes", None)
+            if attrs:
+                scrubbed = scrub_span_attributes(dict(attrs))
+                for key in list(attrs.keys()):
+                    attrs.pop(key)
+                attrs.update(scrubbed)
+
+    def export(spans: Any, *args: Any, **kwargs: Any) -> Any:
+        _scrub_spans(spans)
+        return exporter.export(spans, *args, **kwargs)
+
+    def shutdown(*args: Any, **kwargs: Any) -> None:
+        with suppress(Exception):
+            exporter.shutdown(*args, **kwargs)
+
+    def force_flush(*args: Any, **kwargs: Any) -> Any:
+        with suppress(Exception):
+            return exporter.force_flush(*args, **kwargs)
+
+    # BatchSpanProcessor expects an ExportSpan with .export/.shutdown/.force_flush
+    return types.SimpleNamespace(export=export, shutdown=shutdown, force_flush=force_flush)
 
 
 def install_excepthooks() -> None:
@@ -542,5 +676,14 @@ def install_excepthooks() -> None:
     sys.excepthook = _excepthook
     threading.excepthook = _thread_excepthook
 
+
+__all__ = [
+    "auth_failure_count",
+    "get_status_writer",
+    "MetricsCounter",
+    "ObservabilitySetup",
+    "StatusFileWriter",
+    "install_excepthooks",
+]
 
 log = get_logger("capabilities_observability")

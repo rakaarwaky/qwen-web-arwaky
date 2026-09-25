@@ -4,6 +4,9 @@ version = "6.0.0"
 description = "qwen-web shared taxonomy, contracts, and utilities (domain layer)"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+dependencies = [
+    "typing_extensions>=4.5.0",
+]
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
