@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -27,6 +28,7 @@ import modules.cli.src.surface_cli_init_command as surface_cli_init_command
 import modules.cli.src.surface_cli_interactive_controller as surface_cli_interactive_controller
 import modules.cli.src.surface_cli_login_command as surface_cli_login_command
 import modules.cli.src.surface_cli_run_command as surface_cli_run_command
+import modules.cli.src.surface_cli_sessions_command as surface_cli_sessions_command
 import modules.cli.src.surface_cli_update_command as surface_cli_update_command
 from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
@@ -77,6 +79,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Reinstall package and browser binaries even when already up to date",
     )
+
+    # ── sessions ────────────────────────────────────────────────────────────
+    p_sessions = sub.add_parser("sessions", help="Manage Qwen login sessions", parents=[parent])
+    sessions_sub = p_sessions.add_subparsers(dest="session_command")
+    sessions_sub.add_parser("list", help="List all sessions")
+    sessions_login = sessions_sub.add_parser("login", help="Add a new session")
+    sessions_login.add_argument("--name", required=True, help="Session name (e.g., personal, work)")
+    sessions_sub.add_parser("health-check", help="Check health of all sessions")
+    sessions_remove = sessions_sub.add_parser("remove", help="Remove a session")
+    sessions_remove.add_argument("session_id", help="Session ID to remove")
+    sessions_sub.add_parser("status", help="Show detailed session status")
 
     # ── prompt-direct ─────────────────────────────────────────────────────────
     p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
@@ -133,6 +146,33 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
 
     return p.parse_args(argv)
+
+
+def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedContainer) -> None:
+    """Resolve session path for prompt commands using rotation.
+
+    Only runs for prompt-direct / prompt-only / prompt-with-attachment when
+    multiple sessions exist. Picks a healthy session and overrides cfg.session_path.
+    """
+    action = getattr(args, "action", None)
+    if action not in ("prompt-direct", "prompt-only", "prompt-with-attachment"):
+        return
+
+    pool = container.session_manager.load_pool()
+    if pool.total_count <= 1:
+        return
+
+    async def _pick() -> Path | None:
+        session = await container.session_rotator.get_next_session()
+        return session.path if session else None
+
+    try:
+        session_path = asyncio.run(_pick())
+    except Exception:
+        session_path = None
+
+    if session_path is not None and session_path != DEFAULT_SESSION:
+        args._session_override = session_path
 
 
 def _build_config(args: argparse.Namespace) -> AppConfig:
@@ -208,11 +248,14 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         "mcp": "mcp",
     }
 
+    # Check for session path override from rotation
+    effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
+
     return AppConfig(
         mode=mode_map.get(action, "direct"),
         input_path=prompt_p or dummy_path,
         output_path=out_p,
-        session_path=DEFAULT_SESSION,
+        session_path=effective_session,
         log_path=DEFAULT_LOG,
         headless=headless,
         verbose=verbose,
@@ -292,6 +335,7 @@ def _dispatch(
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
+            container.session_manager,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -316,6 +360,9 @@ def _dispatch(
         result = surface_cli_update_command.handle(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
 
+    if action == "sessions":
+        return surface_cli_sessions_command.handle_sessions(args)
+
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
         return 1
@@ -324,6 +371,8 @@ def _dispatch(
     container.observability.setup_observability(log_path=resolved_log_path, verbose=cfg.verbose)
 
     args._cfg = cfg
+    # Resolve session rotation before dispatch
+    _resolve_session_for_prompt(args, container)
     result = surface_cli_run_command.handle(
         args,
         cfg,

@@ -47,6 +47,9 @@ class _TuiHandlersMixin:
     call_from_thread: Any
     notify: Any
     _session: Any
+    _session_manager: Any
+    _refresh_sessions_table: Any
+    _run_session_health_check: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -83,6 +86,16 @@ class _TuiHandlersMixin:
         if button_id.startswith("btn-copy-log-"):
             slot_id = int(button_id.removeprefix("btn-copy-log-"))
             self._copy_slot_log(slot_id)
+            return
+        # Session management buttons
+        if button_id == "btn-sessions-refresh":
+            self._refresh_sessions_table()
+            return
+        if button_id == "btn-sessions-login":
+            self._session_login_action()
+            return
+        if button_id == "btn-sessions-health":
+            self._run_session_health_check()
             return
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -287,6 +300,31 @@ class _TuiHandlersMixin:
 
     def action_init_action(self) -> None:
         """U8: trigger workspace initialization on a background thread."""
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
+        self._init_worker()
+
+    def _session_login_action(self) -> None:
+        """Handle session login button click."""
+        if not hasattr(self, "_session_manager") or self._session_manager is None:
+            self._log_msg("[yellow]Session manager not available.[/]")
+            return
+        self.push_screen(
+            SessionSetupScreen(
+                status_text="Session Login",
+                on_login=lambda confirmed: self._run_session_login(confirmed),
+                on_back=lambda: self._log_msg("[dim]Login cancelled.[/]"),
+            )
+        )
+
+    def _run_session_login(self, confirmed: bool) -> None:
+        """Run the session login process."""
+        if not confirmed:
+            return
+        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Starting session login...[/]")
+        # This will be handled by the CLI sessions login command via subprocess
+        self.notify(
+            "Use 'qwen-web-arwaky sessions login --name <name>' to add a session", title="Info", severity="information"
+        )
         self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
         self._init_worker()
 

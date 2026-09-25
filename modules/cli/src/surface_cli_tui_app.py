@@ -32,6 +32,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.taxonomy_swarm_vo import SwarmId
@@ -100,6 +101,7 @@ class QwenTuiApp(
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
+        session_manager: ISessionManagerProtocol | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -110,6 +112,7 @@ class QwenTuiApp(
         self._session = session
         self._jobs = jobs
         self._swarm = swarm
+        self._session_manager = session_manager
         self._swarm_id: SwarmId | None = None
         # AR-1: TUI slot config is injected from the Root container, never
         # imported from Capabilities directly.

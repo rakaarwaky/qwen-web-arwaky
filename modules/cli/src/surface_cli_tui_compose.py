@@ -91,7 +91,29 @@ class _TuiComposeMixin:
                     classes="metric-item",
                 )
 
-            # ─── Tab 2: Adaptive Swarm ─────────────────────────
+            # ─── Tab 2: Session Pool ────────────────────────
+            with TabPane("Sessions 👤", id="tab-sessions"), Vertical(classes="overview-container"):
+                with Horizontal(classes="metrics-bar"):
+                    yield Label("SESSION POOL STATUS", classes="metric-item")
+                    yield Label("TOTAL: 0", id="session-total", classes="metric-item")
+                    yield Label("HEALTHY: 0", id="session-healthy", classes="metric-item")
+                    yield Label("LIMITED: 0", id="session-limited", classes="metric-item")
+                yield Label("Registered Sessions", classes="field-label")
+                yield DataTable(id="sessions-table")
+                with Horizontal(classes="toggle-row"):
+                    yield Button("🔄 Refresh", id="btn-sessions-refresh", variant="default")
+                    yield Button("🔐 Add Session", id="btn-sessions-login", variant="primary")
+                    yield Button("🏥 Health Check", id="btn-sessions-health", variant="default")
+                yield QwenTuiRichLog(
+                    id="log-view-sessions",
+                    highlight=True,
+                    markup=True,
+                    max_lines=500,
+                    auto_scroll=True,
+                    wrap=True,
+                )
+
+            # ─── Tab 3: Adaptive Swarm ─────────────────────────
             with TabPane("Swarm ◈", id="tab-swarm"), Vertical(classes="overview-container"):
                 yield Label("Attachment File or Folder", classes="field-label")
                 with Horizontal(classes="field-row"):
