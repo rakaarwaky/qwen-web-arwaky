@@ -50,6 +50,8 @@ class _TuiWorkersMixin:
     _session: Any
     _swarm: Any
     _swarm_id: str | None
+    _swarm_pending_input: Path | None
+    _confirm_or_start_swarm: Any
     _session_check_timed_out: bool
     _last_session_state: str | None
     _login_in_flight: bool
@@ -291,7 +293,11 @@ class _TuiWorkersMixin:
         if not raw_input:
             self.notify("Select a file or folder before starting Swarm.", severity="error")
             return
-        self._swarm_worker(input_path)
+        # Issue #277: a Swarm that launches 4+ browsers confirms first; below
+        # that threshold the start is silent. Presentation lives in the app
+        # class so this file stays within its control-flow budget (AES406).
+        self._swarm_pending_input = input_path
+        self._confirm_or_start_swarm(input_path)
 
     def _cancel_swarm(self) -> None:
         if self._swarm_id is None or self._swarm is None:

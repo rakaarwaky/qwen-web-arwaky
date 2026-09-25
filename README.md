@@ -127,7 +127,7 @@ For MCP client configuration, use the checked-in [`mcp.local.json`](mcp.local.js
 
 The application recognizes these environment variable names:
 
-- `QWEN_DEFAULT_MODEL`
+- `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` — target model (default `Qwen3.8-Max`); the `--model` flag overrides both. A name the picker does not offer degrades to the first available model with a WARNING instead of failing the run.
 - `QWEN_WORKSPACE_ROOT`
 - `QWEN_ENABLE_SANDBOX`
 - `QWEN_DISABLE_SANDBOX`

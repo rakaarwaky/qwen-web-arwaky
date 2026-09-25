@@ -337,6 +337,21 @@ It implements the AES Capabilities and Agent layers: Playwright browser
   writable (file handler skipped); no active span; hook installed twice.
 - **Error Handling**: all third-party init is wrapped in `suppress` /
   `ImportError` guards. File handler `OSError` is ignored.
+- **Update rollback outcomes (issue #279)**: `UpdateReport.rollback_status`
+  disambiguates what a failed update did with the previous version:
+  - [ ]  **Full rollback** (`rollback_status="full"`): package and browser
+    both restored to the previous version; `rolled_back=True`.
+  - [ ]  **Partial rollback** (`rollback_status="partial"`): package
+    restored but browser sync failed (or vice versa); `rolled_back=True`
+    and the report message ends with `Partial rollback: package restored
+    but browser sync failed. Run `qwen-web-arwaky update --force` to retry
+    browser sync.`
+  - [ ]  **Skipped rollback** (`rollback_status="skipped"`): the previous
+    version is unknown, or an editable install was detected;
+    `rolled_back=False` and the step detail says exactly how to recover
+    (`git checkout` for editable installs, manual `pip install` otherwise).
+  - [ ]  No rollback needed (`rollback_status="none"`): the update was
+    healthy; `rolled_back=False`.
 - **Acceptance Criteria**:
   - [ ]  `setup_observability` succeeds with no Sentry/OTel installed.
   - [ ]  JSON renderer is used when stderr is not a TTY and env is production.
@@ -408,6 +423,18 @@ The Swarm feature is approved product scope under change request CR-2026-004
   - A retryable failure (rate limit, timeout/timed out, connection/network,
     empty, stuck) is retried up to `max_attempts`; a non-retryable error
     fails that agent immediately without touching siblings.
+  - **Resource governance (issue #277)**: the Swarm must never bypass the
+    shared guards. `SharedContainer` injects its `CircuitBreaker` and
+    `RateLimiter` into the orchestrator; before each agent attempt the
+    breaker is checked (a tripped breaker fails that agent only, siblings
+    keep their in-flight browsers) and a rate-limit slot is acquired
+    (a busy slot waits for the reported backoff, which the user can still
+    cancel). **Maximum concurrent browsers per Swarm = min(DEFAULT_MAX_WORKERS,
+    available_system_memory / 512 MB)**, hard-capped at 10. A Swarm with
+    4+ concurrent browsers surfaces the TUI warning
+    `"This will launch up to N browser processes. Continue?"` via
+    `SwarmOrchestrator.resource_warning`, shown through a `ConfirmModal`
+    before the fan-out starts.
   - Cancellation is per-agent via `threading.Event` passed as
     `cancel_event` into `IAttachmentPromptAggregate`: cancelling the swarm
     sets every agent event and calls the contract-level `request_cancel`

@@ -220,6 +220,10 @@ class UpdateReport:
     healthy: bool = False
     message: str = ""
     rolled_back: bool = False
+    # Issue #279: disambiguate what a failed update did with the previous
+    # version. "rolled_back" alone cannot tell a partial package-restore from
+    # a fully skipped rollback.
+    rollback_status: str = "none"  # "full" | "partial" | "skipped" | "none"
 
 
 @dataclass
@@ -546,6 +550,10 @@ class AppConfig:
     rate_limit_per_minute: int = 60
     circuit_breaker_threshold: int = 5
     circuit_breaker_window: int = 30
+
+    # Issue #283: stakeholder-configurable model override. Empty means "use
+    # the compiled default (QWEN_DEFAULT_MODEL / QWEN_MODEL env var)".
+    model: str = ""
 
     retry_failed: bool = False
 

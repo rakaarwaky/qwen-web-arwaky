@@ -101,8 +101,10 @@ NAVIGATION_LOAD_TIMEOUT_MS = 15_000
 
 # Default model. Pipeline forces this on every chat session so the
 # user never has to pick a model manually (idempotent per-session).
-# Overridable via QWEN_DEFAULT_MODEL environment variable.
-DEFAULT_MODEL = os.environ.get("QWEN_DEFAULT_MODEL", "Qwen3.8-Max").strip() or "Qwen3.8-Max"
+# Overridable via the QWEN_MODEL or QWEN_DEFAULT_MODEL environment variable, or
+# per-run via the --model CLI flag (issue #283). QWEN_DEFAULT_MODEL is checked
+# first so existing deployments keep their current value.
+DEFAULT_MODEL = os.environ.get("QWEN_DEFAULT_MODEL", os.environ.get("QWEN_MODEL", "")).strip() or "Qwen3.8-Max"
 
 # Accessible-name locators for the chat model picker.
 MODEL_SELECTOR_BUTTON = "Select Model"

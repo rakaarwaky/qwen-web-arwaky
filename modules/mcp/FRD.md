@@ -94,3 +94,36 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 
 - **Predictability & Safety**: Destructive actions (session deletion) require explicit confirmation flags.
 - **Path Resolution**: Relative paths and user paths (`~`) are automatically expanded and resolved before execution.
+
+## UAT Sign-off Criteria (AI agent consumers)
+
+Issue #286: the acceptance scenarios for the AI-agent consumer persona. The
+locked test file is `modules/mcp/tests/unit_mcp_uat_signoff.py`
+(marker `uat`); each scenario below maps to one test, and the JSON payload
+the agent receives is the recorded evidence. Live display and network
+scenarios are marked manual because they need a real host.
+
+| ID | Scenario | Expected | Locked by |
+|---|---|---|---|
+| UAT-MCP-004 | `delete_session` with `confirm=False` | `success=false`, `error.code=CONFIRMATION_REQUIRED`, session NOT deleted | `test_uat_mcp_004_delete_session_without_confirm_is_refused` |
+| UAT-MCP-005 | `delete_session` with `confirm=True` | `success=true`, session directory removed | `test_uat_mcp_005_delete_session_with_confirm_succeeds` |
+| UAT-MCP-006 | Full async job lifecycle: submit → poll ×3 → `COMPLETED` | `ACCEPTED` → `RUNNING` → `COMPLETED` with `output_file` present on the completed envelope | `test_uat_mcp_006_async_job_full_lifecycle` |
+| UAT-MCP-007 | `process_direct_prompt` with an empty prompt | `error.code=VALIDATION_ERROR`, `error.field=prompt`, aggregate never invoked | `test_uat_mcp_007_empty_prompt_is_rejected` |
+| UAT-MCP-008 | `setup_session` on a display-less host | `error.code=SETUP_SESSION_FAILED`, `retryable=false`, non-empty `hint` (display requirement) | `test_uat_mcp_008_setup_session_error_carries_actionable_hint` |
+| UAT-MCP-009 | `init_workspace` with an unwritable `target_dir` | `error.code=INIT_WORKSPACE_FAILED`, non-empty `hint` | `test_uat_mcp_009_unwritable_init_workspace_target_is_reported` |
+
+**Error-recovery contract the agent relies on**
+
+- `retryable=true` → resubmit after the hint's delay; `retryable=false` →
+  fix the environment (display, permissions, login) before retrying.
+- `CONFIRMATION_REQUIRED` is the only confirmation error; the agent re-issues
+  the call with `confirm=true` rather than aborting the session flow.
+- `RATE_LIMITED` always carries `retryable=true` and `retry_after_sec`.
+
+**Sign-off status**
+
+| Item | Status |
+|---|---|
+| UAT-MCP-004 … UAT-MCP-009 | ☑ Automated, run in CI under marker `uat` |
+| Live `setup_session` with a real display | ☐ Manual — needs a headed host + login |
+| Live async job against chat.qwen.ai | ☐ Manual — needs network + valid session |

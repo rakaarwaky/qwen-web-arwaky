@@ -172,11 +172,16 @@ class SharedContainer:
         swarm_workers = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else max_workers
         swarm_headless_env = os.environ.get("QWA_SWARM_HEADLESS", "").strip()
         swarm_headless = swarm_headless_env != "0" and swarm_headless_env.casefold() != "false"
+        # Issue #277: the Swarm fan-out must respect the same shared resource
+        # guards as the job pipeline — the shared breaker and limiter are
+        # injected so 10 concurrent agent attempts cannot bypass them.
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
             attachment=self.agent_attachment_prompt_orchestrator,
             folder_adapter=self.folder_adapter,
             browser_concurrency=swarm_workers,
             headless=swarm_headless,
+            circuit_breaker=self.cb,
+            rate_limiter=self.rl,
         )
 
     def wire(self) -> None:

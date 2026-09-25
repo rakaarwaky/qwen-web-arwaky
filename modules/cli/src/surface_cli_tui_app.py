@@ -13,11 +13,13 @@ All logic is split across focused mixin modules:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from textual.app import App
 from textual.binding import Binding
 
+from modules.cli.src.surface_cli_tui_components import ConfirmModal
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
 from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
@@ -146,6 +148,36 @@ class QwenTuiApp(
         self._login_in_flight: bool = False
         # U7: generation token per-slot to guard _finalize_slot against stale workers.
         self._slot_generation: dict[int, int] = {s: 0 for s in range(1, NUM_SLOTS + 1)}
+        # Issue #277: input held while the Swarm resource modal is up.
+        self._swarm_pending_input: Path | None = None
+
+    # ── Swarm resource-governance presentation (issue #277) ────────────────────
+    # Lives on the App so the Workers mixin stays within its AES406
+    # control-flow budget. Below the threshold a Swarm starts immediately; at
+    # or above it, ConfirmModal asks the user to confirm the fan-out first.
+    def _confirm_or_start_swarm(self, input_path: Path) -> None:
+        """Start the Swarm, presenting a resource warning modal when needed."""
+        warning = getattr(self._swarm, "resource_warning", None)
+        if warning is None:
+            self._swarm_pending_input = None
+            self._swarm_worker(input_path)
+            return
+        self.push_screen(
+            ConfirmModal(
+                title="Swarm Resource Usage",
+                message=warning,
+                confirm_label="Start Swarm",
+            ),
+            callback=self._on_swarm_confirmed,
+        )
+
+    def _on_swarm_confirmed(self, confirmed: bool) -> None:
+        """Launch the held Swarm only when the user confirmed the modal."""
+        pending = self._swarm_pending_input
+        self._swarm_pending_input = None
+        if not confirmed or pending is None:
+            return
+        self._swarm_worker(pending)
 
 
 __all__ = [

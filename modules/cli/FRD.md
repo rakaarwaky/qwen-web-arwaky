@@ -15,6 +15,7 @@ The root parser reads `sys.argv` using a subcommand-based interface (`init`, `lo
 | Subcommand | Signal | Result | Validation |
 |---|---|---|---|
 | `doctor` | `qwen-web-arwaky doctor [--json] [--smoke]` | System health diagnostic | Checks Python, Playwright, workspace, session, permissions; `--smoke` adds a headless browser round-trip (FR-004). |
+| `--model` (all subcommands) | `qwen-web-arwaky <action> --model NAME` | Model override | Target model. Precedence: `--model` > `QWEN_MODEL` > `QWEN_DEFAULT_MODEL` > `Qwen3.8-Max` (issue #283). An unrecognised name falls back to the first model the picker offers with a WARNING. |
 | `login` | `qwen-web-arwaky login [--headless]` | `mode="login"` | Forces headed browser for manual authentication unless overridden. |
 | `init` | `qwen-web-arwaky init [--dir]` | Workspace initialization | Creates XDG storage directories and root `.qwen-web` symlinks. |
 | `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
@@ -31,7 +32,12 @@ The no-argument TTY fallback launches the **Obsidian Nebula Textual TUI App** (`
 
 1. **Dynamic Versioning**: Header displays package version dynamically via `importlib.metadata.version("qwen-web-arwaky")`.
 2. **Safe Default Attachment**: If candidate attachment files do not exist on disk, attachment input defaults to an empty string `""` so optional fields never fail validation.
-3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_YYYYMMDD_HHMMSS.md`) is automatically resolved. Existing files are never silently overwritten.
+   **Acceptance Criteria (issue #280)**:
+   - **AC-1 Output filename uniqueness**: the auto-named output carries a timestamp *and* a 4-hex-digit suffix (`{stem}_YYYYMMDD-HHMMSS_ab12.md`). Second-level timestamps alone are not unique, so two slot runs started within the same second would otherwise overwrite each other.
+   - **AC-2 Unwritable output directory**: the slot log records `Output directory not writable: {path}. Check permissions.` and the run does not start. Writability is probed on the nearest existing ancestor, so a directory that has not been created yet is still validated.
+   - **AC-3 Missing attachment**: the slot run proceeds as prompt-only, and the slot log records `Attachment not found, running as prompt-only ({path}).`
+   - **AC-4 Unicode and space-containing paths** are used verbatim — no truncation, no encoding substitution — in both the attachment path and the resolved output filename.
+3. **Output Folder Auto-Naming**: If an output path is a directory, a timestamped filename (e.g. `qwen_output_20260921-131128_a3f1.md`) is automatically resolved. Existing files are never silently overwritten.
    Invalid, unwritable, or conflicting paths produce an actionable validation error.
 4. **Destructive Action Safety**: Session reset actions present a modal confirmation screen (`ConfirmModal`) before wiping session tokens.
 5. **Non-TTY Rejection**: Running the interactive TUI in non-interactive environments (pipes/cron) prints a helpful, example-driven guidance message pointing to subcommands and `qwen-web-arwaky doctor`.
