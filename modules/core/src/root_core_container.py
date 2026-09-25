@@ -37,6 +37,8 @@ from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
 from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.core.src.capabilities_session_manager import SessionManager
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
 from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.core.src.capabilities_update_manager import UpdateManager
@@ -51,6 +53,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISetupAggregate,
 )
 from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
+from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
@@ -140,6 +143,16 @@ class SharedContainer:
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
             observability=self.observability,
+        )
+
+        # Session rotation infrastructure
+        self.session_manager: ISessionManagerProtocol = SessionManager()
+        self.session_health_checker = SessionHealthChecker()
+        from modules.core.src.agent_session_rotation_orchestrator import SessionRotator
+
+        self.session_rotator: ISessionRotatorAggregate = SessionRotator(
+            session_manager=self.session_manager,
+            health_checker=self.session_health_checker,
         )
         self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
             browser=self.browser,
