@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import threading
@@ -20,10 +21,18 @@ from modules.shared.src.taxonomy_core_constant import (
     SWARM_CONCURRENCY_ENV,
     SWARM_OUTPUT_ROOT,
 )
+from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import HeadlessFlag
 from modules.shared.src.taxonomy_swarm_vo import AgentStatus, SwarmAgentSnapshot, SwarmId, SwarmSnapshot, SwarmStatus
 from modules.shared.src.utility_core_prompt_template import list_prompt_templates, materialize_role_template
 from modules.shared.src.utility_core_response import detect_processing_failure
+
+log = logging.getLogger(__name__)
+
+# Resource-governance policy (issue #277). Above this many concurrent browsers
+# the TUI shows an explicit warning before the fan-out starts; below it the
+# start is silent, matching the interactive cost users expect.
+SWARM_RESOURCE_WARNING_BROWSERS = 4
 
 
 class SwarmOrchestrator(ISwarmAggregate):
@@ -37,6 +46,8 @@ class SwarmOrchestrator(ISwarmAggregate):
         browser_concurrency: int | None = None,
         max_attempts: int = MAX_ATTEMPTS,
         headless: bool = True,
+        circuit_breaker: CircuitBreaker | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._attachment = attachment
         self._folder_adapter = folder_adapter
@@ -49,11 +60,29 @@ class SwarmOrchestrator(ISwarmAggregate):
             concurrency = int(browser_concurrency)
         self._browser_concurrency = min(10, max(1, concurrency))
         self._max_attempts = max(1, int(max_attempts))
+        self._circuit_breaker = circuit_breaker
+        self._rate_limiter = rate_limiter
         self._lock = threading.RLock()
         self._snapshots: dict[SwarmId, SwarmSnapshot] = {}
         self._cancel_events: dict[SwarmId, dict[str, threading.Event]] = {}
         self._executors: dict[SwarmId, ThreadPoolExecutor] = {}
         self._attachment_paths: dict[SwarmId, Path] = {}
+
+    @property
+    def browser_concurrency(self) -> int:
+        """Configured browser concurrency for a single Swarm run."""
+        return self._browser_concurrency
+
+    @property
+    def resource_warning(self) -> str | None:
+        """Return the pre-launch resource warning, or None when it is not needed.
+
+        The TUI Swarm tab presents this as a confirmation modal so a
+        resource-intensive fan-out is never started silently (issue #277).
+        """
+        if self._browser_concurrency < SWARM_RESOURCE_WARNING_BROWSERS:
+            return None
+        return f"This will launch up to {self._browser_concurrency} browser processes. Continue?"
 
     def start(self, input_path: Path) -> SwarmSnapshot:
         """Create a Swarm directory and schedule all discovered templates."""
@@ -158,6 +187,30 @@ class SwarmOrchestrator(ISwarmAggregate):
             if event.is_set():
                 self._update_agent(swarm_id, role, "cancelled", attempt - 1, output_path, "Cancelled by user", start)
                 return
+            if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
+                # The breaker only gates the agent in front of it: siblings keep
+                # their in-flight browsers, so the swarm ends partial, not aborted.
+                self._update_agent(
+                    swarm_id,
+                    role,
+                    "failed",
+                    attempt - 1,
+                    output_path,
+                    "Swarm paused: too many recent failures tripped the circuit breaker",
+                    start,
+                )
+                return
+            if self._rate_limiter is not None:
+                wait_sec = self._rate_limiter.try_acquire()
+                if wait_sec is not None:
+                    self._update_agent(
+                        swarm_id, role, "running" if attempt == 1 else "retrying", attempt, output_path, None, start
+                    )
+                    if event.wait(wait_sec):
+                        self._update_agent(
+                            swarm_id, role, "cancelled", attempt - 1, output_path, "Cancelled by user", start
+                        )
+                        return
             self._update_agent(
                 swarm_id, role, "running" if attempt == 1 else "retrying", attempt, output_path, None, start
             )
@@ -174,10 +227,14 @@ class SwarmOrchestrator(ISwarmAggregate):
                 result_text = str(result)
                 if detect_processing_failure(result_text):
                     last_error = result_text
+                    if self._circuit_breaker is not None:
+                        self._circuit_breaker.record_failure()
                     if not self._is_retryable(last_error) or attempt == self._max_attempts:
                         self._update_agent(swarm_id, role, "failed", attempt, output_path, last_error, start)
                         return
                     continue
+                if self._circuit_breaker is not None:
+                    self._circuit_breaker.record_success()
                 self._update_agent(swarm_id, role, "completed", attempt, output_path, None, start)
                 return
             except Exception as exc:
@@ -185,6 +242,8 @@ class SwarmOrchestrator(ISwarmAggregate):
                 if event.is_set():
                     self._update_agent(swarm_id, role, "cancelled", attempt, output_path, "Cancelled by user", start)
                     return
+                if self._circuit_breaker is not None:
+                    self._circuit_breaker.record_failure()
                 if not self._is_retryable(last_error) or attempt == self._max_attempts:
                     self._update_agent(swarm_id, role, "failed", attempt, output_path, last_error, start)
                     return

@@ -7,6 +7,8 @@ from pathlib import Path
 from threading import Event
 
 from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
 
 class FakeAttachmentAggregate:
@@ -212,3 +214,74 @@ def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
     snapshot = orchestrator.snapshot(initial.swarm_id)
     assert snapshot is not None
     assert snapshot.status == "cancelled"
+
+
+def test_resource_warning_only_above_threshold(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-4: the warning is raised at or above the documented
+    threshold and stays silent below it, so a small fan-out is frictionless."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+
+    quiet = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=3)
+    assert quiet.resource_warning is None
+    assert quiet.browser_concurrency == 3
+
+    loud = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=10)
+    assert loud.resource_warning == "This will launch up to 10 browser processes. Continue?"
+
+
+def test_swarm_respects_injected_rate_limiter(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-1: the injected limiter gates every agent attempt.
+
+    A limiter with no free slot makes the guard observable without waiting out
+    a real 60-second window: the agents must park rather than launch browsers.
+    """
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    limiter = RateLimiter(MaxPerMinute(1))
+    # Burn the single slot so every try_acquire reports a backoff.
+    assert limiter.try_acquire() is None
+
+    orchestrator = SwarmOrchestrator(
+        aggregate,
+        output_root=tmp_path,
+        browser_concurrency=2,
+        rate_limiter=limiter,
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    time.sleep(0.2)
+    snapshot = orchestrator.snapshot(initial.swarm_id)
+    assert snapshot is not None
+    # Still running and no browser launched: the fan-out is waiting on quota.
+    assert snapshot.status == "running"
+    assert aggregate.calls == []
+    orchestrator.cancel(initial.swarm_id)
+
+
+def test_swarm_fails_agent_only_when_circuit_breaker_trips(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-2: a tripped breaker gates the agent in front of it while
+    siblings finish, so the swarm reports partial rather than aborting."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    breaker = CircuitBreaker(FailureThreshold(1), WindowSec(30))
+    breaker.record_failure()
+    orchestrator = SwarmOrchestrator(
+        aggregate,
+        output_root=tmp_path,
+        browser_concurrency=2,
+        circuit_breaker=breaker,
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    # The breaker was open before either agent started a browser.
+    assert final.status == "partial"
+    assert all(agent.status == "failed" for agent in final.agents)
+    assert all("circuit breaker" in str(agent.error).lower() for agent in final.agents)
+    assert aggregate.calls == []
