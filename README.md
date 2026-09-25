@@ -133,6 +133,9 @@ registry — a typo otherwise changes runtime behaviour silently.
 
 Behaviour switches worth knowing:
 
+- `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` — target model (default `Qwen3.8-Max`); the `--model`
+  flag overrides both. A name the picker does not offer degrades to the first available
+  model with a WARNING instead of failing the run.
 - `QWEN_ENABLE_SANDBOX` / `QWEN_DISABLE_SANDBOX` — Chromium runs with its OS sandbox by
   default; `QWEN_DISABLE_SANDBOX` is the explicit opt-out for hosts that cannot provide
   seccomp or user namespaces.
@@ -141,6 +144,9 @@ Behaviour switches worth knowing:
   override, clamped to the derived capacity.
 - `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` — error tracking and tracing. With
   `ENVIRONMENT=production` and neither set, `doctor` reports a warning.
+- `QWEN_WORKSPACE_ROOT` — override the workspace root directory.
+- `QWEN_STREAM_SAFETY_TIMEOUT_SEC` — global ceiling for the response-detection loop.
+- `QWEN_WEB_GITHUB_REPO` — GitHub repo the self-update checks against.
 - `QWEN_DOCTOR_DEEP` — enable the slow Playwright cold-start probe in `doctor`.
 
 Operator runbooks for each `ErrorCategory` live in [`docs/runbooks/`](docs/runbooks/);

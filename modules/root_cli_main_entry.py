@@ -44,6 +44,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parent.add_argument(
         "-v", "--verbose", action="store_true", default=argparse.SUPPRESS, help="Enable verbose debug event logging"
     )
+    # Issue #283: model selection is stakeholder-configurable. --model takes
+    # precedence over QWEN_MODEL, which takes precedence over QWEN_DEFAULT_MODEL.
+    parent.add_argument("--model", default=None, help="Qwen model to target (default: $QWEN_MODEL, else Qwen3.8-Max)")
 
     p = argparse.ArgumentParser(
         prog="qwen-web-arwaky",
@@ -255,6 +258,7 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
 
     # Check for session path override from rotation
     effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
+    model = str(getattr(args, "model", None) or "").strip()
 
     return AppConfig(
         mode=mode_map.get(action, "direct"),
@@ -269,6 +273,7 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         file_path=file_p,
         inline_prompt=action == "prompt-direct",
         inline_prompt_text=text if action == "prompt-direct" else None,
+        model=model,
     )
 
 

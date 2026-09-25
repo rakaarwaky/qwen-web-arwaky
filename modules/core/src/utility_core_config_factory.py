@@ -77,6 +77,7 @@ def build_app_config(
     circuit_breaker_threshold: int = 5,
     circuit_breaker_window: int = 30,
     retry_failed: bool = False,
+    model: str = "",
 ) -> AppConfig:
     """Build a complete AppConfig while preserving every runtime override.
 
@@ -115,6 +116,7 @@ def build_app_config(
         circuit_breaker_threshold=circuit_breaker_threshold,
         circuit_breaker_window=circuit_breaker_window,
         retry_failed=retry_failed,
+        model=model,
     )
 
 
@@ -126,9 +128,13 @@ def resolve_pipeline_output_path(
     """Resolve prompt file and output file paths cleanly for prompt pipeline agents.
 
     The output filename is derived from the attachment path (when provided),
-    otherwise from the prompt filename. In all cases the output name receives
-    a timestamp suffix so repeated runs never silently overwrite each other.
+    otherwise from the prompt filename. In all cases the output name receives a
+    timestamp plus a 4-hex-digit suffix so repeated runs never silently
+    overwrite each other. The timestamp alone only has second-level
+    granularity, so two slot runs started in the same second would collide and
+    one would silently clobber the other (issue #280 AC-1).
     """
+    import uuid
     from datetime import datetime
 
     p_path = Path(prompt_file).resolve()
@@ -136,6 +142,10 @@ def resolve_pipeline_output_path(
         raise FileNotFoundError(f"Input file not found or is a directory: {p_path}")
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # 4 hex digits from 16 random bits: collision-safe for concurrent slot
+    # runs without making filenames unwieldy, and free of separators that
+    # would need escaping on any supported platform.
+    unique = uuid.uuid4().hex[:4]
 
     # Prefer attachment stem; fall back to prompt stem when there is no attachment.
     stem = Path(attachment_path).stem if attachment_path else p_path.stem
@@ -143,12 +153,12 @@ def resolve_pipeline_output_path(
     if output_file:
         out_path = Path(output_file).resolve()
         if out_path.is_dir():
-            out_path = out_path / f"{stem}_{ts}.md"
+            out_path = out_path / f"{stem}_{ts}_{unique}.md"
         elif out_path.exists():
-            out_path = out_path.parent / f"{out_path.stem}_{ts}{out_path.suffix}"
+            out_path = out_path.parent / f"{out_path.stem}_{ts}_{unique}{out_path.suffix}"
         else:
-            out_path = out_path.parent / f"{stem}_{ts}{out_path.suffix}"
+            out_path = out_path.parent / f"{stem}_{ts}_{unique}{out_path.suffix}"
     else:
-        out_path = DEFAULT_OUTPUT / f"{stem}_{ts}.md"
+        out_path = DEFAULT_OUTPUT / f"{stem}_{ts}_{unique}.md"
 
     return p_path, out_path

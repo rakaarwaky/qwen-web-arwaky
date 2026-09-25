@@ -279,7 +279,15 @@ class UpdateManager(IUpdateProtocol):
         actually ran with (issue #293).
         """
         if not previous_version or previous_version == "unknown":
-            return (UpdateStepResult("rollback", False, False, "previous version is unknown"),)
+            return (
+                UpdateStepResult(
+                    "rollback",
+                    False,
+                    False,
+                    "Cannot determine previous version for rollback. Reinstall manually with "
+                    f"`pip install {self.package_name}==<previous-version>`.",
+                ),
+            )
         editable = self._editable_source_dir()
         if editable is not None:
             return (
@@ -287,8 +295,9 @@ class UpdateManager(IUpdateProtocol):
                     "rollback",
                     False,
                     False,
-                    f"rollback is not automated for editable installations; revert the checkout manually: "
-                    f"cd {editable} && git checkout -- . && git pull --ff-only "
+                    f"rollback to v{previous_version} is not automated for editable installations; "
+                    f"revert the checkout manually: "
+                    f"cd {editable} && git checkout v{previous_version} -- . && git pull --ff-only "
                     "(then reconcile dependencies from the snapshot with "
                     f"{self._snapshot_path()})",
                 ),
@@ -407,13 +416,28 @@ class UpdateManager(IUpdateProtocol):
         checks_ok = all(c.success for c in health_checks)
         healthy = steps_ok and checks_ok
         rolled_back = False
+        rollback_status = "none"
         if not healthy and str(previous) != "unknown":
             rollback_steps = self.rollback_to(str(previous))
             steps.extend(rollback_steps)
-            rolled_back = bool(rollback_steps) and all(step.success for step in rollback_steps if step.executed)
+            executed = [step for step in rollback_steps if step.executed]
+            if not executed:
+                rollback_status = "skipped"
+            elif all(step.success for step in executed):
+                rolled_back = True
+                rollback_status = "full"
+            else:
+                rolled_back = any(step.success for step in executed)
+                rollback_status = "partial"
+                log.error("update_rollback_partial previous=%s steps=%s", previous, [s.name for s in executed])
         if not steps_ok:
             failed_detail = "; ".join(f"{s.name}: {s.detail}" for s in steps if not s.success)
             message = f"Update failed — {failed_detail}"
+            if rollback_status == "partial":
+                message += (
+                    " Partial rollback: package restored but browser sync failed. "
+                    "Run `qwen-web-arwaky update --force` to retry browser sync."
+                )
         elif not checks_ok:
             failed_detail = "; ".join(f"{c.name}: {c.detail}" for c in health_checks if not c.success)
             message = f"Update steps completed but health checks failed — {failed_detail}"
@@ -441,6 +465,7 @@ class UpdateManager(IUpdateProtocol):
             healthy=healthy,
             message=message + (f" Rolled back to {previous}." if rolled_back else ""),
             rolled_back=rolled_back,
+            rollback_status=rollback_status,
         )
 
     # ─── Block 3: Private Helpers ──

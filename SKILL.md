@@ -1,9 +1,12 @@
 ---
 name: qwen-web
 description: >
-  Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max intelligence model —
-  zero API keys, persistent browser sessions. Use when an AI agent needs to send
-  prompts, review code, or analyze document attachments via CLI or MCP tools.
+  Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max model by default —
+  zero API keys, persistent browser sessions. The model is configurable via the
+  --model flag or the QWEN_MODEL / QWEN_DEFAULT_MODEL environment variables, and
+  a model name the picker does not offer falls back to the first available one
+  with a WARNING. Use when an AI agent needs to send prompts, review code, or
+  analyze document attachments via CLI or MCP tools.
 version: 6.0.0
 triggers:
   - qwen

@@ -7,6 +7,7 @@ utility only. Logger obtained via structlog (external), not via another capabili
 from __future__ import annotations
 
 import contextlib
+import contextvars
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -52,6 +53,24 @@ from modules.shared.src.taxonomy_core_event import (
 )
 
 log = structlog.get_logger("browser")
+
+# Issue #283: the targeted model is per-run configuration. A contextvar keeps
+# concurrent runs (Swarm fan-out, parallel jobs) on their own override without
+# mutating a module constant another thread is reading. The default is
+# DEFAULT_MODEL, which already resolves QWEN_MODEL / QWEN_DEFAULT_MODEL.
+_TARGET_MODEL: contextvars.ContextVar[str] = contextvars.ContextVar("qwa_target_model", default=DEFAULT_MODEL)
+
+
+def _active_model() -> str:
+    """Return the model this run targets, honouring the --model / env override.
+
+    A value object can land in the context (a config built before the
+    override was applied keeps the brand type, not a string); always return a
+    plain string so picker matching and log formatting behave uniformly.
+    """
+    value = _TARGET_MODEL.get()
+    return str(value).strip() or DEFAULT_MODEL
+
 
 # Block 1: Class Definition & Constructor
 
@@ -205,10 +224,13 @@ class BrowserAdapter(IBrowserProtocol):
         Step 2: Assert authentication session
         Step 3: Start clean conversation state
         Step 4: Emit lifecycle events (EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED)
-        Step 5: Force the hardcoded default model (Qwen3.8-Max)
-        Step 6: Verify the default model is active; proceed with the active
-        model and mark the event ``fallback=True`` when a different model is
-        read, aborting only when no model label can be read at all
+        Step 5: Select the configured default model (DEFAULT_MODEL, overridable
+                per run via --model or QWEN_MODEL)
+        Step 6: Verify the model is active. When the configured model is not
+                offered by the picker, fall back to the first available model
+                and log a WARNING instead of aborting (issue #283 AC-2). The
+                returned event marks ``fallback=True`` when a different model is
+                read, aborting only when no model label can be read at all.
         """
         # Step 1: Navigate to chat URL
         self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
@@ -227,7 +249,7 @@ class BrowserAdapter(IBrowserProtocol):
         emitter.emit(EVENT_WEB_LOADED, {"url": page.url})
         emitter.emit(EVENT_LOGIN_VERIFIED, {"url": page.url})
 
-        # Step 5: Force the hardcoded default model so the user never picks it manually.
+        # Step 5: Select the configured model so the user never picks it manually.
         switched = self.ensure_default_model(page)
 
         # Step 6: Verify the switch actually happened; degrade gracefully if not.
@@ -235,24 +257,27 @@ class BrowserAdapter(IBrowserProtocol):
         emitter.emit(EVENT_MODEL_VERIFIED, {"model": detected, "fallback": not verified})
 
     def _verify_default_model(self, page: Page, require_switch: bool = True) -> tuple[bool, str]:
-        """Confirm the active model is the hardcoded default, degrading when it is not.
+        """Confirm the active model is the configured default, degrading when it is not.
 
         Runs after ``ensure_default_model`` so a silent picker failure cannot let
         the pipeline dispatch the prompt to an unrecorded model. Returns
-        ``(True, DEFAULT_MODEL)`` when the default is active. When a different
-        model label is readable — a rename, regional substitution, or picker DOM
-        drift — it returns ``(False, detected)`` so the caller can proceed with
-        the active model instead of aborting the pipeline. Raises
-        ``ModelSwitchError`` only when no model label can be read at all, since
-        the active model is then unknowable. When the best-effort switch reported
-        failure (``require_switch=False``), verification is retried while the
-        model picker hydrates so a slow picker cannot fail the pipeline.
+        ``(True, target)`` when the configured default is active. When the picker
+        does not offer it — a rename, regional substitution, or picker DOM drift —
+        the first available option is selected and ``(False, label)`` is returned
+        so the caller can proceed on the active model instead of aborting the
+        pipeline. Raises ``ModelSwitchError`` only when no model can be
+        determined at all, since the active model is then unknowable. When the
+        best-effort switch reported failure (``require_switch=False``),
+        verification is retried while the model picker hydrates so a slow picker
+        cannot fail the pipeline.
         """
         # Model picker options can arrive after the committed page document,
         # especially when Qwen's static assets are slow. Keep this readiness gate
         # bounded and retry selection instead of failing the whole pipeline on the
         # first stale model label.
         attempts = 5
+        target = _active_model()
+        current = ""
         for attempt in range(attempts):
             try:
                 picker = self._get_model_trigger(page)
@@ -262,47 +287,95 @@ class BrowserAdapter(IBrowserProtocol):
                 if attempt + 1 < attempts:
                     log.debug(
                         "verify_default_model_read_retry",
-                        model=DEFAULT_MODEL,
+                        model=target,
                         error=str(exc),
                         attempt=attempt + 1,
                     )
                     self._retry_default_model_selection(page)
                     continue
+                fallback = self._select_first_available_model(page, target)
+                if fallback is not None:
+                    return False, fallback
                 raise ModelSwitchError(
                     f"Cannot read active model from '{MODEL_SELECTOR_BUTTON}' button: {exc}"
                 ) from exc
-            if DEFAULT_MODEL in current.split():
-                log.debug("verify_default_model_ok", model=DEFAULT_MODEL)
-                return True, DEFAULT_MODEL
+            if target in current.split():
+                log.debug("verify_default_model_ok", model=target)
+                return True, target
             if attempt + 1 < attempts:
                 log.debug(
                     "verify_default_model_retry",
-                    model=DEFAULT_MODEL,
+                    model=target,
                     found=current,
                     require_switch=require_switch,
                     attempt=attempt + 1,
                 )
                 self._retry_default_model_selection(page)
                 continue
-            # FRD FR-001 fallback: the default model is absent but a real model
-            # label was read, so pipeline availability wins over exact matching.
+            # FRD FR-001 fallback: the configured model is absent but a real
+            # model label was read, so pipeline availability wins over exact
+            # matching. Actively selecting the first offered option keeps the
+            # run on a single model instead of the one still in the picker
+            # (issue #283 AC-2); when that cannot be driven, proceed on the
+            # label that was read rather than aborting.
+            fallback = self._select_first_available_model(page, target)
+            if fallback is not None:
+                return False, fallback
             log.warning(
                 "default_model_unavailable_proceeding_with_active",
-                expected=DEFAULT_MODEL,
+                expected=target,
                 found=current,
             )
             return False, current
-        raise ModelSwitchError(f"Default model not active: expected '{DEFAULT_MODEL}'")
+        fallback = self._select_first_available_model(page, target)
+        if fallback is not None:
+            return False, fallback
+        raise ModelSwitchError(f"Default model not active: expected '{target}'")
+
+    def _select_first_available_model(self, page: Page, configured: str) -> str | None:
+        """Select the first model the picker offers; None when it cannot be read.
+
+        The degradation path for a model that Qwen renamed or withdrew: the run
+        continues on whatever the picker lists first rather than aborting, and
+        the WARNING records both names so the divergence stays auditable
+        (issue #283 AC-2).
+        """
+        label = ""
+        try:
+            picker = self._get_model_trigger(page)
+            picker.click(timeout=5000)
+            try:
+                first_option = page.locator(".wms-list__item").first
+                if first_option.is_visible(timeout=2000) is not True:
+                    return None
+                label = (first_option.inner_text() or "").replace("\n", " ").strip()
+                first_option.click(timeout=5000)
+            finally:
+                with contextlib.suppress(Error):
+                    page.keyboard.press("Escape")
+        except Error as exc:
+            log.warning("model_fallback_unavailable", model=configured, error=str(exc))
+            return None
+        if not label:
+            return None
+        log.warning(
+            "model_fallback_activated",
+            configured=configured,
+            active=label,
+            reason="configured model not offered by the model picker",
+        )
+        return label
 
     def _wait_for_model_picker_ready(self, page: Page, timeout_ms: int = 15_000) -> None:
         """Wait until the hydrated picker exposes the configured default option."""
+        target = _active_model()
         picker = self._get_model_trigger(page)
         picker.wait_for(state="visible", timeout=timeout_ms)
         picker.click(timeout=5000)
         try:
-            option: Any = page.get_by_role("option", name=DEFAULT_MODEL)
+            option: Any = page.get_by_role("option", name=target)
             with contextlib.suppress(Error):
-                loc = page.locator(".wms-list__item", has_text=DEFAULT_MODEL).first
+                loc = page.locator(".wms-list__item", has_text=target).first
                 if loc.is_visible(timeout=1000) is True:
                     option = loc
             option.wait_for(state="visible", timeout=timeout_ms)
@@ -326,21 +399,22 @@ class BrowserAdapter(IBrowserProtocol):
         return page.get_by_role("button", name=MODEL_SELECTOR_BUTTON)
 
     def ensure_default_model(self, page: Page) -> bool:
-        """Best-effort: ensure the active Qwen model is the hardcoded default.
+        """Best-effort: ensure the active Qwen model is the configured default.
 
         Opens the model picker only long enough to click the default option. The
         call is defensive — any failure is logged and swallowed so it can never
-        block the prompt pipeline.
+        block the prompt pipeline; the verify step then drives the fallback.
         """
+        target = _active_model()
         try:
             picker = self._get_model_trigger(page)
             picker.wait_for(state="visible", timeout=5000)
             picker.click(timeout=5000)
 
             # Option item (.wms-list__item or role=option)
-            option = page.get_by_role("option", name=DEFAULT_MODEL)
+            option = page.get_by_role("option", name=target)
             with contextlib.suppress(Error):
-                loc = page.locator(".wms-list__item", has_text=DEFAULT_MODEL).first
+                loc = page.locator(".wms-list__item", has_text=target).first
                 if loc.is_visible(timeout=1000) is True:
                     option = loc
 
@@ -349,10 +423,10 @@ class BrowserAdapter(IBrowserProtocol):
             page.wait_for_timeout(300)
 
             self._try_set_as_default(page)
-            log.debug("ensure_default_model_applied", model=DEFAULT_MODEL)
+            log.debug("ensure_default_model_applied", model=target)
             return True
         except Error as exc:
-            log.debug("ensure_default_model_skipped", model=DEFAULT_MODEL, error=str(exc))
+            log.debug("ensure_default_model_skipped", model=target, error=str(exc))
             return False
 
     def _try_set_as_default(self, page: Page) -> None:
@@ -368,7 +442,7 @@ class BrowserAdapter(IBrowserProtocol):
                     pin = item.locator(".wms-list__pin-action, :has-text('Set as default')").first
                     if "Set as default" in (pin.inner_text() or ""):
                         pin.evaluate("e => e.click()")
-                        log.debug("set_default_model_ui_applied", model=DEFAULT_MODEL)
+                        log.debug("set_default_model_ui_applied", model=_active_model())
                         page.wait_for_timeout(300)
 
             with contextlib.suppress(Error):
@@ -477,6 +551,14 @@ class BrowserAdapter(IBrowserProtocol):
         """
         master_session = cfg.session_path
         mode = getattr(cfg, "mode", "")
+        # Issue #283: scope any per-run --model override to this session so
+        # concurrent runs do not read each other's target model. The default
+        # (empty string) resolves back to the constant so unchanged runs keep
+        # their previous behavior. Non-string values (e.g. a MagicMock in a
+        # test harness) are ignored so they never pollute the contextvar.
+        override = getattr(cfg, "model", "")
+        if isinstance(override, str) and override.strip():
+            _TARGET_MODEL.set(override.strip())
 
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
             chrome_bin = find_chrome_binary()
