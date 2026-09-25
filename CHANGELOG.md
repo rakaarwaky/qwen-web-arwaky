@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.5.0] - 2026-09-24
+
+### Added
+
+- feat(benches): add benchmark suite for performance regression detection
+- feat(core): address category c informational enhancements (#323, #338, #353, #295, #301, #350, #365)
+- feat(tui): add log select and copy capability
+- feat(swarm): event-driven stall detection for stuck agents
+
+### Fixed
+
+- fix(lifecycle): preserve DOCUMENT_PARSED across attachment retries
+- fix(dispatch): hold send on active card parsing and support non-headless swarm
+- fix(dispatch): observe user-turn ACK via user-bubble count; narrow toast scans; retry gate rejects
+- fix(send): gate card-spinner holds on actual visibility
+- fix(lifecycle): gate-aware dispatch retry + event-level TUI status
+- fix: resolve verified warning issues across core, contracts, security and docs
+- fix: resolve 13 verified critical issues (security, contract, timeout, docs)
+- fix(ux): unify all slot status symbols to monospace across TUI
+- fix(workspace): remove default sample inputs from provisioner
+- fix(ux): resolve all 15 open UI/UX findings from swarm review
+- fix(be): resolve all 15 backend-engineer swarm review findings
+- fix(saver): keep metadata out of output.md, use .meta.json sidecar only
+
+### Changed
+
+- docs: add workspace roadmap and feature backlogs (#432)
+- docs: rewrite AGENTS.md as operational guide
+- refactor(tests): organize tests into module-specific directories
+
 ## [6.4.0] - 2026-09-21
 
 ### Fixed
