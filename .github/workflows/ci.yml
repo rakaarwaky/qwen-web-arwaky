@@ -55,7 +55,7 @@ jobs:
         run: uv run ruff check modules/ tests/ modules/shared/benches/ modules/core/benches/
 
       - name: Mypy check
-        run: uv run mypy modules/ modules/shared/benches/ modules/core/benches/
+        run: uv run mypy modules/
 
   build:
     name: Build package
