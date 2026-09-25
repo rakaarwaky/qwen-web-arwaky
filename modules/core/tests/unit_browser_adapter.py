@@ -205,6 +205,56 @@ def test_verify_default_model_retries_transient_picker_read_failure():
     adapter.ensure_default_model.assert_called_once_with(mock_page)
 
 
+def _navigate_fixture(mock_page: MagicMock, model_text: str) -> MagicMock:
+    """Shared navigate_to_chat page mock: authenticated URL + model picker text."""
+    mock_page.url = "https://chat.qwen.ai/"
+    loc = MagicMock()
+    loc.count.return_value = 0
+    loc.first.is_visible.return_value = False
+    loc.first.is_enabled.return_value = False
+    mock_page.locator.return_value = loc
+    mock_page.query_selector.return_value = MagicMock()
+    mock_page.get_by_role.return_value.inner_text.return_value = model_text
+    return MagicMock(spec=LifecycleEmitter)
+
+
+def test_verify_default_model_fallback_event_payload() -> None:
+    """navigate_to_chat marks EVENT_MODEL_VERIFIED fallback=True when a
+    different model is readable, instead of aborting the pipeline."""
+    mock_page = MagicMock()
+    emitter = _navigate_fixture(mock_page, "Select Model Qwen3.7-Plus")
+    adapter = BrowserAdapter()
+    adapter._goto_chat = MagicMock()
+    adapter._start_new_chat = MagicMock()
+    adapter._wait_for_model_picker_ready = MagicMock()
+    adapter.ensure_default_model = MagicMock(return_value=False)
+
+    adapter.navigate_to_chat(mock_page, emitter)
+
+    verified_args, _ = emitter.emit.call_args
+    assert verified_args[0] == EVENT_MODEL_VERIFIED
+    assert verified_args[1]["model"] == "Select Model Qwen3.7-Plus"
+    assert verified_args[1]["fallback"] is True
+
+
+def test_verify_default_model_ok_event_payload() -> None:
+    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+
+    mock_page = MagicMock()
+    emitter = _navigate_fixture(mock_page, f"Select Model {DEFAULT_MODEL}")
+    adapter = BrowserAdapter()
+    adapter._goto_chat = MagicMock()
+    adapter._start_new_chat = MagicMock()
+    adapter._wait_for_model_picker_ready = MagicMock()
+    adapter.ensure_default_model = MagicMock(return_value=True)
+
+    adapter.navigate_to_chat(mock_page, emitter)
+
+    verified_args, _ = emitter.emit.call_args
+    assert verified_args[1]["model"] == DEFAULT_MODEL
+    assert verified_args[1]["fallback"] is False
+
+
 def test_verify_default_model_ok():
     from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
 
@@ -212,28 +262,32 @@ def test_verify_default_model_ok():
     mock_page.get_by_role.return_value.inner_text.return_value = f"Select Model {DEFAULT_MODEL}"
 
     # Must not raise when the picker reports the hardcoded default.
-    BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+
+    assert verified is True
+    assert detected == DEFAULT_MODEL
 
 
-def test_verify_default_model_raises_on_mismatch():
-    from modules.shared.src.taxonomy_core_error import ModelSwitchError
-
+def test_verify_default_model_falls_back_on_mismatch():
+    """A readable non-default model degrades gracefully instead of aborting (issue #374)."""
     mock_page = MagicMock()
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.7-Plus"
 
-    with pytest.raises(ModelSwitchError, match="Default model not active"):
-        BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+
+    assert verified is False
+    assert detected == "Select Model Qwen3.7-Plus"
 
 
 def test_verify_default_model_rejects_superstring_model():
-    """A similarly-named model (e.g. Qwen3.8-Max-X) must NOT pass the gate."""
-    from modules.shared.src.taxonomy_core_error import ModelSwitchError
-
+    """A similarly-named model (e.g. Qwen3.8-Max-X) must NOT pass the gate as the default."""
     mock_page = MagicMock()
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max-Plus"
 
-    with pytest.raises(ModelSwitchError, match="Default model not active"):
-        BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+
+    assert verified is False
+    assert "Qwen3.8-Max-Plus" in detected
 
 
 def test_verify_default_model_retries_when_switch_reported_failure():
@@ -250,7 +304,10 @@ def test_verify_default_model_retries_when_switch_reported_failure():
     mock_page.get_by_role.return_value.inner_text.side_effect = _fake_inner_text
 
     # Must not raise: the retry path fixes the mismatch.
-    BrowserAdapter()._verify_default_model(mock_page, require_switch=False)
+    verified, detected = BrowserAdapter()._verify_default_model(mock_page, require_switch=False)
+
+    assert verified is True
+    assert detected == DEFAULT_MODEL
 
 
 def test_verify_default_model_raises_when_unreadable():

@@ -38,7 +38,13 @@ The no-argument TTY fallback launches the **Obsidian Nebula Textual TUI App** (`
 
 ### FR-003: Manual Login & Session Setup
 
-The login surface accepts an `AppConfig` and delegates session setup to the Core aggregate. It forces headed mode at configuration construction, validates an existing session through the core, and reports success after the core verifies the authenticated chat UI.
+The login surface accepts an `AppConfig` and delegates session setup to the Core aggregate. It forces headed mode at configuration construction and reports success after the core verifies the authenticated chat UI.
+
+There is exactly **one** validation gate: `SetupOrchestrator.setup_session` owns the
+validate-then-login decision (issue #381). The surface performs no pre-check, so an
+expired session costs one headless Chromium cold start before the headed browser
+opens, not two. A valid session returns the "already valid" message with no headed
+browser at all.
 
 ### FR-004: System Diagnostic Command (`doctor`)
 

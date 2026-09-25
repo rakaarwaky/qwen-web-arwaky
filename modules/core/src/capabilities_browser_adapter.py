@@ -206,7 +206,9 @@ class BrowserAdapter(IBrowserProtocol):
         Step 3: Start clean conversation state
         Step 4: Emit lifecycle events (EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED)
         Step 5: Force the hardcoded default model (Qwen3.8-Max)
-        Step 6: Verify the default model is active (abort pipeline if not)
+        Step 6: Verify the default model is active; proceed with the active
+        model and mark the event ``fallback=True`` when a different model is
+        read, aborting only when no model label can be read at all
         """
         # Step 1: Navigate to chat URL
         self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
@@ -228,19 +230,23 @@ class BrowserAdapter(IBrowserProtocol):
         # Step 5: Force the hardcoded default model so the user never picks it manually.
         switched = self.ensure_default_model(page)
 
-        # Step 6: Verify the switch actually happened; abort before prompt if not.
-        self._verify_default_model(page, require_switch=switched)
-        emitter.emit(EVENT_MODEL_VERIFIED, {"model": DEFAULT_MODEL})
+        # Step 6: Verify the switch actually happened; degrade gracefully if not.
+        verified, detected = self._verify_default_model(page, require_switch=switched)
+        emitter.emit(EVENT_MODEL_VERIFIED, {"model": detected, "fallback": not verified})
 
-    def _verify_default_model(self, page: Page, require_switch: bool = True) -> None:
-        """Assert the active model equals the hardcoded default.
+    def _verify_default_model(self, page: Page, require_switch: bool = True) -> tuple[bool, str]:
+        """Confirm the active model is the hardcoded default, degrading when it is not.
 
         Runs after ``ensure_default_model`` so a silent picker failure cannot let
-        the pipeline dispatch the prompt to the wrong model. Raises
-        ``ModelSwitchError`` when the switch cannot be confirmed. When the
-        best-effort switch reported failure (``require_switch=False``), the
-        verification is retried while the model picker hydrates so a slow picker
-        cannot hard-fail the pipeline prematurely.
+        the pipeline dispatch the prompt to an unrecorded model. Returns
+        ``(True, DEFAULT_MODEL)`` when the default is active. When a different
+        model label is readable — a rename, regional substitution, or picker DOM
+        drift — it returns ``(False, detected)`` so the caller can proceed with
+        the active model instead of aborting the pipeline. Raises
+        ``ModelSwitchError`` only when no model label can be read at all, since
+        the active model is then unknowable. When the best-effort switch reported
+        failure (``require_switch=False``), verification is retried while the
+        model picker hydrates so a slow picker cannot fail the pipeline.
         """
         # Model picker options can arrive after the committed page document,
         # especially when Qwen's static assets are slow. Keep this readiness gate
@@ -267,7 +273,7 @@ class BrowserAdapter(IBrowserProtocol):
                 ) from exc
             if DEFAULT_MODEL in current.split():
                 log.debug("verify_default_model_ok", model=DEFAULT_MODEL)
-                return
+                return True, DEFAULT_MODEL
             if attempt + 1 < attempts:
                 log.debug(
                     "verify_default_model_retry",
@@ -278,7 +284,14 @@ class BrowserAdapter(IBrowserProtocol):
                 )
                 self._retry_default_model_selection(page)
                 continue
-            raise ModelSwitchError(f"Default model not active: expected '{DEFAULT_MODEL}', found '{current}'")
+            # FRD FR-001 fallback: the default model is absent but a real model
+            # label was read, so pipeline availability wins over exact matching.
+            log.warning(
+                "default_model_unavailable_proceeding_with_active",
+                expected=DEFAULT_MODEL,
+                found=current,
+            )
+            return False, current
         raise ModelSwitchError(f"Default model not active: expected '{DEFAULT_MODEL}'")
 
     def _wait_for_model_picker_ready(self, page: Page, timeout_ms: int = 15_000) -> None:

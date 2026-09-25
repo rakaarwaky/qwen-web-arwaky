@@ -89,7 +89,28 @@ AsyncRunFlag = NewType("AsyncRunFlag", bool)
 
 @dataclass(frozen=True)
 class JobRecord:
-    """Immutable representation of a background job state."""
+    """Immutable representation of a background job state.
+
+    Attribute provenance (every field and its producing operation):
+
+    - ``job_id``, ``created_at`` — written by ``submit_file_job`` /
+      ``submit_attachment_job`` at DISPATCH_ACKNOWLEDGED.
+    - ``latest_event`` — advanced by each ``_save_*`` transition.
+    - ``completed`` — ``False`` at submit/started, ``True`` at
+      ``_save_success`` / ``_save_failure`` / zombie reconciliation.
+    - ``started_at`` — set by ``_save_started`` in the worker.
+    - ``completed_at``, ``duration_sec`` — set by the terminal ``_save_*``.
+    - ``input_file``, ``attachment_file``, ``output_file`` — set by the
+      submit helpers, refined by ``_save_started`` (attachment path).
+    - ``owner_pid`` — set to the submitting process PID; cleared from
+      consideration only by terminal states.
+    - ``heartbeat_at`` — refreshed by ``_save_started`` for lease checks.
+    - ``error`` — set by ``_save_failure`` or zombie reconciliation.
+    - ``result_preview`` — set by ``_save_success``.
+
+    ``prompt_text`` was removed: no producer ever wrote it, and the job
+    manager exposes no direct-text submit path (SA-2-01 / issue #375).
+    """
 
     job_id: str
     created_at: str
@@ -101,7 +122,6 @@ class JobRecord:
     input_file: str | None = None
     attachment_file: str | None = None
     output_file: str | None = None
-    prompt_text: str | None = None
     owner_pid: int | None = None
     heartbeat_at: str | None = None
     error: str | None = None

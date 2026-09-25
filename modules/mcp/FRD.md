@@ -38,9 +38,16 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 | `COMPLETED` | Polled job finished successfully. | `job_id`, `result_preview`, `duration_sec` |
 | `FAILED` | Polled job finished with an error. | `job_id`, `error` |
 
-- **Throttling**: when the submission rate limit is reached, tools return the error
-  envelope with `code: "RATE_LIMITED"`, `retryable: true`, and a `retry_after_sec`
-  hint rather than blocking the tool call until a slot frees up.
+- **Throttling**: submission is always fast — `submit_*_job` performs only the
+  circuit-breaker check (fail-fast `CIRCUIT_OPEN` style error) and returns a
+  `job_id` in bounded time, never sleeping on the tool-caller thread. The rate
+  limit is applied at worker dispatch: the job worker blocks until a per-minute
+  slot frees before browser work starts, so a burst of submits is throttled by
+  deferred execution rather than by a stalled tool call. A `RATE_LIMITED`
+  envelope (`retryable: true`, `retry_after_sec` hint) is still produced when a
+  throttled path raises `RateLimitError`. Submit-acknowledged (ACCEPTED) and
+  dispatch-throttled (worker waits before RUNNING) are distinct states: the
+  `job_id` arrives immediately either way; only the start of browser work moves.
 
 ### FR-003: Session Management Tools
 
