@@ -17,7 +17,6 @@ from modules.shared.src.taxonomy_core_constant import (
     CODE_EXTENSIONS,
     EXCLUDED_DIR_NAMES,
     EXCLUDED_FILE_EXTENSIONS,
-    EXCLUDED_FILE_PATTERNS,
     MAX_FOLDER_DEPTH,
     MAX_IMPORT_DEPTH,
 )
@@ -38,12 +37,79 @@ def _is_excluded(path: Path, root: Path) -> bool:
     return any(part in EXCLUDED_DIR_NAMES for part in relative.parts)
 
 
-def _is_excluded_file(path: Path) -> bool:
-    """Return True if the file matches secret/credential or ignored file patterns."""
-    name = path.name.lower()
-    if name in EXCLUDED_FILE_PATTERNS or name.startswith(".env"):
+# Keywords matched as substrings against a path name (lowercased) to catch
+# secret-bearing files such as ``my_secret.yaml``, ``service-account.json``,
+# ``deploy.toml`` (registry credentials), or ``certs.pem`` regardless of
+# extension. ``deployment.yaml`` is deliberately *not* matched: it is ordinary
+# infrastructure configuration, not a credential store.
+_SECRET_KEYWORDS: frozenset[str] = frozenset(
+    {
+        ".env",
+        "secret",
+        "credential",
+        "id_rsa",
+        "id_ed25519",
+        "id_ecdsa",
+        "id_dsa",
+        ".pem",
+        ".key",
+        ".crt",
+        ".pfx",
+        ".p12",
+        ".pkcs12",
+        ".kdbx",
+        ".secret",
+        "token",
+        "passwd",
+        "password",
+        "api_key",
+        "apikey",
+        "cert",
+        "service-account",
+    }
+)
+
+# Exact file names that carry credentials regardless of extension.
+_SECRET_FILE_NAMES: frozenset[str] = frozenset(
+    {
+        "deploy.toml",
+        "secrets.toml",
+        "npmrc",
+        "netrc",
+        "pypirc",
+        "dockercfg",
+        ".npmrc",
+        ".netrc",
+        ".pypirc",
+    }
+)
+
+
+def _is_secret_file_name(name: str) -> bool:
+    """Return True when a lowercased file name is a known credential store."""
+    if name in _SECRET_FILE_NAMES:
         return True
-    return path.suffix.lower() in EXCLUDED_FILE_EXTENSIONS
+    return any(keyword in name for keyword in _SECRET_KEYWORDS)
+
+
+def _is_excluded_file(path: Path) -> bool:
+    """Return True when the file matches a secret/credential pattern.
+
+    Security (issue #351): filenames carrying credentials are never compiled —
+    the bundle is uploaded to a third-party service, so a ``credentials.yaml``
+    or ``service-account.json`` would silently exfiltrate its contents. The
+    check is extension-independent: exact credential-store names
+    (``deploy.toml``, ``.netrc``, …) and secret keywords appearing anywhere in
+    the name (``secret``, ``credential``, ``token``, ``password``, ``cert``,
+    ``api_key``, private-key material) all match, so ``my_secret.json`` and
+    ``service-account.pem`` are caught whatever their extension.
+    """
+    name = path.name.lower()
+    if name.startswith(".env"):
+        return True
+    if path.suffix.lower() in EXCLUDED_FILE_EXTENSIONS:
+        return True
+    return _is_secret_file_name(name)
 
 
 def _is_text_file(filepath: Path) -> bool:
@@ -60,6 +126,7 @@ def collect_folder_files(
     folder_path: Path,
     max_depth: int = MAX_FOLDER_DEPTH,
     include_extensions: frozenset[str] | None = None,
+    skipped: list[Path] | None = None,
 ) -> list[Path]:
     """Collect text files from folder recursively.
 
@@ -67,6 +134,9 @@ def collect_folder_files(
         folder_path: Root folder to scan.
         max_depth: Maximum recursion depth (default: 5).
         include_extensions: File extensions to include (default: CODE_EXTENSIONS).
+        skipped: Optional out-parameter receiving files withheld because their
+            name marks them secret-bearing (issue #351), so the calling
+            capability can log ``folder_compile_secret_like_file_skipped``.
 
     Returns:
         Sorted list of file paths.
@@ -106,6 +176,8 @@ def collect_folder_files(
 
             if entry.is_file():
                 if _is_excluded_file(entry):
+                    if skipped is not None:
+                        skipped.append(entry)
                     continue
                 ext = entry.suffix.lower()
                 if ext in include_extensions and _is_text_file(entry):

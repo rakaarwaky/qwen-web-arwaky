@@ -9,12 +9,13 @@ import shutil
 from pathlib import Path
 
 from modules.core.src.utility_core_config_factory import build_app_config
+from modules.core.src.utility_core_session_guard import is_safe_session_target
 from modules.shared.src.contract_core_aggregate import ISessionAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IObservabilityProtocol,
 )
-from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT, DEFAULT_SESSION
+from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
@@ -47,7 +48,16 @@ class SessionOrchestrator(ISessionAggregate):
         return False, "Saved Qwen session is invalid or expired. Please log in again."
 
     def delete_session(self, session_path: Path | None = None) -> ResponseText:
-        """Delete persistent session profile from disk after path safety checks."""
+        """Delete persistent session profile from disk after path safety checks.
+
+        The target must be an existing directory that clears every rule in
+        :func:`is_safe_session_target`: not a filesystem root (``/``,
+        ``C:\\``), not a near-root path such as ``/etc`` or ``C:\\Windows``,
+        and either the application session directory or a safe session name
+        under the user's home. Everything else is refused before ``rmtree``
+        is ever reached, so no path-traversal or Windows drive-root delete is
+        possible.
+        """
         cfg = build_app_config(
             mode="session-check",
             input_path=DEFAULT_OUTPUT,
@@ -59,27 +69,22 @@ class SessionOrchestrator(ISessionAggregate):
         if not target.exists():
             return ResponseText("No session found to delete.")
 
-        # Safety assertion: only delete a path that is (a) the default session dir
-        # under the XDG data home, or (b) an explicitly-passed path whose final
-        # component is 'qwen_session'/'session'-like and sits under the user's
-        # home directory (but not directly as a top-level ~/session directory).
-        # Never accept arbitrary system paths or root.
-        default_session = DEFAULT_SESSION.resolve()
-        home = Path.home().resolve()
-        if target in {home, Path("/"), Path(".").resolve()} or not target.is_dir():
-            raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
-
-        inside_default = target == default_session or default_session in target.parents
-        safe_name = target.name in {"qwen_session", "session", ".qwen_session"}
-        under_home = home in target.parents and target != home and target.parent != home
-        if not (inside_default or (safe_name and under_home)):
+        # Refuse before touching the filesystem: roots, near-root paths,
+        # non-directories, home itself, and any path outside the allow-list.
+        if not is_safe_session_target(target):
             raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
 
         try:
             shutil.rmtree(target)
             return ResponseText("Session deleted successfully.")
         except Exception as exc:
-            raise QwenCliError(f"Failed to delete session: {exc}") from exc
+            # A partial rmtree leaves the profile in an inconsistent state;
+            # surface the failure and the residue so the operator can remove
+            # it by hand instead of silently losing the rest of the tree.
+            raise QwenCliError(
+                f"Failed to delete session {target}: {exc}. "
+                "Deletion may be partial — remove the remaining directory manually."
+            ) from exc
 
     def _validate_saved_session(self, cfg: AppConfig) -> bool:
         """Check an existing profile without opening a visible login window."""

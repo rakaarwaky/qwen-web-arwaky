@@ -1,9 +1,9 @@
 """CLI surface: doctor command — system diagnostic checks (AES406).
 
 Audits environment health: Python version, Playwright browser, workspace initialization,
-session token directory, and output directory write permissions. With --smoke, a
-sixth check runs a headless browser round-trip on the saved session to verify the
-full pipeline end-to-end (issue #322).
+session token directory (presence, age, and re-login recommendation), and output
+directory write permissions. With --smoke, a sixth check runs a headless browser
+round-trip on the saved session to verify the full pipeline end-to-end (issue #322).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from modules.core.src.utility_core_session_cloner import session_age_warning
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT, DEFAULT_SESSION
 
 if TYPE_CHECKING:
@@ -58,17 +59,17 @@ def run_doctor(json_output: bool = False, smoke: bool = False, session: ISession
     playwright_ok = False
     pw_detail = "Playwright chromium binary check"
     try:
-        import shutil
+        from modules.core.src.utility_core_browser_binary import find_chrome_binary
 
-        chrome_in_path = shutil.which("chromium") or shutil.which("chrome")
-        from modules.shared.src.utility_core_paths import get_playwright_browsers_path
+        chrome_in_path = find_chrome_binary()
 
-        ms_pw_dir = get_playwright_browsers_path()
-        has_ms_pw = ms_pw_dir.exists() and any(ms_pw_dir.glob("chromium-*"))
-
-        if has_ms_pw or chrome_in_path:
+        if chrome_in_path:
             playwright_ok = True
-            pw_detail = "Chromium binary found in Playwright cache or system PATH"
+            pw_detail = (
+                f"Chromium binary found in Playwright cache or system PATH ({chrome_in_path})"
+                if chrome_in_path
+                else "Chromium binary found in Playwright cache or system PATH"
+            )
         elif os.environ.get("QWEN_DOCTOR_DEEP") == "1":
             # P4: the sync_playwright cold-start probe (5-15s) is opt-in via
             # QWEN_DOCTOR_DEEP=1 so the common `doctor` path stays fast.
@@ -120,13 +121,21 @@ def run_doctor(json_output: bool = False, smoke: bool = False, session: ISession
     session_dir = DEFAULT_SESSION
     # C6: single existence check (previously duplicated with confusing precedence).
     sess_ok = session_dir.exists() and any(session_dir.iterdir())
+    sess_detail = (
+        f"Saved session found at {session_dir}"
+        if sess_ok
+        else f"No active session found in {session_dir} (run: qwen-web-arwaky login)"
+    )
+    # Session rotation: a profile older than the threshold should be refreshed
+    # before IdP expiry, so report the age alongside presence.
+    age_warning = session_age_warning(session_dir)
+    if age_warning:
+        sess_detail = f"{sess_detail} | {age_warning}"
     checks.append(
         {
             "name": "Session Authentication Token",
             "passed": sess_ok,
-            "detail": f"Saved session found at {session_dir}"
-            if sess_ok
-            else f"No active session found in {session_dir} (run: qwen-web-arwaky login)",
+            "detail": sess_detail,
         }
     )
 
