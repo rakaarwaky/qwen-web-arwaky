@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import types
+from collections.abc import Iterator
 from contextlib import nullcontext, suppress
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
@@ -121,6 +122,32 @@ class MetricsCounter(IMetricsProtocol):
             self._execution_events.append({"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)})
             self._persist()
 
+    def record_failure(self, category: str) -> None:
+        """Bump one occurrence for *category* in the rolling error counter.
+
+        Unknown category names are ignored so a caller passing a raw exception
+        type name cannot inflate the defect counts with unbounded keys; the
+        taxonomy is the single source of truth for valid buckets.
+        """
+        from modules.shared.src.taxonomy_core_error import ErrorCategory
+
+        if category not in ErrorCategory.known():
+            return
+        with self._lock:
+            self._counters[f"error.{category}"] = self._counters.get(f"error.{category}", 0) + 1
+            self._persist()
+
+    def failure_counts(self) -> dict[str, int]:
+        """Return the rolling per-category error counts, ranked by descending count.
+
+        Keys are ``ErrorCategory`` names with the ``error.`` counter prefix
+        stripped, so the QA defect-density report can read them directly.
+        """
+        with self._lock:
+            prefix = "error."
+            counts = {key[len(prefix) :]: value for key, value in self._counters.items() if key.startswith(prefix)}
+        return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
     def get(self, key: str) -> MessageCount:
         """Return the current value of counter *key* (0 when absent)."""
         with self._lock:
@@ -150,7 +177,13 @@ class StatusFileWriter(IStatusProtocol):
         ensure_dir(self._status_path)
 
     def write(self, **kwargs: Any) -> None:
-        """Atomically write the status JSON from keyword fields."""
+        """Atomically write the status JSON from keyword fields.
+
+        ``failure_categories`` is an optional mapping of
+        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` values to
+        occurrence counts, letting monitoring tools answer "which capability is
+        most defective?" without parsing ``app.jsonl`` by hand.
+        """
         rec: dict[str, Any] = {
             "status": kwargs.get("status", "unknown"),
             "mode": kwargs.get("mode", "unknown"),
@@ -158,6 +191,7 @@ class StatusFileWriter(IStatusProtocol):
             "run_id": kwargs.get("run_id"),
             "files_processed": kwargs.get("files_processed", 0),
             "files_failed": kwargs.get("files_failed", 0),
+            "failure_categories": _normalise_categories(kwargs.get("failure_categories")),
         }
         if kwargs.get("cpu_sec") is not None:
             rec["cpu_sec"] = round(kwargs["cpu_sec"], 2)
@@ -445,6 +479,63 @@ class ObservabilitySetup(IObservabilityProtocol):
         """Install global exception handlers (delegates to module-level function)."""
         install_excepthooks()
 
+    def write_quality_report(self, *, run_id: str | None = None) -> Path:
+        """Produce ``quality_report.json`` with error distribution and defect density.
+
+        Reads ``app.jsonl`` under ``self._log_path``, extracts every record
+        whose ``level`` is ``error`` or ``critical``, counts them per
+        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory`, and
+        folds the rolling-24h metrics snapshot into the report so a monitoring
+        dashboard can answer "which capability is most defective?" from one
+        JSON object instead of parsing JSONL by hand.
+        """
+        distribution: dict[str, int] = {}
+        error_records = 0
+        for payload in self._iter_error_records():
+            error_records += 1
+            category = _category_from_record(payload)
+            distribution[category] = distribution.get(category, 0) + 1
+
+        executions: dict[str, Any] = self._metrics.snapshot()
+        total = int(executions.get("total_executions", 0) or 0)
+        report: dict[str, Any] = {
+            "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "run_id": run_id,
+            "source_log": str(self._log_path / "app.jsonl"),
+            "error_records": error_records,
+            "error_distribution": dict(sorted(distribution.items(), key=lambda kv: (-kv[1], kv[0]))),
+            "defect_density": round(error_records / total, 6) if total else None,
+            "executions": executions,
+        }
+        quality_path = self._log_path / "quality_report.json"
+        atomic_write_json(quality_path, report)
+        return quality_path
+
+    def _iter_error_records(self) -> Iterator[dict[str, Any]]:
+        """Yield every ``error``/``critical`` record parsed from ``app.jsonl``.
+
+        Blank lines, unparseable JSON, and non-object records are skipped so a
+        truncated final line — the normal result of a SIGKILL mid-write — never
+        corrupts the report.
+        """
+        log_path = self._log_path / "app.jsonl"
+        try:
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                payload = json.loads(stripped)
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if str(payload.get("level", "")).lower() in ("error", "critical"):
+                yield payload
+
     # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
@@ -453,6 +544,41 @@ class ObservabilitySetup(IObservabilityProtocol):
 
 
 # ─── Module-level helper functions ──────────────────────────────────────────
+
+
+def _normalise_categories(raw: Any) -> dict[str, int]:
+    """Coerce a failure-category breakdown into a sorted ``{category: count}`` map.
+
+    Accepts ``None``, a mapping, or an iterable of pairs.  Non-integer counts
+    are dropped rather than written as strings, so ``status.json`` keeps a
+    stable schema that monitoring tools can sum without type coercion.
+    """
+    if not raw:
+        return {}
+    items = raw.items() if isinstance(raw, dict) else raw
+    result: dict[str, int] = {}
+    for pair in items:
+        try:
+            key, value = pair
+            result[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return dict(sorted(result.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _category_from_record(payload: dict[str, Any]) -> str:
+    """Return the error category for one log record.
+
+    Prefers an explicit ``category`` field written by the caller; falls back to
+    ``other`` so an uncategorized error still counts toward defect density
+    rather than silently disappearing from the distribution.
+    """
+    from modules.shared.src.taxonomy_core_error import ErrorCategory
+
+    raw = payload.get("category")
+    if isinstance(raw, str) and raw in ErrorCategory.known():
+        return raw
+    return "other"
 
 
 def _get_logger(name: str = "qwen-web") -> Any:

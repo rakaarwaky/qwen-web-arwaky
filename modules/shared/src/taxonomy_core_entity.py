@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections import deque
+from collections import Counter, deque
 from collections.abc import Callable, Sequence
 from typing import Protocol
 
@@ -26,6 +26,8 @@ from modules.shared.src.taxonomy_core_event import (
 from modules.shared.src.taxonomy_core_vo import (
     EventSequenceVO,
     EventTimestamp,
+    FailureCategory,
+    FailureCategoryCounts,
     FailureThreshold,
     MaxPerMinute,
     RetryWaitSec,
@@ -33,6 +35,16 @@ from modules.shared.src.taxonomy_core_vo import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _count_categories(categories: Sequence[FailureCategory]) -> FailureCategoryCounts:
+    """Tally *categories* into counts, ranked by descending count.
+
+    Taxonomy owns the ranking rule so ``trip_category`` and
+    ``failure_categories`` cannot disagree on ordering.
+    """
+    tally = Counter(categories)
+    return FailureCategoryCounts(dict(sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))))
 
 
 class CircuitBreaker:
@@ -60,6 +72,7 @@ class CircuitBreaker:
         self._threshold = threshold
         self._window_sec = window_sec
         self._failures: deque[float] = deque()
+        self._failure_categories: deque[FailureCategory] = deque()
         self._trip: bool = False
         # Job workers call record_failure/record_success from up to
         # DEFAULT_MAX_WORKERS threads; every mutation must be serialized so the
@@ -85,18 +98,29 @@ class CircuitBreaker:
         current = time.time()
         while self._failures and (current - self._failures[0]) > self._window_sec:
             self._failures.popleft()
+            if self._failure_categories:
+                self._failure_categories.popleft()
         self._trip = len(self._failures) >= self._threshold
 
     def record_success(self) -> None:
         """Reset the breaker on a successful request."""
         with self._lock:
             self._failures.clear()
+            self._failure_categories.clear()
             self._trip = False
 
-    def record_failure(self) -> None:
-        """Record a failure and trip if threshold exceeded within window."""
+    def record_failure(self, category: FailureCategory | None = None) -> None:
+        """Record a failure and trip if threshold exceeded within window.
+
+        ``category`` is the :class:`~modules.shared.src.taxonomy_core_error.
+        ErrorCategory` of the triggering failure.  When a single category is
+        responsible for most of the window's failures, the trip exposes it so
+        "why did the breaker open?" has one-line answers without log mining.
+        """
         with self._lock:
             self._failures.append(time.time())
+            if category:
+                self._failure_categories.append(category)
             self._refresh_state()
 
     @property
@@ -115,6 +139,30 @@ class CircuitBreaker:
         with self._lock:
             self._refresh_state()
             return self._trip
+
+    @property
+    def trip_category(self) -> FailureCategory | None:
+        """ErrorCategory of the failure that tripped the breaker, when known.
+
+        Returns the single dominant category when one accounts for a strict
+        majority of the in-window failures, and ``None`` when the failures are
+        mixed or were recorded without a category. A mixed window has no single
+        cause, so no single answer is reported.
+        """
+        with self._lock:
+            self._refresh_state()
+            if not self._trip or not self._failure_categories:
+                return None
+            counts = _count_categories(self._failure_categories)
+            top, top_count = next(iter(counts.items()))
+            return FailureCategory(top) if top_count * 2 > len(self._failure_categories) else None
+
+    @property
+    def failure_categories(self) -> FailureCategoryCounts:
+        """In-window failure counts per category, for defect-density reporting."""
+        with self._lock:
+            self._refresh_state()
+            return _count_categories(self._failure_categories)
 
 
 class RateLimiter:

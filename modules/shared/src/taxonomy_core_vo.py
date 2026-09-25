@@ -28,6 +28,8 @@ RunIdHex = NewType("RunIdHex", str)
 JobName = NewType("JobName", str)
 RunContextId = NewType("RunContextId", str)
 MessageCount = NewType("MessageCount", int)
+FailureCategory = NewType("FailureCategory", str)
+FailureCategoryCounts = NewType("FailureCategoryCounts", Mapping[str, int])
 ResponseText = NewType("ResponseText", str)
 StabilityCount = NewType("StabilityCount", int)
 TimeoutSec = NewType("TimeoutSec", int)
@@ -608,6 +610,8 @@ __all__ = [
     "RunIdHex",
     "RunContextId",
     "MessageCount",
+    "FailureCategory",
+    "FailureCategoryCounts",
     "ResponseText",
     "StabilityCount",
     "TimeoutSec",

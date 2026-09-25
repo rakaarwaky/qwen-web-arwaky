@@ -150,6 +150,16 @@ class ErrorCategory:
     """Categorize errors for dashboards and alerting."""
 
     @staticmethod
+    def known() -> frozenset[str]:
+        """Return every category name this taxonomy can produce.
+
+        Consumers that must bucket errors (metrics counters, ``status.json``
+        breakdowns, quality reports) use this to reject unknown keys instead of
+        duplicating the list.
+        """
+        return frozenset({category for _keywords, category in _ERROR_CATEGORY_RULES} | {"other"})
+
+    @staticmethod
     def categorize(exc: BaseException) -> str:
         """Return the error category string."""
         exc_type = type(exc).__name__.lower()

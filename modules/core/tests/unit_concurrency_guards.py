@@ -17,6 +17,7 @@ import pytest
 from modules.core.src.capabilities_job_manager import JobManager
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import (
+    FailureCategory,
     FailureThreshold,
     JobLimit,
     JobRecord,
@@ -208,3 +209,46 @@ def test_list_jobs_keeps_records_containing_temp_like_names(tmp_path: Path) -> N
     listed = {rec.job_id for rec in manager.list_jobs(JobLimit(10))}
 
     assert "batch.tmp_cleanup" in listed
+
+
+# ── Categorised failure tracking (issue #340, AC4) ──────────────────────────
+
+
+def test_circuit_breaker_counts_concurrent_categorised_failures() -> None:
+    """Every concurrent ``record_failure(category)`` must land in the tally.
+
+    The category deque is appended under the same lock that prunes the failure
+    deque, so a worker that interleaves with ``_refresh_state`` must neither be
+    dropped nor counted twice.
+    """
+    categories = ("network", "auth", "browser", "file_io")
+    expected: dict[str, int] = {}
+    for index in range(THREADS):
+        name = categories[index % len(categories)]
+        expected[name] = expected.get(name, 0) + 1
+
+    breaker = CircuitBreaker(FailureThreshold(THREADS + 1), WindowSec(30))
+    errors = _run_in_parallel(lambda i: breaker.record_failure(FailureCategory(categories[i % len(categories)])))
+
+    assert not errors
+    assert breaker.failure_categories == expected
+
+
+def test_circuit_breaker_trip_reports_dominant_error_category() -> None:
+    """A single-category window names its category so the trip is explainable."""
+    breaker = CircuitBreaker(FailureThreshold(3), WindowSec(30))
+    for _ in range(3):
+        breaker.record_failure(FailureCategory("network"))
+
+    assert breaker.is_tripped
+    assert breaker.trip_category == "network"
+
+
+def test_circuit_breaker_trip_category_is_none_for_mixed_failures() -> None:
+    """Two distinct categories have no single cause, so none is reported."""
+    breaker = CircuitBreaker(FailureThreshold(2), WindowSec(30))
+    breaker.record_failure(FailureCategory("network"))
+    breaker.record_failure(FailureCategory("auth"))
+
+    assert breaker.is_tripped
+    assert breaker.trip_category is None

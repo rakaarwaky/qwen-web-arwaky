@@ -228,7 +228,7 @@ and a preferred harness; when adding code, extend the matching pattern.
 | TUI surface | `tests/unit_surface_cli_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
 | MCP surface | `tests/integration_surface_mcp.py`, `tests/unit_mcp_hardening.py`, `tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
 | CLI surface | `tests/integration_surface_*.py`, `tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
-| Update Manager | `tests/unit_surface_cli_update_command.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
+| Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/core/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
 | Swarm | `tests/unit_agent_swarm_orchestrator.py` | fake `IAttachmentPromptAggregate`, real `ThreadPoolExecutor` on tmp dirs | New transition: manifest snapshot after each state change. |
 | End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/pipeline_fixtures.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |
 
@@ -239,7 +239,165 @@ and a preferred harness; when adding code, extend the matching pattern.
 - A fix for a race/cancellation bug ships with a regression test capturing
   the interleaving (see issues #331, #360).
 - CI runs `pytest tests/ -v` (see §3); keep the suite under ~2 minutes.
-- **Parallel Browser / Swarm Execution Environment** (issue #329): Each concurrent Chromium instance requires ~300–500 MB RAM and adequate `/dev/shm` (minimum 2 GB recommended for a 10-worker Swarm). In containerized CI or Docker, ensure `--shm-size=2gb` or `--ipc=host` is allocated to prevent Chromium renderer crashes.
+- **Parallel Browser / Swarm Execution Environment** (issue #329): Each concurrent Chromium instance requires ~300–500 MB RAM and adequate `/dev/shm` (minimum 2 GB recommended for a 10-worker Swarm). In containerized CI or Docker, ensure `--shm-size=2gb` or `--ipc=host` is allocated to prevent Chromium renderer crashes. See §7.5a for the enforced resource gate.
+
+---
+
+## 7.5a Test Environment Requirements for Parallel Browser Execution — issue #329
+
+The parallel tier launches up to `DEFAULT_MAX_WORKERS` (10) concurrent Chromium
+instances, each cloning the master session profile into an ephemeral directory.
+The host must meet these minimums before the tier will run:
+
+| Resource | Minimum | Where enforced |
+|----------|---------|----------------|
+| Available RAM | 8 GiB recommended / 4 GiB floor | `tests/conftest.py` fixture `parallel_browser_resources` — skips the tier below 4 GiB |
+| Usable CPU cores | 4 | Same fixture (uses `os.sched_getaffinity` when available, falls back to `os.cpu_count()`) |
+| `/dev/shm` (containers) | 2 GB | Documented only; Chromium must start with `--shm-size=2gb` |
+| Disk | ~100 MB per clone | Not enforced; the ephemeral dir lives under `TMPDIR` |
+
+Probe implementation: `modules/core/src/utility_core_host_gate.py`
+(stdlib only — Linux `/proc/meminfo`, macOS `vm_stat`, Windows
+`GlobalMemoryStatusEx`). Probing is best-effort: a value the platform will not
+report is `None`, and `None` never skips the tier, so the gate cannot silently
+disable parallel coverage on a host it cannot read.
+
+### Using the resource gate
+
+```python
+@pytest.mark.parallel_browser
+def test_parallel_browser_slot(parallel_browser_resources) -> None:
+    ...
+```
+
+The fixture calls `insufficient_reason(probe())`; a non-`None` return triggers
+`pytest.skip(...)` naming the observed shortfall. The `parallel_browser`
+marker must be registered in `pytest.ini` before use.
+
+### Session cloning resource edge cases
+
+`modules/core/tests/unit_utility_session_cloner_extra.py` covers:
+
+- Destination already exists → merge, not overwrite
+- Live symlinks are materialised as regular files; dangling ones are skipped
+  without aborting the clone (`ignore_dangling_symlinks=True`)
+- A `PermissionError` raised inside the source tree propagates rather than
+  yielding a silently half-populated profile
+- A destination that cannot be tightened to `0o700` does not abort the clone
+- `Singleton*` and `DevToolsActivePort` are always excluded, at every depth
+- `KeyboardInterrupt` / `SystemExit` / generic exception inside the context →
+  ephemeral dir removed
+- 4 concurrent workers each get a distinct, complete session directory
+
+---
+
+## 7.5b TUI Test Automation with Textual — issue #335
+
+All TUI tests use Textual's built-in `App.run_test()` async pilot, which runs
+a real headless widget tree without launching a browser or opening a TTY.
+Textual needs no extra plugin or dependency beyond the project's own
+`textual>=0.64.0`; `pytest-asyncio` is *not* required because the suite drives
+the pilot through a plain `asyncio.run(...)` wrapper.
+
+### Required setup
+
+```python
+import asyncio
+from unittest.mock import MagicMock, patch
+
+from textual.widgets import DataTable, Label
+
+from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
+
+
+def _make_app() -> QwenTuiApp:
+    # Every collaborator is a MagicMock: run_test() mounts the real widget
+    # tree, but no aggregate is allowed to reach a browser or the filesystem.
+    return QwenTuiApp(
+        workspace=MagicMock(),
+        direct=MagicMock(),
+        file_only=MagicMock(),
+        attachment=MagicMock(),
+        slot_config=MagicMock(),
+        setup=MagicMock(),
+        session=MagicMock(),
+        jobs=MagicMock(),
+    )
+
+
+def test_my_tui_feature() -> None:
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            table = app.query_one("#slots-table", DataTable)
+            assert table.row_count >= 2
+            app.action_switch_tab_slot(1)
+            await pilot.pause()
+
+    asyncio.run(_run())
+```
+
+### Invariants for TUI tests
+
+1. **Always pass an explicit `size=`** to `run_test()`. The layout has a
+   documented minimum terminal; a default-size pilot can legitimately render
+   the log panel at height 0 (see `unit_tui_log_containment.py`).
+2. **Never let a test press a button that starts a real worker.** Patch the
+   mixin method (`patch.object(_TuiWorkersMixin, "_do_cancel_slot", autospec=True)`)
+   so the handler runs synchronously against a spy.
+3. **Drive slot state directly** rather than racing a real `@work(thread=True)`
+   worker: write `app._slot_workers`, `app._slot_stats`, and
+   `app._slot_generation`. `unit_surface_cli_tui_app.py` uses this to test
+   double-escape quit guards and stale-cancel isolation.
+4. **`await pilot.pause()` after any state mutation.** Textual processes
+   messages on the event loop; asserting before the loop drains reads stale
+   widget state.
+5. **Modal callbacks are synchronous and re-entrant.** `push_screen` may be
+   patched with a side effect that captures the callback, then invoked by hand
+   to test confirm/decline paths without rendering a modal.
+6. **Log containment**: assert nothing reaches `sys.stderr` while the app runs
+   (`unit_tui_log_containment.py`); this is the regression lock for the
+   Playwright-callback log leak.
+
+### Files
+
+- `modules/cli/tests/unit_surface_cli_tui_app.py` — mount/compose, tab switching, quit guard, stale-cancel isolation
+- `modules/cli/tests/unit_tui_log_containment.py` — log-leak and layout-squeeze regressions
+- `modules/cli/tests/unit_surface_cli_update_command.py` — non-TUI CLI surface
+
+---
+
+## 7.5c Quality Gate: Defect Density Tracking — issue #340
+
+Each capability layer exposes a per-category failure counter so the QA team can
+answer "which capability is most defective?" without parsing ``app.jsonl`` by hand.
+A ``quality_report.json`` summarising error distribution, defect density, and
+the rolling-24h execution metrics is written by ``ObservabilitySetup.write_quality_report()``.
+
+| AC | What ships | File |
+|----|------------|------|
+| 1 — ``MetricsCounter.record_failure(category)`` | bumps one occurrence for *category*; unknown keys are silently dropped | `modules/core/src/capabilities_observability_setup.py` |
+| 2 — ``status.json`` includes ``failure_categories`` | an optional ``{category: count}`` map written atomically alongside status/mode/headless | `modules/core/src/capabilities_observability_setup.py` |
+| 3 — ``write_quality_report()`` aggregates from ``app.jsonl`` | fields ``error_records``, ``error_distribution`` (ranked desc), ``defect_density`` (errors / total_executions), plus a full ``executions`` snapshot | `modules/core/src/capabilities_observability_setup.py` |
+| 4 — ``CircuitBreaker.trip_category`` surfaces the dominant category | `FailureCategory | None`; ``None`` when failures are mixed or uncategorised | `modules/shared/src/taxonomy_core_entity.py` |
+
+**Acceptance-criterion test mapping**
+
+- AC1, AC2, AC3, AC4 are all covered in ``modules/core/tests/unit_capability_quality_report.py``.
+- The orchestrator wiring (AC4) is asserted in ``modules/core/tests/unit_concurrency_guards.py``.
+
+**Guardrails**
+
+- ``ErrorCategory.known()`` is the single source of truth for valid bucket names;
+  any consumer that must bucket errors (metrics, status.json, quality report) calls
+  ``known()`` instead of maintaining its own whitelist.
+- ``_normalise_categories`` coerces malformed input (non-mappings, non-integer
+  counts) to a stable ``{str: int}`` map rather than writing broken types into
+  ``status.json``.
+- A missing or truncated ``app.jsonl`` never crashes the quality report; blank
+  lines, non-dict records, and unknown categories are silently skipped.
 
 ---
 
