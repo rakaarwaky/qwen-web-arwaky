@@ -33,7 +33,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
@@ -98,7 +98,7 @@ class QwenTuiApp(
         direct: IDirectPromptAggregate,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
-        slot_config: ITuiSlotConfigProtocol,
+        slot_config: ISlotRunPlanProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,

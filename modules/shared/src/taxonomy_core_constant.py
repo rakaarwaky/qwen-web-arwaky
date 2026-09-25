@@ -100,6 +100,13 @@ MEMORY_RESERVED_FRACTION = 0.25
 DEFAULT_SWARM_CONCURRENCY = 10
 SWARM_CONCURRENCY_ENV = "QWEN_SWARM_CONCURRENCY"
 
+#: Admission-control bound for the async job queue (issue #362). Submissions
+#: beyond this depth are refused with a retryable over-capacity error instead
+#: of growing the executor's pending queue without limit. One pending slot per
+#: running worker is enough headroom to keep every worker fed while bounding
+#: the worst-case backlog to a known depth.
+MAX_PENDING_JOBS_PER_WORKER = 1
+
 CHAT_URL = "https://chat.qwen.ai/"
 
 # Browser navigation timeouts (milliseconds). The primary goto uses 30s with

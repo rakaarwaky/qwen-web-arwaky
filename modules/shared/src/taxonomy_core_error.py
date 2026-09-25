@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from modules.shared.src.taxonomy_core_vo import ErrorReason, RetryWaitSec
+from modules.shared.src.taxonomy_core_vo import ErrorReason, JobLimit, RetryWaitSec
 
 
 class QwenCliError(RuntimeError):
@@ -42,6 +42,30 @@ class RateLimitError(QwenCliError):
 
 class CircuitBreakerOpenError(QwenCliError):
     """Raised when the circuit breaker trips due to consecutive failures."""
+
+
+class JobQueueFullError(QwenCliError):
+    """Raised when the async job queue is at capacity and a submission is refused.
+
+    Carries a retry hint so the caller (MCP tool, CLI) can back off
+    deliberately instead of silently queueing work that may never start.
+
+    Attributes:
+        retry_after_sec: Seconds the caller should wait before retrying.
+        queue_depth: Number of jobs queued (running plus pending) at refusal time.
+
+    """
+
+    def __init__(
+        self,
+        message: ErrorReason,
+        retry_after_sec: RetryWaitSec | None = None,
+        queue_depth: JobLimit = JobLimit(0),
+    ) -> None:
+        """Store the human-readable reason plus retry and depth context."""
+        super().__init__(message)
+        self.retry_after_sec = retry_after_sec
+        self.queue_depth = queue_depth
 
 
 class BrowserLaunchError(QwenCliError):
@@ -138,6 +162,7 @@ _ERROR_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("response detection", "response timeout", "stream timeout"), "response_timeout"),
     (("network", "connection", "timeout", "dns", "socket"), "network"),
     (("rate", "limit", "throttl", "429"), "rate_limit"),
+    (("over capacity", "queue full", "queue full; retry"), "capacity"),
     (("stuck", "stalled", "no forward progress"), "stuck"),
     (("browser", "launch", "dom", "playwright", "chromium"), "browser"),
     (("injection", "paste", "clipboard", "fill"), "injection"),
@@ -179,6 +204,7 @@ __all__ = [
     "PromptInjectionError",
     "RateLimitError",
     "CircuitBreakerOpenError",
+    "JobQueueFullError",
     "BrowserLaunchError",
     "ElementNotFoundError",
     "NetworkTimeoutError",

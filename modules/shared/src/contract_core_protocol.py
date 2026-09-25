@@ -387,6 +387,10 @@ class IMetricsProtocol(ABC):
     def snapshot(self) -> dict[str, Any]:
         """Return a shallow copy of all counters."""
 
+    @abstractmethod
+    def record_execution(self, success: bool) -> None:
+        """Record a completed pipeline run for the rolling-window execution log."""
+
 
 class IJobStorageProtocol(ABC):
     """Job persistence and state storage contract."""
@@ -404,8 +408,8 @@ class IJobStorageProtocol(ABC):
         """List recently recorded jobs."""
 
 
-class ITuiSlotConfigProtocol(ABC):
-    """Contract for TUI slot-input resolution (surface → capability bridge)."""
+class ISlotRunPlanProtocol(ABC):
+    """Contract for surface-agnostic slot-input resolution (surface → capability bridge)."""
 
     @abstractmethod
     def resolve_slot_run_plan(
@@ -415,7 +419,7 @@ class ITuiSlotConfigProtocol(ABC):
         output_val: OutputPath,
         headless: HeadlessFlag,
     ) -> SlotRunPlan | SlotInputValue:
-        """Resolve raw TUI slot widget values into an executable run plan."""
+        """Resolve raw slot widget values into an executable run plan."""
 
     @abstractmethod
     def discover_batch_prompts(self, batch_dir: FilePath) -> object:
@@ -429,7 +433,9 @@ class IRunCancelProtocol(ABC):
     Implemented by ``capabilities_run_cancel_registry.CapabilitiesRunCancelRegistry``
     and injected into the prompt file / attachment / swarm orchestrators so
     that a cancel can stop one run's browser context without touching sibling
-    runs.
+    runs.  Runs are addressed by their stable ``RunId`` — never by object
+    identity of a ``threading.Event`` — so the handle cannot be invalidated
+    by a collected or recycled event object.
     """
 
     @abstractmethod
@@ -441,16 +447,25 @@ class IRunCancelProtocol(ABC):
         """Drop the entry for a finished run."""
 
     @abstractmethod
-    def cancel_run(self, cancel_event: threading.Event) -> None:
-        """Stop the run identified by ``cancel_event`` and close its browser context."""
+    def cancel_run(self, run_id: RunId) -> None:
+        """Stop the run identified by ``run_id`` and close its browser context."""
 
     @abstractmethod
-    def set_active_bctx(self, cancel_event: threading.Event, bctx: Any) -> None:
+    def cancel_by_event(self, cancel_event: threading.Event) -> None:
+        """Cancel the run that was registered with this cancel event.
+
+        Convenience for surface callers that only hold the original
+        ``threading.Event``.  Delegates to the stable ``run_id`` lookup
+        internally; safe no-op when the run has already finished.
+        """
+
+    @abstractmethod
+    def set_active_bctx(self, run_id: RunId, bctx: Any) -> None:
         """Update the live browser context for a registered run (None clears it)."""
 
     @abstractmethod
-    def active_bctx(self, cancel_event: threading.Event) -> Any:
-        """Return the live browser context for ``cancel_event``, or None."""
+    def active_bctx(self, run_id: RunId) -> Any:
+        """Return the live browser context for ``run_id``, or None."""
 
 
 __all__ = [
@@ -467,7 +482,7 @@ __all__ = [
     "IStatusProtocol",
     "IMetricsProtocol",
     "IJobStorageProtocol",
-    "ITuiSlotConfigProtocol",
+    "ISlotRunPlanProtocol",
     "IRunCancelProtocol",
     "LifecycleObserver",
 ]

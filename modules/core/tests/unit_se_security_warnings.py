@@ -19,10 +19,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import (
     _record_auth_failure,
     auth_failure_count,
 )
+from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.core.src.utility_core_session_cloner import (
     CLONE_DIR_PREFIX,
     clone_base_dir,
@@ -547,7 +549,10 @@ def test_sentry_without_dsn_stays_a_no_op(monkeypatch) -> None:
         lambda **kwargs: init_calls.append(kwargs),
         raising=False,
     )
-    setup = obs.ObservabilitySetup(log_path=Path("/tmp/qwa-se-sentry-check"))
+    log_dir = Path("/tmp/qwa-se-sentry-check")
+    setup = obs.ObservabilitySetup(
+        log_path=log_dir, status_writer=StatusFileWriter(log_dir / "status.json"), metrics=MetricsCounter()
+    )
     setup._configure_sentry()
 
     assert init_calls == []
@@ -565,7 +570,10 @@ def test_sentry_init_wires_the_scrubbing_hook(monkeypatch) -> None:
         lambda **kwargs: init_calls.append(kwargs),
         raising=False,
     )
-    setup = obs.ObservabilitySetup(log_path=Path("/tmp/qwa-se-sentry-hook"))
+    log_dir = Path("/tmp/qwa-se-sentry-hook")
+    setup = obs.ObservabilitySetup(
+        log_path=log_dir, status_writer=StatusFileWriter(log_dir / "status.json"), metrics=MetricsCounter()
+    )
     setup._configure_sentry()
 
     assert init_calls

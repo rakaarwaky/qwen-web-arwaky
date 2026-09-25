@@ -8,6 +8,7 @@ browser automation to IPromptFileAggregate and IAttachmentPromptAggregate.
 from __future__ import annotations
 
 import os
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -20,10 +21,12 @@ from modules.shared.src.contract_core_aggregate import (
     IPromptFileAggregate,
 )
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
+from modules.shared.src.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_error import (
     CircuitBreakerOpenError,
     ErrorCategory,
+    JobQueueFullError,
     QwenCliError,
 )
 from modules.shared.src.taxonomy_core_event import (
@@ -33,6 +36,7 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
+    ErrorReason,
     FailureCategory,
     FilePath,
     HeadlessFlag,
@@ -41,6 +45,7 @@ from modules.shared.src.taxonomy_core_vo import (
     JobRecord,
     OutputPath,
     PromptPath,
+    RetryWaitSec,
 )
 from modules.shared.src.utility_core_response import detect_processing_failure
 
@@ -60,13 +65,64 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         max_workers: int = 1,
         circuit_breaker: CircuitBreaker | None = None,
         rate_limiter: RateLimiter | None = None,
+        max_pending_jobs: int | None = None,
     ) -> None:
         self._storage = storage
         self._file_only = file_only
         self._attachment = attachment
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
-        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="qwen_job_worker")
+        self._max_workers = max(1, int(max_workers))
+        # Admission control (issue #362): a bounded backlog replaces the
+        # executor's unbounded pending queue, so an MCP tool burst is refused
+        # with a retryable error instead of silently accumulating jobs that may
+        # never start. Capacity covers running plus queued work.
+        self._max_pending_jobs = (
+            int(max_pending_jobs)
+            if max_pending_jobs is not None
+            else self._max_workers * MAX_PENDING_JOBS_PER_WORKER + self._max_workers
+        )
+        self._admission = threading.Semaphore(max(1, self._max_pending_jobs))
+        self._inflight = 0
+        self._inflight_lock = threading.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="qwen_job_worker")
+
+    def _reserve_capacity(self) -> None:
+        """Refuse the submission when the bounded queue is already full.
+
+        ``Semaphore.acquire(blocking=False)`` is the admission check: it never
+        parks the calling thread, so an MCP client gets an immediate, structured
+        answer rather than hanging on a blocking rate-limit wait.
+        """
+        if self._admission.acquire(blocking=False):
+            return
+        with self._inflight_lock:
+            depth = self._inflight
+        raise JobQueueFullError(
+            ErrorReason(f"job queue is at capacity: {depth} of {self._max_pending_jobs} slots in use; retry later"),
+            retry_after_sec=RetryWaitSec(5.0),
+            queue_depth=JobLimit(depth),
+        )
+
+    def _release_capacity(self) -> None:
+        """Return a slot to the bounded queue once the job reaches a terminal state."""
+        with self._inflight_lock:
+            self._inflight = max(0, self._inflight - 1)
+        self._admission.release()
+
+    def _enter_flight(self) -> None:
+        """Track the in-flight depth reported alongside an over-capacity refusal."""
+        with self._inflight_lock:
+            self._inflight += 1
+
+    def queue_depth(self) -> int:
+        """Return the current in-flight job count (running plus queued)."""
+        with self._inflight_lock:
+            return self._inflight
+
+    def max_pending_jobs(self) -> int:
+        """Return the bounded queue capacity used for admission control."""
+        return self._max_pending_jobs
 
     def _guard_submit(self) -> None:
         """Fast submit-time guard: reject when the circuit breaker is open.
@@ -77,19 +133,22 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         ``_guard_dispatch`` to acquire a slot before browser work begins.
         """
         if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
-            reason = "circuit open: too many recent job failures"
             trip_category = self._circuit_breaker.trip_category
+            reason = "circuit open: too many recent job failures"
             if trip_category:
                 reason += f" (dominant error category: {trip_category})"
             raise CircuitBreakerOpenError(reason)
 
     def _guard_dispatch(self) -> None:
-        """Worker-time guard: block until a rate-limit slot is available.
+        """Apply the blocking throughput guard on the worker thread.
 
-        Runs on the job worker thread (``_run_file_job`` /
-        ``_run_attachment_job``), not on the submit caller, so a stall here
-        only defers this one job — the submit already returned its
-        ``job_id`` and the MCP client keeps polling.
+        The rate limit is honoured at dispatch time, not submit time: the worker
+        body calls this guard so a saturated limiter parks the *worker* (not the
+        MCP tool caller's thread) until a slot frees up. Submitting stays
+        non-blocking end to end — the tool caller gets a ``JobRecord`` back
+        immediately, and the bounded admission semaphore from issue #362 is what
+        caps the backlog while jobs wait here. The limiter is therefore charged
+        exactly once per job, on the worker.
         """
         if self._rate_limiter is not None:
             self._rate_limiter.acquire()
@@ -108,7 +167,15 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         """Submit a prompt file job for asynchronous background processing."""
         p_path = Path(prompt_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
-        self._guard_submit()
+        # Admission first so a refused submission never leaves a persisted
+        # record that no worker will ever pick up. Capacity is checked before
+        # both guards and released if either rejects the submission.
+        self._reserve_capacity()
+        try:
+            self._guard_submit()
+        except Exception:
+            self._release_capacity()
+            raise
         job_id = self._generate_job_id("file")
         now = _utc_now_iso()
 
@@ -123,6 +190,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         )
         self._storage.save_job(record)
 
+        self._enter_flight()
         self._executor.submit(
             self._run_file_job,
             job_id=job_id,
@@ -143,7 +211,12 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         p_path = Path(prompt_file).expanduser().resolve()
         a_path = Path(attachment_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve() if output_file else None
-        self._guard_submit()
+        self._reserve_capacity()
+        try:
+            self._guard_submit()
+        except Exception:
+            self._release_capacity()
+            raise
         job_id = self._generate_job_id("att")
         now = _utc_now_iso()
 
@@ -176,7 +249,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
 
         ``owner_pid`` is carried over from the submit record and ``heartbeat_at``
         is stamped to ``started_at`` so a crashed process leaves an owned,
-        reclaimable record that ``JobManager.reconcile_zombies`` can detect.
+        reclaimable record that ``JobStorage.reconcile_zombies`` can detect.
         """
         if record is None:
             return None
@@ -278,11 +351,29 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         output_path: Path | None,
         headless: HeadlessFlag,
     ) -> None:
-        """Execute and persist a prompt-file job."""
+        """Execute and persist a prompt-file job, then return its queue slot.
+
+        The bounded-queue slot is released in a ``finally`` so a crashed worker
+        cannot permanently shrink capacity. The rate limiter is consumed here
+        on the worker thread so the submit path never parks the MCP caller.
+        """
+        self._guard_dispatch()
+        try:
+            self._execute_file_job(job_id, prompt_path, output_path, headless)
+        finally:
+            self._release_capacity()
+
+    def _execute_file_job(
+        self,
+        job_id: JobId,
+        prompt_path: Path,
+        output_path: Path | None,
+        headless: HeadlessFlag,
+    ) -> None:
+        """Run the prompt-file job and persist its terminal state."""
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
         record = self._storage.get_job(job_id)
-        self._guard_dispatch()
         self._save_started(record, started_at)
         try:
             result = self._file_only.process_prompt_file_only(
@@ -332,11 +423,30 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         output_path: Path | None,
         headless: HeadlessFlag,
     ) -> None:
-        """Execute and persist a prompt-with-attachment job."""
+        """Execute and persist a prompt-with-attachment job, then return its slot.
+
+        The rate limiter is consumed on the worker thread, mirroring
+        :meth:`_run_file_job`, so an admitted job still honours throughput
+        limits without the submit path ever blocking.
+        """
+        self._guard_dispatch()
+        try:
+            self._execute_attachment_job(job_id, prompt_path, attachment_path, output_path, headless)
+        finally:
+            self._release_capacity()
+
+    def _execute_attachment_job(
+        self,
+        job_id: JobId,
+        prompt_path: Path,
+        attachment_path: Path,
+        output_path: Path | None,
+        headless: HeadlessFlag,
+    ) -> None:
+        """Run the attachment job and persist its terminal state."""
         start_t = time.perf_counter()
         started_at = _utc_now_iso()
         record = self._storage.get_job(job_id)
-        self._guard_dispatch()
         self._save_started(record, started_at, attachment_path=attachment_path)
         try:
             result = self._attachment.process_prompt_with_attachment(

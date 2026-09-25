@@ -1,23 +1,20 @@
-"""Regression tests: structlog loggers must not emit %-format event strings.
+"""Regression tests: capabilities_browser_adapter uses stdlib printf-style logging.
 
-Defect being locked down:
-    ``capabilities_browser_adapter.py`` used ``log = structlog.get_logger("browser")``
-    but called it with stdlib ``%-style`` positional args, e.g.::
+Defect being locked down (issue #366):
+    ``capabilities_browser_adapter.py`` used ``structlog.get_logger`` but called
+    it with keyword arguments that structlog treats as extra fields — the
+    event name was always a bare message string, so passing ``key=value``
+    instead of ``%s`` args would leak no value into the ``event`` field. When
+    we later moved the logger to stdlib via ``get_logger``, passing
+    keyword args instead of positional printf args would raise
+    ``TypeError: Logger._log() got an unexpected keyword argument``.
 
-        log.warning("Load state wait failed, proceeding: %s", err)
+    The fix converts those calls to stdlib printf-style, e.g.::
 
-    Through the structlog stdlib bridge + ``ProcessorFormatter(JSONRenderer)``,
-    that produced ``{"event": "Load state wait failed, proceeding: %s",
-    "positional_args": ["TimeoutError(...)"]}`` — the human-readable ``event``
-    kept the literal ``%s`` and the real value leaked into a ``positional_args``
-    key that no consumer (JSONL reader, TUI RichLog, monitoring) interpolates.
-    Every emitted record was thus missing its actual error value.
+        log.warning("load_state_wait_failed_proceeding %s", str(err))
 
-    The fix converts those calls to structlog keyword-arg style, e.g.::
-
-        log.warning("load_state_wait_failed_proceeding", err=str(err))
-
-    These tests pin that contract.
+    These tests pin that contract so a future edit cannot regress to
+    either keyword-arg structlog calls or bare %-placeholders without args.
 """
 
 from __future__ import annotations
@@ -104,27 +101,26 @@ def test_old_percent_style_leaks_positional_args() -> None:
     assert "positional_args" not in fixed
 
 
-_PERCENT_IN_LOG_CALL_RE = re.compile(r"""log\.(?:debug|info|warning|error|critical|exception)\(\s*["'].*?%[a-zA-Z]""")
+def test_browser_adapter_has_no_kwarg_style_log_calls() -> None:
+    """Static guard: capabilities_browser_adapter.py has no keyword-arg log calls.
 
-
-def test_browser_adapter_has_no_percent_style_structlog_calls() -> None:
-    """Static guard: capabilities_browser_adapter.py has no %-style log calls.
-
-    Locks the source so a future edit cannot reintroduce the defect.
+    Locks the source so a future edit cannot reintroduce the TypeError from
+    passing ``key=value`` to a stdlib logger.
     """
     src = Path(__file__).resolve().parents[1] / "src" / "capabilities_browser_adapter.py"
     text = src.read_text(encoding="utf-8")
-    offenders = [m.group(0) for m in _PERCENT_IN_LOG_CALL_RE.finditer(text)]
-    assert not offenders, "%-style structlog log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)
+    kwarg_re = re.compile(r"""log\.(?:debug|info|warning|error|critical|exception)\([^)]*?\w+=[\w.]""")
+    offenders = [m.group(0) for m in kwarg_re.finditer(text)]
+    assert not offenders, "keyword-arg log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)
 
 
-def test_browser_adapter_module_logger_emits_no_positional_args() -> None:
-    """End-to-end: the real browser-adapter module logger, used keyword-style, is clean."""
+def test_browser_adapter_module_logger_is_stdlib() -> None:
+    """End-to-end: the real browser-adapter module logger is a stdlib logger, not structlog."""
+    import logging as _logging
+
     from modules.core.src import capabilities_browser_adapter as adapter
 
-    assert adapter.log is not None
-    record = _clean_emit_and_read("load_state_wait_failed_proceeding", err="TimeoutError('15000ms exceeded')")
-    assert record["event"] == "load_state_wait_failed_proceeding"
-    assert record["err"] == "TimeoutError('15000ms exceeded')"
-    assert "%" not in record["event"]
-    assert "positional_args" not in record
+    assert isinstance(adapter.log, _logging.Logger), (
+        f"browser adapter logger must be a stdlib logging.Logger, got {type(adapter.log).__name__}"
+    )
+    assert adapter.log.name == "browser"

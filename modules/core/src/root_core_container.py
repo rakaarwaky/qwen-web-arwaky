@@ -37,7 +37,8 @@ from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
 from modules.core.src.capabilities_folder_compiler import FolderCompiler
 from modules.core.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
-from modules.core.src.capabilities_job_manager import JobManager
+from modules.core.src.capabilities_job_storage import JobStorage
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
 from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_prompt_injector import PromptInjector
@@ -45,8 +46,9 @@ from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCan
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.core.src.capabilities_session_manager import SessionManager
+from modules.core.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
+from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
-from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
 from modules.core.src.capabilities_update_manager import UpdateManager
 from modules.core.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_core_aggregate import (
@@ -58,7 +60,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol, IUpdateProtocol
+from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol, IUpdateProtocol
 from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
@@ -69,6 +71,7 @@ from modules.shared.src.taxonomy_core_constant import (
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 from modules.shared.src.utility_core_capacity import recommended_max_workers
+from modules.shared.src.utility_core_status import status_path_for
 
 
 class SharedContainer:
@@ -99,15 +102,19 @@ class SharedContainer:
         self.streamer = StreamMonitor()
         self.uploader = FileUploader()
         self.saver = Saver()
-        self.observability = ObservabilitySetup(log)
+        self.observability = ObservabilitySetup(
+            log,
+            status_writer=StatusFileWriter(status_path_for(log)),
+            metrics=MetricsCounter(metrics_path=log / "metrics.json"),
+        )
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
-        # Surface (QwenTuiApp) can consume it through ITuiSlotConfigProtocol
+        # Surface (QwenTuiApp) can consume it through ISlotRunPlanProtocol
         # instead of importing the Capabilities class directly.
-        self.tui_slot_config: ITuiSlotConfigProtocol = TuiSlotConfigResolver()
+        self.slot_plan: ISlotRunPlanProtocol = SlotRunPlanResolver()
 
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
@@ -166,9 +173,9 @@ class SharedContainer:
             observability=self.observability,
         )
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
-        self.job_manager = JobManager(storage_dir=DEFAULT_JOBS_DIR)
+        self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(
-            storage=self.job_manager,
+            storage=self.job_storage,
             file_only=self.agent_prompt_file_orchestrator,
             attachment=self.agent_attachment_prompt_orchestrator,
             max_workers=max_workers,

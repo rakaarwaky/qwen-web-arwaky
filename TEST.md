@@ -410,7 +410,7 @@ the following automated and manual drill scenarios:
 
 1. **Chromium Process Crash / Kill Drill**:
    - **Simulation**: Trigger a long generation or Swarm run, identify the child Chromium PID via `pgrep -f chromium`, and execute `kill -9 <PID>`.
-   - **Expected Invariant**: The orchestrator must catch `TargetClosedError` or process loss, record the failure in `JobManager` with status `failed`, trigger retry if attempts remain, and cleanly decrement active worker counters without hanging the caller or crashing the parent process.
+   - **Expected Invariant**: The orchestrator must catch `TargetClosedError` or process loss, record the failure in `JobStorage` with status `failed`, trigger retry if attempts remain, and cleanly decrement active worker counters without hanging the caller or crashing the parent process.
 2. **Upstream Gateway Rate-Limiting & HTTP 429/503 Drill**:
    - **Simulation**: Mock the Playwright network response router or route `chat.qwen.ai` responses with HTTP status 429/503 or CAPTCHA triggers.
    - **Expected Invariant**: The sliding-window `CircuitBreaker` must record sequential failures; once `threshold` failures occur within `window_sec`, subsequent calls must fail immediately with `CircuitBreakerOpenError` without initiating browser launches.

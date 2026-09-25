@@ -95,13 +95,13 @@ The `update` subcommand delegates the full pipeline to `IUpdateProtocol` (owned 
 
 ## Dependency Injection (AR-1)
 
-The TUI surface must not import the Capabilities layer directly (AES layer rules). Slot-input resolution (role-template materialization, path validation, timestamped output naming) is owned by `capabilities_tui_slot_config.py` → `TuiSlotConfigResolver` (`ITuiSlotConfigProtocol`), and the TUI consumes it only through constructor injection of the protocol, wired by the Root container:
+The TUI surface must not import the Capabilities layer directly (AES layer rules). Slot-input resolution (role-template materialization, path validation, timestamped output naming) is owned by `capabilities_slot_plan_resolver.py` → `SlotRunPlanResolver` (`ISlotRunPlanProtocol`), and the TUI consumes it only through constructor injection of the protocol, wired by the Root container:
 
-- `root_core_container.SharedContainer.tui_slot_config` exposes the resolver as `ITuiSlotConfigProtocol`.
+- `root_core_container.SharedContainer.slot_plan` exposes the resolver as `ISlotRunPlanProtocol`.
 - `surface_cli_interactive_controller.InteractiveController` forwards the injected instance to `QwenTuiApp` (fifth constructor argument, `slot_config`).
-- The surface never references `TuiSlotConfigResolver` by concrete class.
+- The surface never references `SlotRunPlanResolver` by concrete class.
 
-Change propagation for a new TUI slot field: contract protocol (`modules/shared/src/contract_core_protocol.py`) → capability resolver (`modules/core/src/capabilities_tui_slot_config.py`) → container wiring (`modules/core/src/root_core_container.py`, unchanged when the resolver class is reused) → surface constructor (`surface_cli_tui_app.py`, `surface_cli_interactive_controller.py`). The integration test `modules/cli/tests/integration_tui_slot_di.py` locks this wiring.
+Change propagation for a new TUI slot field: contract protocol (`modules/shared/src/contract_core_protocol.py`) → capability resolver (`modules/core/src/capabilities_slot_plan_resolver.py`) → container wiring (`modules/core/src/root_core_container.py`, unchanged when the resolver class is reused) → surface constructor (`surface_cli_tui_app.py`, `surface_cli_interactive_controller.py`). The integration test `modules/cli/tests/integration_tui_slot_di.py` locks this wiring.
 
 ---
 

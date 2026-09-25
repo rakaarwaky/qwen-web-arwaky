@@ -5,6 +5,9 @@ Fixtures layered cleanly across:
 2. Pipeline Layer (fixture_root, cfg, audit, run_ctx)
 3. E2E Layer (e2e_cfg)
 4. Host Gate (parallel_browser_resources) for the concurrent-browser tier
+
+Parallel browser tiers (marked ``parallel_browser``) gate on host resources
+via the ``parallel_browser_resources`` fixture (issue #329; see TEST.md 7.5a).
 """
 
 from __future__ import annotations
@@ -22,13 +25,16 @@ import contextlib
 
 from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
 from modules.core.src.capabilities_prompt_injector import PromptInjector
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
 from modules.core.src.utility_core_async_loop import isolate_thread_event_loop
 from modules.core.src.utility_core_host_gate import insufficient_reason, probe
 from modules.shared.src import AppConfig, RunContext
+from modules.shared.src.utility_core_status import status_path_for
 from tests.pipeline_fixtures import restore_fixture_state
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
@@ -76,7 +82,11 @@ def client(browser_ctx: BrowserContext, page) -> DirectPromptOrchestrator:
         injector=PromptInjector(),
         sender=SendDispatcher(),
         streamer=StreamMonitor(),
-        observability=ObservabilitySetup(cfg.log_path),
+        observability=ObservabilitySetup(
+            cfg.log_path,
+            StatusFileWriter(status_path_for(cfg.log_path)),
+            MetricsCounter(metrics_path=cfg.log_path / "metrics.json"),
+        ),
     )
 
 

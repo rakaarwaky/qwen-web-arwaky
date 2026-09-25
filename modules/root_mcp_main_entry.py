@@ -18,10 +18,13 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool
 from mcp_types._types import ServerCapabilities, ToolsCapability
 
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
+from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.core.src.root_core_container import SharedContainer
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
+from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_core_version import get_package_version
 
 # ─── Logging setup ──────────────────────────────────────────────────────────
@@ -294,7 +297,11 @@ GENERATED_TOOLS = TOOL_HANDLERS
 
 def run_mcp_server() -> None:
     """Run the MCP server over stdio."""
-    ObservabilitySetup(DEFAULT_LOG).setup_observability(log_path=DEFAULT_LOG)
+    ObservabilitySetup(
+        DEFAULT_LOG,
+        StatusFileWriter(status_path_for(DEFAULT_LOG)),
+        MetricsCounter(metrics_path=DEFAULT_LOG / "metrics.json"),
+    ).setup_observability(log_path=DEFAULT_LOG)
 
     async def serve() -> None:
         """Register request handlers and serve MCP over stdio until shutdown."""

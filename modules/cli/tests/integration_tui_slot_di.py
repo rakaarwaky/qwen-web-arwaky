@@ -1,8 +1,8 @@
 """Integration tests for AR-1: TUI slot-config DI wiring (issue #316).
 
 Locks the three-party chain TUI Surface → Root Container → Capabilities
-(TuiSlotConfigResolver): the container exposes the resolver as
-ITuiSlotConfigProtocol, and QwenTuiApp receives it through its constructor
+(SlotRunPlanResolver): the container exposes the resolver as
+ISlotRunPlanProtocol, and QwenTuiApp receives it through its constructor
 — never by importing the capability directly.
 """
 
@@ -13,13 +13,13 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.core.src.root_core_container import SharedContainer
-from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol
+from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol
 
 
 def test_container_exposes_slot_config_protocol() -> None:
-    """SharedContainer.tui_slot_config must satisfy ITuiSlotConfigProtocol."""
+    """SharedContainer.slot_plan must satisfy ISlotRunPlanProtocol."""
     container = SharedContainer()
-    assert isinstance(container.tui_slot_config, ITuiSlotConfigProtocol)
+    assert isinstance(container.slot_plan, ISlotRunPlanProtocol)
 
 
 def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
@@ -30,7 +30,7 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
         container.agent_direct_prompt_orchestrator,
         container.agent_prompt_file_orchestrator,
         container.agent_attachment_prompt_orchestrator,
-        container.tui_slot_config,
+        container.slot_plan,
         container.agent_setup_orchestrator,
         container.agent_session_orchestrator,
         container.agent_job_orchestrator,
@@ -47,15 +47,15 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
 
     assert result["success"] is True
     mock_app.assert_called_once()
-    # 5th positional constructor argument is slot_config (ITuiSlotConfigProtocol).
+    # 5th positional constructor argument is slot_config (ISlotRunPlanProtocol).
     injected = mock_app.call_args.args[4]
-    assert injected is container.tui_slot_config
-    assert isinstance(injected, ITuiSlotConfigProtocol)
+    assert injected is container.slot_plan
+    assert isinstance(injected, ISlotRunPlanProtocol)
 
 
 def test_controller_forwards_slot_config_without_capability_import() -> None:
     """InteractiveController must forward the injected resolver unchanged."""
-    slot_config = MagicMock(spec=ITuiSlotConfigProtocol)
+    slot_config = MagicMock(spec=ISlotRunPlanProtocol)
     controller = InteractiveController(
         MagicMock(),
         MagicMock(),
@@ -72,6 +72,6 @@ def test_surface_does_not_import_slot_config_capability() -> None:
     offenders = [
         path.name
         for path in src_dir.glob("surface_cli_*.py")
-        if "capabilities_tui_slot_config" in path.read_text(encoding="utf-8")
+        if "capabilities_slot_plan_resolver" in path.read_text(encoding="utf-8")
     ]
     assert offenders == []

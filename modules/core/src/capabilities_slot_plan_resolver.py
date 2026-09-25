@@ -1,10 +1,10 @@
-"""Capability layer (capabilities_tui_slot_config): resolve TUI slot inputs to AppConfig.
+"""Capability layer (capabilities_slot_plan_resolver): resolve slot inputs to AppConfig.
 
-Implements ITuiSlotConfigProtocol.
+Implements ISlotRunPlanProtocol.
 
 Keeps domain/control logic (role-template materialization, path resolution,
 attachment-stem output naming with mandatory timestamp) out of the passive
-TUI surface. The TUI only reads widget values and delegates here.
+surface. The surface only reads widget values and delegates here.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from modules.core.src.utility_core_config_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.shared.src.contract_core_protocol import ITuiSlotConfigProtocol
+from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
@@ -50,8 +50,8 @@ def _output_dir_write_error(out_path: Path) -> str | None:
     return None
 
 
-class TuiSlotConfigResolver(ITuiSlotConfigProtocol):
-    """Resolve raw TUI slot widget values into an executable run plan."""
+class SlotRunPlanResolver(ISlotRunPlanProtocol):
+    """Resolve raw slot widget values into an executable run plan."""
 
     def resolve_slot_run_plan(
         self,
@@ -136,4 +136,4 @@ class TuiSlotConfigResolver(ITuiSlotConfigProtocol):
         return files
 
 
-__all__ = ["SlotInputError", "SlotRunPlan", "TuiSlotConfigResolver"]
+__all__ = ["SlotInputError", "SlotRunPlan", "SlotRunPlanResolver"]

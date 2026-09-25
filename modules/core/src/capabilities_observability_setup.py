@@ -1,7 +1,9 @@
 """Capabilities: observability stack setup (AES403).
 
-Implements IObservabilityProtocol. Metrics counters and status.json writes
-live here as helper types (FR-009) — not standalone capabilities.
+Implements IObservabilityProtocol. ``MetricsCounter`` and ``StatusFileWriter``
+are separate capabilities (issue #359) injected into :class:`ObservabilitySetup`
+by the composition root; they are not defined or re-exported here, because a
+capability must not import its peers (AES201).
 """
 
 from __future__ import annotations
@@ -38,7 +40,7 @@ with suppress(ImportError):
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor
 
-from modules.core.src.utility_core_io_writer import atomic_write_json, ensure_dir
+from modules.core.src.utility_core_io_writer import atomic_write_json
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.core.src.utility_telemetry_scrubber import (
     harden_private_dir,
@@ -48,9 +50,9 @@ from modules.core.src.utility_telemetry_scrubber import (
 )
 from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR, DEFAULT_LOG
+from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
-from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, MessageCount, RunId, ServiceName, StatusRecordVO
+from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
 from modules.shared.src.utility_core_status import status_path_for
 
 #: Version of the ``status.json`` document contract. Bumped when a field is
@@ -58,231 +60,39 @@ from modules.shared.src.utility_core_status import status_path_for
 #: (issue #296).
 STATUS_SCHEMA_VERSION = 2
 
-# Block 1: Class Definition & Constructor
-
-
-class MetricsCounter(IMetricsProtocol):
-    """Thread-safe metrics collector persisted in a rolling-window JSON file."""
-
-    def __init__(self, metrics_path: Path | None = None) -> None:
-        self._lock = threading.Lock()
-        self._metrics_path = Path(metrics_path or (DEFAULT_LOG / "metrics.json"))
-        self._counters: dict[str, int] = {}
-        self._execution_events: list[dict[str, Any]] = []
-        self._start_time = datetime.now(tz=timezone.utc)
-        self._load()
-
-    def _load(self) -> None:
-        try:
-            raw = json.loads(self._metrics_path.read_text(encoding="utf-8"))
-            counters = raw.get("counters", {}) if isinstance(raw, dict) else {}
-            if isinstance(counters, dict):
-                self._counters = {str(k): int(v) for k, v in counters.items()}
-            events = raw.get("execution_events", []) if isinstance(raw, dict) else []
-            if isinstance(events, list):
-                self._execution_events = [event for event in events if isinstance(event, dict)]
-            self._prune_events()
-        except (OSError, ValueError, TypeError):
-            self._counters = {}
-            self._execution_events = []
-
-    def _prune_events(self) -> None:
-        cutoff = datetime.now(tz=timezone.utc).timestamp() - 24 * 60 * 60
-        kept: list[dict[str, Any]] = []
-        for event in self._execution_events:
-            try:
-                if datetime.fromisoformat(str(event["at"]).replace("Z", "+00:00")).timestamp() >= cutoff:
-                    kept.append(event)
-            except (KeyError, TypeError, ValueError):
-                continue
-        self._execution_events = kept
-
-    def _persist(self) -> None:
-        self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
-        self._prune_events()
-        total = len(self._execution_events)
-        successful = sum(1 for event in self._execution_events if event.get("success") is True)
-        atomic_write_json(
-            self._metrics_path,
-            {
-                "window": "rolling_24h",
-                "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-                "counters": self._counters,
-                "execution_events": self._execution_events,
-                "total_executions": total,
-                "successful_executions": successful,
-            },
-        )
-        harden_private_file(self._metrics_path)
-
-    def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
-        """Add *amount* to the counter *key* and persist the metrics file."""
-        with self._lock:
-            self._counters[key] = self._counters.get(key, MessageCount(0)) + amount
-            self._persist()
-
-    def record_execution(self, success: bool) -> None:
-        """Record one terminal pipeline execution for the reliability SLO."""
-        with self._lock:
-            self._execution_events.append({"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)})
-            self._persist()
-
-    def record_failure(self, category: str) -> None:
-        """Bump one occurrence for *category* in the rolling error counter.
-
-        Unknown category names are ignored so a caller passing a raw exception
-        type name cannot inflate the defect counts with unbounded keys; the
-        taxonomy is the single source of truth for valid buckets.
-        """
-        from modules.shared.src.taxonomy_core_error import ErrorCategory
-
-        if category not in ErrorCategory.known():
-            return
-        with self._lock:
-            self._counters[f"error.{category}"] = self._counters.get(f"error.{category}", 0) + 1
-            self._persist()
-
-    def failure_counts(self) -> dict[str, int]:
-        """Return the rolling per-category error counts, ranked by descending count.
-
-        Keys are ``ErrorCategory`` names with the ``error.`` counter prefix
-        stripped, so the QA defect-density report can read them directly.
-        """
-        with self._lock:
-            prefix = "error."
-            counts = {key[len(prefix) :]: value for key, value in self._counters.items() if key.startswith(prefix)}
-        return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
-
-    def get(self, key: str) -> MessageCount:
-        """Return the current value of counter *key* (0 when absent)."""
-        with self._lock:
-            return MessageCount(self._counters.get(key, 0))
-
-    def snapshot(self) -> dict[str, Any]:
-        """Return all counters plus rolling-24h execution totals and success rate."""
-        with self._lock:
-            self._prune_events()
-            result: dict[str, Any] = dict(self._counters)
-            total = len(self._execution_events)
-            successful = sum(1 for event in self._execution_events if event.get("success") is True)
-            result["total_executions"] = total
-            result["successful_executions"] = successful
-            result["success_rate"] = round(successful / total, 6) if total else None
-            return result
-
-    def __repr__(self) -> str:
-        return f"MetricsCounter(path={self._metrics_path!s})"
-
-
-class StatusFileWriter(IStatusProtocol):
-    """Atomic JSON status file for systemd / monitoring tools."""
-
-    def __init__(self, status_path: Path) -> None:
-        self._status_path = status_path
-        ensure_dir(self._status_path)
-
-    def write(self, **kwargs: Any) -> None:
-        """Atomically write the status JSON from keyword fields.
-
-        When a ``metrics`` mapping is supplied it is embedded under
-        ``metrics``, so an external monitor reading ``status.json`` sees the
-        same counters the process keeps alive in memory (issue #296). The
-        document is also stamped with ``schema_version`` and ``updated_at``
-        so a monitor can parse it without guessing. Field contract:
-
-        - ``schema_version``: int, currently 2.
-        - ``updated_at``: ISO-8601 UTC timestamp of the write.
-        - ``status`` / ``mode`` / ``headless`` / ``run_id``: run identity.
-        - ``files_processed`` / ``files_failed`` / ``cpu_sec``: run totals.
-        - ``failure_categories``: optional mapping of
-          :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` values
-          to occurrence counts, letting monitoring tools answer "which
-          capability is most defective?" without parsing ``app.jsonl`` by hand.
-        - ``metrics``: counters plus ``total_executions``,
-          ``successful_executions``, and ``success_rate`` over a rolling 24 h
-          window (``None`` when no execution has been recorded).
-        - ``error``: present only when the run failed.
-        """
-        rec: dict[str, Any] = {
-            "schema_version": STATUS_SCHEMA_VERSION,
-            "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-            "status": kwargs.get("status", "unknown"),
-            "mode": kwargs.get("mode", "unknown"),
-            "headless": kwargs.get("headless", False),
-            "run_id": kwargs.get("run_id"),
-            "files_processed": kwargs.get("files_processed", 0),
-            "files_failed": kwargs.get("files_failed", 0),
-            "failure_categories": _normalise_categories(kwargs.get("failure_categories")),
-        }
-        metrics = kwargs.get("metrics")
-        if isinstance(metrics, dict):
-            rec["metrics"] = metrics
-        if kwargs.get("cpu_sec") is not None:
-            rec["cpu_sec"] = round(kwargs["cpu_sec"], 2)
-        if kwargs.get("error"):
-            rec["error"] = kwargs["error"]
-
-        with suppress(OSError):
-            atomic_write_json(self._status_path, rec)
-
-    def write_record(self, record: StatusRecordVO, *, metrics: dict[str, Any] | None = None) -> None:
-        """Write the status JSON from a typed status record.
-
-        ``metrics`` carries the persisted counter snapshot so a monitor reading
-        only ``status.json`` still sees the rolling-24h execution totals
-        (issue #296).
-        """
-        self.write(
-            status=record.status,
-            mode=record.mode,
-            headless=record.headless,
-            run_id=record.run_id,
-            error=record.error,
-            cpu_sec=record.cpu_sec,
-            files_processed=record.files_processed,
-            files_failed=record.files_failed,
-            metrics=metrics,
-        )
-
-    def read(self) -> dict[str, Any] | None:
-        """Return the parsed status file, or None when missing or invalid."""
-        try:
-            result: Any = json.loads(self._status_path.read_text(encoding="utf-8"))
-            return result if isinstance(result, dict) else None
-        except FileNotFoundError:
-            return None
-        except (OSError, ValueError):
-            return None
-
-    def __repr__(self) -> str:
-        return "StatusFileWriter()"
-
-    @classmethod
-    def create_default(cls, log_path: Path) -> StatusFileWriter:
-        """Build a writer targeting the conventional status path for *log_path*."""
-        return cls(status_path_for(log_path))
-
-
-def get_status_writer(log_path: Path) -> StatusFileWriter:
-    """Create a status writer at log_path/status.json."""
-    return StatusFileWriter.create_default(log_path)
+# NOTE (issue #359): ``MetricsCounter`` and ``StatusFileWriter`` were extracted
+# into their own capability modules (``capabilities_metrics_counter`` /
+# ``capabilities_status_writer``) and are injected into ``ObservabilitySetup``
+# by the composition root. They are intentionally NOT defined here so this file
+# does not import its peer capabilities (AES201).
 
 
 class ObservabilitySetup(IObservabilityProtocol):
-    """Full observability bootstrap: Sentry → OTel → structlog → status → hooks."""
+    """Full observability bootstrap: Sentry → OTel → structlog → status → hooks.
 
-    def __init__(self, log_path: Path, status_writer: IStatusProtocol | None = None) -> None:
+    The status writer and metrics counter are injected rather than constructed
+    here. Building them in this file would make it import its peer capabilities
+    (``capabilities_status_writer``, ``capabilities_metrics_counter``), which
+    AES201 forbids, so the composition root owns construction (issue #359).
+    """
+
+    def __init__(
+        self,
+        log_path: Path,
+        status_writer: IStatusProtocol,
+        metrics: IMetricsProtocol,
+    ) -> None:
         self._log_path = log_path
         self._status_path = status_path_for(log_path)
-        self._status_writer = status_writer or StatusFileWriter(self._status_path)
-        self._metrics = MetricsCounter(metrics_path=self._log_path / "metrics.json")
+        self._status_writer = status_writer
+        self._metrics = metrics
         self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
     # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
 
     @property
-    def metrics(self) -> MetricsCounter:
+    def metrics(self) -> IMetricsProtocol:
         """Return the persistent execution metrics collector."""
         return self._metrics
 
@@ -584,66 +394,71 @@ class ObservabilitySetup(IObservabilityProtocol):
             metrics=self._metrics.snapshot(),
         )
 
-    def install_excepthooks(self) -> None:
-        """Install global exception handlers (delegates to module-level function)."""
-        install_excepthooks()
-
     def write_quality_report(self, *, run_id: str | None = None) -> Path:
-        """Produce ``quality_report.json`` with error distribution and defect density.
+        """Aggregate the error-category distribution of ``app.jsonl`` and persist it.
 
-        Reads ``app.jsonl`` under ``self._log_path``, extracts every record
-        whose ``level`` is ``error`` or ``critical``, counts them per
-        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory`, and
-        folds the rolling-24h metrics snapshot into the report so a monitoring
-        dashboard can answer "which capability is most defective?" from one
-        JSON object instead of parsing JSONL by hand.
+        The report answers "which capability is most defective?" without a
+        human reading the JSONL log: failures are bucketed by
+        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` and
+        ranked by count, alongside the rolling-24h execution totals.
+
+        Returns the written path. A missing or unparseable log yields an empty
+        report rather than raising — the log may not exist yet on a cold start.
         """
+        report_path = self._log_path / "quality_report.json"
         distribution: dict[str, int] = {}
-        error_records = 0
-        for payload in self._iter_error_records():
-            error_records += 1
-            category = _category_from_record(payload)
-            distribution[category] = distribution.get(category, 0) + 1
-
-        executions: dict[str, Any] = self._metrics.snapshot()
-        total = int(executions.get("total_executions", 0) or 0)
-        report: dict[str, Any] = {
+        total_lines = 0
+        for record in self._iter_error_records():
+            total_lines += 1
+            distribution[record] = distribution.get(record, 0) + 1
+        ranked = dict(sorted(distribution.items(), key=lambda kv: (-kv[1], kv[0])))
+        snapshot = self._metrics.snapshot()
+        payload: dict[str, Any] = {
             "generated_at": datetime.now(tz=timezone.utc).isoformat(),
             "run_id": run_id,
             "source_log": str(self._log_path / "app.jsonl"),
-            "error_records": error_records,
-            "error_distribution": dict(sorted(distribution.items(), key=lambda kv: (-kv[1], kv[0]))),
-            "defect_density": round(error_records / total, 6) if total else None,
-            "executions": executions,
+            "error_records": total_lines,
+            "error_distribution": ranked,
+            "defect_density": (
+                round(total_lines / int(snapshot.get("total_executions", 0)), 6)
+                if int(snapshot.get("total_executions", 0))
+                else None
+            ),
+            "executions": snapshot,
         }
-        quality_path = self._log_path / "quality_report.json"
-        atomic_write_json(quality_path, report)
-        return quality_path
+        with suppress(OSError):
+            atomic_write_json(report_path, payload)
+        return report_path
 
-    def _iter_error_records(self) -> Iterator[dict[str, Any]]:
-        """Yield every ``error``/``critical`` record parsed from ``app.jsonl``.
+    def _iter_error_records(self) -> Iterator[str]:
+        """Yield the error category of every error-level record in ``app.jsonl``.
 
-        Blank lines, unparseable JSON, and non-object records are skipped so a
-        truncated final line — the normal result of a SIGKILL mid-write — never
-        corrupts the report.
+        Unreadable lines and non-JSON payloads are skipped: a truncated final
+        line (crash mid-write) must not break the report.
         """
-        log_path = self._log_path / "app.jsonl"
+        log_file = self._log_path / "app.jsonl"
         try:
-            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            handle = log_file.open(encoding="utf-8", errors="ignore")
         except OSError:
             return
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            try:
-                payload = json.loads(stripped)
-            except (ValueError, TypeError):
-                continue
-            if not isinstance(payload, dict):
-                continue
-            if str(payload.get("level", "")).lower() in ("error", "critical"):
-                yield payload
+        with handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    payload = json.loads(stripped)
+                except ValueError:
+                    continue
+                if not isinstance(payload, dict):
+                    continue
+                if str(payload.get("level", "")).lower() not in ("error", "critical"):
+                    continue
+                yield _category_from_record(payload)
+
+    def install_excepthooks(self) -> None:
+        """Install global exception handlers (delegates to module-level function)."""
+        install_excepthooks()
 
     # Block 3: Dunder Methods, Factories & Helpers
 
@@ -655,38 +470,19 @@ class ObservabilitySetup(IObservabilityProtocol):
 # ─── Module-level helper functions ──────────────────────────────────────────
 
 
-def _normalise_categories(raw: Any) -> dict[str, int]:
-    """Coerce a failure-category breakdown into a sorted ``{category: count}`` map.
-
-    Accepts ``None``, a mapping, or an iterable of pairs.  Non-integer counts
-    are dropped rather than written as strings, so ``status.json`` keeps a
-    stable schema that monitoring tools can sum without type coercion.
-    """
-    if not raw:
-        return {}
-    items = raw.items() if isinstance(raw, dict) else raw
-    result: dict[str, int] = {}
-    for pair in items:
-        try:
-            key, value = pair
-            result[str(key)] = int(value)
-        except (TypeError, ValueError):
-            continue
-    return dict(sorted(result.items(), key=lambda kv: (-kv[1], kv[0])))
-
-
 def _category_from_record(payload: dict[str, Any]) -> str:
-    """Return the error category for one log record.
+    """Return the error category of a JSONL log record.
 
-    Prefers an explicit ``category`` field written by the caller; falls back to
-    ``other`` so an uncategorized error still counts toward defect density
-    rather than silently disappearing from the distribution.
+    Prefers the ``category`` field the crash handler already writes
+    (``ErrorCategory.categorize``).  A value outside
+    :meth:`~modules.shared.src.taxonomy_core_error.ErrorCategory.known` is
+    treated as uncategorized, so a hand-written or stale bucket name cannot
+    fragment the distribution; records emitted without one fall back to
+    ``"other"`` so they still show up rather than being dropped.
     """
-    from modules.shared.src.taxonomy_core_error import ErrorCategory
-
-    raw = payload.get("category")
-    if isinstance(raw, str) and raw in ErrorCategory.known():
-        return raw
+    category = payload.get("category")
+    if isinstance(category, str) and category in ErrorCategory.known():
+        return category
     return "other"
 
 
@@ -932,11 +728,8 @@ def install_excepthooks() -> None:
 
 
 __all__ = [
-    "auth_failure_count",
-    "get_status_writer",
-    "MetricsCounter",
     "ObservabilitySetup",
-    "StatusFileWriter",
+    "auth_failure_count",
     "install_excepthooks",
 ]
 

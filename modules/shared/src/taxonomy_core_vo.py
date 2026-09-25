@@ -317,7 +317,7 @@ class SlotRunPlan:
     """Validated TUI slot configuration ready to execute.
 
     Shared VO so the contract layer can name the success return type of
-    ``ITuiSlotConfigProtocol.resolve_slot_run_plan`` without importing the
+    ``ISlotRunPlanProtocol.resolve_slot_run_plan`` without importing the
     Capabilities layer.
     """
 
@@ -554,8 +554,10 @@ class AppConfig:
     circuit_breaker_threshold: int = 5
     circuit_breaker_window: int = 30
 
-    # Issue #283: stakeholder-configurable model override. Empty means "use
-    # the compiled default (QWEN_DEFAULT_MODEL / QWEN_MODEL env var)".
+    # Issue #283: stakeholder-configurable model override. When set, the
+    # browser adapter tries this model first; when the picker does not expose
+    # it, the pipeline falls back to the first available model and logs a
+    # WARNING instead of aborting.
     model: str = ""
 
     retry_failed: bool = False
@@ -595,16 +597,19 @@ class AppConfig:
 class RunState:
     """Per-run cancellation and browser-context state.
 
-    One instance per orchestrator invocation.  cancel_event is owned by
+    One instance per orchestrator invocation.  ``cancel_event`` is owned by
     the caller when provided (targeted cancel), otherwise a private event is
-    created for internal fail-fast checks.  active_bctx holds the live
-    browser context so a cancel can close it; bctx_lock guards that field
-    against concurrent set/clear from the run's worker thread.
+    created for internal fail-fast checks.  ``active_bctx`` holds the live
+    browser context so a cancel can close it; ``bctx_lock`` guards that field
+    against concurrent set/clear from the run's worker thread.  ``run_id``
+    is a stable identifier used by the run-cancel registry for lookups so
+    cancellation never depends on event object identity across threads.
     """
 
     cancel_event: threading.Event = field(default_factory=threading.Event)
     active_bctx: object | None = None
     bctx_lock: threading.Lock = field(default_factory=threading.Lock)
+    run_id: RunId = field(default_factory=lambda: RunId(uuid.uuid4().hex[:8]))
 
     def cancel_requested(self) -> bool:
         """True when the run's cancel event is set."""

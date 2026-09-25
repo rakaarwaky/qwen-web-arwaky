@@ -92,8 +92,11 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
         ``process_prompt_with_attachment``, and later calls this method with
         the same event to stop *only that run*. Sibling runs holding
         different events are unaffected.
+
+        The registry resolves the event to a stable run_id internally, so the
+        lookup never depends on event object identity outliving the run.
         """
-        self._cancel.cancel_run(cancel_event)
+        self._cancel.cancel_by_event(cancel_event)
 
     def process_prompt_with_attachment(
         self,
@@ -146,7 +149,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
 
             t0 = time.time()
             with self._browser.browser_session(cfg) as bctx:
-                self._cancel.set_active_bctx(run_state.cancel_event, bctx)
+                self._cancel.set_active_bctx(run_state.run_id, bctx)
                 try:
                     if run_state.cancel_event.is_set():
                         raise RunCancelledError("Cancelled by user before browser launch")
@@ -155,7 +158,7 @@ class AttachmentPromptOrchestrator(IAttachmentPromptAggregate):
                         page, p_path, att_path, cfg.request_timeout, cfg, emitter, state, run_state.cancel_event
                     )
                 finally:
-                    self._cancel.set_active_bctx(run_state.cancel_event, None)
+                    self._cancel.set_active_bctx(run_state.run_id, None)
             dur = time.time() - t0
             save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
             return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")

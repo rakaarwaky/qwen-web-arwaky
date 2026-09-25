@@ -3,6 +3,14 @@
 Enables 1-browser-per-job parallel execution with shared login sessions
 by creating isolated temporary clones of the master profile directory.
 
+Materialization is O(delta) rather than O(full profile): only the immutable
+resource files Chromium ships into the profile are hardlinked from the master
+(so they cost a directory entry, not a copy), while every file Chromium may
+write — cookies, preferences, LevelDB, caches, logs — is copied. No global
+lock serializes the clones, so parallel browser startup does not queue behind
+the slowest copy; only stale-lock cleanup of the master profile is
+synchronized.
+
 Security (issue #346): clones carry live authentication cookies, so they are
 created under ``$XDG_RUNTIME_DIR`` (a tmpfs cleared at logout) whenever it is
 available, orphaned clones left behind by a ``SIGKILL`` or power loss are
@@ -13,6 +21,7 @@ profile age so operators can re-login before IdP expiry.
 from __future__ import annotations
 
 import contextlib
+import fnmatch
 import logging
 import os
 import shutil
@@ -23,8 +32,19 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-_CLONE_LOCK = threading.Lock()
+#: Serializes stale-lock cleanup of the *master* profile only. Clone
+#: materialization never takes this lock, so concurrent startups overlap.
+_MASTER_LOCKS_LOCK = threading.Lock()
+
 STALE_LOCK_PATTERNS = ("SingletonLock", "SingletonSocket", "SingletonCookie", "DevToolsActivePort")
+
+#: Glob patterns of files Chromium never writes back. Everything else — cookies,
+#: ``Preferences``, ``Local State``, the whole LevelDB tree, caches, logs — is
+#: copied, because a hardlinked inode would let the clone's writes corrupt the
+#: master profile. Hardlinking is a directory-entry operation, so these cost
+#: nothing per byte and stay the bulk of a stock profile.
+_IMMUTABLE_GLOBS = ("*.pak", "*.bin")
+_IMMUTABLE_DIRS = ("locales",)
 
 # Prefix shared by every ephemeral credential clone; also the glob used to
 # recognise orphans left behind by crashed processes.
@@ -132,22 +152,88 @@ def clean_stale_locks(profile_dir: Path) -> None:
                 lock_path.unlink(missing_ok=True)
 
 
+def _is_immutable(name: str, path: Path) -> bool:
+    """True when *path* is a Chromium resource Chromium never writes back.
+
+    Symlinks are reproduced as symlinks rather than linked, and directories are
+    materialized entry by entry, so neither is a hardlink candidate here.
+    """
+    if path.is_symlink() or path.is_dir():
+        return False
+    return any(fnmatch.fnmatch(name, pattern) for pattern in _IMMUTABLE_GLOBS)
+
+
+def _link_tree(src: Path, dst: Path) -> None:
+    """Hardlink an immutable resource tree, falling back to a copy.
+
+    Returns ``False`` when the fallback was needed, so the caller can report
+    a profile that was not fully hardlinked.
+    """
+    # Create the destination root first: a file directly inside *src* links to
+    # dst/<name>, and both os.link and shutil.copy2 fail if dst itself is
+    # missing.
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            _link_tree(item, target)
+        else:
+            try:
+                os.link(item, target)
+            except OSError:
+                # Cross-device link or a file removed mid-clone: copying the
+                # bytes is always correct, just slower.
+                shutil.copy2(item, target, follow_symlinks=False)
+
+
+def _copy_profile_overlay(src: Path, dst: Path) -> None:
+    """Materialize *dst* as a hardlink-overlay copy of *src*.
+
+    Immutable files matching ``_IMMUTABLE_GLOBS`` are hardlinked from the
+    source so they cost a directory entry, not a full copy.  Everything else —
+    mutable state and immutable resource directories — is copied verbatim.
+    The master profile is only read, so clones never contend for a write and
+    no lock is required.
+    """
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_symlink():
+            with contextlib.suppress(OSError):
+                os.symlink(os.readlink(item), target)
+        elif item.is_dir() and item.name in _IMMUTABLE_DIRS:
+            _link_tree(item, target)
+        elif item.is_dir():
+            shutil.copytree(
+                item, target, symlinks=True, ignore=shutil.ignore_patterns("Singleton*", "DevToolsActivePort")
+            )
+        elif _is_immutable(item.name, item):
+            try:
+                os.link(item, target)
+            except OSError:
+                # Cross-device link or a file removed mid-clone: copying the
+                # bytes is always correct, just slower.
+                shutil.copy2(item, target, follow_symlinks=False)
+        else:
+            shutil.copy2(item, target)
+
+
 def clone_session_profile(src: Path, dst: Path) -> None:
-    """Clone master profile files into destination directory, ignoring locks and broken symlinks."""
+    """Clone master profile files into destination directory, ignoring locks and broken symlinks.
+
+    Only the master's stale-lock cleanup is serialized; the overlay copy itself
+    runs unguarded so parallel job startup overlaps instead of queueing.
+    """
     dst.mkdir(parents=True, exist_ok=True)
     if not src.exists() or not src.is_dir():
         with contextlib.suppress(OSError):
             dst.chmod(0o700)
         return
 
-    with _CLONE_LOCK:
-        shutil.copytree(
-            src,
-            dst,
-            ignore=shutil.ignore_patterns("Singleton*", "DevToolsActivePort"),
-            ignore_dangling_symlinks=True,
-            dirs_exist_ok=True,
-        )
+    with _MASTER_LOCKS_LOCK:
+        clean_stale_locks(src)
+    _copy_profile_overlay(src, dst)
 
     clean_stale_locks(dst)
     with contextlib.suppress(OSError):
@@ -172,7 +258,8 @@ def create_ephemeral_session(
     master_session.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
         master_session.chmod(0o700)
-    clean_stale_locks(master_session)
+    with _MASTER_LOCKS_LOCK:
+        clean_stale_locks(master_session)
 
     if mode == "login":
         yield master_session

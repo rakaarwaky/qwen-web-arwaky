@@ -340,7 +340,7 @@ def _dispatch(
             container.agent_direct_prompt_orchestrator,
             container.agent_prompt_file_orchestrator,
             container.agent_attachment_prompt_orchestrator,
-            container.tui_slot_config,
+            container.slot_plan,
             container.agent_setup_orchestrator,
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,

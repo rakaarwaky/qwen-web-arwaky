@@ -16,7 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
+from modules.core.src.capabilities_status_writer import StatusFileWriter
+from modules.shared.src.utility_core_status import status_path_for
 
 
 @pytest.fixture
@@ -76,7 +79,11 @@ class _FakeStderr:
 def test_interactive_mode_attaches_no_stderr_handler(tmp_path: Path, isolated_root_logger, monkeypatch) -> None:
     """attach_stderr=False must leave the root logger without a stderr handler."""
     monkeypatch.setattr("sys.stderr", _FakeStderr())
-    cap = ObservabilitySetup(tmp_path)
+    cap = ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    )
 
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
 
@@ -87,7 +94,11 @@ def test_cli_mode_still_attaches_stderr_handler(tmp_path: Path, isolated_root_lo
     """Non-interactive CLI runs keep the stderr handler for operator visibility."""
     fake = _FakeStderr()
     monkeypatch.setattr("sys.stderr", fake)
-    cap = ObservabilitySetup(tmp_path)
+    cap = ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    )
 
     cap.setup_observability(log_path=tmp_path, attach_stderr=True)
 
@@ -98,7 +109,11 @@ def test_browser_logs_do_not_reach_stderr_in_tui_mode(tmp_path: Path, isolated_r
     """The exact startup scenario: browser callbacks emit while the TUI runs."""
     fake = _FakeStderr()
     monkeypatch.setattr("sys.stderr", fake)
-    cap = ObservabilitySetup(tmp_path)
+    cap = ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    )
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
 
     # Replay what Playwright's page.on("response") callback emits during the
@@ -116,7 +131,11 @@ def test_browser_logs_still_persist_to_file_in_tui_mode(tmp_path: Path, isolated
     """Disabling stderr must not drop operational logging — app.jsonl still written."""
     fake = _FakeStderr()
     monkeypatch.setattr("sys.stderr", fake)
-    cap = ObservabilitySetup(tmp_path)
+    cap = ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    )
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
 
     log = cap.get_logger("capabilities_browser_adapter")

@@ -18,7 +18,7 @@ from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 
 
 def _make_app() -> QwenTuiApp:
-    # AR-1: slot_config is injected (ITuiSlotConfigProtocol), no longer
+    # AR-1: slot_config is injected (ISlotRunPlanProtocol), no longer
     # constructed inside the TUI surface.
     return QwenTuiApp(
         workspace=MagicMock(),
