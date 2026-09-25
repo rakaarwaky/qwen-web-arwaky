@@ -375,7 +375,8 @@ class SwarmOrchestrator(ISwarmAggregate):
     @staticmethod
     def _new_swarm_id() -> SwarmId:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        return SwarmId(f"swarm_{timestamp}_{secrets.token_hex(3)}")
+        token = secrets.token_hex(3)
+        return SwarmId(f"swarm_{timestamp}_{token}")
 
 
 __all__ = ["SwarmOrchestrator"]

@@ -15,18 +15,17 @@ from types import MappingProxyType
 from typing import NewType, TypeAlias
 
 from .taxonomy_core_vo import (
-    EventDetails as EventDetailsValue,
-)
-from .taxonomy_core_vo import (
+    EventDetails,
     EventDetailsMapping,
     EventId,
     EventName,
+    EventOrderMap,
     EventOrderMapping,
     EventTimestamp,
 )
-from .taxonomy_core_vo import (
-    EventOrderMap as EventOrderMapValue,
-)
+
+EventDetailsValue = EventDetails
+EventOrderMapValue = EventOrderMap
 
 EventDetails: TypeAlias = EventDetailsMapping
 EventOrderMap: TypeAlias = EventOrderMapping

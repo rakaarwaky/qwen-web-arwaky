@@ -12,7 +12,7 @@ import sys
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, cast
 
-import mcp.types as types
+from mcp import types
 from mcp.server import InitializationOptions, Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool

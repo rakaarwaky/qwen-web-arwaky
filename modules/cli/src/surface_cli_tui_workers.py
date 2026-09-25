@@ -81,7 +81,7 @@ class _TuiWorkersMixin:
 
     def _run_slot(self, slot_id: int) -> None:
         if self._slot_workers.get(slot_id) is not None:
-            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Slot {slot_id} already running.", slot_id)
+            self._log_msg("[bold {}]WARNING:[/] Slot {} already running.".format(THEME["warn"], slot_id), slot_id)
             with contextlib.suppress(Exception):
                 self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
@@ -94,7 +94,7 @@ class _TuiWorkersMixin:
         except Exception as exc:
             # U1: a user-initiated action must never fail silently.
             msg = f"Could not read Slot {slot_id} inputs: {exc}"
-            self._log_msg(f"[bold {THEME['err']}]ERROR:[/] {escape(msg)}", slot_id)
+            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
             with contextlib.suppress(Exception):
                 self.notify(msg, severity="error", title=f"Slot {slot_id}")
             return
@@ -106,7 +106,7 @@ class _TuiWorkersMixin:
             HeadlessFlag(headless_val),
         )
         if isinstance(plan, SlotInputValue):
-            msg = f"[bold {THEME['err']}]ERROR:[/] {escape(str(plan.message))} (Slot {slot_id})"
+            msg = "[bold {}]ERROR:[/] {} (Slot {})".format(THEME["err"], escape(str(plan.message)), slot_id)
             self._log_msg(msg, slot_id)
             self._log_msg(msg)
             with contextlib.suppress(Exception):
@@ -141,7 +141,7 @@ class _TuiWorkersMixin:
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
         if worker is None:
-            self._log_msg(f"[{THEME['muted']}]No run active in Slot {slot_id}.[/]", slot_id)
+            self._log_msg("[{}]No run active in Slot {}.[/]".format(THEME["muted"], slot_id), slot_id)
             return
         # U2: confirm before cancelling runs older than 30 seconds
         stats = self._slot_stats.get(slot_id, {})
@@ -200,7 +200,7 @@ class _TuiWorkersMixin:
         # the dict entry behind would leak one Event per cancelled run and
         # could be mistaken for a live, cancellable run.
         self._slot_cancel_events.pop(slot_id, None)
-        self._log_msg(f"[bold {THEME['warn']}]CANCELLED:[/] Slot {slot_id} stopped by user.", slot_id)
+        self._log_msg("[bold {}]CANCELLED:[/] Slot {} stopped by user.".format(THEME["warn"], slot_id), slot_id)
         self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ●")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
@@ -307,7 +307,7 @@ class _TuiWorkersMixin:
         snapshot = self._swarm.snapshot(self._swarm_id)
         if snapshot is not None:
             self._render_swarm_snapshot(snapshot)
-        self._log_msg(f"[bold {THEME['warn']}]SWARM:[/] cancelled; active browsers are stopping.")
+        self._log_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
 
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
@@ -317,7 +317,9 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['accent_fg']}]SWARM:[/] started {snapshot.swarm_id} with {len(snapshot.agents)} agents.",
+                "[bold {}]SWARM:[/] started {} with {} agents.".format(
+                    THEME["accent_fg"], snapshot.swarm_id, len(snapshot.agents)
+                ),
             )
             while True:
                 time.sleep(1.0)
@@ -328,14 +330,18 @@ class _TuiWorkersMixin:
                 if latest.status in {"completed", "partial", "failed", "cancelled"}:
                     self.call_from_thread(
                         self._log_msg,
-                        f"[bold {THEME['ok'] if latest.status == 'completed' else THEME['warn']}]SWARM:[/] "
-                        f"{latest.status} ({latest.completed_count}/{len(latest.agents)} completed).",
+                        "[bold {}]SWARM:[/] {} ({}/{} completed).".format(
+                            THEME["ok"] if latest.status == "completed" else THEME["warn"],
+                            latest.status,
+                            latest.completed_count,
+                            len(latest.agents),
+                        ),
                     )
                     break
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}]SWARM ERROR:[/] {escape(str(exc))}",
+                "[bold {}]SWARM ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
         finally:
             self._swarm_id = None
@@ -350,7 +356,9 @@ class _TuiWorkersMixin:
         prompt_name = cfg.prompt_path.name if cfg.prompt_path else cfg.input_path.name
         self.call_from_thread(
             self._log_msg,
-            f"[bold {THEME['accent_fg']}]>>> [Slot {slot_id}] Starting browser for: {escape(prompt_name)}[/]",
+            "[bold {}]>>> [Slot {}] Starting browser for: {}[/]".format(
+                THEME["accent_fg"], slot_id, escape(prompt_name)
+            ),
             slot_id,
         )
         start_t = time.perf_counter()
@@ -402,14 +410,14 @@ class _TuiWorkersMixin:
             if is_dict_err or fail_reason:
                 self.call_from_thread(
                     self._log_msg,
-                    f"[bold {THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(res_str)}",
+                    "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(res_str)),
                     slot_id,
                 )
                 self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
             else:
                 self.call_from_thread(
                     self._log_msg,
-                    f"[bold {THEME['ok']}][Slot {slot_id}] SUCCESS:[/] {escape(res_str)}",
+                    "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True, gen)
@@ -417,7 +425,7 @@ class _TuiWorkersMixin:
             dur = round(time.perf_counter() - start_t, 1)
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}][Slot {slot_id}] FAILED:[/] {escape(str(exc))}",
+                "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(exc))),
                 slot_id,
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
@@ -440,13 +448,13 @@ class _TuiWorkersMixin:
             res = self._setup.setup_session()
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['ok']}]LOGIN RESULT:[/] {escape(str(res))}",
+                "[bold {}]LOGIN RESULT:[/] {}".format(THEME["ok"], escape(str(res))),
             )
             self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}]LOGIN FAILED:[/] {escape(str(exc))}",
+                "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(exc))),
             )
         finally:
             self._login_in_flight = False
@@ -480,7 +488,7 @@ class _TuiWorkersMixin:
                 return
             badge.update("⚠ SESSION: TIMEOUT")
             badge.set_classes("invalid")
-        self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] {msg}")
+        self._log_msg("[bold {}]WARNING:[/] {}".format(THEME["warn"], msg))
         with contextlib.suppress(Exception):
             self.notify(msg, severity="warning", title="Session")
 
@@ -543,14 +551,16 @@ class _TuiWorkersMixin:
                     self.query_one("#session-limited", Label).update(f"LIMITED: {limited}")
                 self.call_from_thread(
                     self._log_msg,
-                    f"[bold {THEME['ok']}]SESSIONS:[/] Loaded {total} sessions ({healthy} healthy, {limited} limited).",
+                    "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
+                        THEME["ok"], total, healthy, limited
+                    ),
                 )
 
             self.call_from_thread(_update)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}]SESSION LOAD ERROR:[/] {escape(str(exc))}",
+                "[bold {}]SESSION LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
 
     @work(thread=True)
@@ -569,13 +579,13 @@ class _TuiWorkersMixin:
             healthy_count = sum(1 for _, h in results if h)
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['ok']}]HEALTH CHECK:[/] {healthy_count}/{len(results)} sessions healthy.",
+                "[bold {}]HEALTH CHECK:[/] {}/{} sessions healthy.".format(THEME["ok"], healthy_count, len(results)),
             )
             self.call_from_thread(self._refresh_sessions_table)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}]HEALTH CHECK ERROR:[/] {escape(str(exc))}",
+                "[bold {}]HEALTH CHECK ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
 
     def _session_login_action(self) -> None:
@@ -583,7 +593,7 @@ class _TuiWorkersMixin:
         if getattr(self, "_session_manager", None) is None:
             self._log_msg("[yellow]Session manager not available.[/]")
             return
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Opening session login dialog...[/]")
+        self._log_msg("[bold {}]>>> Opening session login dialog...[/]".format(THEME["accent_fg"]))
         # For now, log that login would be triggered; the actual flow uses subprocess
         self.notify(
             "Use 'qwen-web-arwaky sessions login --name <name>' command",

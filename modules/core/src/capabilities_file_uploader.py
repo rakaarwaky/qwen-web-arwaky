@@ -30,7 +30,7 @@ from modules.shared.src.taxonomy_core_vo import (
     OptionTimeoutMs,
     UploadConfig,
 )
-from modules.shared.src.utility_core_validation import validate_file as _validate_file_util
+from modules.shared.src.utility_core_validation import validate_file
 
 log = get_logger("capabilities_file_uploader")
 
@@ -85,7 +85,7 @@ class FileUploader(IUploadProtocol):
 
         # ── Step 1: Validate file pre-flight ──
         try:
-            size_bytes = FileSizeBytes(_validate_file_util(filepath, float(self.max_file_size_mb)))
+            size_bytes = FileSizeBytes(validate_file(filepath, float(self.max_file_size_mb)))
         except FileValidationError as e:
             self.last_error = e
             log.error("Pre-flight validation failed: %s", e)
@@ -163,7 +163,7 @@ class FileUploader(IUploadProtocol):
         """Public protocol method — pre-flight validation returning size in bytes."""
         if max_size_mb != float(self.max_file_size_mb):
             self.max_file_size_mb = MaxFileSizeMb(max_size_mb)
-        return FileSizeBytes(_validate_file_util(filepath, float(self.max_file_size_mb)))
+        return FileSizeBytes(validate_file(filepath, float(self.max_file_size_mb)))
 
     # ─── Block 3: Private Helpers (In Chronological Execution Order) ──
 
