@@ -1,7 +1,7 @@
 """Thread-safety tests for the shared dispatch guards and job storage.
 
 The system runs up to ``DEFAULT_MAX_WORKERS`` browser slots, so ``CircuitBreaker``,
-``RateLimiter`` and ``JobManager`` are all exercised from several threads at once.
+``RateLimiter`` and ``JobStorage`` are all exercised from several threads at once.
 These tests use a ``threading.Barrier`` to make every worker reach the contended
 call at the same instant, which is what makes an unsynchronized implementation
 actually fail rather than merely being theoretically racy.
@@ -14,10 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from modules.core.src.capabilities_job_manager import JobManager
+from modules.core.src.capabilities_job_storage import JobStorage
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import (
-    FailureCategory,
     FailureThreshold,
     JobLimit,
     JobRecord,
@@ -94,6 +93,72 @@ def test_circuit_breaker_survives_interleaved_success_and_failure() -> None:
     assert not errors, f"unexpected exceptions: {errors}"
 
 
+def test_circuit_breaker_trip_reports_dominant_error_category() -> None:
+    """A trip must name the single category that caused it (issue #340)."""
+    breaker = CircuitBreaker(FailureThreshold(3), WindowSec(30))
+
+    breaker.record_failure("network")
+    breaker.record_failure("network")
+    breaker.record_failure("network")
+
+    assert breaker.is_tripped
+    assert breaker.trip_category == "network"
+    assert breaker.failure_categories == {"network": 3}
+
+
+def test_circuit_breaker_trip_category_is_none_for_mixed_failures() -> None:
+    """A mixed window has no single cause, so no single cause is reported."""
+    breaker = CircuitBreaker(FailureThreshold(4), WindowSec(30))
+
+    for category in ("network", "network", "auth", "browser"):
+        breaker.record_failure(category)
+
+    assert breaker.is_tripped
+    assert breaker.trip_category is None, "a mixed window must not claim a single cause"
+    assert breaker.failure_categories == {"auth": 1, "browser": 1, "network": 2}
+
+
+def test_circuit_breaker_trip_category_is_none_without_categories() -> None:
+    """Uncategorised failures keep the old behaviour: no category claimed."""
+    breaker = CircuitBreaker(FailureThreshold(2), WindowSec(30))
+
+    breaker.record_failure()
+    breaker.record_failure()
+
+    assert breaker.is_tripped
+    assert breaker.trip_category is None
+    assert breaker.failure_categories == {}
+
+
+def test_circuit_breaker_success_clears_recorded_categories() -> None:
+    """A success resets the breaker, so a stale cause cannot be reported."""
+    breaker = CircuitBreaker(FailureThreshold(2), WindowSec(30))
+    breaker.record_failure("auth")
+    breaker.record_failure("auth")
+    assert breaker.trip_category == "auth"
+
+    breaker.record_success()
+
+    assert not breaker.is_tripped
+    assert breaker.trip_category is None
+    assert breaker.failure_categories == {}
+
+
+def test_circuit_breaker_counts_concurrent_categorised_failures() -> None:
+    """Category bookkeeping must be as thread-safe as the failure count."""
+    breaker = CircuitBreaker(FailureThreshold(THREADS * 2), WindowSec(30))
+    categories = ["network", "auth", "browser", "file_io"]
+    expected = {name: 0 for name in categories}
+    for index in range(THREADS):
+        expected[categories[index % len(categories)]] += 1
+
+    errors = _run_in_parallel(lambda i: breaker.record_failure(categories[i % len(categories)]))
+
+    assert not errors, f"unexpected exceptions: {errors}"
+    assert breaker.failure_categories == dict(sorted(expected.items(), key=lambda kv: (-kv[1], kv[0])))
+    assert sum(breaker.failure_categories.values()) == THREADS
+
+
 def test_rate_limiter_never_exceeds_cap_under_concurrent_acquire() -> None:
     """At most max_per_minute reservations may be handed out in one window."""
     limit = 5
@@ -127,7 +192,7 @@ def test_rate_limiter_reports_retry_delay_when_exhausted() -> None:
 
 def test_job_manager_concurrent_writes_are_all_readable(tmp_path: Path) -> None:
     """Every concurrently saved record must survive and read back intact."""
-    manager = JobManager(storage_dir=tmp_path / "jobs")
+    manager = JobStorage(storage_dir=tmp_path / "jobs")
 
     def worker(index: int) -> None:
         for revision in range(10):
@@ -150,7 +215,7 @@ def test_job_manager_concurrent_writes_are_all_readable(tmp_path: Path) -> None:
 
 def test_job_manager_list_jobs_tolerates_concurrent_writes(tmp_path: Path) -> None:
     """list_jobs must not raise while other threads are saving records."""
-    manager = JobManager(storage_dir=tmp_path / "jobs")
+    manager = JobStorage(storage_dir=tmp_path / "jobs")
     stop = threading.Event()
 
     def writer(index: int) -> None:
@@ -183,7 +248,7 @@ def test_job_manager_list_jobs_tolerates_concurrent_writes(tmp_path: Path) -> No
 def test_job_file_path_stays_inside_storage_dir(tmp_path: Path, job_id: str) -> None:
     """Unsafe or oversized job IDs must not escape or overflow the filesystem."""
     storage = (tmp_path / "jobs").resolve()
-    manager = JobManager(storage_dir=storage)
+    manager = JobStorage(storage_dir=storage)
 
     path = manager._job_file_path(job_id).resolve()
 
@@ -193,7 +258,7 @@ def test_job_file_path_stays_inside_storage_dir(tmp_path: Path, job_id: str) -> 
 
 def test_job_file_path_keeps_long_ids_distinct(tmp_path: Path) -> None:
     """Truncated long IDs must not collide with one another."""
-    manager = JobManager(storage_dir=tmp_path / "jobs")
+    manager = JobStorage(storage_dir=tmp_path / "jobs")
 
     first = manager._job_file_path("b" * 300 + "_one")
     second = manager._job_file_path("b" * 300 + "_two")
@@ -203,52 +268,9 @@ def test_job_file_path_keeps_long_ids_distinct(tmp_path: Path) -> None:
 
 def test_list_jobs_keeps_records_containing_temp_like_names(tmp_path: Path) -> None:
     """A real job whose ID resembles the temp-file marker must still be listed."""
-    manager = JobManager(storage_dir=tmp_path / "jobs")
+    manager = JobStorage(storage_dir=tmp_path / "jobs")
     manager.save_job(JobRecord(job_id="batch.tmp_cleanup", created_at="2026-09-22T00:00:00Z"))
 
     listed = {rec.job_id for rec in manager.list_jobs(JobLimit(10))}
 
     assert "batch.tmp_cleanup" in listed
-
-
-# ── Categorised failure tracking (issue #340, AC4) ──────────────────────────
-
-
-def test_circuit_breaker_counts_concurrent_categorised_failures() -> None:
-    """Every concurrent ``record_failure(category)`` must land in the tally.
-
-    The category deque is appended under the same lock that prunes the failure
-    deque, so a worker that interleaves with ``_refresh_state`` must neither be
-    dropped nor counted twice.
-    """
-    categories = ("network", "auth", "browser", "file_io")
-    expected: dict[str, int] = {}
-    for index in range(THREADS):
-        name = categories[index % len(categories)]
-        expected[name] = expected.get(name, 0) + 1
-
-    breaker = CircuitBreaker(FailureThreshold(THREADS + 1), WindowSec(30))
-    errors = _run_in_parallel(lambda i: breaker.record_failure(FailureCategory(categories[i % len(categories)])))
-
-    assert not errors
-    assert breaker.failure_categories == expected
-
-
-def test_circuit_breaker_trip_reports_dominant_error_category() -> None:
-    """A single-category window names its category so the trip is explainable."""
-    breaker = CircuitBreaker(FailureThreshold(3), WindowSec(30))
-    for _ in range(3):
-        breaker.record_failure(FailureCategory("network"))
-
-    assert breaker.is_tripped
-    assert breaker.trip_category == "network"
-
-
-def test_circuit_breaker_trip_category_is_none_for_mixed_failures() -> None:
-    """Two distinct categories have no single cause, so none is reported."""
-    breaker = CircuitBreaker(FailureThreshold(2), WindowSec(30))
-    breaker.record_failure(FailureCategory("network"))
-    breaker.record_failure(FailureCategory("auth"))
-
-    assert breaker.is_tripped
-    assert breaker.trip_category is None

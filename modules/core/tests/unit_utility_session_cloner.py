@@ -97,3 +97,40 @@ def test_create_ephemeral_session_parallel_yields_distinct_directories(tmp_path:
             assert s2.exists()
             assert (s1 / "Cookies").read_text(encoding="utf-8") == "shared_login"
             assert (s2 / "Cookies").read_text(encoding="utf-8") == "shared_login"
+
+
+def test_clone_session_profile_parallel_does_not_queue(tmp_path: Path) -> None:
+    """Two concurrent clones should start materialization in parallel, not
+    serialize behind a global lock. With the old global ``_CLONE_LOCK`` this
+    was impossible to verify directly, but we can still confirm the clones
+    are independent: writing inside one clone's ephemeral dir never corrupts
+    the other."""
+    master = tmp_path / "master"
+    master.mkdir()
+    (master / "Cookies").write_text("shared", encoding="utf-8")
+    (master / "test.pak").write_text("bundle", encoding="utf-8")
+
+    import threading
+
+    seen: dict[str, str] = {}
+    dirs: list[Path] = []
+    lock = threading.Lock()
+
+    def clone_and_write(label: str) -> None:
+        with create_ephemeral_session(master) as session:
+            (session / f"write_{label}.txt").write_text(label, encoding="utf-8")
+            # Read back inside the with-block so the temp dir still exists.
+            with lock:
+                seen[label] = (session / f"write_{label}.txt").read_text(encoding="utf-8")
+                dirs.append(session)
+
+    t1 = threading.Thread(target=clone_and_write, args=("a",))
+    t2 = threading.Thread(target=clone_and_write, args=("b",))
+    t1.start()
+    t2.start()
+    t1.join(timeout=5)
+    t2.join(timeout=5)
+
+    assert len(dirs) == 2
+    assert dirs[0] != dirs[1]
+    assert seen == {"a": "a", "b": "b"}

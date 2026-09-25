@@ -97,9 +97,9 @@ class TestTuiPromptTemplateIntegration:
 
     def test_tui_action_run_action_with_role(self) -> None:
         from modules.cli.src.surface_cli_tui_app import QwenTuiApp
-        from modules.core.src.capabilities_tui_slot_config import TuiSlotConfigResolver
+        from modules.core.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
 
-        # AR-1: 5th positional arg is slot_config (ITuiSlotConfigProtocol),
+        # AR-1: 5th positional arg is slot_config (ISlotRunPlanProtocol),
         # injected from the Root container instead of being constructed
         # inside the TUI surface. Use the real resolver so role-template
         # materialization is exercised end-to-end.
@@ -108,7 +108,7 @@ class TestTuiPromptTemplateIntegration:
             MagicMock(),  # direct
             MagicMock(),  # file_only
             MagicMock(),  # attachment
-            TuiSlotConfigResolver(),  # slot_config
+            SlotRunPlanResolver(),  # slot_config
         )
 
         mock_input_prompt = MagicMock(value="software-architect")

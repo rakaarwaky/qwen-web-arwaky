@@ -1,4 +1,4 @@
-"""Capabilities: job persistence and state management (AES403).
+"""Capabilities: job persistence and state storage (AES403).
 
 Implements IJobStorageProtocol.
 """
@@ -22,7 +22,7 @@ from modules.shared.src.taxonomy_core_vo import (
     JobRecord,
 )
 
-log = get_logger("capabilities_job_manager")
+log = get_logger("capabilities_job_storage")
 
 #: Anything outside this set is replaced before a job ID touches the filesystem.
 _UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.\-]")
@@ -30,8 +30,8 @@ _UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.\-]")
 _MAX_JOB_FILENAME_LEN = 200
 
 
-class JobManager(IJobStorageProtocol):
-    """File-backed job state manager adhering to XDG state specification."""
+class JobStorage(IJobStorageProtocol):
+    """File-backed job state persistence adhering to XDG state specification."""
 
     def __init__(self, storage_dir: Path | None = None) -> None:
         self.storage_dir = storage_dir or DEFAULT_JOBS_DIR

@@ -21,10 +21,7 @@ import json
 import os
 import re
 import shutil
-import signal
 import sys
-import tempfile
-import time
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -86,9 +83,18 @@ def _tail(text: str | None, max_chars: int = 400) -> str:
     return f"...{cleaned[-max_chars:]}"
 
 
-def _decode_output(data: bytes) -> str:
-    """Decode captured process output without allowing invalid bytes to escape."""
-    return data.decode("utf-8", errors="replace")
+def _decode_output(data: bytes | str | None) -> str:
+    """Decode captured process output without allowing invalid bytes to escape.
+
+    ``subprocess.run(capture_output=True)`` yields bytes, but a caller-supplied
+    transcript may already be text; both are accepted so the helper never
+    raises on its way to reporting a subprocess failure.
+    """
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        return data
+    return bytes(data).decode("utf-8", errors="replace")
 
 
 def _smoke_gate_unavailable(reason: str) -> tuple[UpdateStepResult, ...]:
@@ -761,12 +767,19 @@ class UpdateManager(IUpdateProtocol):
     _SUBPROCESS_FORBIDDEN_CHARS = set(";&|$`><\n\r\0")
 
     def _run_subprocess(self, cmd: list[str], timeout_sec: float) -> tuple[int, str, str]:
-        """Run a subprocess capturing transcripts.
+        """Run a subprocess capturing transcripts, portably across all platforms.
 
         Defensive validation: every argument must be free of shell metacharacters,
         and any absolute path argument must live under the project root, the
         user home directory, or a standard system toolchain location — preventing
         injection via manipulated package metadata or environment variables.
+
+        The allowlist in ``_approved_spawn_command`` further pins the executable
+        to a fixed shape, and the child is launched through the stdlib
+        ``subprocess`` layer so the same code path serves Windows, macOS, and
+        Linux. No POSIX-only primitive (``posix_spawn``, ``waitpid``,
+        ``waitstatus_to_exitcode``) is used, so ``update`` runs everywhere the
+        CLI itself runs.
         """
         for arg in cmd:
             if any(ch in arg for ch in self._SUBPROCESS_FORBIDDEN_CHARS):
@@ -782,72 +795,51 @@ class UpdateManager(IUpdateProtocol):
                 if not any(root == p or root in p.parents for root in allowed_roots):
                     log.error("subprocess_rejected_path arg=%r", arg)
                     return 1, "", f"Refusing subprocess path outside allowed roots: {arg}"
-        if not hasattr(os, "posix_spawn") or sys.platform == "win32":
-            import subprocess  # nosec B404
-
-            try:
-                proc = subprocess.run(  # nosec B603
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_sec,
-                    check=False,
-                )
-                return proc.returncode, str(proc.stdout or ""), str(proc.stderr or "")
-            except subprocess.TimeoutExpired as exc:
-                return 124, str(exc.stdout or ""), str(exc.stderr or "Subprocess execution timed out")
-            except FileNotFoundError as exc:
-                return 127, "", f"Executable not found: {exc}"
-            except Exception as exc:
-                return 1, "", f"Subprocess execution error: {exc}"
         try:
-            executable, argv = self._approved_spawn_command(cmd)
-            with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
-                file_actions = [
-                    (os.POSIX_SPAWN_DUP2, stdout_file.fileno(), 1),
-                    (os.POSIX_SPAWN_DUP2, stderr_file.fileno(), 2),
-                ]
-                if executable == "git":
-                    pid = os.posix_spawn("git", ["git", *argv[1:]], os.environ.copy(), file_actions=file_actions)
-                else:
-                    pid = os.posix_spawn(
-                        "python3", ["python3", *argv[1:]], os.environ.copy(), file_actions=file_actions
-                    )
-                deadline = time.monotonic() + timeout_sec
-                status: int | None = None
-                while status is None:
-                    waited_pid, waited_status = os.waitpid(pid, os.WNOHANG)
-                    if waited_pid == pid:
-                        status = waited_status
-                        break
-                    if time.monotonic() >= deadline:
-                        os.kill(pid, signal.SIGKILL)
-                        _, status = os.waitpid(pid, 0)
-                        stdout_file.seek(0)
-                        stderr_file.seek(0)
-                        return 124, _decode_output(stdout_file.read()), _decode_output(stderr_file.read())
-                    time.sleep(0.05)
-                stdout_file.seek(0)
-                stderr_file.seek(0)
-                return (
-                    os.waitstatus_to_exitcode(status),
-                    _decode_output(stdout_file.read()),
-                    _decode_output(stderr_file.read()),
-                )
-        except OSError as exc:
+            spawn_cmd = self._approved_spawn_command(cmd)
+        except ValueError as exc:
+            log.error("subprocess_rejected_command cmd=%r", cmd)
             return 1, "", str(exc)
+
+        import subprocess  # nosec B404 - allowlisted argv, shell=False
+
+        try:
+            completed = subprocess.run(  # nosec B603 - allowlisted argv, no shell
+                spawn_cmd,
+                capture_output=True,
+                timeout=timeout_sec,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return (
+                124,
+                _decode_output(exc.stdout or b""),
+                _decode_output(exc.stderr or b"") or "Subprocess execution timed out",
+            )
         except FileNotFoundError as exc:
             return 127, "", f"Executable not found: {exc}"
+        except OSError as exc:
+            return 1, "", str(exc)
         except Exception as exc:
             return 1, "", f"Subprocess execution error: {exc}"
+        return (
+            completed.returncode,
+            _decode_output(completed.stdout or b""),
+            _decode_output(completed.stderr or b""),
+        )
 
     @staticmethod
-    def _approved_spawn_command(cmd: list[str]) -> tuple[str, list[str]]:
-        """Map validated update commands to a fixed executable and argv shape."""
+    def _approved_spawn_command(cmd: list[str]) -> list[str]:
+        """Map a validated update command onto a fixed, platform-neutral argv.
+
+        ``git`` is invoked directly; ``-m pip`` / ``-m playwright`` run under the
+        *current* interpreter rather than a hard-coded ``python3`` so the update
+        targets the environment it was launched from on every platform.
+        """
         if cmd and cmd[0] == "git":
-            return "git", cmd
-        if len(cmd) >= 3 and cmd[1:2] == ["-m"] and cmd[2] in {"pip", "playwright"}:
-            return "python3", ["python3", *cmd[1:]]
+            return [*cmd]
+        if len(cmd) >= 3 and cmd[0] == sys.executable and cmd[1:2] == ["-m"] and cmd[2] in {"pip", "playwright"}:
+            return [*cmd]
         raise ValueError("Unsupported update command")
 
     def _playwright_browsers_path(self) -> Path:

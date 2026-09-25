@@ -113,6 +113,49 @@ def test_navigate_to_chat_emits_web_loaded():
     assert emitted_events == [EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED, EVENT_MODEL_VERIFIED]
 
 
+def test_navigate_to_chat_reports_fallback_model_on_event():
+    """issue #283 AC-2: an unlisted model degrades to the first available one."""
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    trigger = MagicMock()
+    trigger.is_visible.return_value = True
+    trigger.inner_text.return_value = "Select Model Qwen3.7-Plus"
+    first_item = MagicMock()
+    first_item.is_visible.return_value = True
+    first_item.inner_text.return_value = "Qwen3.7-Plus"
+
+    def _fake_locator(selector, has_text=None):
+        loc = MagicMock()
+        if ".wms-trigger" in selector:
+            loc.first = trigger
+        else:
+            loc.count.return_value = 0
+            loc.first = first_item
+            loc.first.is_enabled.return_value = False
+        return loc
+
+    mock_page.locator.side_effect = _fake_locator
+    mock_page.get_by_role.return_value = trigger
+    mock_emitter = MagicMock(spec=LifecycleEmitter)
+
+    BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+
+    verified = [call for call in mock_emitter.emit.call_args_list if call.args[0] == EVENT_MODEL_VERIFIED]
+    assert verified, "MODEL_VERIFIED must be emitted even on the fallback path"
+    # ``fallback`` rides along (issue #374) so a consumer can tell a substituted
+    # model from the configured one.
+    assert verified[0].args[1] == {"model": "Qwen3.7-Plus", "fallback": True}
+
+
+def test_select_first_available_model_returns_none_when_picker_closed():
+    from modules.core.src.capabilities_browser_adapter import BrowserAdapter as Adapter
+
+    mock_page = MagicMock()
+    mock_page.locator.return_value.first.is_visible.return_value = False
+
+    assert Adapter()._select_first_available_model(mock_page) is None
+
+
 def test_clean_stale_locks(tmp_path: Path):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -269,8 +312,14 @@ def test_verify_default_model_ok():
 
 
 def test_verify_default_model_falls_back_on_mismatch():
-    """A readable non-default model degrades gracefully instead of aborting (issue #374)."""
+    """A readable non-default model degrades gracefully instead of aborting (issue #374).
+
+    The active model is not in the picker's offer list, so ``_select_first_available_model``
+    (issue #283 AC-2) is tried first; when the picker reports it is not visible the
+    readable-but-different label is returned with ``verified=False`` instead of raising.
+    """
     mock_page = MagicMock()
+    mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.7-Plus"
 
     verified, detected = BrowserAdapter()._verify_default_model(mock_page)
@@ -282,6 +331,7 @@ def test_verify_default_model_falls_back_on_mismatch():
 def test_verify_default_model_rejects_superstring_model():
     """A similarly-named model (e.g. Qwen3.8-Max-X) must NOT pass the gate as the default."""
     mock_page = MagicMock()
+    mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max-Plus"
 
     verified, detected = BrowserAdapter()._verify_default_model(mock_page)
@@ -317,6 +367,9 @@ def test_verify_default_model_raises_when_unreadable():
 
     mock_page = MagicMock()
     mock_page.get_by_role.return_value.wait_for.side_effect = PwError("picker gone")
+    # Ensure the fallback path also cannot read the picker so the full
+    # exception stack is exercised.
+    mock_page.locator.return_value.first.is_visible.return_value = False
 
     with pytest.raises(ModelSwitchError, match="Cannot read active model"):
         BrowserAdapter()._verify_default_model(mock_page)

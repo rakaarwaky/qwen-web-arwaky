@@ -221,13 +221,22 @@ def test_doctor_does_not_warn_in_development_without_a_backend(capsys) -> None:
 
 def test_degraded_observability_is_logged_at_setup(caplog) -> None:
     """setup_observability emits an explicit observability_degraded event for file-only mode."""
+    from modules.core.src.capabilities_metrics_counter import MetricsCounter
     from modules.core.src.capabilities_observability_setup import ObservabilitySetup
+    from modules.core.src.capabilities_status_writer import StatusFileWriter
 
+    log_dir = Path("test.jsonl").parent
     with (
         patch("os.environ", {"SENTRY_DSN": "", "OTEL_EXPORTER_OTLP_ENDPOINT": ""}),
         caplog.at_level(logging.INFO, logger="capabilities_observability"),
     ):
-        obs = ObservabilitySetup(log_path=Path("test.jsonl"))
+        # The status writer and metrics counter are injected (issue #359); this
+        # test only exercises the telemetry-mode branch, so the real ones are fine.
+        obs = ObservabilitySetup(
+            log_dir,
+            StatusFileWriter(log_dir / "status.json"),
+            MetricsCounter(metrics_path=log_dir / "metrics.json"),
+        )
         obs.setup_observability(log_path=Path("test.jsonl"), attach_stderr=False)
 
     messages = [record.getMessage() for record in caplog.records]

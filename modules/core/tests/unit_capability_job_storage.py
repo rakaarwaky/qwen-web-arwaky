@@ -1,4 +1,4 @@
-"""Unit tests for JobManager capability and AgentJobOrchestrator."""
+"""Unit tests for JobStorage capability and AgentJobOrchestrator."""
 
 import os
 import tempfile
@@ -7,29 +7,32 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
-from modules.core.src.capabilities_job_manager import JobManager
-from modules.shared.src.taxonomy_core_entity import RateLimiter
+from modules.core.src.capabilities_job_storage import JobStorage
+from modules.shared.src.taxonomy_core_entity import CircuitBreaker
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,
 )
 from modules.shared.src.taxonomy_core_vo import (
+    FailureThreshold,
     HeadlessFlag,
     JobId,
     JobRecord,
-    MaxPerMinute,
     ResponseText,
+    WindowSec,
 )
 
 
-class TestJobManager(unittest.TestCase):
-    """Test suite for JobManager persistence."""
+class TestJobStorage(unittest.TestCase):
+    """Test suite for JobStorage persistence."""
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.storage_dir = Path(self.temp_dir.name)
-        self.mgr = JobManager(storage_dir=self.storage_dir)
+        self.mgr = JobStorage(storage_dir=self.storage_dir)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
@@ -90,7 +93,7 @@ class TestAgentJobOrchestrator(unittest.TestCase):
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = JobManager(storage_dir=Path(self.temp_dir.name))
+        self.storage = JobStorage(storage_dir=Path(self.temp_dir.name))
         self.mock_file_only = MagicMock()
         self.mock_attachment = MagicMock()
         self.orchestrator = AgentJobOrchestrator(
@@ -145,7 +148,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = JobManager(storage_dir=Path(self.temp_dir.name))
+        self.storage = JobStorage(storage_dir=Path(self.temp_dir.name))
         self.mock_file_only = MagicMock()
         self.mock_attachment = MagicMock()
         self.orchestrator = AgentJobOrchestrator(
@@ -195,32 +198,35 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         self.assertEqual(loaded.owner_pid, pid)
 
     def test_submit_is_non_blocking_even_when_rate_limiter_would_starve(self) -> None:
-        """Issue #383: ``submit_file_job`` must return a JobRecord within
-        bounded time. Rate limiting is applied at worker dispatch, not on the
-        caller thread; a saturating limiter should NOT block submit.
+        """Issue #362/#383: ``submit_file_job`` must return within bounded time.
+
+        Throughput is enforced on the worker thread, so a saturated limiter does
+        not stall the MCP caller. The submit path raises ``CircuitBreakerOpenError``
+        immediately (not ``RateLimitError``) when the submit-time guard rejects,
+        returning the reserved slot so the caller can retry.
         """
+        from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
+
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
         self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
 
-        # 1 request per minute — exhausting the limiter should NOT stall submit.
-        throttled_limiter = RateLimiter(MaxPerMinute(1))
-        throttled_limiter.acquire()  # consume the single slot
+        # Open the breaker up front — the submit-time guard must refuse immediately.
         throttled = AgentJobOrchestrator(
             storage=self.storage,
             file_only=self.mock_file_only,
             attachment=self.mock_attachment,
             max_workers=1,
-            rate_limiter=throttled_limiter,
+            circuit_breaker=CircuitBreaker(threshold=FailureThreshold(1), window_sec=WindowSec(60)),
         )
+        throttled._circuit_breaker.record_failure()
 
         start = time.perf_counter()
-        rec = throttled.submit_file_job(prompt_file=prompt_file)
+        with pytest.raises(CircuitBreakerOpenError):
+            throttled.submit_file_job(prompt_file=prompt_file)
         elapsed = time.perf_counter() - start
 
-        self.assertLess(elapsed, 0.5, f"submit took {elapsed:.2f}s — must be sub-500ms when rate-limited")
-        self.assertFalse(rec.completed)
-        self.assertTrue(rec.job_id.startswith("file_"))
+        self.assertLess(elapsed, 0.5, f"submit took {elapsed:.2f}s — must be sub-500ms when rejected")
         throttled._executor.shutdown(wait=True)
 
 

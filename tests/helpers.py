@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
 from modules.core.src.capabilities_file_uploader import FileUploader
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import (
     ObservabilitySetup,
 )
@@ -31,7 +32,9 @@ from modules.core.src.capabilities_observability_setup import (
 )
 from modules.core.src.capabilities_output_saver import Saver
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.shared.src import AppConfig
+from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_core_validation import validate_file as _util_validate_file
 
 
@@ -49,17 +52,36 @@ def click_send(page, emitter=None, config=None) -> None:
 
 def _configure_sentry() -> None:
     """Standalone wrapper for ObservabilitySetup._configure_sentry."""
-    ObservabilitySetup._configure_sentry(ObservabilitySetup(Path("/tmp")))
+    ObservabilitySetup._configure_sentry(
+        ObservabilitySetup(
+            Path("/tmp"),
+            StatusFileWriter(status_path_for(Path("/tmp"))),
+            MetricsCounter(metrics_path=Path("/tmp") / "metrics.json"),
+        )
+    )
 
 
 def _configure_tracing() -> None:
     """Standalone wrapper for ObservabilitySetup._configure_tracing."""
-    ObservabilitySetup._configure_tracing(ObservabilitySetup(Path("/tmp")))
+    ObservabilitySetup._configure_tracing(
+        ObservabilitySetup(
+            Path("/tmp"),
+            StatusFileWriter(status_path_for(Path("/tmp"))),
+            MetricsCounter(metrics_path=Path("/tmp") / "metrics.json"),
+        )
+    )
 
 
 def _configure_logging(log_path: Path) -> None:
     """Standalone wrapper for ObservabilitySetup._configure_logging."""
-    ObservabilitySetup._configure_logging(ObservabilitySetup(Path("/tmp")), log_path)
+    ObservabilitySetup._configure_logging(
+        ObservabilitySetup(
+            Path("/tmp"),
+            StatusFileWriter(status_path_for(Path("/tmp"))),
+            MetricsCounter(metrics_path=Path("/tmp") / "metrics.json"),
+        ),
+        log_path,
+    )
 
 
 def bind_run_context(run_id: str, **extra) -> None:

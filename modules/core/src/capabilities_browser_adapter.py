@@ -1,7 +1,7 @@
 """Browser lifecycle capability (Playwright adaptation).
 
 Capabilities layer: implements IBrowserProtocol. Imports taxonomy, contract(protocol),
-utility only. Logger obtained via structlog (external), not via another capability.
+utility only. Logger obtained via get_logger (standard library), not via another capability.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-import structlog
 from playwright.sync_api import (
     BrowserContext,
     Error,
@@ -26,6 +25,7 @@ from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 from modules.core.src.utility_core_async_loop import isolate_thread_event_loop
 from modules.core.src.utility_core_browser_binary import find_chrome_binary
 from modules.core.src.utility_core_dom_helper import click_first_visible_enabled, is_any_visible
+from modules.core.src.utility_core_logger_factory import get_logger
 from modules.core.src.utility_core_session_cloner import create_ephemeral_session
 from modules.shared.src.contract_core_protocol import IBrowserProtocol
 from modules.shared.src.taxonomy_core_constant import (
@@ -52,24 +52,27 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_WEB_LOADED,
 )
 
-log = structlog.get_logger("browser")
+log = get_logger("browser")
 
-# Issue #283: the targeted model is per-run configuration. A contextvar keeps
-# concurrent runs (Swarm fan-out, parallel jobs) on their own override without
-# mutating a module constant another thread is reading. The default is
-# DEFAULT_MODEL, which already resolves QWEN_MODEL / QWEN_DEFAULT_MODEL.
+# Issue #283: the targeted model is per-run configuration. A contextvars token
+# lets concurrent runs (Swarm fan-out, parallel jobs) keep their own override
+# without mutating shared state. The override is active only for runs that
+# received an AppConfig with a non-empty ``model`` field; the constant-level
+# default (QWEN_DEFAULT_MODEL / QWEN_MODEL env var) is preserved otherwise.
 _TARGET_MODEL: contextvars.ContextVar[str] = contextvars.ContextVar("qwa_target_model", default=DEFAULT_MODEL)
 
 
 def _active_model() -> str:
-    """Return the model this run targets, honouring the --model / env override.
+    """Return the model a running pipeline should target.
 
-    A value object can land in the context (a config built before the
-    override was applied keeps the brand type, not a string); always return a
-    plain string so picker matching and log formatting behave uniformly.
+    ``ContextVar.get()`` returns the raw stored value, which in tests may be a
+    ``MagicMock`` (leaked by a prior unmocked ``browser_session`` call). Only a
+    genuine string is a valid target; anything else falls back to the default.
     """
     value = _TARGET_MODEL.get()
-    return str(value).strip() or DEFAULT_MODEL
+    if isinstance(value, str) and value:
+        return value
+    return DEFAULT_MODEL
 
 
 # Block 1: Class Definition & Constructor
@@ -89,19 +92,19 @@ class SessionCheck:
         try:
             ready = self.page.evaluate("() => document.readyState")
             if ready != "complete":
-                log.warning("session_check_failed", reason="page_not_ready", ready=ready)
+                log.warning("session_check_failed %s %s", "page_not_ready", ready)
                 return False
 
             if not self.page.query_selector(TEXTAREA_SELECTOR):
-                log.warning("session_check_failed", reason="textarea_missing")
+                log.warning("session_check_failed %s", "textarea_missing")
                 return False
 
             return True
         except Error as exc:
-            log.warning("session_check_failed", reason="playwright_error", error=str(exc))
+            log.warning("session_check_failed %s %s", "playwright_error", str(exc))
             return False
         except Exception as exc:  # defensive fallback beyond playwright Error
-            log.warning("session_check_failed", reason="unexpected_error", error=str(exc))
+            log.warning("session_check_failed %s %s", "unexpected_error", str(exc))
             return False
 
     def check_auth(self) -> None:
@@ -138,7 +141,7 @@ def _assert_on_chat_page(page: Page) -> None:
         )
 
     if not page.query_selector(TEXTAREA_SELECTOR):
-        log.warning("chat_textarea_missing_but_no_login_form_detected", url=page.url)
+        log.warning("chat_textarea_missing_but_no_login_form_detected %s", page.url)
 
 
 # Block 1: Class Definition & Constructor
@@ -172,11 +175,11 @@ class BrowserAdapter(IBrowserProtocol):
         """
         # Fast path: eager navigation in browser_session already landed us here.
         if "chat.qwen.ai" in (page.url or ""):
-            log.debug("browser_skip_goto_already_on_chat", url=page.url)
+            log.debug("browser_skip_goto_already_on_chat %s", page.url)
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
             except Error as err:
-                log.warning("load_state_wait_failed_proceeding", err=str(err))
+                log.warning("load_state_wait_failed_proceeding %s", str(err))
             return
 
         max_attempts = 4
@@ -192,18 +195,14 @@ class BrowserAdapter(IBrowserProtocol):
                 try:
                     page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
                 except Error as err:
-                    log.warning("load_state_wait_failed_proceeding", err=str(err))
+                    log.warning("load_state_wait_failed_proceeding %s", str(err))
                 return
             except Error as err:
                 last_error = err
                 if attempt < max_attempts - 1:
                     wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
                     log.warning(
-                        "page_goto_failed_retrying",
-                        attempt=attempt + 1,
-                        max=max_attempts,
-                        err=str(err),
-                        retry_in_sec=wait // 1000,
+                        "page_goto_failed_retrying %s %s %s %s", attempt + 1, max_attempts, str(err), wait // 1000
                     )
                     page.wait_for_timeout(wait)
         if last_error is not None:
@@ -215,7 +214,7 @@ class BrowserAdapter(IBrowserProtocol):
             emitter.emit(EVENT_NETWORK_RECONNECTING, {"url": CHAT_URL})
             self._goto_chat(page, 10_000, NAVIGATION_LOAD_TIMEOUT_MS)
         except Error as e:
-            log.warning("page_reset_failed", err=str(e))
+            log.warning("page_reset_failed %s", str(e))
 
     def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Navigate to chat.qwen.ai, verify session, and emit lifecycle events step-by-step:
@@ -224,13 +223,12 @@ class BrowserAdapter(IBrowserProtocol):
         Step 2: Assert authentication session
         Step 3: Start clean conversation state
         Step 4: Emit lifecycle events (EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED)
-        Step 5: Select the configured default model (DEFAULT_MODEL, overridable
-                per run via --model or QWEN_MODEL)
-        Step 6: Verify the model is active. When the configured model is not
-                offered by the picker, fall back to the first available model
-                and log a WARNING instead of aborting (issue #283 AC-2). The
-                returned event marks ``fallback=True`` when a different model is
-                read, aborting only when no model label can be read at all.
+        Step 5: Select the configured default model (issue #283)
+        Step 6: Verify the model is active; when the configured model is not
+        offered by the picker, fall back to the first available model and log a
+        WARNING instead of aborting the pipeline, marking the event
+        ``fallback=True`` whenever a different model is read and aborting only
+        when no model label can be read at all
         """
         # Step 1: Navigate to chat URL
         self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
@@ -249,10 +247,14 @@ class BrowserAdapter(IBrowserProtocol):
         emitter.emit(EVENT_WEB_LOADED, {"url": page.url})
         emitter.emit(EVENT_LOGIN_VERIFIED, {"url": page.url})
 
-        # Step 5: Select the configured model so the user never picks it manually.
+        # Step 5: Select the configured default model so the user never picks
+        # it manually.
         switched = self.ensure_default_model(page)
 
-        # Step 6: Verify the switch actually happened; degrade gracefully if not.
+        # Step 6: Verify the switch actually happened. A readable but different
+        # model degrades to the first available picker entry with a WARNING
+        # (issue #283 AC-2) instead of aborting, and the event carries
+        # ``fallback=True`` so the substitution is auditable (issue #374).
         verified, detected = self._verify_default_model(page, require_switch=switched)
         emitter.emit(EVENT_MODEL_VERIFIED, {"model": detected, "fallback": not verified})
 
@@ -261,23 +263,23 @@ class BrowserAdapter(IBrowserProtocol):
 
         Runs after ``ensure_default_model`` so a silent picker failure cannot let
         the pipeline dispatch the prompt to an unrecorded model. Returns
-        ``(True, target)`` when the configured default is active. When the picker
-        does not offer it — a rename, regional substitution, or picker DOM drift —
-        the first available option is selected and ``(False, label)`` is returned
-        so the caller can proceed on the active model instead of aborting the
-        pipeline. Raises ``ModelSwitchError`` only when no model can be
-        determined at all, since the active model is then unknowable. When the
-        best-effort switch reported failure (``require_switch=False``),
-        verification is retried while the model picker hydrates so a slow picker
-        cannot fail the pipeline.
+        ``(True, target)`` when the configured default is active. When the
+        configured model is absent from the picker, the first available model is
+        selected and a WARNING is logged (issue #283 AC-2); the method then
+        returns ``(False, fallback)`` so the caller can proceed with the active
+        model instead of aborting the pipeline (issue #374). Raises
+        ``ModelSwitchError`` only when no model label can be read at all, since
+        the active model is then unknowable. When the best-effort switch reported
+        failure (``require_switch=False``), verification is retried while the
+        model picker hydrates so a slow picker cannot fail the pipeline.
         """
         # Model picker options can arrive after the committed page document,
         # especially when Qwen's static assets are slow. Keep this readiness gate
         # bounded and retry selection instead of failing the whole pipeline on the
         # first stale model label.
         attempts = 5
-        target = _active_model()
         current = ""
+        target = _active_model()
         for attempt in range(attempts):
             try:
                 picker = self._get_model_trigger(page)
@@ -285,62 +287,48 @@ class BrowserAdapter(IBrowserProtocol):
                 current = (picker.inner_text() or "").replace("\n", " ").strip()
             except Error as exc:
                 if attempt + 1 < attempts:
-                    log.debug(
-                        "verify_default_model_read_retry",
-                        model=target,
-                        error=str(exc),
-                        attempt=attempt + 1,
-                    )
+                    log.debug("verify_default_model_read_retry %s %s %s", target, str(exc), attempt + 1)
                     self._retry_default_model_selection(page)
                     continue
-                fallback = self._select_first_available_model(page, target)
+                fallback = self._select_first_available_model(page)
                 if fallback is not None:
                     return False, fallback
                 raise ModelSwitchError(
                     f"Cannot read active model from '{MODEL_SELECTOR_BUTTON}' button: {exc}"
                 ) from exc
             if target in current.split():
-                log.debug("verify_default_model_ok", model=target)
+                log.debug("verify_default_model_ok %s", target)
                 return True, target
             if attempt + 1 < attempts:
-                log.debug(
-                    "verify_default_model_retry",
-                    model=target,
-                    found=current,
-                    require_switch=require_switch,
-                    attempt=attempt + 1,
-                )
+                log.debug("verify_default_model_retry %s %s %s %s", target, current, require_switch, attempt + 1)
                 self._retry_default_model_selection(page)
                 continue
-            # FRD FR-001 fallback: the configured model is absent but a real
-            # model label was read, so pipeline availability wins over exact
-            # matching. Actively selecting the first offered option keeps the
-            # run on a single model instead of the one still in the picker
-            # (issue #283 AC-2); when that cannot be driven, proceed on the
-            # label that was read rather than aborting.
-            fallback = self._select_first_available_model(page, target)
+            # FRD FR-001 fallback: the configured default is absent from the
+            # picker, so pipeline availability wins over exact matching
+            # (issue #374). Prefer actively selecting the first available model
+            # so the run continues on a known-good picker entry (issue #283).
+            fallback = self._select_first_available_model(page)
             if fallback is not None:
                 return False, fallback
             log.warning(
-                "default_model_unavailable_proceeding_with_active",
-                expected=target,
-                found=current,
+                "default_model_unavailable_proceeding_with_active %s %s",
+                target,
+                current,
             )
             return False, current
-        fallback = self._select_first_available_model(page, target)
+        fallback = self._select_first_available_model(page)
         if fallback is not None:
             return False, fallback
         raise ModelSwitchError(f"Default model not active: expected '{target}'")
 
-    def _select_first_available_model(self, page: Page, configured: str) -> str | None:
-        """Select the first model the picker offers; None when it cannot be read.
+    def _select_first_available_model(self, page: Page) -> str | None:
+        """Select the first model the picker offers, or return None when unreadable.
 
-        The degradation path for a model that Qwen renamed or withdrew: the run
-        continues on whatever the picker lists first rather than aborting, and
-        the WARNING records both names so the divergence stays auditable
-        (issue #283 AC-2).
+        The graceful-degradation path for a renamed or deprecated model
+        identifier (issue #283 AC-2): the run continues on whatever model the
+        picker exposes first, and the WARNING names both the configured and the
+        active model so the discrepancy is auditable.
         """
-        label = ""
         try:
             picker = self._get_model_trigger(page)
             picker.click(timeout=5000)
@@ -354,15 +342,15 @@ class BrowserAdapter(IBrowserProtocol):
                 with contextlib.suppress(Error):
                     page.keyboard.press("Escape")
         except Error as exc:
-            log.warning("model_fallback_unavailable", model=configured, error=str(exc))
+            log.warning("model_fallback_unavailable %s %s", _active_model(), str(exc))
             return None
         if not label:
             return None
         log.warning(
-            "model_fallback_activated",
-            configured=configured,
-            active=label,
-            reason="configured model not offered by the model picker",
+            "model_fallback_activated %s %s %s",
+            _active_model(),
+            label,
+            "configured model not offered by the model picker",
         )
         return label
 
@@ -403,7 +391,7 @@ class BrowserAdapter(IBrowserProtocol):
 
         Opens the model picker only long enough to click the default option. The
         call is defensive — any failure is logged and swallowed so it can never
-        block the prompt pipeline; the verify step then drives the fallback.
+        block the prompt pipeline (the verify step then drives fallback).
         """
         target = _active_model()
         try:
@@ -423,10 +411,10 @@ class BrowserAdapter(IBrowserProtocol):
             page.wait_for_timeout(300)
 
             self._try_set_as_default(page)
-            log.debug("ensure_default_model_applied", model=target)
+            log.debug("ensure_default_model_applied %s", target)
             return True
         except Error as exc:
-            log.debug("ensure_default_model_skipped", model=target, error=str(exc))
+            log.debug("ensure_default_model_skipped %s %s", target, str(exc))
             return False
 
     def _try_set_as_default(self, page: Page) -> None:
@@ -442,13 +430,13 @@ class BrowserAdapter(IBrowserProtocol):
                     pin = item.locator(".wms-list__pin-action, :has-text('Set as default')").first
                     if "Set as default" in (pin.inner_text() or ""):
                         pin.evaluate("e => e.click()")
-                        log.debug("set_default_model_ui_applied", model=_active_model())
+                        log.debug("set_default_model_ui_applied %s", _active_model())
                         page.wait_for_timeout(300)
 
             with contextlib.suppress(Error):
                 page.keyboard.press("Escape")
         except Error as exc:
-            log.debug("set_default_model_ui_skipped", error=str(exc))
+            log.debug("set_default_model_ui_skipped %s", str(exc))
             with contextlib.suppress(Error):
                 page.keyboard.press("Escape")
 
@@ -458,7 +446,7 @@ class BrowserAdapter(IBrowserProtocol):
             return
         try:
             if "/c/" in page.url.lower():
-                log.info("active_chat_thread_detected_navigating", url=page.url)
+                log.info("active_chat_thread_detected_navigating %s", page.url)
                 self._goto_chat(page, 15_000, NAVIGATION_LOAD_TIMEOUT_MS)
                 page.wait_for_timeout(1000)
 
@@ -468,7 +456,7 @@ class BrowserAdapter(IBrowserProtocol):
                     page.wait_for_selector("textarea.message-input-textarea, textarea", state="visible", timeout=3000)
                 log.debug("Started a clean Qwen chat before dispatch")
         except Error as exc:
-            log.debug("new_chat_reset_unavailable", err=str(exc))
+            log.debug("new_chat_reset_unavailable %s", str(exc))
 
     def check_auth(self, page: Page) -> None:
         """Raise AuthRequiredError if the page is on a login/auth URL or login form detected."""
@@ -494,10 +482,10 @@ class BrowserAdapter(IBrowserProtocol):
         except AuthRequiredError:
             return False
         except Error as exc:
-            log.warning("session_validation_failed", error=str(exc))
+            log.warning("session_validation_failed %s", str(exc))
             return False
         except Exception as exc:  # defensive fallback for closed pages/adapters
-            log.warning("session_validation_failed", error=str(exc))
+            log.warning("session_validation_failed %s", str(exc))
             return False
 
     def _clean_stale_locks(self, user_data_dir: str) -> None:
@@ -509,7 +497,7 @@ class BrowserAdapter(IBrowserProtocol):
                 if lock_path.is_symlink() or lock_path.exists():
                     lock_path.unlink(missing_ok=True)
             except OSError as e:
-                log.warning("stale_lock_delete_failed", lock=lock_path, err=str(e))
+                log.warning("stale_lock_delete_failed %s %s", lock_path, str(e))
 
     def _launch_context(self, p: Playwright, kwargs: dict[str, Any]) -> BrowserContext:
         """Launch the persistent context with tenacity retry for transient crashes."""
@@ -522,10 +510,10 @@ class BrowserAdapter(IBrowserProtocol):
             if user_data_dir:
                 self._clean_stale_locks(user_data_dir)
             log.warning(
-                "browser_launch_failed_retrying",
-                attempt=retry_state.attempt_number,
-                next_wait_sec=sleep_val,
-                error=str(retry_state.outcome.exception()) if retry_state.outcome else "unknown",
+                "browser_launch_failed_retrying %s %s %s",
+                retry_state.attempt_number,
+                sleep_val,
+                str(retry_state.outcome.exception()) if retry_state.outcome else "unknown",
             )
 
         for attempt in Retrying(
@@ -597,6 +585,10 @@ class BrowserAdapter(IBrowserProtocol):
                 with sync_playwright() as p:
                     ctx = self._launch_context(p, kwargs)
                     context_started = True
+                    # Issue #283: bind per-run model override so the browser
+                    # adapter references the correct token across all nested
+                    # helpers without threading an extra parameter.
+                    _TARGET_MODEL.set(cfg.model or DEFAULT_MODEL)
 
                     # Eagerly navigate the initial about:blank page to CHAT_URL
                     # so the browser starts loading while route/diagnostics setup
@@ -608,9 +600,9 @@ class BrowserAdapter(IBrowserProtocol):
                                 wait_until="commit",
                                 timeout=NAVIGATION_TIMEOUT_MS,
                             )
-                            log.debug("browser_eager_navigate_ok", url=CHAT_URL)
+                            log.debug("browser_eager_navigate_ok %s", CHAT_URL)
                         except Error as exc:
-                            log.warning("browser_eager_navigate_failed_retry_in_navigate", err=str(exc))
+                            log.warning("browser_eager_navigate_failed_retry_in_navigate %s", str(exc))
 
                     if mode != "login":
                         ctx.route(
@@ -633,19 +625,17 @@ class BrowserAdapter(IBrowserProtocol):
 
                         def on_request_failed(request: Any) -> None:
                             """Log failed browser requests with sanitized URLs."""
-                            log.warning("browser_request_failed", url=_sanitize_url(request.url), error=request.failure)
+                            log.warning("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
 
                         def on_console(message: Any) -> None:
                             """Log page console errors and warnings."""
                             if message.type in {"error", "warning"}:
-                                log.warning("browser_console_message", type=message.type, text=message.text)
+                                log.warning("browser_console_message %s %s", message.type, message.text)
 
                         def on_request(request: Any) -> None:
                             """Log mutating requests sent to qwen.ai."""
                             if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
-                                log.info(
-                                    "browser_mutation_request", method=request.method, url=_sanitize_url(request.url)
-                                )
+                                log.info("browser_mutation_request %s %s", request.method, _sanitize_url(request.url))
 
                         def on_response(response: Any) -> None:
                             """Log API error responses and qwen.ai mutation responses."""
@@ -653,12 +643,10 @@ class BrowserAdapter(IBrowserProtocol):
                             if response.status >= 400 and any(
                                 token in url for token in ("chat", "completion", "generate", "conversation", "api")
                             ):
-                                log.warning(
-                                    "browser_http_error", status=response.status, url=_sanitize_url(response.url)
-                                )
+                                log.warning("browser_http_error %s %s", response.status, _sanitize_url(response.url))
                             elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
                                 log.info(
-                                    "browser_mutation_response", status=response.status, url=_sanitize_url(response.url)
+                                    "browser_mutation_response %s %s", response.status, _sanitize_url(response.url)
                                 )
 
                         page.on("request", on_request)
@@ -676,7 +664,7 @@ class BrowserAdapter(IBrowserProtocol):
                             ctx.close()
                         except Exception as e:
                             # Teardown is best-effort and must never mask the domain failure.
-                            log.warning("browser_context_cleanup_failed", error=str(e))
+                            log.warning("browser_context_cleanup_failed %s", str(e))
             except AuthRequiredError:
                 raise
             except BrowserLaunchError:
@@ -684,7 +672,7 @@ class BrowserAdapter(IBrowserProtocol):
             except Exception as e:
                 if context_started:
                     raise
-                log.critical("browser_launch_failed", error=str(e))
+                log.critical("browser_launch_failed %s", str(e))
                 raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
 
     # Block 3: Dunder Methods, Factories & Helpers

@@ -1,14 +1,17 @@
 """Extended unit tests for utility_core_session_cloner (issue #329).
 
-Covers the edge cases the base suite in ``unit_utility_session_cloner.py``
-leaves open: merging into a pre-existing destination, symlink preservation,
-permission-denied reads, and ``create_ephemeral_session`` teardown when the
-consumer is interrupted.
+Covers the edge cases that the base test suite in
+``unit_utility_session_cloner.py`` misses:
 
-The hardlink overlay and the split master/clone lock that a later revision of
-this module introduced are not part of origin/main, so they are out of scope
-here; the contract under test is the ``shutil.copytree`` implementation this
-branch ships.
+- ``clone_session_profile`` with a pre-existing destination, symlink handling,
+  permission-denied reads, and the immutable-hardlink overlay
+  (``_IMMUTABLE_GLOBS`` / ``_IMMUTABLE_DIRS``)
+- ``create_ephemeral_session`` cleanup when the consumer raises
+- the stale-lock-cleanup lock used on the master profile
+
+Materialization is an O(delta) overlay: only the resource files Chromium ships
+into the profile are hardlinked from the master, every mutable file is copied,
+and no global lock serializes the clones (issue #363).
 """
 
 from __future__ import annotations
@@ -23,12 +26,15 @@ import pytest
 
 from modules.core.src import utility_core_session_cloner as cloner
 from modules.core.src.utility_core_session_cloner import (
+    _IMMUTABLE_DIRS,
+    _IMMUTABLE_GLOBS,
+    _MASTER_LOCKS_LOCK,
     STALE_LOCK_PATTERNS,
     clone_session_profile,
     create_ephemeral_session,
 )
 
-# ── clone_session_profile edge cases ─────────────────────────────────────────
+# ── clone_session_profile: destination handling ──────────────────────────────
 
 
 def test_clone_over_existing_destination_merges_not_raises(tmp_path: Path) -> None:
@@ -46,14 +52,28 @@ def test_clone_over_existing_destination_merges_not_raises(tmp_path: Path) -> No
     assert (dst / "b.txt").read_text(encoding="utf-8") == "b"
 
 
-def test_clone_copies_symlink_targets_and_skips_dangling_ones(tmp_path: Path) -> None:
-    """A live symlink is materialised as a real file; a dangling one is skipped.
+def test_clone_source_missing_creates_empty_destination(tmp_path: Path) -> None:
+    """A missing source is tolerated; the destination is still created empty."""
+    src = tmp_path / "missing"
+    dst = tmp_path / "dst"
 
-    ``clone_session_profile`` calls ``shutil.copytree`` with the default
-    ``symlinks=False``, so a symlink is followed and its content copied. A
-    symlink whose target does not exist is skipped outright
-    (``ignore_dangling_symlinks=True``) rather than aborting the clone — a
-    broken preference link in a real profile must not fail every parallel job.
+    clone_session_profile(src, dst)
+
+    assert dst.is_dir()
+    assert not any(dst.iterdir())
+
+
+# ── Symlink handling ────────────────────────────────────────────────────────
+
+
+def test_clone_copies_symlink_targets_and_skips_dangling_ones(tmp_path: Path) -> None:
+    """A live symlink is reproduced as a symlink; a dangling one survives too.
+
+    The overlay copies with ``follow_symlinks=False``, so a link is recreated
+    rather than materialised into a regular file — a hardlinked copy of a
+    preference link would break Chromium's relative-path resolution.  A link
+    whose target does not exist is still recreated, because skipping it would
+    silently drop a preference the user may repair.
     """
     src = tmp_path / "src"
     dst = tmp_path / "dst"
@@ -65,13 +85,67 @@ def test_clone_copies_symlink_targets_and_skips_dangling_ones(tmp_path: Path) ->
 
     clone_session_profile(src, dst)
 
-    # symlinks=False: the link becomes a regular file holding the target's bytes.
-    assert (dst / "real_link").is_file()
-    assert not (dst / "real_link").is_symlink()
+    assert (dst / "real_link").is_symlink()
     assert (dst / "real_link").read_text(encoding="utf-8") == "data"
-    # ignore_dangling_symlinks=True: the unresolvable link is dropped, not raised on.
-    assert not (dst / "dangling").exists()
-    assert not (dst / "dangling").is_symlink()
+    assert (dst / "dangling").is_symlink()
+    assert os.readlink(str(dst / "dangling")) == "/does/not/exist"
+
+
+# ── Immutable-resource overlay (issue #363) ─────────────────────────────────
+
+
+def test_clone_hardlinks_immutable_resources(tmp_path: Path) -> None:
+    """Files matching ``_IMMUTABLE_GLOBS`` are hardlinked; everything else is copied."""
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    top_pak = src / "resource.pak"
+    top_pak.write_text("pak bytes", encoding="utf-8")
+    top_bin = src / "snapshot.bin"
+    top_bin.write_text("bin bytes", encoding="utf-8")
+    cookies = src / "Cookies"
+    cookies.write_text("cookies", encoding="utf-8")
+
+    clone_session_profile(src, dst)
+
+    assert os.stat(str(top_pak)).st_ino == os.stat(str(dst / "resource.pak")).st_ino
+    assert os.stat(str(top_bin)).st_ino == os.stat(str(dst / "snapshot.bin")).st_ino
+    assert os.stat(str(cookies)).st_ino != os.stat(str(dst / "Cookies")).st_ino
+    assert (dst / "resource.pak").read_text(encoding="utf-8") == "pak bytes"
+    assert (dst / "Cookies").read_text(encoding="utf-8") == "cookies"
+
+
+def test_clone_hardlinks_immutable_dirs(tmp_path: Path) -> None:
+    """``_IMMUTABLE_DIRS`` is recursed, hardlinking the files inside it."""
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    src.mkdir()
+    locales = src / "locales"
+    locales.mkdir()
+    (locales / "en.pak").write_text("en locale", encoding="utf-8")
+
+    clone_session_profile(src, dst)
+
+    assert (dst / "locales" / "en.pak").exists()
+    assert os.stat(str(locales / "en.pak")).st_ino == os.stat(str(dst / "locales" / "en.pak")).st_ino
+
+
+def test_clone_copies_mutable_subdirs_copytree(tmp_path: Path) -> None:
+    """Non-immutable directories are recursed and copied, never hardlinked."""
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    data_dir = src / "Default" / "Local Storage"
+    data_dir.mkdir(parents=True)
+    (data_dir / "data.ldb").write_text("ldb", encoding="utf-8")
+
+    clone_session_profile(src, dst)
+
+    cloned = dst / "Default" / "Local Storage" / "data.ldb"
+    assert cloned.read_text(encoding="utf-8") == "ldb"
+    assert os.stat(str(data_dir / "data.ldb")).st_ino != os.stat(str(cloned)).st_ino
+
+
+# ── Filtered files and permissions ──────────────────────────────────────────
 
 
 def test_clone_excludes_singleton_and_devtools_files(tmp_path: Path) -> None:
@@ -81,14 +155,16 @@ def test_clone_excludes_singleton_and_devtools_files(tmp_path: Path) -> None:
     src.mkdir()
     default_dir = src / "Default"
     default_dir.mkdir()
+    lock_dir = default_dir / "SingletonLock"
+    lock_dir.mkdir()
+    (lock_dir / "inner").write_text("should not appear", encoding="utf-8")
     (default_dir / "DevToolsActivePort").write_text("9333", encoding="utf-8")
-    (default_dir / "SingletonLock").write_text("host-pid", encoding="utf-8")
     (default_dir / "normal.txt").write_text("keep", encoding="utf-8")
 
     clone_session_profile(src, dst)
 
-    assert not (dst / "Default" / "DevToolsActivePort").exists()
     assert not (dst / "Default" / "SingletonLock").exists()
+    assert not (dst / "Default" / "DevToolsActivePort").exists()
     assert (dst / "Default" / "normal.txt").read_text(encoding="utf-8") == "keep"
 
 
@@ -108,17 +184,6 @@ def test_clone_sets_owner_only_directory_permissions(tmp_path: Path) -> None:
         assert mode == 0o700, f"{dirpath}: expected 0o700, got {oct(mode)}"
 
 
-def test_clone_source_missing_creates_empty_destination(tmp_path: Path) -> None:
-    """A missing source is tolerated; the destination is still created."""
-    src = tmp_path / "missing"
-    dst = tmp_path / "dst"
-
-    clone_session_profile(src, dst)
-
-    assert dst.is_dir()
-    assert not any(dst.iterdir())
-
-
 def test_clone_propagates_permission_errors(tmp_path: Path) -> None:
     """A read failure inside the source tree is surfaced, not swallowed.
 
@@ -131,8 +196,9 @@ def test_clone_propagates_permission_errors(tmp_path: Path) -> None:
     (src / "Cookies").write_text("token", encoding="utf-8")
 
     with patch.object(cloner.shutil, "copytree", side_effect=PermissionError(13, "Permission denied")):
-        with pytest.raises(PermissionError):
-            clone_session_profile(src, dst)
+        with patch.object(cloner.shutil, "copy2", side_effect=PermissionError(13, "Permission denied")):
+            with pytest.raises(PermissionError):
+                clone_session_profile(src, dst)
 
 
 def test_chmod_failure_on_destination_is_suppressed(tmp_path: Path) -> None:
@@ -196,18 +262,19 @@ def test_ephemeral_session_cleans_up_deep_subtrees(tmp_path: Path) -> None:
 # ── Concurrency ──────────────────────────────────────────────────────────────
 
 
-def test_clone_lock_is_a_real_threading_lock() -> None:
-    """The clone materialisation lock is a real ``threading.Lock`` and is idle."""
-    assert isinstance(cloner._CLONE_LOCK, type(threading.Lock()))
-    assert not cloner._CLONE_LOCK.locked()
+def test_master_lock_is_a_real_threading_lock() -> None:
+    """The stale-lock-cleanup lock is a real ``threading.Lock`` and is idle."""
+    assert isinstance(_MASTER_LOCKS_LOCK, type(threading.Lock()))
+    assert not _MASTER_LOCKS_LOCK.locked()
 
 
 def test_parallel_clones_yield_distinct_complete_profiles(tmp_path: Path) -> None:
     """Four concurrent clones of one master all succeed and never collide.
 
     This is the ``DEFAULT_MAX_WORKERS`` path the host gate in
-    ``utility_core_host_gate`` protects; the lock must serialise without
-    deadlocking or leaking one worker's files into another's.
+    ``utility_core_host_gate`` protects; the clones must overlap rather than
+    queue behind one another, and none may leak a worker's files into
+    another's profile.
     """
     master = tmp_path / "master"
     master.mkdir()
@@ -232,10 +299,50 @@ def test_parallel_clones_yield_distinct_complete_profiles(tmp_path: Path) -> Non
             errors.append(exc)
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=60)
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+
+    assert not errors, f"concurrent clone errors: {errors}"
+    assert len(results) == 4
+    assert len(set(results)) == 4
+
+
+def test_parallel_clones_are_not_serialised(tmp_path: Path) -> None:
+    """Only stale-lock cleanup is serialized; overlay copies overlap.
+
+    The master's cleanup is guarded, but the overlay copy runs unguarded, so
+    four parallel clones of the same master all produce a complete profile
+    within the timeout instead of queueing behind a global clone lock.
+    """
+    master = tmp_path / "master"
+    master.mkdir()
+    for name in ("a.pak", "b.pak", "cookies.db"):
+        (master / name).write_text(name, encoding="utf-8")
+    (master / "Default").mkdir()
+    (master / "Default" / "prefs.json").write_text("{}", encoding="utf-8")
+
+    results: list[Path] = []
+    errors: list[BaseException] = []
+    results_lock = threading.Lock()
+
+    def worker(index: int) -> None:
+        try:
+            with create_ephemeral_session(master, mode="batch") as session_dir:
+                for name in ("a.pak", "b.pak", "cookies.db", "Default"):
+                    if not (session_dir / name).exists():
+                        errors.append(AssertionError(f"worker {index}: {name} missing"))
+                with results_lock:
+                    results.append(session_dir)
+        except BaseException as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
 
     assert not errors, f"concurrent clone errors: {errors}"
     assert len(results) == 4
@@ -251,6 +358,13 @@ def test_stale_lock_patterns_cover_the_chromium_singleton_set() -> None:
     assert "SingletonSocket" in STALE_LOCK_PATTERNS
     assert "SingletonCookie" in STALE_LOCK_PATTERNS
     assert "DevToolsActivePort" in STALE_LOCK_PATTERNS
+
+
+def test_immutable_patterns_are_documented() -> None:
+    """Immutable-resource constants match Chromium's shipped content shape."""
+    assert "*.pak" in _IMMUTABLE_GLOBS
+    assert "*.bin" in _IMMUTABLE_GLOBS
+    assert "locales" in _IMMUTABLE_DIRS
 
 
 def test_chmod_0o700_is_itself_private() -> None:

@@ -18,7 +18,7 @@ from modules.shared.src.taxonomy_core_error import OutputWriteError
 from modules.shared.src.taxonomy_core_event import EVENT_OUTPUT_COPIED
 
 #: Suffix appended to in-flight atomic writes. Deliberately not a ``.json``/
-#: ``.md`` extension so directory scans (e.g. ``JobManager.list_jobs`` globbing
+#: ``.md`` extension so directory scans (e.g. ``JobStorage.list_jobs`` globbing
 #: ``*.json``) never pick up a partial write, and so real records are free to
 #: contain arbitrary substrings without being mistaken for temp artifacts.
 ATOMIC_TEMP_SUFFIX = ".tmpwrite"

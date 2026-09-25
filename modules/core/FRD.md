@@ -363,16 +363,18 @@ It implements the AES Capabilities and Agent layers: Playwright browser
 
 ## Capability Inventory
 
-The product requirement inventory is 13 capabilities (one per P0 capability,
+The product requirement inventory is 14 capabilities (one per P0 capability,
 FR-001…FR-013 in `PRD.md`). FR-001…FR-008 are the browser-automation
 capabilities documented above; FR-009…FR-013 are the extended Core
 capabilities (folder compiler, folder-to-attachment adapter, job manager,
 TUI slot configuration, update manager) whose traceability rows are listed
 below. The old heading “exactly 8” was an inventory error.
 
-Metrics counters and `status.json` writes are helper types inside
-`capabilities_observability_setup.py` (FR-008). Do not reintroduce them as
-standalone capability files.
+`MetricsCounter` (`capabilities_metrics_counter.py`, FR-009a) and
+`StatusFileWriter` (`capabilities_status_writer.py`, FR-009b) are now
+standalone capability files with their own contract protocols
+(`IMetricsProtocol`, `IStatusProtocol`), consumed by
+`ObservabilitySetup`.
 
 ## API Contract
 
@@ -479,8 +481,8 @@ The Swarm feature is approved product scope under change request CR-2026-004
 | FR-008 | `IObservabilityProtocol` | `capabilities_observability_setup.py`   | `unit_observability_stderr.py`, `unit_structlog_no_percent_interp.py` |
 | FR-009 | `IFolderCompileProtocol` | `capabilities_folder_compiler.py`       | `unit_folder_compiler.py` |
 | FR-010 | `IFolderToAttachmentProtocol` | `capabilities_folder_to_attachment.py` | `unit_folder_compiler.py` (adapter paths) |
-| FR-011 | `IJobStorageProtocol`    | `capabilities_job_manager.py`           | `unit_capability_job_manager.py`, `integration_parallel_jobs.py` |
-| FR-012 | `ITuiSlotConfigProtocol` | `capabilities_tui_slot_config.py`       | `unit_surface_cli_tui_app.py` (slot planning) |
+| FR-011 | `IJobStorageProtocol`    | `capabilities_job_storage.py`           | `unit_capability_job_storage.py`, `integration_parallel_jobs.py` |
+| FR-012 | `ISlotRunPlanProtocol`   | `capabilities_slot_plan_resolver.py`    | `integration_tui_slot_di.py` (slot planning) |
 | FR-013 | `IUpdateProtocol`        | `capabilities_update_manager.py`        | `unit_surface_cli_update_command.py` |
 | CR-2026-004 | `ISwarmAggregate`    | `agent_swarm_orchestrator.py`           | `unit_agent_swarm_orchestrator.py` |
 

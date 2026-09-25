@@ -12,7 +12,7 @@ import pytest
 
 from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-from modules.core.src.capabilities_job_manager import JobManager
+from modules.core.src.capabilities_job_storage import JobStorage
 from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_vo import (
     HeadlessFlag,
@@ -37,7 +37,7 @@ def test_shared_container_reads_env_var(monkeypatch: pytest.MonkeyPatch) -> None
 def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
     """Confirm N jobs start nearly simultaneously (max_workers=3, sleep gate)."""
     with tempfile.TemporaryDirectory() as tmp:
-        storage = JobManager(storage_dir=Path(tmp))
+        storage = JobStorage(storage_dir=Path(tmp))
         file_only = MagicMock()
         attachment = MagicMock()
 

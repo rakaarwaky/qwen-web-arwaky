@@ -33,7 +33,10 @@ from textual.widgets import RichLog
 
 from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+from modules.core.src.capabilities_metrics_counter import MetricsCounter
 from modules.core.src.capabilities_observability_setup import ObservabilitySetup
+from modules.core.src.capabilities_status_writer import StatusFileWriter
+from modules.shared.src.utility_core_status import status_path_for
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -114,7 +117,11 @@ class _NoOp:
 
 def _tui_observability(tmp_path: Path) -> ObservabilitySetup:
     """Observability configured exactly like the interactive TUI path."""
-    cap = ObservabilitySetup(tmp_path)
+    cap = ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    )
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
     return cap
 
@@ -133,7 +140,11 @@ def test_tui_mode_attaches_no_stderr_handler(tmp_path: Path, isolated_root_logge
 def test_cli_mode_keeps_stderr_handler(tmp_path: Path, isolated_root_logger, monkeypatch) -> None:
     """Non-interactive CLI runs keep the stderr handler for operator visibility."""
     monkeypatch.setattr(sys, "stderr", _FakeStderr())
-    ObservabilitySetup(tmp_path).setup_observability(log_path=tmp_path, attach_stderr=True)
+    ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    ).setup_observability(log_path=tmp_path, attach_stderr=True)
 
     assert _stderr_handlers(isolated_root_logger) != [], "CLI mode must keep its stderr handler"
 
@@ -141,7 +152,11 @@ def test_cli_mode_keeps_stderr_handler(tmp_path: Path, isolated_root_logger, mon
 def test_default_is_stderr_enabled(tmp_path: Path, isolated_root_logger, monkeypatch) -> None:
     """The default must stay backwards-compatible: stderr attached."""
     monkeypatch.setattr(sys, "stderr", _FakeStderr())
-    ObservabilitySetup(tmp_path).setup_observability(log_path=tmp_path)
+    ObservabilitySetup(
+        tmp_path,
+        StatusFileWriter(status_path_for(tmp_path)),
+        MetricsCounter(metrics_path=tmp_path / "metrics.json"),
+    ).setup_observability(log_path=tmp_path)
 
     assert _stderr_handlers(isolated_root_logger) != []
 
