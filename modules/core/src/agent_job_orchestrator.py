@@ -21,7 +21,11 @@ from modules.shared.src.contract_core_aggregate import (
 )
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
+from modules.shared.src.taxonomy_core_error import (
+    CircuitBreakerOpenError,
+    ErrorCategory,
+    QwenCliError,
+)
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_FAILED,
@@ -29,6 +33,7 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
+    FailureCategory,
     FilePath,
     HeadlessFlag,
     JobId,
@@ -72,7 +77,11 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         ``_guard_dispatch`` to acquire a slot before browser work begins.
         """
         if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
-            raise CircuitBreakerOpenError("circuit open: too many recent job failures")
+            reason = "circuit open: too many recent job failures"
+            trip_category = self._circuit_breaker.trip_category
+            if trip_category:
+                reason += f" (dominant error category: {trip_category})"
+            raise CircuitBreakerOpenError(reason)
 
     def _guard_dispatch(self) -> None:
         """Worker-time guard: block until a rate-limit slot is available.
@@ -288,7 +297,9 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             )
             if failure:
                 if self._circuit_breaker is not None:
-                    self._circuit_breaker.record_failure()
+                    self._circuit_breaker.record_failure(
+                        FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+                    )
                 self._save_failure(job_id, record, started_at, duration, prompt_path, failure, output_path=output_path)
                 return
             self._save_success(
@@ -302,7 +313,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             )
         except Exception as exc:
             if self._circuit_breaker is not None:
-                self._circuit_breaker.record_failure()
+                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
             self._save_failure(
                 job_id,
                 record,
@@ -341,7 +352,9 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             )
             if failure:
                 if self._circuit_breaker is not None:
-                    self._circuit_breaker.record_failure()
+                    self._circuit_breaker.record_failure(
+                        FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+                    )
                 self._save_failure(
                     job_id,
                     record,
@@ -365,7 +378,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             )
         except Exception as exc:
             if self._circuit_breaker is not None:
-                self._circuit_breaker.record_failure()
+                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
             self._save_failure(
                 job_id,
                 record,

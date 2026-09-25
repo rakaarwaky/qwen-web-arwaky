@@ -564,7 +564,9 @@ class UpdateManager(IUpdateProtocol):
                     return cwd
         return None
 
-    _SUBPROCESS_FORBIDDEN_CHARS = set(";&|$`><\n\r")
+    # \0 would truncate the argument at the C level (argv is NUL-joined), so it
+    # must be refused alongside the shell metacharacters.
+    _SUBPROCESS_FORBIDDEN_CHARS = set(";&|$`><\n\r\0")
 
     def _run_subprocess(self, cmd: list[str], timeout_sec: float) -> tuple[int, str, str]:
         """Run a subprocess capturing transcripts.
