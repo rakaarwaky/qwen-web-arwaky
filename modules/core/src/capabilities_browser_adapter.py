@@ -534,20 +534,26 @@ class BrowserAdapter(IBrowserProtocol):
                             return url.split("?")[0]
 
                     def attach_page_diagnostics(page: Page) -> None:
+                        """Wire network and console listeners onto *page* for run diagnostics."""
+
                         def on_request_failed(request: Any) -> None:
+                            """Log failed browser requests with sanitized URLs."""
                             log.warning("browser_request_failed", url=_sanitize_url(request.url), error=request.failure)
 
                         def on_console(message: Any) -> None:
+                            """Log page console errors and warnings."""
                             if message.type in {"error", "warning"}:
                                 log.warning("browser_console_message", type=message.type, text=message.text)
 
                         def on_request(request: Any) -> None:
+                            """Log mutating requests sent to qwen.ai."""
                             if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
                                 log.info(
                                     "browser_mutation_request", method=request.method, url=_sanitize_url(request.url)
                                 )
 
                         def on_response(response: Any) -> None:
+                            """Log API error responses and qwen.ai mutation responses."""
                             url = response.url.lower()
                             if response.status >= 400 and any(
                                 token in url for token in ("chat", "completion", "generate", "conversation", "api")

@@ -104,6 +104,7 @@ class SwarmIssue:
 
     @property
     def role_label(self) -> str:
+        """GitHub label for the agent role, with an unknown fallback."""
         return ROLE_LABEL.get(self.role, "swarm-unknown")
 
     @property
@@ -114,6 +115,8 @@ class SwarmIssue:
 
 @dataclass
 class ImportResult:
+    """Outcome buckets of one import run: created, skipped, and failed issues."""
+
     created: list[SwarmIssue] = field(default_factory=list)
     skipped_existing: list[SwarmIssue] = field(default_factory=list)
     skipped_duplicate_in_batch: list[SwarmIssue] = field(default_factory=list)
@@ -121,10 +124,12 @@ class ImportResult:
 
     @property
     def total(self) -> int:
+        """Number of issues processed, excluding in-batch duplicates."""
         return len(self.created) + len(self.skipped_existing) + len(self.errors)
 
     @property
     def ok(self) -> bool:
+        """Whether the run finished without errors."""
         return not self.errors
 
 
@@ -166,6 +171,7 @@ def discover_swarm_runs(base: Path) -> list[Path]:
 
 
 def read_manifest(run: Path) -> dict:
+    """Return the parsed manifest.json of a swarm run, or {} when unreadable."""
     try:
         return json.loads((run / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -206,6 +212,7 @@ def build_issue_body(
     swarm_id: str,
     open_questions: str = "",
 ) -> str:
+    """Render the Markdown body of a GitHub issue for one swarm finding."""
     parts = [
         f"## {ROLE_SCOPE_NOTE.get(role, 'Swarm review')}",
         "",
@@ -240,6 +247,7 @@ def parse_agent_output(role: str, path: Path, swarm_id: str) -> list[SwarmIssue]
     code_lines: list[str] = []
 
     def flush() -> None:
+        """Finalise the issue being collected and append it to the result list."""
         nonlocal cur, collecting_desc, in_code
         if cur is not None:
             desc = "\n".join(cur["desc"]).strip()
@@ -448,12 +456,15 @@ def parse_swarm_run(run: Path) -> list[SwarmIssue]:
 
 
 class GitHubClient:
+    """Minimal GitHub REST client for label and issue creation."""
+
     def __init__(self, base_url: str = "https://api.github.com", repo: str = ""):
         self.base_url = base_url.rstrip("/")
         self._repo = repo
         self._token: str | None = None
 
     def authenticate(self) -> None:
+        """Resolve a token from the environment or the gh CLI, or exit."""
         token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
         if not token:
             gh = shutil.which("gh")
@@ -493,6 +504,7 @@ class GitHubClient:
             raise RuntimeError(f"GitHub API {method} {path} -> HTTP {e.code}: {err_body[:500]}") from e
 
     def list_labels(self) -> set[str]:
+        """Return all repo label names, lowercased."""
         labels = set()
         page = 1
         while True:
@@ -507,6 +519,7 @@ class GitHubClient:
         return labels
 
     def ensure_label(self, name: str, existing: set[str]) -> None:
+        """Create the label when missing, tolerating creation races."""
         if name.lower() in existing:
             return
         color = LABEL_COLORS.get(name, "BFD4F2")
@@ -543,6 +556,7 @@ class GitHubClient:
         return None
 
     def create_issue(self, title: str, body: str, labels: list[str]) -> int:
+        """Create the issue and return its number."""
         payload = {"title": title, "body": body, "labels": labels}
         res = self._req("POST", f"/repos/{self._repo}/issues", payload)
         return int(res["number"])
@@ -618,6 +632,7 @@ def detect_local_github_projects() -> list[tuple[str, str]]:
 
 
 def prompt_swarm_folder() -> Path:
+    """Interactively pick (or type) a swarm run directory and validate it."""
     default_root = Path.home() / ".local" / "share" / "qwen-web-arwaky" / "swarm"
     found = discover_swarm_runs(default_root) if default_root.is_dir() else []
     print("Swarm run candidates under ~/.local/share/qwen-web-arwaky/swarm:")
@@ -640,6 +655,7 @@ def prompt_swarm_folder() -> Path:
 
 
 def prompt_repo(detected: list[tuple[str, str]]) -> str:
+    """Interactively pick or type the target owner/repo and validate it."""
     choices = [f"{o}/{r}" for o, r in detected]
     val = _prompt_choice("Target GitHub project (owner/repo):", choices, allow_input=True)
     if not re.match(r"^[\w.-]+/[\w.-]+$", val):
@@ -653,6 +669,7 @@ def prompt_repo(detected: list[tuple[str, str]]) -> str:
 
 
 def print_preview(issues: list[SwarmIssue]) -> None:
+    """Print a one-line-per-issue preview of what would be created."""
     print(f"\nParsed {len(issues)} issue(s):\n")
     for it in issues:
         print(f"  [{it.role}] {it.issue_id:12s}  {it.title[:64]}")
@@ -661,6 +678,7 @@ def print_preview(issues: list[SwarmIssue]) -> None:
 
 
 def confirm(message: str) -> bool:
+    """Ask a yes/no question; EOF or interrupt counts as no."""
     try:
         ans = input(f"{message} [y/N]: ").strip().lower()
     except (EOFError, KeyboardInterrupt):
@@ -675,6 +693,7 @@ def confirm(message: str) -> bool:
 
 
 def main() -> None:
+    """Parse a swarm run into issues and import them into GitHub."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--folder", help="Swarm run directory (default: prompt)")
     ap.add_argument("--repo", help="GitHub owner/repo (default: prompt)")

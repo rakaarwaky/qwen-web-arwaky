@@ -102,6 +102,7 @@ class MetricsCounter(IMetricsProtocol):
         )
 
     def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
+        """Add *amount* to the counter *key* and persist the metrics file."""
         with self._lock:
             self._counters[key] = self._counters.get(key, MessageCount(0)) + amount
             self._persist()
@@ -113,10 +114,12 @@ class MetricsCounter(IMetricsProtocol):
             self._persist()
 
     def get(self, key: str) -> MessageCount:
+        """Return the current value of counter *key* (0 when absent)."""
         with self._lock:
             return MessageCount(self._counters.get(key, 0))
 
     def snapshot(self) -> dict[str, Any]:
+        """Return all counters plus rolling-24h execution totals and success rate."""
         with self._lock:
             self._prune_events()
             result: dict[str, Any] = dict(self._counters)
@@ -139,6 +142,7 @@ class StatusFileWriter(IStatusProtocol):
         ensure_dir(self._status_path)
 
     def write(self, **kwargs: Any) -> None:
+        """Atomically write the status JSON from keyword fields."""
         rec: dict[str, Any] = {
             "status": kwargs.get("status", "unknown"),
             "mode": kwargs.get("mode", "unknown"),
@@ -156,6 +160,7 @@ class StatusFileWriter(IStatusProtocol):
             atomic_write_json(self._status_path, rec)
 
     def write_record(self, record: StatusRecordVO) -> None:
+        """Write the status JSON from a typed status record."""
         self.write(
             status=record.status,
             mode=record.mode,
@@ -168,6 +173,7 @@ class StatusFileWriter(IStatusProtocol):
         )
 
     def read(self) -> dict[str, Any] | None:
+        """Return the parsed status file, or None when missing or invalid."""
         try:
             result: Any = json.loads(self._status_path.read_text(encoding="utf-8"))
             return result if isinstance(result, dict) else None
@@ -181,6 +187,7 @@ class StatusFileWriter(IStatusProtocol):
 
     @classmethod
     def create_default(cls, log_path: Path) -> StatusFileWriter:
+        """Build a writer targeting the conventional status path for *log_path*."""
         return cls(status_path_for(log_path))
 
 
@@ -345,18 +352,23 @@ class ObservabilitySetup(IObservabilityProtocol):
             pass
 
     def get_logger(self, name: str = "qwen-web") -> Any:
+        """Return a bound structlog logger."""
         return _get_logger(name)
 
     def get_tracer(self) -> Any:
+        """Return the OpenTelemetry tracer (no-op when OTel is absent)."""
         return _get_tracer()
 
     def start_span(self, name: str) -> Any:
+        """Start and return a tracing span named *name*."""
         return _start_span(name)
 
     def bind_run_context(self, run_id: str, **extra: Any) -> None:
+        """Bind *run_id* and extras to the logging context for this run."""
         _bind_run_context(run_id, **extra)
 
     def clear_run_context(self) -> None:
+        """Clear the run-scoped logging context."""
         _clear_run_context()
 
     def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
@@ -394,6 +406,7 @@ class ObservabilitySetup(IObservabilityProtocol):
                 handler.close()
 
     def exit_code_for(self, exc: BaseException) -> ExitCode:
+        """Map an exception to the process exit code contract."""
         return ExitCode(utility_core_exit.exit_code_for(exc))
 
     def write_status(self, status: str, mode: str, headless: bool, run_id: str | None = None) -> None:

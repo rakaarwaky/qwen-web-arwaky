@@ -38,6 +38,8 @@ SIMPLE_PROMPT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_simple_prompt.
 
 @dataclass(frozen=True)
 class TestArgs:
+    """Parsed CLI options selecting which real pipelines to run and how."""
+
     headless: bool
     run_p1: bool
     run_p2: bool
@@ -47,6 +49,7 @@ class TestArgs:
 
 
 def parse_args() -> TestArgs:
+    """Parse CLI flags into a typed TestArgs."""
     parser = argparse.ArgumentParser(
         description="Run real end-to-end tests for qwen-web pipelines using test fixtures."
     )
@@ -140,6 +143,7 @@ def run_pipeline_cmd(name: str, cmd: list[str]) -> bool:
 
 
 def main() -> int:
+    """Run the selected real end-to-end pipelines and return an exit code."""
     args = parse_args()
     output_dir: Path = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)

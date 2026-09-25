@@ -12,6 +12,11 @@ from pathlib import Path
 
 
 def get_playwright_browsers_path() -> Path:
+    """Return the Playwright browser cache directory for this platform.
+
+    Honours ``PLAYWRIGHT_BROWSERS_PATH`` when set (unless it is ``"0"``),
+    then falls back to the platform-conventional cache location.
+    """
     if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
         env_path = os.environ["PLAYWRIGHT_BROWSERS_PATH"]
         if env_path != "0":

@@ -48,6 +48,7 @@ class FilePickerModal(ModalScreen[str | None]):
         self._return_focus_id = return_focus_id
 
     def compose(self) -> ComposeResult:
+        """Build the directory tree, title hint, and action buttons."""
         title = "SELECT FILE OR FOLDER" if self._select_directories else "SELECT FILE"
         hint = (
             "press Enter on a file, or click 'Select This Folder'"
@@ -63,27 +64,33 @@ class FilePickerModal(ModalScreen[str | None]):
                 yield Button("Cancel (Esc)", id="btn-cancel-modal")
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        """Dismiss with the chosen file path."""
         # Accept regular files in both modes; folders are picked via the button.
         self.dismiss(str(event.path))
 
     def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        """Track the highlighted directory for folder selection."""
         self._current_path = Path(event.path)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dismiss with the current folder or cancel."""
         if event.button.id == "btn-cancel-modal":
             self.dismiss(None)
         elif event.button.id == "btn-select-folder":
             self.dismiss(str(self._current_path))
 
     def action_dismiss_modal(self) -> None:
+        """Cancel the picker without a selection."""
         self.dismiss(None)
 
     def action_select_current_folder(self) -> None:
+        """Dismiss with the highlighted directory when folder mode is on."""
         if self._select_directories:
             self.dismiss(str(self._current_path))
 
     # A2: return focus to the invoking widget after dismissal.
     def on_dismiss(self) -> None:
+        """Return focus to the widget that opened the picker."""
         if self._return_focus_id:
             with contextlib.suppress(LookupError):
                 target = self.app.query_one(f"#{self._return_focus_id}")
@@ -103,6 +110,7 @@ class HelpScreen(ModalScreen[None]):
         self._num_slots = num_slots
 
     def compose(self) -> ComposeResult:
+        """Render the shortcut list sized to the live slot count."""
         # UX-1-2: render the slot-chord section from the live slot count so the
         # help never advertises chords that do not exist for this configuration.
         lines = ["alt+0            Overview tab"]
@@ -138,10 +146,12 @@ class HelpScreen(ModalScreen[None]):
             yield Button("Close", id="help-close")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Close the help overlay."""
         if event.button.id == "help-close":
             self.dismiss(None)
 
     def action_dismiss_modal(self) -> None:
+        """Close the help overlay."""
         self.dismiss(None)
 
 
@@ -168,24 +178,29 @@ class ConfirmModal(ModalScreen[bool]):
         self._confirm_label = confirm_label
 
     def compose(self) -> ComposeResult:
+        """Build the warning text and Cancel / Confirm buttons."""
         with Vertical(id="confirm-modal-container"):
             yield Static(f"[bold red]{self._title.upper()}[/bold red]\n\n{self._message}\n")
             yield Button("Cancel", id="btn-cancel", variant="default")
             yield Button(self._confirm_label, id="btn-confirm", variant="error")
 
     def on_mount(self) -> None:
+        """Focus Cancel so Enter never confirms a destructive action by default."""
         self.query_one("#btn-cancel").focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dismiss with True on confirm, False otherwise."""
         if event.button.id == "btn-confirm":
             self.dismiss(True)
         else:
             self.dismiss(False)
 
     def action_dismiss_no(self) -> None:
+        """Dismiss answering no."""
         self.dismiss(False)
 
     def action_dismiss_yes(self) -> None:
+        """Dismiss answering yes."""
         self.dismiss(True)
 
 
@@ -248,6 +263,7 @@ class QwenTuiLogHandler(logging.Handler):
         self._app = app
 
     def filter(self, record: logging.LogRecord) -> bool:
+        """Keep only records from the qwen-web stack or the root logger."""
         name = record.name or ""
         return not name or name.startswith(self._APP_PREFIXES)
 
@@ -257,6 +273,7 @@ class QwenTuiLogHandler(logging.Handler):
         return text if len(text) <= limit else text[: limit - 3] + "..."
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Format the record as Rich text and write it to the per-slot log view."""
         try:
             msg = self._truncate(record.getMessage())
             name = record.name

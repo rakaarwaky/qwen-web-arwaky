@@ -48,6 +48,7 @@ class SessionSetupScreen(Screen[None]):
         self._on_back = on_back
 
     def compose(self) -> ComposeResult:
+        """Build the status line, action buttons, and footer."""
         yield Vertical(
             Static(self._status_text, id="session_status"),
             Button("Delete Session & Login Again", id="login", variant="error"),
@@ -56,6 +57,7 @@ class SessionSetupScreen(Screen[None]):
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Route presses to the confirm-gated login flow or the back callback."""
         if event.button.id == "login":
             # U1 (CRITICAL): the ConfirmModal is the single gate — the user
             # must explicitly confirm "Delete Session & Login" before the

@@ -483,6 +483,7 @@ def write_markdown(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for file selection and output path."""
     parser = argparse.ArgumentParser(description="Export a source file into a single consolidated Markdown document.")
     parser.add_argument(
         "--file",
@@ -498,6 +499,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Export a single source file to Markdown, interactively or from CLI arguments."""
     args = parse_args()
     # Capture via getattr: Pylance false-positives on synthesized Namespace.__getattr__ for plain attribute access.
     file_arg: str | None = getattr(args, "file", None)

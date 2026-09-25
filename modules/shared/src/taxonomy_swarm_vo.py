@@ -37,10 +37,12 @@ class SwarmSnapshot:
 
     @property
     def completed_count(self) -> int:
+        """Number of agents that finished successfully."""
         return sum(agent.status == "completed" for agent in self.agents)
 
     @property
     def failed_count(self) -> int:
+        """Number of agents that ended in failure."""
         return sum(agent.status == "failed" for agent in self.agents)
 
 

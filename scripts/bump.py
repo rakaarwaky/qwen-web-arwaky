@@ -98,6 +98,7 @@ def run_git_release(new_version: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Parse the bump target and apply it, optionally committing and tagging."""
     parser = argparse.ArgumentParser(description="Bump version in pyproject.toml files.")
     parser.add_argument(
         "target",
