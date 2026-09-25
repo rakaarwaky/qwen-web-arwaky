@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from modules.core.src.root_core_container import SharedContainer
-from modules.shared.src import DEFAULT_LOG, DEFAULT_OUTPUT, SWARM_OUTPUT_ROOT
+from modules.shared.src import DEFAULT_JOBS_DIR, DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION, SWARM_OUTPUT_ROOT
 
 
 class TestQwaInit(unittest.TestCase):
@@ -25,23 +25,21 @@ class TestQwaInit(unittest.TestCase):
             content = skill_md.read_text(encoding="utf-8")
             self.assertIn("name: qwen-web", content)
 
-            # 2. Verify .qwen-web symlinks
+            # 2. Verify all five .qwen-web symlinks (issue #319)
             dot_qwen = target_path / ".qwen-web"
             self.assertTrue(dot_qwen.exists())
 
-            log_link = dot_qwen / "log"
-            output_link = dot_qwen / "output"
-            session_link = dot_qwen / "qwen_session"
-            swarm_link = dot_qwen / "swarm"
-
-            self.assertTrue(log_link.is_symlink())
-            self.assertTrue(output_link.is_symlink())
-            self.assertTrue(session_link.is_symlink())
-            self.assertTrue(swarm_link.is_symlink())
-
-            self.assertEqual(log_link.resolve(), DEFAULT_LOG.resolve())
-            self.assertEqual(output_link.resolve(), DEFAULT_OUTPUT.resolve())
-            self.assertEqual(swarm_link.resolve(), SWARM_OUTPUT_ROOT.resolve())
+            link_targets = {
+                "jobs": DEFAULT_JOBS_DIR,
+                "log": DEFAULT_LOG,
+                "output": DEFAULT_OUTPUT,
+                "qwen_session": DEFAULT_SESSION,
+                "swarm": SWARM_OUTPUT_ROOT,
+            }
+            for name, target in link_targets.items():
+                link = dot_qwen / name
+                self.assertTrue(link.is_symlink() or link.exists(), f".qwen-web/{name} missing")
+                self.assertEqual(link.resolve(), target.resolve(), f".qwen-web/{name} target mismatch")
 
             # 3. Verify .gitignore
             gitignore = target_path / ".gitignore"

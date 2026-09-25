@@ -257,24 +257,40 @@ It implements the AES Capabilities and Agent layers: Playwright browser
 - **Output**: Directories, skill file, symlinks, and gitignore mutation.
   No return value.
 - **Business Rules**:
-  - Always ensure XDG `DEFAULT_TODO`, `DEFAULT_OUTPUT`, `DEFAULT_LOG`.
+  - Always ensure XDG `DEFAULT_JOBS_DIR`, `DEFAULT_OUTPUT`, and `DEFAULT_LOG`
+    exist.
   - Copy `SKILL.md` from XDG copy if present, else package root, else write
     a minimal front-matter stub.
-  - Create `.qwen-web/{log,input,output}` as directory symlinks to the XDG
-    paths. Existing real directories are left untouched. Broken/old links
-    are replaced.
+  - Create five `.qwen-web/` directory symlinks into the XDG paths
+    (issue #319 — the spec previously listed only three, and named an `input`
+    link the provisioner never creates):
+
+    | Link | Target |
+    |---|---|
+    | `.qwen-web/jobs` | `DEFAULT_JOBS_DIR` |
+    | `.qwen-web/log` | `DEFAULT_LOG` |
+    | `.qwen-web/output` | `DEFAULT_OUTPUT` |
+    | `.qwen-web/qwen_session` | `DEFAULT_SESSION` |
+    | `.qwen-web/swarm` | `SWARM_OUTPUT_ROOT` |
+
+    An existing real directory occupying a link name is moved aside to
+    `<name>.backup-<ns>` rather than clobbered; broken or stale links are
+    replaced. A target that cannot be linked (restricted filesystem) is
+    created as a real directory so `init` still succeeds.
   - Append `.qwen-web/` to `.gitignore` if missing; create the file when
     absent. Symlink creation `OSError` is ignored (non-fatal).
 - **Edge Cases**: target is not a git repo; `.gitignore` exists without
   trailing newline; symlink not permitted (some FS); XDG and package skill
-  files both missing.
+  files both missing; a pre-existing real directory occupying a link name.
 - **Error Handling**: filesystem errors on skill write propagate. Symlink
   failures are skipped so `init` still succeeds on restricted hosts.
 - **Acceptance Criteria**:
   - [ ]  `init` creates `.agents/skills/qwen-web/SKILL.md`.
-  - [ ]  `.qwen-web/input|output|log` point at XDG defaults when linking works.
+  - [ ]  All five links (`jobs`, `log`, `output`, `qwen_session`, `swarm`)
+    resolve to their documented XDG targets when linking works.
   - [ ]  `.gitignore` contains `.qwen-web/` exactly once after repeated inits.
-  - [ ]  XDG input/output/log directories exist after init.
+  - [ ]  XDG jobs/output/log directories exist after init.
+  - [ ]  A second `init` leaves the link set unchanged (idempotent).
 - **Tests**: `tests/integration_surface_init_cmd.py`.
 
 ### FR-008: Observability Setup
@@ -450,8 +466,16 @@ integration).
 - [ ]  FR-004: 100k-char prompt injects via React setter on fixture.
 - [ ]  FR-005: send is refused while attachment parse gate is false.
 - [ ]  FR-006: circuit of Stop button → streaming text → stable text completes.
-- [ ]  FR-007: second `init` is idempotent.
+- [ ]  FR-007: second `init` is idempotent and all five `.qwen-web` links
+  resolve to their XDG targets.
 - [ ]  FR-008: process starts with empty `SENTRY_DSN` and no OTLP endpoint.
+- [ ]  Pipeline smoke test (issue #322): `qwen-web-arwaky doctor --smoke`
+  reports a pass/fail result for a headless browser round-trip against the
+  saved session. The browser launch is live and gated on an authenticated
+  session, so CI asserts the deterministic wiring — that the flag reaches the
+  surface, appends the sixth check, and maps the aggregate result to
+  pass/fail — while the operator runs the full round-trip.
+  Locks: `modules/cli/tests/integration_doctor_smoke.py`.
 - [ ]  Aggregate boundary: failed single-file prompts return an error envelope,
   nested role routing is preserved, and a
   supplied `AppConfig` reaches the browser session unchanged. Input files stay
