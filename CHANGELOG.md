@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.5.2] - 2026-09-26
+
+Rollback-safe patch release: cuts a tagged point after the stream-monitor
+thinking-card fix (#461) and the backlog/issue documentation (#462). No
+new behaviour; v6.5.1 plus the two merged fixes below.
+
+### Fixed
+
+- Stream monitor no longer scrapes Qwen's thinking-card status line
+  ("Thought stopped") as the assistant answer. The response extractor now
+  skips nodes whose whole text matches a `THINKING_CARD_TEXT_MARKERS`
+  entry, so a thinking card that renders inside the assistant message
+  container can no longer poison the extracted response (#461).
+- `request_timeout` default raised from 120s to 600s across all three call
+  sites (`AppConfig`, `build_app_config`, `SlotRunPlanResolver`) and made
+  operator-tunable via `QWEN_REQUEST_TIMEOUT_SEC`. The old 120s wall-clock
+  ceiling cut off live thinking phases on heavy-reasoning runs; a 426s
+  thinking run previously produced a 32-byte `Thought stopped` output, and
+  the same input now returns the full 40KB response.
+
+### Added
+
+- Regression tests: `THINKING_CARD_TEXT_MARKERS` sanity checks, env-override
+  tests, a live-Chromium DOM test that reproduces the exact failing DOM, and
+  two ceiling assertions that lock the 600s default so a silent revert to
+  120s fails in CI rather than in the field.
+
 ## [6.5.1] - 2026-09-26
 
 Closes 48 swarm-review warnings across all seven review categories, plus the architecture-lint
