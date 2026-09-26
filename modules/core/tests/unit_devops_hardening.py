@@ -19,10 +19,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src import utility_core_session_guard as session_guard
 from modules.core.src.capabilities_observability_setup import effective_telemetry_mode
 from modules.core.src.capabilities_update_manager import UpdateManager
 from modules.core.src.utility_core_config_factory import build_app_config, sandbox_unavailable
+from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
 
 # ─── #290: sandbox is on by default ─────────────────────────────────────────

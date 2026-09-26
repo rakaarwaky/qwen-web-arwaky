@@ -272,7 +272,6 @@ class IConfigAggregate(ABC):
         prompt_file: Path | None = None,
         file_path: Path | None = None,
         model: str = "",
-        **overrides: Any,
     ) -> AppConfig:
         """Build an ``AppConfig`` for ``mode`` with the given overrides.
 

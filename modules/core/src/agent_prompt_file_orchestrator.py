@@ -15,9 +15,6 @@ from modules.core.src.utility_core_config_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
-from modules.core.src.utility_core_error_mapping import to_error_response
-from modules.core.src.utility_core_io_writer import save_orchestrator_output
 from modules.shared.src.contract_core_aggregate import IPromptFileAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
@@ -43,6 +40,9 @@ from modules.shared.src.taxonomy_core_vo import (
     RunId,
     RunState,
 )
+from modules.shared.src.utility_dom_helper import setup_lifecycle_state
+from modules.shared.src.utility_error_mapping import to_error_response
+from modules.shared.src.utility_io_writer import save_orchestrator_output
 
 
 def new_run_state(cancel_event: threading.Event | None = None) -> RunState:

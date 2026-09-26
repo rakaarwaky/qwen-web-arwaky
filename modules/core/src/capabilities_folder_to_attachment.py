@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IFolderCompileProtocol, IFolderToAttachmentProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderValidationError
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_folder_to_attachment")
 

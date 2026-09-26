@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
-from modules.core.src.utility_core_dom_helper import click_send
 from modules.shared.src.taxonomy_core_vo import SenderConfig
+from modules.shared.src.utility_dom_helper import click_send
 
 
 def test_click_send_explicit_timeout_overrides_config() -> None:

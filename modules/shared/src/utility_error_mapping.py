@@ -1,6 +1,6 @@
 """Error mapping utilities.
 
-Utility layer (utility_core_error_mapping): convert exceptions to ResponseText.
+Utility layer (utility_error_mapping): convert exceptions to ResponseText.
 Stateless function consumed by Agent orchestrator for error handling.
 """
 

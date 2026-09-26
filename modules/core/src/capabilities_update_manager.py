@@ -27,7 +27,6 @@ from typing import Any
 from urllib import request
 from urllib.parse import unquote, urlparse
 
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import XDG_STATE_HOME
 from modules.shared.src.taxonomy_core_vo import (
@@ -38,6 +37,7 @@ from modules.shared.src.taxonomy_core_vo import (
     VersionString,
 )
 from modules.shared.src.utility_core_version import get_package_version
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_update_manager")
 

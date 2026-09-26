@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from modules.core.src.utility_core_dom_query import count_messages, latest_message_text
 from modules.shared.src import (
     LifecycleEmitter,
     RunContext,
     SaverConfig,
 )
 from modules.shared.src.utility_core_text import strip_ui_noise
+from modules.shared.src.utility_dom_query import count_messages, latest_message_text
 from tests.helpers import (
     _configure_logging,
     _configure_sentry,

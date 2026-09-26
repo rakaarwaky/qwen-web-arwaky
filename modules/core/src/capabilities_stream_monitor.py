@@ -12,9 +12,6 @@ import time
 
 from playwright.sync_api import Error, Page
 
-from modules.core.src.utility_core_dom_helper import is_any_visible
-from modules.core.src.utility_core_dom_query import latest_message_text
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IStreamProtocol
 from modules.shared.src.taxonomy_core_constant import (
     STOP_BUTTON_SELECTORS,
@@ -41,6 +38,9 @@ from modules.shared.src.taxonomy_core_vo import (
 )
 from modules.shared.src.utility_core_events import is_stability_satisfied, should_treat_as_new_response
 from modules.shared.src.utility_core_validation import validate_response_content
+from modules.shared.src.utility_dom_helper import is_any_visible
+from modules.shared.src.utility_dom_query import latest_message_text
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_stream_monitor")
 # Test seam: patched by unit_capability_stream_monitor to script DOM responses.

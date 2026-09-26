@@ -10,9 +10,9 @@ from playwright.sync_api import Error
 
 import modules.core.src.capabilities_send_dispatcher as sd
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
-from modules.core.src.utility_core_dom_query import count_messages, latest_message_text
 from modules.shared.src import LifecycleEmitter, SendDispatchError
 from modules.shared.src.taxonomy_core_vo import ClickTimeoutMs, SenderConfig
+from modules.shared.src.utility_dom_query import count_messages, latest_message_text
 
 
 def _sender() -> SendDispatcher:

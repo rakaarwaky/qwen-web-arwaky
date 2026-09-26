@@ -1,6 +1,6 @@
 """DOM query utilities for Playwright pages.
 
-Utility layer (utility_core_dom_query): stateless functions for DOM reading.
+Utility layer (utility_dom_query): stateless functions for DOM reading.
 Consumed by SendDispatcher, StreamMonitor, and Agent.
 Taxonomy constants + Playwright Page only.
 """

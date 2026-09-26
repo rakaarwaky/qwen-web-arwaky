@@ -31,10 +31,10 @@ from modules.core.src.capabilities_prompt_injector import PromptInjector
 from modules.core.src.capabilities_send_dispatcher import SendDispatcher
 from modules.core.src.capabilities_status_writer import StatusFileWriter
 from modules.core.src.capabilities_stream_monitor import StreamMonitor
-from modules.core.src.utility_core_async_loop import isolate_thread_event_loop
-from modules.core.src.utility_core_host_gate import insufficient_reason, probe
 from modules.shared.src import AppConfig, RunContext
+from modules.shared.src.utility_async_loop import isolate_thread_event_loop
 from modules.shared.src.utility_core_status import status_path_for
+from modules.shared.src.utility_host_gate import insufficient_reason, probe
 from tests.pipeline_fixtures import restore_fixture_state
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
