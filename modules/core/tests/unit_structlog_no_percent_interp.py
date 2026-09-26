@@ -107,7 +107,7 @@ def test_browser_adapter_has_no_kwarg_style_log_calls() -> None:
     Locks the source so a future edit cannot reintroduce the TypeError from
     passing ``key=value`` to a stdlib logger.
     """
-    src = Path(__file__).resolve().parents[1] / "src" / "capabilities_browser_adapter.py"
+    src = Path(__file__).resolve().parents[2] / "browser" / "src" / "capabilities_browser_adapter.py"
     text = src.read_text(encoding="utf-8")
     kwarg_re = re.compile(r"""log\.(?:debug|info|warning|error|critical|exception)\([^)]*?\w+=[\w.]""")
     offenders = [m.group(0) for m in kwarg_re.finditer(text)]
@@ -118,7 +118,7 @@ def test_browser_adapter_module_logger_is_stdlib() -> None:
     """End-to-end: the real browser-adapter module logger is a stdlib logger, not structlog."""
     import logging as _logging
 
-    from modules.core.src import capabilities_browser_adapter as adapter
+    from modules.browser.src import capabilities_browser_adapter as adapter
 
     assert isinstance(adapter.log, _logging.Logger), (
         f"browser adapter logger must be a stdlib logging.Logger, got {type(adapter.log).__name__}"

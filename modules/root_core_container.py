@@ -8,49 +8,49 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.cli.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
+
 # Root is the composition layer, so it wires the functional doctor gate into
 # the updater: after an upgrade the pipeline re-runs the operator diagnostics
 # and rolls back when they fail (issue #294). The gate itself lives in the
 # doctor Surface; Capabilities only ever sees an injected callable.
 from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
-# agent_attachment_prompt_orchestrator
-from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentPromptOrchestrator
-
-# agent_direct_prompt_orchestrator
-from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
-
 # agent_job_orchestrator
-from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
+from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
+from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
+from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
+from modules.jobs.src.capabilities_job_storage import JobStorage
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
+from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
 
-# agent_prompt_file_orchestrator
-from modules.core.src.agent_prompt_file_orchestrator import PromptFileOrchestrator
+# capabilities_attachment_prompt_adapter
+from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
+
+# capabilities_direct_prompt_adapter
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt.src.capabilities_output_saver import Saver
+
+# capabilities_prompt_file_adapter
+from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
+from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 
 # agent_session_orchestrator
-from modules.core.src.agent_session_orchestrator import SessionOrchestrator
+from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
+from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.session.src.capabilities_session_manager import SessionManager
 
-# agent_setup_orchestrator
-from modules.core.src.agent_setup_orchestrator import SetupOrchestrator
-from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
-from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-from modules.core.src.capabilities_file_uploader import FileUploader
-from modules.core.src.capabilities_folder_compiler import FolderCompiler
-from modules.core.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
-from modules.core.src.capabilities_job_storage import JobStorage
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-from modules.core.src.capabilities_output_saver import Saver
-from modules.core.src.capabilities_prompt_injector import PromptInjector
-from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
-from modules.core.src.capabilities_send_dispatcher import SendDispatcher
-from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
-from modules.core.src.capabilities_session_manager import SessionManager
-from modules.core.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
-from modules.core.src.capabilities_status_writer import StatusFileWriter
-from modules.core.src.capabilities_stream_monitor import StreamMonitor
-from modules.core.src.capabilities_update_manager import UpdateManager
-from modules.core.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+# capabilities_setup_adapter
+from modules.session.src.capabilities_setup_adapter import SetupAdapter
+from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
+from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -72,6 +72,7 @@ from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 from modules.shared.src.utility_core_capacity import recommended_max_workers
 from modules.shared.src.utility_core_status import status_path_for
+from modules.update.src.capabilities_update_manager import UpdateManager
 
 
 class SharedContainer:
@@ -123,7 +124,7 @@ class SharedContainer:
         self.run_cancel_registry: CapabilitiesRunCancelRegistry = CapabilitiesRunCancelRegistry()
 
         # The 5 specialized agent orchestrators
-        self.agent_direct_prompt_orchestrator: IDirectPromptAggregate = DirectPromptOrchestrator(
+        self.agent_direct_prompt_orchestrator: IDirectPromptAggregate = DirectPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -132,7 +133,7 @@ class SharedContainer:
             observability=self.observability,
             flow=self.agent_shared_flow_orchestrator,
         )
-        self.agent_prompt_file_orchestrator: IPromptFileAggregate = PromptFileOrchestrator(
+        self.agent_prompt_file_orchestrator: IPromptFileAggregate = PromptFileAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -142,7 +143,7 @@ class SharedContainer:
             flow=self.agent_shared_flow_orchestrator,
             cancel=self.run_cancel_registry,
         )
-        self.agent_attachment_prompt_orchestrator: IAttachmentPromptAggregate = AttachmentPromptOrchestrator(
+        self.agent_attachment_prompt_orchestrator: IAttachmentPromptAggregate = AttachmentPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -162,13 +163,13 @@ class SharedContainer:
         # Session rotation infrastructure
         self.session_manager: ISessionManagerProtocol = SessionManager()
         self.session_health_checker = SessionHealthChecker()
-        from modules.core.src.agent_session_rotation_orchestrator import SessionRotator
+        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 
-        self.session_rotator: ISessionRotatorAggregate = SessionRotator(
+        self.session_rotator: ISessionRotatorAggregate = SessionRotationAdapter(
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
+        self.agent_setup_orchestrator: ISetupAggregate = SetupAdapter(
             browser=self.browser,
             observability=self.observability,
         )
@@ -189,7 +190,7 @@ class SharedContainer:
         # Issue #277: the Swarm fan-out must respect the same shared resource
         # guards as the job pipeline — the shared breaker and limiter are
         # injected so 10 concurrent agent attempts cannot bypass them.
-        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
+        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmAdapter(
             attachment=self.agent_attachment_prompt_orchestrator,
             folder_adapter=self.folder_adapter,
             browser_concurrency=swarm_workers,

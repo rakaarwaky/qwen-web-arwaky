@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from modules.core.src.capabilities_folder_compiler import FolderCompiler
+from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files,
     collect_folder_files_with_imports,

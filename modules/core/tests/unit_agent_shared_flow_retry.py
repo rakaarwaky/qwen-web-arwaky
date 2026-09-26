@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
+from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
 from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS
 from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE, STANDARD_PROMPT_EVENTS
@@ -88,7 +88,7 @@ def test_dispatch_retry_survives_first_attempt_timeout() -> None:
         "final response",
     ]
 
-    with patch("modules.core.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
         response = _run_once(flow, emitter, state, streamer, observability)
 
     assert response == "final response"
@@ -108,7 +108,7 @@ def test_dispatch_retry_reraises_on_max_attempts() -> None:
     streamer = MagicMock()
     streamer.wait_for_response.side_effect = ResponseDetectionTimeoutError("always times out")
 
-    with patch("modules.core.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
         with pytest.raises(ResponseDetectionTimeoutError):
             _run_once(flow, emitter, state, streamer, observability)
 
@@ -157,7 +157,7 @@ def test_attachment_pipeline_retry_preserves_document_parsed() -> None:
         "final response",
     ]
 
-    with patch("modules.core.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
         response = _run_once(flow, emitter, state, streamer, observability, PIPELINE_EVENT_SEQUENCE)
 
     assert response == "final response"

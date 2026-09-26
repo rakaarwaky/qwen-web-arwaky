@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.shared.src import AppConfig
 
 _browser = BrowserAdapter()
@@ -25,7 +25,7 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
@@ -57,7 +57,7 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
@@ -79,7 +79,7 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
@@ -100,7 +100,7 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
@@ -120,7 +120,7 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
@@ -143,7 +143,7 @@ class TestBrowserSession:
         mock_ctx.pages = [MagicMock()]
         mock_ctx.close.side_effect = Error("already closed")
 
-        with patch("modules.core.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)

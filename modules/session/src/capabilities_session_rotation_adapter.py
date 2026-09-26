@@ -36,7 +36,7 @@ class AllSessionsLimitedError(Exception):
         )
 
 
-class SessionRotator(ISessionRotatorAggregate):
+class SessionRotationAdapter(ISessionRotatorAggregate):
     """Transparent session rotation with health checking."""
 
     def __init__(
@@ -51,7 +51,7 @@ class SessionRotator(ISessionRotatorAggregate):
     def _ensure_checker(self) -> ISessionHealthCheckerProtocol:
         """Return the health checker, raising if not configured."""
         if self._checker is None:
-            raise RuntimeError("Health checker not configured — pass one to SessionRotator()")
+            raise RuntimeError("Health checker not configured — pass one to SessionRotationAdapter()")
         return self._checker
 
     async def get_next_session(self) -> SessionInfo | None:
@@ -146,7 +146,7 @@ class SessionRotator(ISessionRotatorAggregate):
 
 
 __all__ = [
-    "SessionRotator",
+    "SessionRotationAdapter",
     "AllSessionsLimitedError",
     "RotationMetrics",
 ]

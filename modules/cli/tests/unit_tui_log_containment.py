@@ -33,9 +33,9 @@ from textual.widgets import RichLog
 
 from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-from modules.core.src.capabilities_status_writer import StatusFileWriter
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.shared.src.utility_core_status import status_path_for
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ def test_tui_log_handler_ignores_third_party_records() -> None:
         rec = logging.LogRecord(noisy, logging.INFO, "p.py", 1, "noise", (), None)
         assert handler.filter(rec) is False, f"{noisy} must be filtered out"
 
-    for allowed in ("", "qwen-web", "modules.core.src.capabilities_browser_adapter", "browser"):
+    for allowed in ("", "qwen-web", "modules.browser.src.capabilities_browser_adapter", "browser"):
         rec = logging.LogRecord(allowed, logging.INFO, "p.py", 1, "keep", (), None)
         assert handler.filter(rec) is True, f"{allowed!r} must be allowed"
 

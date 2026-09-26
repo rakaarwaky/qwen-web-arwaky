@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from modules.core.src.capabilities_update_manager import UpdateManager
+from modules.update.src.capabilities_update_manager import UpdateManager
 
 
 def test_rollback_unknown_previous_version_returns_skipped_message() -> None:

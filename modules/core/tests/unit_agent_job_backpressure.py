@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
+from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, JobQueueFullError
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec

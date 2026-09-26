@@ -23,7 +23,7 @@ from unittest.mock import patch
 
 import pytest
 
-from modules.core.src.capabilities_update_manager import UpdateManager
+from modules.update.src.capabilities_update_manager import UpdateManager
 
 FORBIDDEN = UpdateManager._SUBPROCESS_FORBIDDEN_CHARS
 

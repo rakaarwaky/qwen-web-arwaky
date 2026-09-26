@@ -19,11 +19,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.capabilities_observability_setup import effective_telemetry_mode
-from modules.core.src.capabilities_update_manager import UpdateManager
-from modules.core.src.utility_core_config_factory import build_app_config, sandbox_unavailable
+from modules.config.src.utility_config_app_factory import build_app_config, sandbox_unavailable
+from modules.logging.src.capabilities_observability_setup import effective_telemetry_mode
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.update.src.capabilities_update_manager import UpdateManager
 
 # ─── #290: sandbox is on by default ─────────────────────────────────────────
 
@@ -32,7 +32,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
     """No opt-in and a sandbox-capable host means the sandbox stays on."""
     with (
         patch.dict("os.environ", {}, clear=False),
-        patch("modules.core.src.utility_core_config_factory.sandbox_unavailable", return_value=False),
+        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -41,7 +41,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
 def test_sandbox_dropped_on_explicit_opt_in() -> None:
     """QWEN_DISABLE_SANDBOX is the documented way to drop the sandbox."""
     with (
-        patch("modules.core.src.utility_core_config_factory.sandbox_unavailable", return_value=False),
+        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -50,7 +50,7 @@ def test_sandbox_dropped_on_explicit_opt_in() -> None:
 def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
     """A container with no seccomp filter and no user namespaces falls back."""
     with (
-        patch("modules.core.src.utility_core_config_factory.sandbox_unavailable", return_value=True),
+        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -59,7 +59,7 @@ def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
 def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
     """QWEN_ENABLE_SANDBOX overrides the container detection."""
     with (
-        patch("modules.core.src.utility_core_config_factory.sandbox_unavailable", return_value=True),
+        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_ENABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -71,7 +71,7 @@ def test_sandbox_unavailable_returns_a_bool_on_this_host() -> None:
 
 def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     """The launch kwargs carry ``--no-sandbox`` iff the config dropped the sandbox."""
-    from modules.core.src import capabilities_browser_adapter as adapter_module
+    from modules.browser.src import capabilities_browser_adapter as adapter_module
 
     captured: list[dict] = []
 
@@ -221,9 +221,9 @@ def test_doctor_does_not_warn_in_development_without_a_backend(capsys) -> None:
 
 def test_degraded_observability_is_logged_at_setup(caplog) -> None:
     """setup_observability emits an explicit observability_degraded event for file-only mode."""
-    from modules.core.src.capabilities_metrics_counter import MetricsCounter
-    from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-    from modules.core.src.capabilities_status_writer import StatusFileWriter
+    from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+    from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+    from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 
     log_dir = Path("test.jsonl").parent
     with (
@@ -310,7 +310,7 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
 
 def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:
     """Root composes the gate; the Capabilities updater only sees a callable."""
-    from modules.core.src.root_core_container import SharedContainer
+    from modules.root_core_container import SharedContainer
 
     container = SharedContainer()
     assert callable(getattr(container.updater, "_smoke_gate", None))
@@ -320,7 +320,7 @@ def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:
 
 def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
     """delete_session refuses when no backup exists unless forced (#300)."""
-    from modules.core.src import agent_session_orchestrator as session_module
+    from modules.session.src import agent_session_orchestrator as session_module
 
     orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
     session = tmp_path / "qwen_session"
@@ -334,7 +334,7 @@ def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
 
 def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
     """force=True skips the backup guard so an operator can still delete."""
-    from modules.core.src import agent_session_orchestrator as session_module
+    from modules.session.src import agent_session_orchestrator as session_module
 
     orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
     session = tmp_path / "qwen_session"

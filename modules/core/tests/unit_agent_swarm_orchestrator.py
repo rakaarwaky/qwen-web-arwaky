@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from threading import Event
 
-from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
@@ -33,7 +33,7 @@ class FakeAttachmentAggregate:
         event.set()
 
 
-def _wait_for_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
+def _wait_for_terminal(orchestrator: SwarmAdapter, swarm_id: str):
     for _ in range(100):
         snapshot = orchestrator.snapshot(swarm_id)
         assert snapshot is not None
@@ -45,11 +45,11 @@ def _wait_for_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
 
 def _patch_templates(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
-        "modules.core.src.agent_swarm_orchestrator.list_prompt_templates",
+        "modules.session.src.capabilities_swarm_adapter.list_prompt_templates",
         lambda: ("architect", "security-reviewer"),
     )
     monkeypatch.setattr(
-        "modules.core.src.agent_swarm_orchestrator.materialize_role_template",
+        "modules.session.src.capabilities_swarm_adapter.materialize_role_template",
         lambda role: tmp_path / f"{role}.md",
     )
 
@@ -57,7 +57,7 @@ def _patch_templates(monkeypatch, tmp_path: Path) -> None:
 def test_swarm_discovers_all_templates_and_writes_existing_format(monkeypatch, tmp_path: Path) -> None:
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=10)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=10)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -74,7 +74,7 @@ def test_swarm_discovers_all_templates_and_writes_existing_format(monkeypatch, t
 def test_swarm_retries_transient_agent_failure_and_allows_partial(monkeypatch, tmp_path: Path) -> None:
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"security-reviewer": 3})
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=1)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -94,7 +94,7 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
     error recorded — proving the stuck path never hangs the swarm."""
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"architect": 2, "security-reviewer": 100})
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -146,7 +146,7 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
 
     aggregate.process_prompt_with_attachment = process_with_auth_error
 
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -181,7 +181,7 @@ def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> 
 
     aggregate.process_prompt_with_attachment = process_with_gate_rejection
 
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=1, max_attempts=3)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -201,7 +201,7 @@ def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
     """Cancelling a swarm must stop executors and clean up internal dictionary state."""
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
-    orchestrator = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=1)
+    orchestrator = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=1)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -222,11 +222,11 @@ def test_resource_warning_only_above_threshold(monkeypatch, tmp_path: Path) -> N
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
 
-    quiet = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=3)
+    quiet = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=3)
     assert quiet.resource_warning is None
     assert quiet.browser_concurrency == 3
 
-    loud = SwarmOrchestrator(aggregate, output_root=tmp_path, browser_concurrency=10)
+    loud = SwarmAdapter(aggregate, output_root=tmp_path, browser_concurrency=10)
     assert loud.resource_warning == "This will launch up to 10 browser processes. Continue?"
 
 
@@ -242,7 +242,7 @@ def test_swarm_respects_injected_rate_limiter(monkeypatch, tmp_path: Path) -> No
     # Burn the single slot so every try_acquire reports a backoff.
     assert limiter.try_acquire() is None
 
-    orchestrator = SwarmOrchestrator(
+    orchestrator = SwarmAdapter(
         aggregate,
         output_root=tmp_path,
         browser_concurrency=2,
@@ -268,7 +268,7 @@ def test_swarm_fails_agent_only_when_circuit_breaker_trips(monkeypatch, tmp_path
     aggregate = FakeAttachmentAggregate()
     breaker = CircuitBreaker(FailureThreshold(1), WindowSec(30))
     breaker.record_failure()
-    orchestrator = SwarmOrchestrator(
+    orchestrator = SwarmAdapter(
         aggregate,
         output_root=tmp_path,
         browser_concurrency=2,

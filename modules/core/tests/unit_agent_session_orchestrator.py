@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.agent_session_orchestrator import SessionOrchestrator
+from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.utility_session_guard import is_filesystem_root, is_safe_session_target
 
@@ -107,7 +107,7 @@ def test_delete_session_refuses_posix_root(tmp_path: Path) -> None:
     """``delete_session`` must refuse ``/`` with the documented error."""
     orch = _orchestrator()
     with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
-        with patch("modules.core.src.agent_session_orchestrator.build_app_config") as build:
+        with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
             build.return_value.session_path = Path("/")
             with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
                 orch.delete_session()
@@ -117,7 +117,7 @@ def test_delete_session_refuses_etc(tmp_path: Path) -> None:
     """A near-root system directory must be refused before ``rmtree``."""
     orch = _orchestrator()
     with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
-        with patch("modules.core.src.agent_session_orchestrator.build_app_config") as build:
+        with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
             build.return_value.session_path = Path("/etc")
             with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
                 orch.delete_session()
@@ -153,7 +153,7 @@ def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> 
     target = tmp_path / "projects" / "session"
     target.mkdir(parents=True)
     (target / "keepme.txt").write_text("unrelated data", encoding="utf-8")
-    with patch("modules.core.src.agent_session_orchestrator.build_app_config") as build:
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
             orch.delete_session()
@@ -172,9 +172,9 @@ def test_orchestrator_refuses_target_when_guard_rejects(tmp_path: Path) -> None:
     target.mkdir()
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False),
-        patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
         patch(
-            "modules.core.src.agent_session_orchestrator.is_safe_session_target",
+            "modules.session.src.agent_session_orchestrator.is_safe_session_target",
             return_value=False,
         ) as guard,
     ):
@@ -187,7 +187,7 @@ def test_orchestrator_refuses_target_when_guard_rejects(tmp_path: Path) -> None:
 def test_delete_session_missing_target_reports_not_found(tmp_path: Path) -> None:
     """A non-existent target is a no-op, not a refusal."""
     orch = _orchestrator()
-    with patch("modules.core.src.agent_session_orchestrator.build_app_config") as build:
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = tmp_path / "absent"
         assert "No session found" in str(orch.delete_session())
 
@@ -204,7 +204,7 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     backups_dir.mkdir(parents=True)
     with (
         patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
-        patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
         result = orch.delete_session()
@@ -221,8 +221,8 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     with (
         patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
-        patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
-        patch("modules.core.src.agent_session_orchestrator.shutil.rmtree", side_effect=OSError("device busy")),
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.shutil.rmtree", side_effect=OSError("device busy")),
     ):
         build.return_value.session_path = fake_default
         with pytest.raises(QwenCliError) as excinfo:

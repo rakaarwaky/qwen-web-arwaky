@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from modules.core.src.capabilities_job_storage import JobStorage
+from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import (
     FailureThreshold,

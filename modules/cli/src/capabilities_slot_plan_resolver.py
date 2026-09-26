@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from modules.core.src.utility_core_config_factory import (
+from modules.config.src.utility_config_app_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )

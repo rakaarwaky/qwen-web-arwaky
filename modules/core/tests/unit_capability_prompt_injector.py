@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from playwright.sync_api import Error, TimeoutError
 
-from modules.core.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.shared.src import (
     DEFAULT_INJECTOR_CONFIG,
     ElementNotFoundError,

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.core.src.agent_update_orchestrator import UpdateOrchestrator
+from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 
 
 @pytest.fixture

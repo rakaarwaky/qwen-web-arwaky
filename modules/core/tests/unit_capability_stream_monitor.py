@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.capabilities_stream_monitor import (
+from modules.prompt.src.capabilities_stream_monitor import (
     DEFAULT_SAFETY_TIMEOUT_SEC,
     StreamMonitor,
     validate_response_content,
@@ -188,10 +188,10 @@ class TestWaitForResponseEdgeCases:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
             patch.object(StreamMonitor, "is_generation_complete", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 14_400]
             mock_time.sleep = MagicMock()
@@ -212,12 +212,12 @@ class TestWaitForResponseEdgeCases:
 
         with (
             patch(
-                "modules.core.src.capabilities_stream_monitor._dom_latest",
+                "modules.prompt.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[None, TimeoutError("temporary"), response, response],
             ),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 1, 2, 3, 4, 5]
             mock_time.sleep = MagicMock()
@@ -246,9 +246,9 @@ class TestWaitForResponseEdgeCases:
 
         with (
             patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 0.4, 0.5, 0.6]
             mock_time.sleep = MagicMock()
@@ -272,11 +272,11 @@ class TestWaitForResponseEdgeCases:
         with (
             patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
             patch(
-                "modules.core.src.capabilities_stream_monitor._dom_latest",
+                "modules.prompt.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[None, response, response, response],
             ),
             patch.object(StreamMonitor, "is_generation_complete", side_effect=[False, False, True]),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 1, 2, 3, 4]
             mock_time.sleep = MagicMock()
@@ -301,9 +301,9 @@ class TestWaitForResponseEdgeCases:
 
         with (
             patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0] + [0.1] * 20
             mock_time.sleep = MagicMock()
@@ -335,9 +335,9 @@ class TestWaitForResponseEdgeCases:
 
         with (
             patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0] + [0.1] * 50
             mock_time.sleep = MagicMock()
@@ -360,10 +360,10 @@ class TestWaitForResponseEdgeCases:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
             patch.object(StreamMonitor, "is_generation_complete", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             # The stall window (300s) trips well inside the 900s hard-cutoff
             # budget (issue #372) so the event-driven error surfaces, not the
@@ -403,10 +403,10 @@ class TestWaitForResponseEdgeCases:
         time_calls = [0, 250, 500, 750, 1000, 1000, 1000]
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=text_side_effect),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=text_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = time_calls
             mock_time.sleep = MagicMock()
@@ -441,11 +441,11 @@ class TestPreSendBaseline:
         with (
             patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
             patch(
-                "modules.core.src.capabilities_stream_monitor._dom_latest",
+                "modules.prompt.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[response, response, response],
             ),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 0.1, 0.2, 0.3, 0.4]
             mock_time.sleep = MagicMock()
@@ -473,10 +473,10 @@ class TestHardResponseTimeout:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
             patch.object(StreamMonitor, "is_generation_complete", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             # wall clock jumps past the 120s budget while the 4h safety
             # breaker and the 5min stall window are nowhere near tripping.
@@ -498,10 +498,10 @@ class TestHardResponseTimeout:
         emitter = MagicMock(spec=LifecycleEmitter)
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
             patch.object(StreamMonitor, "is_generation_complete", return_value=False),
-            patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 14_400]
             mock_time.sleep = MagicMock()
@@ -549,7 +549,7 @@ class TestReloadGatedOnProgress:
         )
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=lambda *_: next(texts)),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=lambda *_: next(texts)),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
         ):
@@ -576,7 +576,7 @@ class TestReloadGatedOnProgress:
         response = "a stable final answer"
 
         with (
-            patch("modules.core.src.capabilities_stream_monitor._dom_latest", return_value=response),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=response),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
         ):
@@ -673,25 +673,25 @@ class TestRequestTimeoutBudget:
         assert cfg.request_timeout >= 600, "a 120s ceiling aborts healthy thinking runs"
 
     def test_env_override_is_honored(self, monkeypatch):
-        from modules.core.src.utility_core_config_factory import build_app_config
+        from modules.config.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "1800")
         assert build_app_config().request_timeout == 1800
 
     def test_invalid_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.core.src.utility_core_config_factory import build_app_config
+        from modules.config.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "not-a-number")
         assert build_app_config().request_timeout == 600
 
     def test_non_positive_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.core.src.utility_core_config_factory import build_app_config
+        from modules.config.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "0")
         assert build_app_config().request_timeout == 600
 
     def test_absent_env_keeps_the_default(self, monkeypatch):
-        from modules.core.src.utility_core_config_factory import build_app_config
+        from modules.config.src.utility_config_app_factory import build_app_config
 
         monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
         assert build_app_config().request_timeout == 600
@@ -715,6 +715,6 @@ class TestRequestTimeoutBudget:
     def test_measured_thinking_phase_is_not_a_duplicate_of_the_marker_default(self):
         """Guard the 600 literal so a silent default change is visible in the
         diff of the two tests above rather than hidden inside a range check."""
-        from modules.core.src.utility_core_config_factory import build_app_config
+        from modules.config.src.utility_config_app_factory import build_app_config
 
         assert build_app_config().request_timeout == 600

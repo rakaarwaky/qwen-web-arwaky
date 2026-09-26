@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from modules.core.src.utility_core_config_factory import build_app_config
+from modules.config.src.utility_config_app_factory import build_app_config
 from modules.shared.src.contract_core_aggregate import ISetupAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
@@ -21,7 +21,7 @@ from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
 from modules.shared.src.utility_core_session_backup import take_snapshot
 
 
-class SetupOrchestrator(ISetupAggregate):
+class SetupAdapter(ISetupAggregate):
     """Orchestrates interactive manual login and CAPTCHA setup."""
 
     def __init__(
@@ -106,4 +106,4 @@ class SetupOrchestrator(ISetupAggregate):
             return False
 
 
-__all__ = ["SetupOrchestrator"]
+__all__ = ["SetupAdapter"]

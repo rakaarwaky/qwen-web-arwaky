@@ -8,12 +8,12 @@ from unittest.mock import patch
 
 import pytest
 
-from modules.core.src.agent_config_orchestrator import ConfigOrchestrator
+from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
 from modules.shared.src.taxonomy_core_vo import Mode, TimeoutSec
 
 
 def test_for_mode_passes_mode_and_paths_through() -> None:
-    with patch("modules.core.src.agent_config_orchestrator.build_app_config") as build:
+    with patch("modules.config.src.agent_config_orchestrator.build_app_config") as build:
         ConfigOrchestrator().for_mode(
             Mode("prompt-direct"),
             input_path=Path("/tmp/in.md"),
@@ -29,7 +29,7 @@ def test_for_mode_passes_mode_and_paths_through() -> None:
 
 
 def test_for_mode_uses_defaults_for_unspecified_fields() -> None:
-    with patch("modules.core.src.agent_config_orchestrator.build_app_config") as build:
+    with patch("modules.config.src.agent_config_orchestrator.build_app_config") as build:
         ConfigOrchestrator().for_mode(Mode("job"))
 
     kwargs = build.call_args.kwargs
@@ -67,7 +67,7 @@ def test_for_mode_sandbox_flag_follows_host_capability(monkeypatch: pytest.Monke
     monkeypatch.delenv("QWEN_ENABLE_SANDBOX", raising=False)
 
     with patch(
-        "modules.core.src.utility_core_config_factory.sandbox_unavailable",
+        "modules.config.src.utility_config_app_factory.sandbox_unavailable",
         return_value=True,
     ):
         cfg = ConfigOrchestrator().for_mode(Mode("prompt-direct"))
@@ -80,7 +80,7 @@ def test_for_mode_env_can_force_sandbox_on(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("QWEN_DISABLE_SANDBOX", "")
 
     with patch(
-        "modules.core.src.utility_core_config_factory.sandbox_unavailable",
+        "modules.config.src.utility_config_app_factory.sandbox_unavailable",
         return_value=True,
     ):
         cfg = ConfigOrchestrator().for_mode(Mode("prompt-direct"))

@@ -23,9 +23,9 @@ from typing import Any
 
 import pytest
 
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-from modules.core.src.capabilities_status_writer import StatusFileWriter, get_status_writer
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter, get_status_writer
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker
 from modules.shared.src.taxonomy_core_error import (
     AuthRequiredError,

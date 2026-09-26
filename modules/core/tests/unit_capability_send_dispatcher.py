@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from playwright.sync_api import Error
 
-import modules.core.src.capabilities_send_dispatcher as sd
-from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+import modules.prompt.src.capabilities_send_dispatcher as sd
+from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.shared.src import LifecycleEmitter, SendDispatchError
 from modules.shared.src.taxonomy_core_vo import ClickTimeoutMs, SenderConfig
 from modules.shared.src.utility_dom_query import count_messages, latest_message_text
@@ -116,8 +116,8 @@ class TestClickSendExtended:
         page.evaluate.side_effect = evaluate_factory
 
         with (
-            patch("modules.core.src.capabilities_send_dispatcher._is_file_card_parsing", return_value=False),
-            patch("modules.core.src.capabilities_send_dispatcher._is_parse_toast_visible", return_value=False),
+            patch("modules.prompt.src.capabilities_send_dispatcher._is_file_card_parsing", return_value=False),
+            patch("modules.prompt.src.capabilities_send_dispatcher._is_parse_toast_visible", return_value=False),
         ):
             _sender().click_send(page, emitter)
         assert emitter.emit.call_count == 2
@@ -247,9 +247,9 @@ def test_ack_observed_via_user_bubble_count():
     unchanged (assistant has not started streaming yet)."""
     page = MagicMock()
     with (
-        patch("modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1),
-        patch("modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=1),
-        patch("modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
+        patch("modules.prompt.src.capabilities_send_dispatcher.count_messages", return_value=1),
+        patch("modules.prompt.src.capabilities_send_dispatcher.count_user_messages", return_value=1),
+        patch("modules.prompt.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
     ):
         dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(50))
         assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=50, baseline_user_count=0) is True
@@ -265,9 +265,9 @@ def test_ack_not_observed_without_user_bubble_growth():
     loc.count.return_value = 0
     page.locator.return_value = loc
     with (
-        patch("modules.core.src.capabilities_send_dispatcher.count_messages", return_value=1),
-        patch("modules.core.src.capabilities_send_dispatcher.count_user_messages", return_value=0),
-        patch("modules.core.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
+        patch("modules.prompt.src.capabilities_send_dispatcher.count_messages", return_value=1),
+        patch("modules.prompt.src.capabilities_send_dispatcher.count_user_messages", return_value=0),
+        patch("modules.prompt.src.capabilities_send_dispatcher.latest_message_text", return_value=None),
     ):
         dispatcher = SendDispatcher(click_timeout_ms=ClickTimeoutMs(100))
         assert dispatcher._wait_for_dispatch_ack(page, 1, None, timeout_ms=100, baseline_user_count=0) is False

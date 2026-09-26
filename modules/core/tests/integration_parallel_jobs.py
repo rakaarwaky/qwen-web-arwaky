@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-from modules.core.src.capabilities_job_storage import JobStorage
-from modules.core.src.root_core_container import SharedContainer
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
+from modules.jobs.src.capabilities_job_storage import JobStorage
+from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_vo import (
     HeadlessFlag,
     ResponseText,

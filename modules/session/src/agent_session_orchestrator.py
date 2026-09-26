@@ -8,7 +8,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from modules.core.src.utility_core_config_factory import build_app_config
+from modules.config.src.utility_config_app_factory import build_app_config
 from modules.shared.src.contract_core_aggregate import ISessionAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,

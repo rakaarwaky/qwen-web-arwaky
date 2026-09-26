@@ -18,11 +18,11 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool
 from mcp_types._types import ServerCapabilities, ToolsCapability
 
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-from modules.core.src.capabilities_status_writer import StatusFileWriter
-from modules.core.src.root_core_container import SharedContainer
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
+from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
 from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_core_version import get_package_version

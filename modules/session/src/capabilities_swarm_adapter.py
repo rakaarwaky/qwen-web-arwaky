@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 SWARM_RESOURCE_WARNING_BROWSERS = 4
 
 
-class SwarmOrchestrator(ISwarmAggregate):
+class SwarmAdapter(ISwarmAggregate):
     """Run every discovered role template against one attachment."""
 
     def __init__(
@@ -379,4 +379,4 @@ class SwarmOrchestrator(ISwarmAggregate):
         return SwarmId(f"swarm_{timestamp}_{token}")
 
 
-__all__ = ["SwarmOrchestrator"]
+__all__ = ["SwarmAdapter"]

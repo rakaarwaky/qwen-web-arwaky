@@ -9,30 +9,30 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-from modules.core.src.capabilities_file_uploader import FileUploader
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import (
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import (
     ObservabilitySetup,
 )
-from modules.core.src.capabilities_observability_setup import (
+from modules.logging.src.capabilities_observability_setup import (
     _bind_run_context as _obs_bind,
 )
-from modules.core.src.capabilities_observability_setup import (
+from modules.logging.src.capabilities_observability_setup import (
     _clear_run_context as _obs_clear,
 )
-from modules.core.src.capabilities_observability_setup import (
+from modules.logging.src.capabilities_observability_setup import (
     _get_logger as _obs_get_logger,
 )
-from modules.core.src.capabilities_observability_setup import (
+from modules.logging.src.capabilities_observability_setup import (
     _get_tracer as _obs_get_tracer,
 )
-from modules.core.src.capabilities_observability_setup import (
+from modules.logging.src.capabilities_observability_setup import (
     _start_span as _obs_start_span,
 )
-from modules.core.src.capabilities_output_saver import Saver
-from modules.core.src.capabilities_send_dispatcher import SendDispatcher
-from modules.core.src.capabilities_status_writer import StatusFileWriter
+from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt.src.capabilities_output_saver import Saver
+from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.shared.src import AppConfig
 from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_core_validation import validate_file as _util_validate_file
@@ -146,11 +146,11 @@ def make_app_config(tmp_path: Path, **overrides) -> AppConfig:
     return AppConfig(**defaults)
 
 
-from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
 
 
-def make_test_orchestrator(**overrides) -> DirectPromptOrchestrator:
-    """Build a DirectPromptOrchestrator with all dependencies mocked."""
+def make_test_orchestrator(**overrides) -> DirectPromptAdapter:
+    """Build a DirectPromptAdapter with all dependencies mocked."""
     defaults = dict(
         browser=MagicMock(),
         injector=MagicMock(),
@@ -160,4 +160,4 @@ def make_test_orchestrator(**overrides) -> DirectPromptOrchestrator:
         observability=MagicMock(get_logger=MagicMock(return_value=MagicMock())),
     )
     defaults.update(overrides)
-    return DirectPromptOrchestrator(**defaults)  # type: ignore[arg-type]
+    return DirectPromptAdapter(**defaults)  # type: ignore[arg-type]

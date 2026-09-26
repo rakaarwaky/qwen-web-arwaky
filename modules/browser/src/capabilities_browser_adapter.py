@@ -22,6 +22,7 @@ from playwright.sync_api import (
 )
 from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
+from modules.browser.src.utility_browser_async_loop import isolate_thread_event_loop
 from modules.shared.src.contract_core_protocol import IBrowserProtocol
 from modules.shared.src.taxonomy_core_constant import (
     AUTH_KEYWORDS,
@@ -46,11 +47,10 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_NETWORK_RECONNECTING,
     EVENT_WEB_LOADED,
 )
-from modules.shared.src.utility_async_loop import isolate_thread_event_loop
-from modules.shared.src.utility_browser_binary import find_chrome_binary
 from modules.shared.src.utility_dom_helper import click_first_visible_enabled, is_any_visible
 from modules.shared.src.utility_logger_factory import get_logger
 from modules.shared.src.utility_session_cloner import create_ephemeral_session
+from modules.update.src.utility_update_browser_binary import find_chrome_binary
 
 log = get_logger("browser")
 

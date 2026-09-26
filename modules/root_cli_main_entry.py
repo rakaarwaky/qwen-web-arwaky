@@ -32,7 +32,7 @@ from modules.cli.src import (
     surface_cli_sessions_command,
     surface_cli_update_command,
 )
-from modules.core.src.root_core_container import SharedContainer
+from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template

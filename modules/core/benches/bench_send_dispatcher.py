@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 
 
 def bench_count_messages(iterations: int = 1000) -> float:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Any
 
-from modules.core.src.capabilities_session_manager import SessionManager
+from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.taxonomy_session_vo import SessionStatus
 
 if TYPE_CHECKING:
@@ -173,7 +173,7 @@ def cmd_health_check(manager: SessionManager) -> int:
     """Health check all sessions using real ping test."""
     import asyncio
 
-    from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
+    from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
     from modules.shared.src.taxonomy_session_vo import SessionInfo
 
     sessions = manager.list_sessions()

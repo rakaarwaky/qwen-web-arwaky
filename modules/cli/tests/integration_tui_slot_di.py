@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
-from modules.core.src.root_core_container import SharedContainer
+from modules.root_core_container import SharedContainer
 from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol
 
 

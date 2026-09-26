@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from modules.core.src.capabilities_stream_monitor import validate_response_content
+from modules.prompt.src.capabilities_stream_monitor import validate_response_content
 from modules.shared.src import (
     AuthRequiredError,
     CircuitBreaker,

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.core.src.agent_job_orchestrator import AgentJobOrchestrator
-from modules.core.src.capabilities_job_storage import JobStorage
+from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
+from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,

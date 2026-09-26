@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
@@ -148,7 +148,7 @@ def test_navigate_to_chat_reports_fallback_model_on_event():
 
 
 def test_select_first_available_model_returns_none_when_picker_closed():
-    from modules.core.src.capabilities_browser_adapter import BrowserAdapter as Adapter
+    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter as Adapter
 
     mock_page = MagicMock()
     mock_page.locator.return_value.first.is_visible.return_value = False

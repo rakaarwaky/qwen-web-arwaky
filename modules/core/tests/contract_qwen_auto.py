@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator as CoreOrchestrator
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter as CoreOrchestrator
 from modules.shared.src import AppConfig, AuthRequiredError, PromptInjectionError, RunContext
 
 

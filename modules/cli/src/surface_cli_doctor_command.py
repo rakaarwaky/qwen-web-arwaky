@@ -126,7 +126,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     expensive ``sync_playwright`` cold-start probe runs only when
     ``QWEN_DOCTOR_DEEP=1`` so the default report stays fast.
     """
-    from modules.shared.src.utility_browser_binary import find_chrome_binary
+    from modules.update.src.utility_update_browser_binary import find_chrome_binary
 
     trusted_binary = find_chrome_binary()
     browsers_dir = get_playwright_browsers_path()

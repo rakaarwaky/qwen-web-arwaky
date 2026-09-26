@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.core.src import capabilities_send_dispatcher as sd
-from modules.core.src.capabilities_file_uploader import FileUploader
+from modules.prompt.src import capabilities_send_dispatcher as sd
+from modules.prompt.src.capabilities_file_uploader import FileUploader
 
 # ── Precise DOM mock ─────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ class TestWaitForSendEnabledHoldFlag:
     """When hold_on_card_parsing=False, the card spinner must not block the send."""
 
     def test_no_hold_when_document_parsed(self):
-        from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+        from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 
         dispatcher = SendDispatcher()
         call_log: list[bool] = []
@@ -173,7 +173,7 @@ class TestWaitForSendEnabledHoldFlag:
         assert call_log == [], f"_is_file_card_parsing called with hold=False: {call_log}"
 
     def test_hold_when_not_parsed(self):
-        from modules.core.src.capabilities_send_dispatcher import SendDispatcher
+        from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 
         dispatcher = SendDispatcher()
         call_log: list[bool] = []
@@ -205,7 +205,7 @@ class TestWaitForDomParseReadySpinnerVisibility:
         filepath.write_text("hello")
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=False, spinner_count=2)
 
-        with patch("modules.core.src.capabilities_file_uploader.time") as mod_time:
+        with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
             # Call 1 (deadline base) → 0.0; call 2 (while check) → 0.0 (< 0.001, body
             # runs); subsequent calls → 99999.0 (past deadline, loop exits if the
             # body did not return).
@@ -223,7 +223,7 @@ class TestWaitForDomParseReadySpinnerVisibility:
         filepath.write_text("hello")
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=True, spinner_count=2)
 
-        with patch("modules.core.src.capabilities_file_uploader.time") as mod_time:
+        with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
             # The loop runs one iteration: deadline = 0.0 + 0.001, while check at 0.0
             # enters the body. The visible spinner makes is_ready False, so the body
             # falls through to wait_for_timeout(300) and loops back; the third

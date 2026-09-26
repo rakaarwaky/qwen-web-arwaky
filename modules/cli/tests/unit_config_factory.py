@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.core.src.utility_core_config_factory import resolve_pipeline_output_path
+from modules.config.src.utility_config_app_factory import resolve_pipeline_output_path
 
 
 def test_directory_output_names_are_unique_across_rapid_calls(tmp_path: Path) -> None:

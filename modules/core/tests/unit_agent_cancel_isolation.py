@@ -6,22 +6,22 @@ import inspect
 import threading
 from unittest.mock import MagicMock
 
-from modules.core.src.agent_attachment_prompt_orchestrator import (
-    AttachmentPromptOrchestrator,
+from modules.prompt.src.capabilities_attachment_prompt_adapter import (
+    AttachmentPromptAdapter,
 )
-from modules.core.src.agent_prompt_file_orchestrator import (
-    PromptFileOrchestrator,
+from modules.prompt.src.capabilities_prompt_file_adapter import (
+    PromptFileAdapter,
 )
-from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
+from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.shared.src.taxonomy_core_vo import RunState
 
 
-def _make_file_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> PromptFileOrchestrator:
-    return PromptFileOrchestrator(*(MagicMock() for _ in range(7)), cancel=cancel)
+def _make_file_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> PromptFileAdapter:
+    return PromptFileAdapter(*(MagicMock() for _ in range(7)), cancel=cancel)
 
 
-def _make_attachment_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> AttachmentPromptOrchestrator:
-    return AttachmentPromptOrchestrator(*(MagicMock() for _ in range(9)), cancel=cancel)
+def _make_attachment_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> AttachmentPromptAdapter:
+    return AttachmentPromptAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
 
 
 def test_file_orchestrator_cancel_only_closes_target_context() -> None:
@@ -108,9 +108,9 @@ class TestCancelContract:
         assert callable(getattr(IPromptFileAggregate, "request_cancel", None))
 
     def test_swarm_calls_request_cancel_without_getattr_hack(self) -> None:
-        from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+        from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
 
-        src = inspect.getsource(SwarmOrchestrator._request_attachment_cancel)
+        src = inspect.getsource(SwarmAdapter._request_attachment_cancel)
         # direct typed contract call (no duck-typing escape hatch)
         assert "self._attachment.request_cancel(event)" in src
         assert "callable(" not in src

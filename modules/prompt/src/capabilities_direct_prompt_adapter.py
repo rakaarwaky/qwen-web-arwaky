@@ -12,7 +12,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.core.src.utility_core_config_factory import build_app_config, resolve_pipeline_output_path
+from modules.config.src.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
 from modules.shared.src.contract_core_aggregate import IDirectPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
@@ -41,7 +41,7 @@ from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
 
 
-class DirectPromptOrchestrator(IDirectPromptAggregate):
+class DirectPromptAdapter(IDirectPromptAggregate):
     """Orchestrates direct string text prompt execution."""
 
     def __init__(
@@ -142,4 +142,4 @@ class DirectPromptOrchestrator(IDirectPromptAggregate):
         )
 
 
-__all__ = ["DirectPromptOrchestrator"]
+__all__ = ["DirectPromptAdapter"]

@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 
 from playwright.sync_api import Error
 
-from modules.core.src.agent_attachment_prompt_orchestrator import AttachmentPromptOrchestrator
-from modules.core.src.capabilities_prompt_injector import PromptInjector
-from modules.core.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
+from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
+from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.shared.src import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,
@@ -22,8 +22,8 @@ from modules.shared.src import (
 )
 
 
-def _make_attachment_orchestrator() -> AttachmentPromptOrchestrator:
-    """Build an AttachmentPromptOrchestrator with all dependencies mocked."""
+def _make_attachment_orchestrator() -> AttachmentPromptAdapter:
+    """Build an AttachmentPromptAdapter with all dependencies mocked."""
     saver = MagicMock()
 
     def write_output(path, *_args, **_kwargs):
@@ -31,7 +31,7 @@ def _make_attachment_orchestrator() -> AttachmentPromptOrchestrator:
         path.write_text("saved output", encoding="utf-8")
 
     saver.write_output.side_effect = write_output
-    return AttachmentPromptOrchestrator(
+    return AttachmentPromptAdapter(
         browser=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),

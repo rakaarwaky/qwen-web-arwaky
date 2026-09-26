@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.core.src.capabilities_output_saver import Saver
+from modules.prompt.src.capabilities_output_saver import Saver
 from modules.shared.src import RunContext, SaverConfig
 from modules.shared.src.taxonomy_core_error import OutputWriteError
 from modules.shared.src.utility_core_text import strip_ui_noise

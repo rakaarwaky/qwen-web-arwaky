@@ -1,10 +1,10 @@
-"""Unit tests for DirectPromptOrchestrator (AES405)."""
+"""Unit tests for DirectPromptAdapter (AES405)."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
 from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
@@ -16,7 +16,7 @@ from modules.shared.src.taxonomy_core_event import (
 )
 
 
-def _make_direct_orchestrator() -> tuple[DirectPromptOrchestrator, dict[str, MagicMock]]:
+def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMock]]:
     browser = MagicMock()
     injector = MagicMock()
     sender = MagicMock()
@@ -31,7 +31,7 @@ def _make_direct_orchestrator() -> tuple[DirectPromptOrchestrator, dict[str, Mag
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
 
-    orchestrator = DirectPromptOrchestrator(
+    orchestrator = DirectPromptAdapter(
         browser=browser,
         injector=injector,
         sender=sender,

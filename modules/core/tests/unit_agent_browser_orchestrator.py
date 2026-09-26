@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from playwright.sync_api import Page
 
-from modules.core.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.shared.src.taxonomy_core_vo import AppConfig
 
 
