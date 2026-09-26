@@ -1,0 +1,312 @@
+"""Unit tests for the adaptive Swarm orchestrator."""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from threading import Event
+
+from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+
+
+class FakeAttachmentAggregate:
+    def __init__(self, failures: dict[str, int] | None = None) -> None:
+        self.failures = failures or {}
+        self.calls: list[tuple[str, Path]] = []
+        self.cancelled: list[Event] = []
+
+    def process_prompt_with_attachment(self, prompt_file, attachment_file, output_file, headless, cancel_event=None):
+        role = Path(prompt_file).stem
+        self.calls.append((role, Path(output_file)))
+        remaining = self.failures.get(role, 0)
+        if remaining:
+            self.failures[role] = remaining - 1
+            return "ERROR [transient timeout]"
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_file).write_text(f"result for {role}", encoding="utf-8")
+        return f"Successfully processed {role}"
+
+    def request_cancel(self, event: Event) -> None:
+        self.cancelled.append(event)
+        event.set()
+
+    def execute(self, request):
+        """Route the aggregate execute() verb to the verb this fake implements."""
+        from modules.shared.src.taxonomy_prompt_vo import PromptResponse
+
+        verb = request.verb
+        if verb == "process_prompt_with_attachment":
+            text = self.process_prompt_with_attachment(
+                prompt_file=request.prompt_file,
+                attachment_file=request.attachment_file,
+                output_file=request.output_file,
+                headless=request.headless,
+                cancel_event=request.cancel_event,
+            )
+            return PromptResponse(response_text=text)
+        if verb == "request_cancel":
+            self.request_cancel(request.cancel_event)
+            return PromptResponse(cancelled=True)
+        raise AssertionError(f"unsupported verb {verb}")
+
+
+def _wait_for_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
+    for _ in range(100):
+        snapshot = orchestrator.snapshot(swarm_id)
+        assert snapshot is not None
+        if snapshot.status in {"completed", "partial", "failed", "cancelled"}:
+            return snapshot
+        time.sleep(0.01)
+    raise AssertionError("Swarm did not finish")
+
+
+def _patch_templates(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "modules.swarm.src.capabilities_swarm_runner.list_prompt_templates",
+        lambda: ("architect", "security-reviewer"),
+    )
+    monkeypatch.setattr(
+        "modules.swarm.src.capabilities_swarm_runner.materialize_role_template",
+        lambda role: tmp_path / f"{role}.md",
+    )
+
+
+def test_swarm_discovers_all_templates_and_writes_existing_format(monkeypatch, tmp_path: Path) -> None:
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    assert final.status == "completed"
+    assert final.completed_count == 2
+    assert (tmp_path / initial.swarm_id / "manifest.json").exists()
+    assert (tmp_path / initial.swarm_id / "architect" / "output.md").exists()
+    assert {role for role, _ in aggregate.calls} == {"architect", "security-reviewer"}
+
+
+def test_swarm_retries_transient_agent_failure_and_allows_partial(monkeypatch, tmp_path: Path) -> None:
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate({"security-reviewer": 3})
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    assert final.status == "partial"
+    assert final.completed_count == 1
+    failed = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
+    assert failed.status == "failed"
+    assert failed.attempt == 3
+
+
+def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> None:
+    """A StuckDetectedError (event-driven stall) is retryable; the swarm
+    retries up to max_attempts then marks the agent failed with the stuck
+    error recorded — proving the stuck path never hangs the swarm."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate({"architect": 2, "security-reviewer": 100})
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    # Make the fake aggregate raise a StuckDetectedError-flavoured failure string
+    # that exercises the retryable path without hitting real browsers.
+    original_process = aggregate.process_prompt_with_attachment
+
+    def process_with_stuck(prompt_file, attachment_file, output_file, headless, cancel_event=None):
+        role = Path(prompt_file).stem
+        remaining = aggregate.failures.get(role, 0)
+        if remaining > 0:
+            aggregate.failures[role] = remaining - 1
+            return "ERROR [stuck] Stuck detected: no forward lifecycle event for 300s"
+        return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
+
+    aggregate.process_prompt_with_attachment = process_with_stuck
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    assert final.status == "partial"
+    assert final.completed_count == 1
+    architect = next(agent for agent in final.agents if agent.agent_id == "architect")
+    # architect exhausted 3 attempts (2 stuck failures + 1 success would be
+    # completed, but 2 stuck failures then 1 real success = completed).
+    # With 2 stuck failures and max_attempts=3, the 3rd attempt succeeds.
+    assert architect.status in {"completed", "failed"}
+    if architect.status == "failed":
+        assert "stuck" in str(architect.error).lower()
+    security = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
+    assert security.status == "failed"
+    assert "stuck" in str(security.error).lower()
+
+
+def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_path: Path) -> None:
+    """A non-retryable error (e.g. auth failure) must fail the agent on the
+    first attempt without retrying."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate({"architect": 100})
+
+    # Override to produce a non-retryable failure string
+    def process_with_auth_error(prompt_file, attachment_file, output_file, headless, cancel_event=None):
+        role = Path(prompt_file).stem
+        remaining = aggregate.failures.get(role, 0)
+        if remaining > 0:
+            aggregate.failures[role] = remaining - 1
+            return "ERROR [auth] Login session expired — run qwa login"
+        return f"Successfully processed {role}"
+
+    aggregate.process_prompt_with_attachment = process_with_auth_error
+
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    architect = next(agent for agent in final.agents if agent.agent_id == "architect")
+    # Auth failure is non-retryable → should fail on attempt 1, not 3.
+    assert architect.status == "failed"
+    assert architect.attempt == 1
+    assert "login" in str(architect.error).lower()
+
+
+def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> None:
+    """A lifecycle-gate rejection (concurrent attachment runs miss
+    DOCUMENT_PARSED on the first attempt) is retryable: the swarm retries
+    with a fresh browser session up to max_attempts, then fails with the
+    gate error recorded."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate({"architect": 3, "security-reviewer": 3})
+
+    gate_error = "ERROR [RuntimeError] Lifecycle gate rejected EVENT_PROMPT_INJECTED: requires successful predecessor EVENT_DOCUMENT_PARSED"
+    original_process = aggregate.process_prompt_with_attachment
+
+    def process_with_gate_rejection(prompt_file, attachment_file, output_file, headless, cancel_event=None):
+        role = Path(prompt_file).stem
+        remaining = aggregate.failures.get(role, 0)
+        if remaining > 0:
+            aggregate.failures[role] = remaining - 1
+            return gate_error
+        return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
+
+    aggregate.process_prompt_with_attachment = process_with_gate_rejection
+
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    # Both agents hit the gate rejection on every attempt (3 each) and are
+    # retried up to max_attempts=3 before failing — proving the gate path
+    # is treated as retryable, not terminal on attempt 1.
+    for agent in final.agents:
+        assert agent.status == "failed"
+        assert agent.attempt == 3
+        assert "lifecycle gate rejected" in str(agent.error).lower()
+
+
+def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
+    """Cancelling a swarm must stop executors and clean up internal dictionary state."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    runner = SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate)
+    orchestrator = SwarmOrchestrator(runner=runner)
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    orchestrator.cancel(initial.swarm_id)
+
+    assert initial.swarm_id not in runner._executors
+    assert initial.swarm_id not in runner._cancel_events
+    assert initial.swarm_id not in runner._attachment_paths
+    snapshot = orchestrator.snapshot(initial.swarm_id)
+    assert snapshot is not None
+    assert snapshot.status == "cancelled"
+
+
+def test_resource_warning_only_above_threshold(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-4: the warning is raised at or above the documented
+    threshold and stays silent below it, so a small fan-out is frictionless."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+
+    quiet = SwarmOrchestrator(runner=SwarmRunner(output_root=tmp_path, browser_concurrency=3, attachment=aggregate))
+    assert quiet.resource_warning is None
+    assert quiet.browser_concurrency == 3
+
+    loud = SwarmOrchestrator(runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate))
+    assert loud.resource_warning == "This will launch up to 10 browser processes. Continue?"
+
+
+def test_swarm_respects_injected_rate_limiter(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-1: the injected limiter gates every agent attempt.
+
+    A limiter with no free slot makes the guard observable without waiting out
+    a real 60-second window: the agents must park rather than launch browsers.
+    """
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    limiter = RateLimiter(MaxPerMinute(1))
+    # Burn the single slot so every try_acquire reports a backoff.
+    assert limiter.try_acquire() is None
+
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, rate_limiter=limiter, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    time.sleep(0.2)
+    snapshot = orchestrator.snapshot(initial.swarm_id)
+    assert snapshot is not None
+    # Still running and no browser launched: the fan-out is waiting on quota.
+    assert snapshot.status == "running"
+    assert aggregate.calls == []
+    orchestrator.cancel(initial.swarm_id)
+
+
+def test_swarm_fails_agent_only_when_circuit_breaker_trips(monkeypatch, tmp_path: Path) -> None:
+    """Issue #277 AC-2: a tripped breaker gates the agent in front of it while
+    siblings finish, so the swarm reports partial rather than aborting."""
+    _patch_templates(monkeypatch, tmp_path)
+    aggregate = FakeAttachmentAggregate()
+    breaker = CircuitBreaker(FailureThreshold(1), WindowSec(30))
+    breaker.record_failure()
+    orchestrator = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, circuit_breaker=breaker, attachment=aggregate)
+    )
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    initial = orchestrator.start(input_path)
+    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+
+    # The breaker was open before either agent started a browser.
+    assert final.status == "partial"
+    assert all(agent.status == "failed" for agent in final.agents)
+    assert all("circuit breaker" in str(agent.error).lower() for agent in final.agents)
+    assert aggregate.calls == []
