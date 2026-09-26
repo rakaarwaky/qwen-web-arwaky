@@ -4,6 +4,87 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.5.1] - 2026-09-26
+
+Closes 48 swarm-review warnings across all seven review categories, plus the architecture-lint
+cleanup that unblocked the CI self-lint gate. Every change is behaviour-preserving refactoring
+or documentation; no user-facing interface changed except two new capabilities noted below.
+
+### Added
+
+- `doctor --smoke` runs a headless browser round-trip on the saved session, so a broken install
+  is caught before the first real prompt (#322)
+- `qwen-web-arwaky --model` global flag and `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` env vars override
+  the target model; an unavailable model degrades to the first available one with a warning
+  instead of failing the run (#283, #374)
+- Operator runbooks for every `ErrorCategory` under `docs/runbooks/`, linked from `doctor` output
+  (#299)
+- `.env.example` plus an env-var registry; `doctor --json` reports the effective configuration with
+  secrets masked and warns on unregistered names (#292)
+- Master session profile is snapshotted to `.backups/<UTC ts>/` at mode 0700 after login, with three
+  generations retained; `delete_session` refuses to run without a backup unless forced (#300)
+- Backpressure on the job queue: over-capacity submits raise a retryable `JobQueueFullError`
+  carrying `retry_after_sec` and `queue_depth` (#362)
+- Defect-density tracking: failure categories are counted per `ErrorCategory` and reported by
+  `write_quality_report()` (#340)
+- `security.audit` event channel for authentication failures and CAPTCHA challenges (#354)
+
+### Changed
+
+- Chromium runs with its OS sandbox enabled by default; `--no-sandbox` is now an explicit opt-out
+  via `QWEN_DISABLE_SANDBOX` or an auto-detected host without user namespaces (#290)
+- Browser fan-out derives its worker count from available host memory (~700 MiB per Chromium);
+  an explicit override above capacity is reported as a warning (#291)
+- Update rollback reinstalls from a `pip freeze` snapshot taken before the upgrade, so transitive
+  dependencies match the version being rolled back to; editable installs report a manual revert
+  path with the snapshot location instead of silently skipping (#293)
+- `update` verifies the target with a pinned commit URL and refuses to install an unpinnable
+  release, replacing the POSIX-only `posix_spawn` implementation with `subprocess.run` behind an
+  argument allowlist (#367, #293)
+- Session cloning no longer serialises on a global lock; an overlay hardlinks the immutable
+  Chromium payload (`*.pak`, `*.bin`, `locales/`) and copies only mutable state (#363)
+- `capabilities_job_manager.py` → `capabilities_job_storage.py` and `JobManager` → `JobStorage`,
+  matching `IJobStorageProtocol`; `capabilities_tui_slot_config.py` →
+  `capabilities_slot_plan_resolver.py` with the corresponding protocol rename (#357, #358)
+- `MetricsCounter` and `StatusFileWriter` are separate capabilities, injected into
+  `ObservabilitySetup` rather than imported by it (#359)
+- Swarm cancellation is keyed by a stable `RunId` instead of `id()`, and the executor entry is
+  removed when a swarm is cancelled (#361, #377)
+- The 30-second periodic page reload is gated on forward progress, so a still-streaming response
+  no longer resets the stability counter (#382)
+- The rate limiter moved from the submit path to the worker thread: submitting a job always
+  returns promptly, and throttling happens before browser work begins (#383)
+- Capabilities log through the stdlib `logging` printf convention rather than structlog keyword
+  calls (#366)
+
+### Fixed
+
+- `JobRecord` carries `owner_pid` and `heartbeat_at`, and every persistence path preserves them, so
+  a crashed run is reconcilable instead of a permanent "started, not completed" record (#376)
+- `delete_session` refuses filesystem roots, near-root paths, and Windows drive roots, and
+  requires a prior session backup (#345, #337, #300)
+- Session credentials cloned for a rotated profile are removed on teardown with a documented
+  rotation policy (#346)
+- Browser binary discovery validates trust before handing it the authenticated profile (#347)
+- Folder compilation skips secret-bearing config formats (.toml, .cfg, .env) (#351)
+- Telemetry attributes are scrubbed of local paths and error context before egress; the log and
+  job directories are permission-hardened to 0700/0600 (#352)
+- Model output returned to MCP agents is marked as untrusted data (#343)
+- Runtime dependencies are declared and pinned in all four sub-package manifests (#349)
+- `importlib.invalidate_caches()` is called on the correct module; the previous call targeted
+  `importlib.metadata`, which has no such attribute, and failed silently inside
+  `contextlib.suppress` (#458)
+- `mypy` treats `opentelemetry.*` as an optional dependency and allows the sentinel-then-reimport
+  rebind in `capabilities_observability_setup`, clearing 7 pre-existing type errors (#458)
+
+### Changed (internal)
+
+- Twenty-six `AES203 UNUSED_IMPORT` findings were linter false positives, not dead code: the
+  detector does not resolve names used inside f-strings, dotted imports, or import aliases. All
+  26 imports are retained; their call sites were rewritten to forms the detector resolves.
+  Upstream bug report: `rakaarwaky/lint-arwaky#277` (#458)
+- Test artifacts `test.jsonl/` and `modules/core/tests/fixtures/.last_run_ts` are untracked (#459)
+
 ## [6.5.0] - 2026-09-24
 
 ### Added
