@@ -50,6 +50,46 @@ agresif), sehingga bebas captcha dan berhasil.
 - [ ] Re-dogfood: attachment tunggal + swarm 10-role sampai 10/10 tanpa
       bot-verification.
 
+## Terselesaikan: thinking card ter-scrape sebagai jawaban (PR #461, 2026-09-26)
+
+Run `20260926_014817_5cd3cc` menulis output 32 byte berisi hanya `Thought stopped`
+padahal Qwen masih thinking. Dua sebab, keduanya sudah diperbaiki dan diverifikasi:
+
+1. **Kartu thinking jadi "jawaban".** `JS_GET_RESPONSE_TEXT` tidak menyaring kartu
+   thinking yang render di dalam container assistant-message yang sama. Begitu fase
+   thinking selesai, `innerText` kartu itu berubah jadi status line pendek
+   (`Thought stopped`), dan monitor stabilize di atas kartu — bukan jawaban asli.
+   Perbaikan: array `THINKING_CARD_MARKERS` di dalam JS; node yang seluruh teksnya
+   persis salah satu marker di-skip, scanner lanjut ke node lebih lama.
+
+2. **Ceiling 120s memotong fase thinking yang masih hidup.** `request_timeout`
+   diperlakukan stream monitor sebagai *wall-clock ceiling* (`elapsed >= timeout_sec`),
+   bukan idle budget. Fase thinking panjang tidak emit forward event selama
+   durasinya, jadi ceiling 120s lebih dulu menembus dari stall detector 300s.
+   Perbaikan: default `request_timeout` 120 → 600s di tiga call site, plus env
+   override `QWEN_REQUEST_TIMEOUT_SEC` (nilai invalid/tidak-positif jatuh ke default).
+
+Verifikasi setelah merge — run `20260926_023444_f5705c` dengan input yang sama:
+
+| Metrik | Sebelum (1215cd3c… / 014817) | Sesudah (023444_f5705c) |
+| --- | --- | --- |
+| Hard timeout | 120s | 600s |
+| Elapsed sampai stabil | 120s (terbunuh) | 426s (selesai normal) |
+| Output | 32 byte (`Thought stopped`) | 40,718 byte (15 issue report) |
+| Stabil pada | thinking card | jawaban asli |
+
+Regression test: 6 marker-sanity + 5 env-override + 2 live-Chromium DOM
+(`TestThinkingCardIsNotAnAnswer`, `TestRequestTimeoutBudget`,
+`TestThinkingCardDomExtraction`) di `modules/core/tests/unit_capability_stream_monitor.py`.
+Total suite: 809 passed, 1 xfailed.
+
+Belum terselesaikan dari kasus ini: **thinking *detection* masih salah baca** —
+`is_thinking_active` hanya mengenali teks yang mengandung `"thinking"`, sehingga
+kartu berstatus `Thought stopped` terbaca sebagai "tidak thinking" (that's why the
+TUI showed "streaming" while Qwen was thinking). Status *display* itu belum
+diperbaiki; yang diperbaiki adalah sampling output-nya. Jika TUI masih menampilkan
+"streaming" saat model berpikir, selector thinking-card perlu diperluas.
+
 ## Catatan lingkungan
 
 - Worktree main: `/tmp/qwa-latest` (editable, v6.4.0). Worktree v6.3.0:
