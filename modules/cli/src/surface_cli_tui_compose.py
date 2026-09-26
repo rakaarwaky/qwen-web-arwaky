@@ -255,17 +255,18 @@ class _TuiComposeMixin:
         self._log_handler.setLevel(logging.INFO)
         root.addHandler(self._log_handler)
 
+        muted = THEME["muted"]
         self._log_msg(
             f"[bold {THEME['accent_fg']}]Qwen Web Automation TUI initialized with multi-slot architecture.[/]"
         )
-        self._log_msg(f"[{THEME['muted']}]Each slot runs an independent Chromium process sharing login state.[/]")
+        self._log_msg(f"[{muted}]Each slot runs an independent Chromium process sharing login state.[/]")
 
         # U5: seed per-slot log views with an empty-state hint.
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
                 log_view.auto_scroll = True
-                log_view.write(f"[{THEME['muted']}]Set a prompt file, then press Enter or RUN.[/]")
+                log_view.write(f"[{muted}]Set a prompt file, then press Enter or RUN.[/]")
 
         self._refresh_session_badge()
 

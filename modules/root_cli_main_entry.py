@@ -24,12 +24,14 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-import modules.cli.src.surface_cli_init_command as surface_cli_init_command
-import modules.cli.src.surface_cli_interactive_controller as surface_cli_interactive_controller
-import modules.cli.src.surface_cli_login_command as surface_cli_login_command
-import modules.cli.src.surface_cli_run_command as surface_cli_run_command
-import modules.cli.src.surface_cli_sessions_command as surface_cli_sessions_command
-import modules.cli.src.surface_cli_update_command as surface_cli_update_command
+from modules.cli.src import (
+    surface_cli_init_command,
+    surface_cli_interactive_controller,
+    surface_cli_login_command,
+    surface_cli_run_command,
+    surface_cli_sessions_command,
+    surface_cli_update_command,
+)
 from modules.core.src.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig

@@ -14,9 +14,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import NewType, TypeAlias
 
-from .taxonomy_core_vo import (
-    EventDetails as EventDetailsValue,
-)
+from . import taxonomy_core_vo as _vo
 from .taxonomy_core_vo import (
     EventDetailsMapping,
     EventId,
@@ -24,9 +22,9 @@ from .taxonomy_core_vo import (
     EventOrderMapping,
     EventTimestamp,
 )
-from .taxonomy_core_vo import (
-    EventOrderMap as EventOrderMapValue,
-)
+
+EventDetailsValue = _vo.EventDetails
+EventOrderMapValue = _vo.EventOrderMap
 
 EventDetails: TypeAlias = EventDetailsMapping
 EventOrderMap: TypeAlias = EventOrderMapping

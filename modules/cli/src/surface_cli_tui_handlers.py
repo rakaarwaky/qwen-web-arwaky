@@ -112,14 +112,15 @@ class _TuiHandlersMixin:
             prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
             prompt_input.value = str(role)
             self._log_msg(
-                f"[bold {THEME['bright']}]TEMPLATE:[/] Slot {slot_id} ← role '{escape(str(role))}'",
+                "[bold {}]TEMPLATE:[/] Slot {} ← role '{}'".format(THEME["bright"], slot_id, escape(str(role))),
                 slot_id,
             )
             # U8: optimistic existence hint when the picked value is a file path.
             if str(role) not in self._template_roles and not Path(str(role)).exists():
                 self._log_msg(
-                    f"[{THEME['warn']}]WARNING:[/] '{escape(str(role))}' is not a "
-                    "known role and the file does not exist.",
+                    "[{}]WARNING:[/] '{}' is not a known role and the file does not exist.".format(
+                        THEME["warn"], escape(str(role))
+                    ),
                     slot_id,
                 )
 
@@ -272,19 +273,21 @@ class _TuiHandlersMixin:
         """Open the session-setup submenu guarding the destructive login flow."""
         # U3: re-entrancy guard — one login flow at a time.
         if getattr(self, "_login_in_flight", False):
-            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Login already in progress.")
+            self._log_msg("[bold {}]WARNING:[/] Login already in progress.".format(THEME["warn"]))
             return
 
         # SA-1: wire the previously-dead SessionSetupScreen into the TUI login
         # path.  Show the session-setup submenu; "Delete Session & Login
         # Again" triggers the blocking setup_session() worker after
         # confirmation, "Back to Main Menu" dismisses the screen.
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Opening session setup menu...[/]")
+        self._log_msg("[bold {}]>>> Opening session setup menu...[/]".format(THEME["accent_fg"]))
         self.push_screen(
             SessionSetupScreen(
                 status_text=f"[bold]Session status: {self._session_badge_text()}[/]",
                 on_login=self._start_login_worker,
-                on_back=lambda: self._log_msg(f"[{THEME['muted']}]Session setup cancelled — back to main menu.[/]"),
+                on_back=lambda: self._log_msg(
+                    "[{}]Session setup cancelled — back to main menu.[/]".format(THEME["muted"])
+                ),
             )
         )
 
@@ -302,12 +305,12 @@ class _TuiHandlersMixin:
         if not confirmed:
             return
         self._login_in_flight = True
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Launching interactive session setup...[/]")
+        self._log_msg("[bold {}]>>> Launching interactive session setup...[/]".format(THEME["accent_fg"]))
         self._login_worker()
 
     def action_init_action(self) -> None:
         """U8: trigger workspace initialization on a background thread."""
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
+        self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
         self._init_worker()
 
     def _session_login_action(self) -> None:
@@ -327,12 +330,12 @@ class _TuiHandlersMixin:
         """Run the session login process."""
         if not confirmed:
             return
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Starting session login...[/]")
+        self._log_msg("[bold {}]>>> Starting session login...[/]".format(THEME["accent_fg"]))
         # This will be handled by the CLI sessions login command via subprocess
         self.notify(
             "Use 'qwen-web-arwaky sessions login --name <name>' to add a session", title="Info", severity="information"
         )
-        self._log_msg(f"[bold {THEME['accent_fg']}]>>> Initializing workspace...[/]")
+        self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
         self._init_worker()
 
     @work(thread=True)
@@ -344,13 +347,13 @@ class _TuiHandlersMixin:
             cwd = Path.cwd()
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['ok']}]INIT:[/] Workspace initialized in {escape(str(cwd))}",
+                "[bold {}]INIT:[/] Workspace initialized in {}".format(THEME["ok"], escape(str(cwd))),
             )
             self.call_from_thread(self.notify, f"Workspace initialized in {cwd}", "information", 3)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                f"[bold {THEME['err']}]INIT ERROR:[/] {escape(str(exc))}",
+                "[bold {}]INIT ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
 
     def action_request_quit(self) -> None:
@@ -366,7 +369,7 @@ class _TuiHandlersMixin:
                 self._last_esc_time = now
                 # A6: use notify for visibility regardless of active tab
                 self.notify("Press Escape again within 2s to quit", timeout=3.0)
-                self._log_msg(f"[{THEME['muted']}]Press Escape again within 2s to quit.[/]")
+                self._log_msg("[{}]Press Escape again within 2s to quit.[/]".format(THEME["muted"]))
                 return
             self.exit()
             return

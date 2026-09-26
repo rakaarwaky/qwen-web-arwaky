@@ -10,7 +10,7 @@ import time
 
 from playwright.sync_api import Error, Page
 
-from modules.core.src.utility_core_dom_helper import click_send as _dom_click_send
+from modules.core.src.utility_core_dom_helper import click_send
 from modules.core.src.utility_core_dom_query import count_messages, count_user_messages, latest_message_text
 from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import ISendProtocol
@@ -177,7 +177,7 @@ class SendDispatcher(ISendProtocol):
             baseline_user_count = count_user_messages(page)
 
             # Step 3: Trigger DOM send click
-            if not _dom_click_send(page, _config=effective_config):
+            if not click_send(page, _config=effective_config):
                 raise SendDispatchError("Unable to dispatch prompt: send button and Enter fallback both failed")
 
             page.wait_for_timeout(300)
@@ -243,7 +243,7 @@ class SendDispatcher(ISendProtocol):
         started, which matters for large attachments whose parsing makes
         the first response slow.
         """
-        from modules.core.src.utility_core_dom_query import latest_message_text as _latest_message_text
+        from modules.core.src.utility_core_dom_query import latest_message_text
 
         effective_timeout = timeout_ms if timeout_ms is not None else int(self.click_timeout_ms)
         deadline = time.monotonic() + (effective_timeout / 1000)
@@ -255,7 +255,7 @@ class SendDispatcher(ISendProtocol):
                     return True
                 if count_user_messages(page) > baseline_user_count:
                     return True
-                current_text = _latest_message_text(page)
+                current_text = latest_message_text(page)
                 if current_text is not None and str(current_text).strip() and current_text != baseline_text:
                     return True
             except (Error, TimeoutError):

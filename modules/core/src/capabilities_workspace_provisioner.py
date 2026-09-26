@@ -74,7 +74,8 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
 
             if link_path.is_symlink() or link_path.exists():
                 if link_path.is_dir() and not link_path.is_symlink():
-                    backup = dot_qwen / f"{link_name}.backup-{time.time_ns()}"
+                    ts = time.time_ns()
+                    backup = dot_qwen / f"{link_name}.backup-{ts}"
                     shutil.move(str(link_path), str(backup))
                 else:
                     link_path.unlink(missing_ok=True)

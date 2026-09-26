@@ -35,10 +35,15 @@ with suppress(ImportError):
 with suppress(ImportError):
     import structlog
 with suppress(ImportError):
-    from opentelemetry import trace as otel_trace
-    from opentelemetry.sdk.resources import Resource as OTelResource
-    from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor
+    from opentelemetry import trace
+    from opentelemetry.sdk import resources
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    otel_trace = trace
+    OTelResource = resources.Resource
+    OTelTracerProvider = TracerProvider
+    OTelBatchSpanProcessor = BatchSpanProcessor
 
 from modules.core.src.utility_core_io_writer import atomic_write_json
 from modules.core.src.utility_core_logger_factory import get_logger

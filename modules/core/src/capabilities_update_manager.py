@@ -16,15 +16,15 @@ from __future__ import annotations
 
 import contextlib
 import importlib
-import importlib.metadata
 import json
 import os
 import re
 import shutil
 import sys
-import urllib.request
+from importlib import metadata
 from pathlib import Path
 from typing import Any
+from urllib import request
 from urllib.parse import unquote, urlparse
 
 from modules.core.src.utility_core_logger_factory import get_logger
@@ -692,11 +692,11 @@ class UpdateManager(IUpdateProtocol):
                 or parsed.port not in (None, 443)
             ):
                 raise ValueError("Only HTTPS requests to api.github.com are permitted")
-            req = urllib.request.Request(
+            req = request.Request(
                 url,
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=self.http_timeout_sec) as resp:  # nosec B310 - HTTPS GitHub API only
+            with request.urlopen(req, timeout=self.http_timeout_sec) as resp:  # nosec B310 - HTTPS GitHub API only
                 payload = json.loads(resp.read().decode("utf-8"))
             return payload if isinstance(payload, dict) else None
         except Exception as exc:
@@ -735,8 +735,8 @@ class UpdateManager(IUpdateProtocol):
         """Detect a PEP 610 editable install or fallback to cwd source checkout."""
         dist = None
         try:
-            dist = importlib.metadata.distribution(self.package_name)
-        except importlib.metadata.PackageNotFoundError:
+            dist = metadata.distribution(self.package_name)
+        except metadata.PackageNotFoundError:
             dist = None
         except Exception as exc:
             log.debug("distribution_lookup_failed error=%s", exc)
