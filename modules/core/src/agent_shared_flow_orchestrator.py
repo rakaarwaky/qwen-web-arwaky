@@ -12,7 +12,6 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.core.src.utility_core_dom_query import latest_message_text
 from modules.shared.src.contract_core_aggregate import IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IInjectionProtocol,
@@ -38,6 +37,7 @@ from modules.shared.src.taxonomy_core_vo import (
     SenderConfig,
     TimeoutSec,
 )
+from modules.shared.src.utility_dom_query import latest_message_text
 
 
 class SharedFlowOrchestrator(IPromptFlowAggregate):

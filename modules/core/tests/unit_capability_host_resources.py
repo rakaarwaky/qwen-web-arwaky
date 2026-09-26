@@ -17,7 +17,7 @@ import sys
 
 import pytest
 
-from modules.core.src.utility_core_host_gate import (
+from modules.shared.src.utility_host_gate import (
     MIN_CPU_CORES,
     MIN_RAM_GB,
     insufficient_reason,

@@ -1,6 +1,6 @@
 """Async event-loop isolation utilities.
 
-Utility layer (utility_core_async_loop): stateless functions for event-loop
+Utility layer (utility_async_loop): stateless functions for event-loop
 management in worker threads that host Playwright sync APIs.
 """
 

@@ -9,7 +9,6 @@ import shutil
 from pathlib import Path
 
 from modules.core.src.utility_core_config_factory import build_app_config
-from modules.core.src.utility_core_session_guard import is_safe_session_target
 from modules.shared.src.contract_core_aggregate import ISessionAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
@@ -20,6 +19,7 @@ from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
 from modules.shared.src.utility_core_session_backup import refuse_delete_without_backup
+from modules.shared.src.utility_session_guard import is_safe_session_target
 
 
 class SessionOrchestrator(ISessionAggregate):

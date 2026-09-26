@@ -16,11 +16,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.core.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
-from modules.core.src.utility_core_dom_helper import setup_lifecycle_state
 from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS
 from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE, STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import AppConfig, MessageCount
+from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 
 
 def _make_cfg() -> AppConfig:

@@ -8,7 +8,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
@@ -17,6 +16,7 @@ from modules.shared.src.utility_folder_compiler import (
     compile_files_to_markdown,
     validate_folder_for_compile,
 )
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_folder_compiler")
 

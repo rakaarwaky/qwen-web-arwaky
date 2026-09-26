@@ -10,9 +10,6 @@ import time
 
 from playwright.sync_api import Error, Page
 
-from modules.core.src.utility_core_dom_helper import click_send
-from modules.core.src.utility_core_dom_query import count_messages, count_user_messages, latest_message_text
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import ISendProtocol
 from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
@@ -25,6 +22,9 @@ from modules.shared.src.taxonomy_core_vo import (
     SenderConfig,
     TryEnterKeyFallbackFlag,
 )
+from modules.shared.src.utility_dom_helper import click_send
+from modules.shared.src.utility_dom_query import count_messages, count_user_messages, latest_message_text
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_send_dispatcher")
 
@@ -243,7 +243,7 @@ class SendDispatcher(ISendProtocol):
         started, which matters for large attachments whose parsing makes
         the first response slow.
         """
-        from modules.core.src.utility_core_dom_query import latest_message_text
+        from modules.shared.src.utility_dom_query import latest_message_text
 
         effective_timeout = timeout_ms if timeout_ms is not None else int(self.click_timeout_ms)
         deadline = time.monotonic() + (effective_timeout / 1000)

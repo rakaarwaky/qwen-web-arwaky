@@ -10,11 +10,11 @@ from typing import Any
 
 from playwright.sync_api import Error, Page
 
-from modules.core.src.utility_core_dom_helper import first_visible_element_handle
-from modules.core.src.utility_core_logger_factory import get_logger
 from modules.shared.src.contract_core_protocol import IInjectionProtocol
 from modules.shared.src.taxonomy_core_error import ElementNotFoundError, PromptInjectionError
 from modules.shared.src.taxonomy_core_vo import DEFAULT_INJECTOR_CONFIG, InjectorConfig
+from modules.shared.src.utility_dom_helper import first_visible_element_handle
+from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_prompt_injector")
 

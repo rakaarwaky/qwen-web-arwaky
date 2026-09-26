@@ -23,7 +23,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from modules.core.src.utility_core_session_cloner import session_age_warning
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.utility_core_capacity import describe_capacity, recommended_max_workers
 from modules.shared.src.utility_core_env import (
@@ -36,6 +35,7 @@ from modules.shared.src.utility_core_env import (
 )
 from modules.shared.src.utility_core_paths import get_playwright_browsers_path
 from modules.shared.src.utility_core_session_backup import has_session_backup, snapshots_count
+from modules.shared.src.utility_session_cloner import session_age_warning
 
 if TYPE_CHECKING:
     from modules.shared.src.contract_core_aggregate import ISessionAggregate
@@ -126,7 +126,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     expensive ``sync_playwright`` cold-start probe runs only when
     ``QWEN_DOCTOR_DEEP=1`` so the default report stays fast.
     """
-    from modules.core.src.utility_core_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_browser_binary import find_chrome_binary
 
     trusted_binary = find_chrome_binary()
     browsers_dir = get_playwright_browsers_path()

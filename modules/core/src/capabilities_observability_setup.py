@@ -45,20 +45,20 @@ with suppress(ImportError):
     OTelTracerProvider = TracerProvider
     OTelBatchSpanProcessor = BatchSpanProcessor
 
-from modules.core.src.utility_core_io_writer import atomic_write_json
-from modules.core.src.utility_core_logger_factory import get_logger
-from modules.core.src.utility_telemetry_scrubber import (
-    harden_private_dir,
-    harden_private_file,
-    scrub_span_attributes,
-    scrub_telemetry_event,
-)
 from modules.shared.src import utility_core_exit
 from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
 from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
 from modules.shared.src.utility_core_status import status_path_for
+from modules.shared.src.utility_io_writer import atomic_write_json
+from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.utility_telemetry_scrubber import (
+    harden_private_dir,
+    harden_private_file,
+    scrub_span_attributes,
+    scrub_telemetry_event,
+)
 
 #: Version of the ``status.json`` document contract. Bumped when a field is
 #: added or its meaning changes, so external monitors can branch on it
