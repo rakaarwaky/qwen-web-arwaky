@@ -114,7 +114,7 @@ class SlotRunPlanResolver(ISlotRunPlanProtocol):
             prompt_path=p_path,
             file_path=f_path,
             headless=headless,
-            request_timeout=120,
+            request_timeout=600,
         )
         return SlotRunPlan(prompt_path=p_path, attachment_path=f_path, config=cfg)
 

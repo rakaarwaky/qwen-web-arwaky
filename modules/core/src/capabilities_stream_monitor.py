@@ -171,7 +171,7 @@ class StreamMonitor(IStreamProtocol):
     ) -> ResponseText | None:
         """Wait for a terminal assistant response using event-driven DOM signals.
 
-        ``timeout_sec`` is a **hard cutoff** (issue #372), matching the
+        ``timeout_sec`` is a **wall-clock ceiling** (issue #372), matching the
         MCP/CLI contract wording ("maximum seconds to wait for the assistant
         response"): when the elapsed wait exceeds it without a terminal
         generation event, a ``ResponseDetectionTimeoutError`` is raised so the
@@ -179,14 +179,21 @@ class StreamMonitor(IStreamProtocol):
         exits on a terminal generation event (stable response plus a
         completed generation state).
 
-        Failure detection is event-driven inside the budget: the monitor
+        Because the ceiling measures wall-clock time rather than idle time, a
+        long thinking phase that emits no forward event for its whole duration
+        still consumes it. The default budget is therefore sized for a heavy
+        reasoning model, and ``QWEN_REQUEST_TIMEOUT_SEC`` raises it for slower
+        hosts. Run 20260926_014817_5cd3cc was truncated this way: a 244KB
+        attachment review was cut off at 120s while Qwen was still thinking.
+
+        Failure detection inside that budget is event-driven: the monitor
         tracks the last *forward event* (thinking started, streamed text
         change, or terminal completion). When no forward event arrives within
         ``stall_timeout_sec``, a ``StuckDetectedError`` is raised so callers
-        can retry. Slow-but-alive generations keep emitting forward events
-        and are never misclassified as stuck — but they are still bounded by
-        the ``timeout_sec`` hard cutoff, and the ``safety_timeout_sec``
-        circuit breaker remains an absolute backstop for pathological cases.
+        can retry. Slow-but-alive generations keep emitting forward events and
+        are never misclassified as stuck — but they are still bounded by the
+        ``timeout_sec`` ceiling, and the ``safety_timeout_sec`` circuit breaker
+        remains an absolute backstop for pathological cases.
 
         ``cancel_event`` is an optional per-run ``threading.Event`` created by
         the calling orchestrator. When it is set, the loop raises

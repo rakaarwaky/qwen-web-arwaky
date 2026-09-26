@@ -218,6 +218,22 @@ TYPING_INDICATOR_SELECTORS: str = (
 
 JS_GET_RESPONSE_TEXT: str = r"""
 () => {
+    // Markers for a stale Qwen thinking card. The card renders inside the
+    // assistant message container and, once the thinking phase ends, leaves a
+    // bare status line such as "Thought stopped". Treating that line as the
+    // answer made the stream monitor stabilise on the card instead of the real
+    // response (run 20260926_014817_5cd3cc wrote a 32-byte output holding only
+    // "Thought stopped"). Any node whose whole text matches one of these is a
+    // stale card: skip it and keep scanning older nodes.
+    var THINKING_CARD_MARKERS = [
+        'thought stopped',
+        'thought completed',
+        'thought complete',
+        'thinking stopped',
+        'thinking completed',
+        'thinking complete',
+        'thinking process'
+    ];
     var responseNodes = document.querySelectorAll(
         '.qwen-markdown, .qwen-chat-message-assistant, .chat-response-message, .chat-message-assistant, '
         + '[data-role="assistant"], .response-message-content, .qwen-markdown-text, [class*="message-content"], '
@@ -301,6 +317,11 @@ JS_GET_RESPONSE_TEXT: str = r"""
         if (responseText === "Skip") {
             continue;
         }
+        // A stale thinking card leaves a bare status line ("Thought stopped")
+        // inside the assistant message container. Treat it as a non-answer and
+        // keep scanning older nodes for the real response.
+        var isThinkingCard = ~THINKING_CARD_MARKERS.indexOf(responseText.toLowerCase().trim());
+        if (isThinkingCard) continue;
         // Skip if text is only a pagination indicator
         if (paginationRe.test(responseText)) {
             continue;
@@ -355,6 +376,20 @@ CHALLENGE_KEYWORDS: tuple[str, ...] = (
     "finished processing before sending",
     "failed to upload",
     "something went wrong",
+)
+
+# ─── Qwen thinking-card markers ─────────────────────────────────────────────
+# Mirror of the JS THINKING_CARD_MARKERS array inside JS_GET_RESPONSE_TEXT.
+# Kept as a Python tuple so tests can assert the JS list stays in sync without
+# re-parsing the JS source.
+THINKING_CARD_TEXT_MARKERS: tuple[str, ...] = (
+    "thought stopped",
+    "thought completed",
+    "thought complete",
+    "thinking stopped",
+    "thinking completed",
+    "thinking complete",
+    "thinking process",
 )
 
 # ─── Folder compiler defaults ───────────────────────────────────────────────

@@ -544,7 +544,14 @@ class AppConfig:
     # container that cannot provide user namespaces (issue #290).
     disable_sandbox: bool = False
 
-    request_timeout: int = 120
+    # Wall-clock ceiling on the response wait, enforced by the stream monitor
+    # (``elapsed >= timeout_sec``). It is a ceiling, not an idle budget: a long
+    # thinking phase emits no forward lifecycle event for its whole duration,
+    # so a short ceiling aborts healthy runs. Run 20260926_014817_5cd3cc lost a
+    # 244KB-attachment review to a 120s ceiling while Qwen was still thinking.
+    # Override per environment with QWEN_REQUEST_TIMEOUT_SEC; the 300s stall
+    # detector handles genuinely wedged runs inside this budget.
+    request_timeout: int = 600
     poll_interval: float = 1.0
     streaming_timeout: int = 180
     inline_prompt: bool = False
