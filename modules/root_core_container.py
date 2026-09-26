@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.cli.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
 
 # Root is the composition layer, so it wires the functional doctor gate into
 # the updater: after an upgrade the pipeline re-runs the operator diagnostics
@@ -17,8 +16,9 @@ from modules.cli.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
 # doctor Surface; Capabilities only ever sees an injected callable.
 from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
-# agent_job_orchestrator
-from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
+# agent_config_orchestrator
+from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
+from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.jobs.src.capabilities_job_storage import JobStorage

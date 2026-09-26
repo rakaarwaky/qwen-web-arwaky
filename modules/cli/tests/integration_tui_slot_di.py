@@ -72,6 +72,6 @@ def test_surface_does_not_import_slot_config_capability() -> None:
     offenders = [
         path.name
         for path in src_dir.glob("surface_cli_*.py")
-        if "capabilities_slot_plan_resolver" in path.read_text(encoding="utf-8")
+        if "capabilities_config_slot_resolver" in path.read_text(encoding="utf-8")
     ]
     assert offenders == []
