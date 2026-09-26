@@ -712,14 +712,14 @@ class TestThinkingCardDomExtraction:
     when only the card is present), matching the two observed failure modes."""
 
     CARD_AND_ANSWER_HTML = (
-        "<html><body><div class=\"qwen-chat-message-assistant\" data-role=\"assistant\">"
-        "<div class=\"thinking status-card completed\">Thought stopped</div>"
-        "<div class=\"qwen-markdown\">Here is the reviewed architecture.</div>"
+        '<html><body><div class="qwen-chat-message-assistant" data-role="assistant">'
+        '<div class="thinking status-card completed">Thought stopped</div>'
+        '<div class="qwen-markdown">Here is the reviewed architecture.</div>'
         "</div></body></html>"
     )
     CARD_ONLY_HTML = (
-        "<html><body><div class=\"qwen-chat-message-assistant\" data-role=\"assistant\">"
-        "<div class=\"thinking status-card completed\">Thought stopped</div>"
+        '<html><body><div class="qwen-chat-message-assistant" data-role="assistant">'
+        '<div class="thinking status-card completed">Thought stopped</div>'
         "</div></body></html>"
     )
 
@@ -736,10 +736,7 @@ class TestThinkingCardDomExtraction:
             return result
 
     def test_card_plus_answer_returns_answer(self):
-        assert self._evaluate(JS_GET_RESPONSE_TEXT, self.CARD_AND_ANSWER_HTML) == (
-            "Here is the reviewed architecture."
-        )
+        assert self._evaluate(JS_GET_RESPONSE_TEXT, self.CARD_AND_ANSWER_HTML) == ("Here is the reviewed architecture.")
 
     def test_card_only_returns_none(self):
         assert self._evaluate(JS_GET_RESPONSE_TEXT, self.CARD_ONLY_HTML) is None
-
