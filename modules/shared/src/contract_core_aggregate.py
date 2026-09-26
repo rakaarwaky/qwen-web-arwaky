@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 
@@ -29,12 +30,17 @@ from modules.shared.src.taxonomy_core_vo import (
     JobLimit,
     JobRecord,
     MessageCount,
+    Mode,
     OutputPath,
     PromptPath,
     PromptText,
     ResponseText,
     SenderConfig,
     TimeoutSec,
+    UpdateCheckResult,
+    UpdateReport,
+    UpdateStepResult,
+    VersionString,
 )
 
 
@@ -220,12 +226,103 @@ class IJobManagerAggregate(ABC):
         """Stop accepting background work and release the job executor."""
 
 
+class IBrowserAggregate(ABC):
+    """Authenticated browser session aggregate contract.
+
+    Wraps the low-level ``IBrowserProtocol`` so consumers open an
+    authenticated chat page through one call instead of repeating the
+    launch → navigate → auth-check sequence. A session that cannot be
+    authenticated raises rather than yielding a page the caller must
+    validate, so no orchestrator skips the auth check by accident.
+    """
+
+    @abstractmethod
+    def open_session(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+        """Context manager yielding an authenticated ``chat.qwen.ai`` page.
+
+        The context owns the Chromium process group: entering launches the
+        persistent context, navigates to the chat, and proves the saved
+        session is still authenticated; exiting tears the browser down
+        even when the body raises.
+        """
+
+    @abstractmethod
+    def check_session(self, page: Page) -> bool:
+        """Return True when ``page`` already shows the authenticated chat UI."""
+
+
+class IConfigAggregate(ABC):
+    """Runtime configuration aggregate contract.
+
+    Replaces direct calls to the config-building free function. Every
+    orchestrator that needs an ``AppConfig`` receives this aggregate so
+    environment-derived decisions (sandbox probing, request-timeout
+    override) have one injection point instead of a module-level import.
+    """
+
+    @abstractmethod
+    def for_mode(
+        self,
+        mode: Mode = Mode(""),
+        *,
+        input_path: Path | None = None,
+        output_path: Path | None = None,
+        headless: bool = True,
+        session_path: Path | None = None,
+        prompt_file: Path | None = None,
+        file_path: Path | None = None,
+        model: str = "",
+        **overrides: Any,
+    ) -> AppConfig:
+        """Build an ``AppConfig`` for ``mode`` with the given overrides.
+
+        Unspecified fields fall back to the shared defaults, and
+        environment switches still win over the passed values, so callers
+        cannot bypass the sandbox or timeout policy by constructing a
+        config directly.
+        """
+
+    @abstractmethod
+    def request_timeout_sec(self) -> TimeoutSec:
+        """Return the effective response-wait ceiling in seconds."""
+
+
+class IUpdateAggregate(ABC):
+    """Self-update aggregate contract for the update command surface.
+
+    Sits between the update surface and ``IUpdateProtocol`` so the surface
+    depends on an aggregate rather than the capability protocol, keeping
+    the rollback decision (run the post-update health gate, then restore
+    the previous version when it fails) in the agent layer.
+    """
+
+    @abstractmethod
+    def check(self) -> UpdateCheckResult:
+        """Report whether a newer release is published, without mutating anything."""
+
+    @abstractmethod
+    def perform(self, *, force: bool = False) -> UpdateReport:
+        """Run the full update pipeline and return the aggregated report.
+
+        When the post-update health gate fails, the aggregate restores the
+        previous version before returning, so the report's ``rolled_back``
+        and ``rollback_status`` fields describe work the caller can trust.
+        """
+
+    @abstractmethod
+    def rollback(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
+        """Restore ``previous_version`` and return the per-step outcome."""
+
+
 __all__ = [
     "IAttachmentPromptAggregate",
+    "IBrowserAggregate",
+    "IConfigAggregate",
     "IDirectPromptAggregate",
     "IJobManagerAggregate",
     "IPromptFileAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
     "ISetupAggregate",
+    "IUpdateAggregate",
 ]
