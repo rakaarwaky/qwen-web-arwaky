@@ -695,3 +695,26 @@ class TestRequestTimeoutBudget:
 
         monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
         assert build_app_config().request_timeout == 600
+
+    def test_default_exceeds_the_measured_thinking_phase_with_margin(self):
+        """Run 20260926_023444_f5705c stabilised after 426s of real thinking
+        with a 244KB attachment — the same input that the old 120s ceiling
+        killed. The default must stay above that with room for a slower host,
+        so a future change to 120s (or 300s) fails here instead of in the field.
+        """
+        from modules.shared.src.taxonomy_core_vo import AppConfig
+
+        measured_thinking_sec = 426
+        cfg = AppConfig(input_path="/tmp/in.md", output_path="/tmp/out.md", session_path="/tmp/session")
+        assert cfg.request_timeout > measured_thinking_sec, (
+            f"ceiling {cfg.request_timeout}s does not clear the measured "
+            f"{measured_thinking_sec}s thinking phase; raise QWEN_REQUEST_TIMEOUT_SEC "
+            "or the default"
+        )
+
+    def test_measured_thinking_phase_is_not_a_duplicate_of_the_marker_default(self):
+        """Guard the 600 literal so a silent default change is visible in the
+        diff of the two tests above rather than hidden inside a range check."""
+        from modules.core.src.utility_core_config_factory import build_app_config
+
+        assert build_app_config().request_timeout == 600
