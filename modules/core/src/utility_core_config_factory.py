@@ -18,6 +18,24 @@ from modules.shared.src.taxonomy_core_vo import AppConfig
 
 _TRUE_VALUES = frozenset({"1", "true", "yes"})
 
+#: Operator override for the response-wait ceiling. The stream monitor treats
+#: ``request_timeout`` as wall-clock, so a host with slower reasoning models can
+#: raise it without a code change; unparseable or non-positive values fall back
+#: to the built-in default instead of failing the pipeline boot.
+REQUEST_TIMEOUT_ENV = "QWEN_REQUEST_TIMEOUT_SEC"
+
+
+def _resolve_request_timeout(override: int) -> int:
+    """Resolve the response-wait ceiling from the env override or the default."""
+    raw = os.environ.get(REQUEST_TIMEOUT_ENV, "").strip()
+    if not raw:
+        return override
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return override
+    return parsed if parsed > 0 else override
+
 
 def sandbox_unavailable() -> bool:
     """Return True when the Linux host cannot host Chromium's OS sandbox.
@@ -70,7 +88,7 @@ def build_app_config(
     chrome_profile: str = "qwen-cli-profile",
     storage_state_file: Path | None = None,
     disable_sandbox: bool = False,
-    request_timeout: int = 120,
+    request_timeout: int = 600,
     poll_interval: float = 1.0,
     streaming_timeout: int = 180,
     rate_limit_per_minute: int = 60,
@@ -109,7 +127,7 @@ def build_app_config(
         chrome_profile=chrome_profile,
         storage_state_file=storage_state_file,
         disable_sandbox=disable_sandbox,
-        request_timeout=request_timeout,
+        request_timeout=_resolve_request_timeout(request_timeout),
         poll_interval=poll_interval,
         streaming_timeout=streaming_timeout,
         rate_limit_per_minute=rate_limit_per_minute,

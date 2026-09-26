@@ -19,7 +19,7 @@ from modules.shared.src import (
     LifecycleEmitter,
     OutputValidationError,
 )
-from modules.shared.src.taxonomy_core_constant import JS_GET_RESPONSE_TEXT
+from modules.shared.src.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
 from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
 
 # ─── validate_response_content ──────────────────────────────────────────────
@@ -620,3 +620,78 @@ class TestSafetyTimeoutConfiguration:
         monkeypatch.delenv("QWEN_STREAM_SAFETY_TIMEOUT_SEC", raising=False)
         with pytest.raises(ValueError, match="safety_timeout_sec"):
             StreamMonitor(safety_timeout_sec=0)
+
+
+# ─── Thinking-card text must not become the assistant answer ────────────────
+
+
+class TestThinkingCardIsNotAnAnswer:
+    """Run 20260926_014817_5cd3cc wrote a 32-byte output holding only
+    "Thought stopped": Qwen's thinking card renders inside the assistant
+    message container, so the response extractor picked up the card's status
+    line and the monitor stabilised on it in 4s."""
+
+    def test_js_declares_thinking_card_markers(self):
+        assert "THINKING_CARD_MARKERS" in JS_GET_RESPONSE_TEXT
+
+    def test_js_skips_a_thinking_card_node(self):
+        assert "isThinkingCard" in JS_GET_RESPONSE_TEXT
+
+    def test_every_python_marker_appears_in_the_js(self):
+        for marker in THINKING_CARD_TEXT_MARKERS:
+            assert marker in JS_GET_RESPONSE_TEXT, marker
+
+    def test_observed_failure_string_is_a_declared_marker(self):
+        assert "thought stopped" in THINKING_CARD_TEXT_MARKERS
+
+    def test_real_response_is_not_a_marker(self):
+        for answer in (
+            "Here is the reviewed architecture for the shared module.",
+            "Thought stopped, so here is what I found instead.",
+            "Use the stop button to halt a running generation.",
+        ):
+            assert answer.strip().lower() not in THINKING_CARD_TEXT_MARKERS
+
+    def test_marker_match_is_exact_not_a_substring(self):
+        """The JS compares the whole trimmed text, so a real answer that merely
+        contains a marker phrase still returns."""
+        answer = "Thought stopped. Here is the analysis you asked for."
+        assert answer.strip().lower() not in THINKING_CARD_TEXT_MARKERS
+
+
+# ─── Response-wait ceiling ──────────────────────────────────────────────────
+
+
+class TestRequestTimeoutBudget:
+    """The ceiling is wall-clock, so a long thinking phase consumes it. The
+    default must cover a heavy reasoning model and stay operator-tunable."""
+
+    def test_default_covers_a_long_thinking_phase(self):
+        from modules.shared.src.taxonomy_core_vo import AppConfig
+
+        cfg = AppConfig(input_path="/tmp/in.md", output_path="/tmp/out.md", session_path="/tmp/session")
+        assert cfg.request_timeout >= 600, "a 120s ceiling aborts healthy thinking runs"
+
+    def test_env_override_is_honored(self, monkeypatch):
+        from modules.core.src.utility_core_config_factory import build_app_config
+
+        monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "1800")
+        assert build_app_config().request_timeout == 1800
+
+    def test_invalid_env_falls_back_to_the_default(self, monkeypatch):
+        from modules.core.src.utility_core_config_factory import build_app_config
+
+        monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "not-a-number")
+        assert build_app_config().request_timeout == 600
+
+    def test_non_positive_env_falls_back_to_the_default(self, monkeypatch):
+        from modules.core.src.utility_core_config_factory import build_app_config
+
+        monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "0")
+        assert build_app_config().request_timeout == 600
+
+    def test_absent_env_keeps_the_default(self, monkeypatch):
+        from modules.core.src.utility_core_config_factory import build_app_config
+
+        monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
+        assert build_app_config().request_timeout == 600
