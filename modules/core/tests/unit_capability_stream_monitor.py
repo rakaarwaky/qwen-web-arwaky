@@ -695,3 +695,51 @@ class TestRequestTimeoutBudget:
 
         monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
         assert build_app_config().request_timeout == 600
+
+
+# ─── Live DOM: thinking card must not be extracted as the response ─────────
+#
+# CI installs Playwright Chromium (`.github/workflows/ci.yml` —
+# `uv run python -m playwright install chromium`), so these run in the normal
+# pytest gate. They reproduce the failure DOM from run 20260926_014817_5cd3cc:
+# a "Thought stopped" card inside the same assistant container as the streamed
+# answer. Each builds its own page so it does not depend on the shared
+# ``page`` fixture's fixture HTML.
+
+
+class TestThinkingCardDomExtraction:
+    """Extractor skips the thinking card and returns the real answer (or None
+    when only the card is present), matching the two observed failure modes."""
+
+    CARD_AND_ANSWER_HTML = (
+        "<html><body><div class=\"qwen-chat-message-assistant\" data-role=\"assistant\">"
+        "<div class=\"thinking status-card completed\">Thought stopped</div>"
+        "<div class=\"qwen-markdown\">Here is the reviewed architecture.</div>"
+        "</div></body></html>"
+    )
+    CARD_ONLY_HTML = (
+        "<html><body><div class=\"qwen-chat-message-assistant\" data-role=\"assistant\">"
+        "<div class=\"thinking status-card completed\">Thought stopped</div>"
+        "</div></body></html>"
+    )
+
+    @staticmethod
+    def _evaluate(js: str, html: str) -> str | None:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.set_content(html)
+            result = page.evaluate(js)
+            browser.close()
+            return result
+
+    def test_card_plus_answer_returns_answer(self):
+        assert self._evaluate(JS_GET_RESPONSE_TEXT, self.CARD_AND_ANSWER_HTML) == (
+            "Here is the reviewed architecture."
+        )
+
+    def test_card_only_returns_none(self):
+        assert self._evaluate(JS_GET_RESPONSE_TEXT, self.CARD_ONLY_HTML) is None
+
