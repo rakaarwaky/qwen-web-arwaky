@@ -1,6 +1,6 @@
 """Logger factory utility.
 
-Utility layer (utility_core_logger_factory): provide logger retrieval without
+Utility layer (utility_logger_factory): provide logger retrieval without
 making Capabilities depend on Observability Capability.
 """
 

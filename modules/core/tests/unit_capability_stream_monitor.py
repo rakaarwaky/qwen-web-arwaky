@@ -245,7 +245,7 @@ class TestWaitForResponseEdgeCases:
         response = "A delayed response that must wait for the explicit completed signal."
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=1),
+            patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
             patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
@@ -270,7 +270,7 @@ class TestWaitForResponseEdgeCases:
         response = "A response whose text is stable while Qwen is still generating."
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=1),
+            patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
             patch(
                 "modules.core.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[None, response, response, response],
@@ -300,7 +300,7 @@ class TestWaitForResponseEdgeCases:
         msg_side_effect = [None, first_text, second_text, second_text, second_text]
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
             patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
@@ -334,7 +334,7 @@ class TestWaitForResponseEdgeCases:
         msg_side_effect = [None] + [stable_text] * 20
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
             patch("modules.core.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.core.src.capabilities_stream_monitor.time") as mock_time,
@@ -439,7 +439,7 @@ class TestPreSendBaseline:
         response = "A newly generated response that is already rendered before polling starts."
 
         with (
-            patch("modules.core.src.utility_core_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
             patch(
                 "modules.core.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[response, response, response],

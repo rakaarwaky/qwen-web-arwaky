@@ -1,6 +1,6 @@
 """Chrome binary discovery utilities.
 
-Utility layer (utility_core_browser_binary): stateless functions for locating
+Utility layer (utility_browser_binary): stateless functions for locating
 a Chromium-based browser binary on the host.
 
 Security (issue #347): the discovered binary is launched by Playwright together

@@ -12,10 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from modules.core.src.utility_core_io_writer import atomic_write_json, ensure_dir
 from modules.shared.src.contract_core_protocol import IStatusProtocol
 from modules.shared.src.taxonomy_core_vo import StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
+from modules.shared.src.utility_io_writer import atomic_write_json, ensure_dir
 
 #: Version of the ``status.json`` document contract. Bumped when a field is
 #: added or its meaning changes, so external monitors can branch on it

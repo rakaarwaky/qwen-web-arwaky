@@ -1,11 +1,11 @@
-"""Unit tests for utility_core_session_cloner (Method A)."""
+"""Unit tests for utility_session_cloner (Method A)."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-from modules.core.src.utility_core_session_cloner import (
+from modules.shared.src.utility_session_cloner import (
     clean_stale_locks,
     clone_session_profile,
     create_ephemeral_session,

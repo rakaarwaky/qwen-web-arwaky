@@ -20,8 +20,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.core.src.agent_session_orchestrator import SessionOrchestrator
-from modules.core.src.utility_core_session_guard import is_filesystem_root, is_safe_session_target
 from modules.shared.src.taxonomy_core_error import QwenCliError
+from modules.shared.src.utility_session_guard import is_filesystem_root, is_safe_session_target
 
 
 def _orchestrator() -> SessionOrchestrator:
@@ -73,7 +73,7 @@ def test_default_session_directory_is_allowed(tmp_path: Path) -> None:
     """The application's own session directory stays deletable."""
     fake_default = tmp_path / "share" / "qwen-web-arwaky" / "qwen_session"
     fake_default.mkdir(parents=True)
-    with patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default):
+    with patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default):
         assert is_safe_session_target(fake_default) is True
 
 
@@ -82,7 +82,7 @@ def test_child_of_default_session_is_allowed(tmp_path: Path) -> None:
     fake_default = tmp_path / "share" / "qwen_session"
     child = fake_default / "Default"
     child.mkdir(parents=True)
-    with patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default):
+    with patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default):
         assert is_safe_session_target(child) is True
 
 
@@ -203,7 +203,7 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     backups_dir = fake_default / ".backups" / "20250101T000000Z"
     backups_dir.mkdir(parents=True)
     with (
-        patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default),
+        patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
         patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
@@ -220,7 +220,7 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     # Seed a generation so the no-backup guard does not short-circuit.
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     with (
-        patch("modules.core.src.utility_core_session_guard.DEFAULT_SESSION", fake_default),
+        patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
         patch("modules.core.src.agent_session_orchestrator.build_app_config") as build,
         patch("modules.core.src.agent_session_orchestrator.shutil.rmtree", side_effect=OSError("device busy")),
     ):
