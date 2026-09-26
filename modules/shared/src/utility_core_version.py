@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import re
-from importlib import metadata
+from importlib import invalidate_caches, metadata
 from pathlib import Path
 
 PACKAGE_NAME = "qwen-web-arwaky"
@@ -31,7 +31,7 @@ def get_package_version(package_name: str = PACKAGE_NAME) -> str:
                 return match.group(1).strip()
 
     with contextlib.suppress(Exception):
-        metadata.invalidate_caches()
+        invalidate_caches()
         return metadata.version(package_name)
 
     return "0.0.0-dev"

@@ -14,18 +14,17 @@ from enum import Enum
 from types import MappingProxyType
 from typing import NewType, TypeAlias
 
+from . import taxonomy_core_vo as _vo
 from .taxonomy_core_vo import (
-    EventDetails,
     EventDetailsMapping,
     EventId,
     EventName,
-    EventOrderMap,
     EventOrderMapping,
     EventTimestamp,
 )
 
-EventDetailsValue = EventDetails
-EventOrderMapValue = EventOrderMap
+EventDetailsValue = _vo.EventDetails
+EventOrderMapValue = _vo.EventOrderMap
 
 EventDetails: TypeAlias = EventDetailsMapping
 EventOrderMap: TypeAlias = EventOrderMapping

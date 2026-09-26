@@ -94,11 +94,19 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*", "rich.*", "textual.*"]
+module = ["playwright.*", "tenacity.*", "structlog.*", "sentry_sdk.*", "mcp.*", "fastmcp.*", "rich.*", "textual.*", "opentelemetry.*", "opentelemetry.sdk.*", "opentelemetry.sdk.resources.*", "opentelemetry.sdk.trace.*", "opentelemetry.sdk.trace.export.*", "opentelemetry.exporter.otlp.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
 disallow_subclassing_any = false
 check_untyped_defs = false
+
+# Optional-dependency sentinels: these modules declare `X: Any = None` then
+# re-import X inside `with suppress(ImportError)`. The sentinel is the
+# declared type when the dependency is absent, so the re-import is a
+# deliberate rebind, not an accidental duplicate definition.
+[[tool.mypy.overrides]]
+module = ["modules.core.src.capabilities_observability_setup"]
+disable_error_code = ["no-redef"]
 
 # Relax mypy strictness for test files
 [[tool.mypy.overrides]]
