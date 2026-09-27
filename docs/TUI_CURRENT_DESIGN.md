@@ -73,35 +73,52 @@ Typography conventions:
 
 ## 3. Tab 1 — Overview (`tab-overview`)
 
-Vertical stack inside `.overview-container` (padding 1×2, scroll-y auto):
+Vertical stack inside `.overview-container` (padding 1×2×0×2). Everything
+except the log strip lives in `.overview-scroll` (height 1fr, `overflow-y:
+auto`); the log strip is pinned below the band so it stays inside the pane at
+every terminal size.
 
-1. **Metric tile strip** (`.card-inner`, `bg_raised`, bordered, height 3)
-   - `SLOTS` section-label + value `10` (metric-value).
-   - `ACTIVE` section-label + value `0` (metric-accent, cyan — live count of
-     RUNNING slots, debounced 4 refresh/sec).
-   - `DONE` section-label + value `0` (metric-value — SUCCESS+FAILED count).
-   - `SESSION` section-label + value badge (`#session-badge`), states:
+1. **Telemetry card** (`.screen-card.metric-card`, `bg_overlay`, bordered, no
+   vertical padding → 4 rows) holding two `bg_raised` tiles split by a
+   one-column gap:
+   - **Tile 1** — caption `● ACTIVE ACCOUNTS` (`#metric-active-label`) over
+     value `#metric-active` (bare RUNNING-slot count) plus the unit label
+     `Active`.
+   - **Tile 2** — caption `⊕ MODEL` (`#metric-model-label`) over
+     `#metric-model`, with the telemetry cluster (`.metric-cluster`) on the
+     value row: `SLOTS` / `#metric-slots` (10), `DONE` / `#metric-done`
+     (SUCCESS+FAILED count), `SESSION` / `#session-badge`. Badge states:
      `CHECKING…` → `VALID` (green) / `EXPIRED` (warn class) / `TIMEOUT`
      (15s timeout) / `LOGGING IN…` / `N/A`.
-2. **Label**: `Active Job Slots (1 Browser per Job)`
-3. **Cluster health bar** (`#segment-bar`, `.segment-bar`) — one
-   `Static("█", classes="segment-fill segment-idle")` per slot, rendered as a
-   single row of block glyphs. State classes per segment: `segment-idle`
-   (dim `fg_muted`), `segment-running` (accent cyan, pulses), `segment-done`
-   (`status_ok`), `segment-failed` (`status_err`), `segment-cancelled`
-   (`status_warn`). Compact cluster-health read taken from
-   `design/overview_engine_status`.
-4. **Slots table** (`#slots-table`, DataTable, `bg_surface`, max-height 9
-   rows so the log panel below stays visible on short terminals)
+2. **Engine card ×2** (`.screen-card.engine-card`, 7 rows each): card title
+   (`⌬ Swarm Status` / `💬 Chat Status`, carrying `#metric-swarm-label` /
+   `#metric-threads-label`) over a 3-row readout row:
+   - **Ring** (`#metric-swarm-ring` / `#metric-threads-ring`) — accent-bordered
+     box holding the `n/m` count (swarm agents / slot threads).
+   - **Detail** — `Idle` or `N Running` (`#metric-swarm-detail`); the chat card
+     adds the `Active Threads` sub-caption over `N Running · N Idle`
+     (`#metric-threads-detail`).
+   - **Uptime** (swarm card only, `#metric-swarm-uptime`) — right-aligned;
+     `Uptime Elapsed —` while idle, split onto two lines
+     (`Uptime Elapsed` / `21m 53s`) once a run is live.
+   - **Cluster bar** (`#metric-swarm-bar` / `#metric-threads-bar`) — one tinted
+     segment per slot stretched across the card, re-tinted on resize from the
+     bar's own width.
+3. **Label**: `≡ THREADS MATRIX` (`.section-label`).
+4. **Threads matrix** (`#threads-matrix`, 2-column grid, `grid-gutter: 1 1`) —
+   one cell per job slot: `#thread-state-N` (`Ready` / `Streaming` / `Done` /
+   `Failed` / `Cancelled` / `Stopping`, tinted per state) and
+   `#thread-duration-N` (elapsed, right-aligned). Cells mount once and update
+   in place.
+5. **Slots table** (`#slots-table`, DataTable) — below the matrix, reachable by
+   scrolling the band.
    - Columns: `Slot` | `Status` | `Prompt File` | `Duration`
    - One row per slot; status cell uses table format (section 8); duration
      ticks every 5s while running (`12s`, `1m 5s`).
-5. **Pane title row**: `System Event Log` + button **`📋 Copy`**
+6. **Pane title row**: `System Event Log` + button **`📋 Copy`**
    (`btn-copy-log`, 1-row height, accent text on `bg_base`).
-6. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
-   lines, bordered).
-7. **Help hint** (dim): `Press ? for keyboard shortcuts. Configure a slot
-   tab, then press Enter to run.`
+7. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
+   lines, bordered, height 4 = 2 content rows).
 
 Startup message in log: `Qwen Web Automation TUI initialized with multi-slot
 architecture.` / `Each slot runs an independent Chromium process sharing

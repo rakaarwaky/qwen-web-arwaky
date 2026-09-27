@@ -86,19 +86,29 @@ def format_event_label(event_name: str) -> str:
 # Redesign v6.5.2: thread-state labels used by the Overview Threads Matrix.
 # The mockup names each cell's state in one short word (Streaming / Ready /
 # Done / Active / Idle) rather than the pipeline event name, so the table
-# stays scannable at a glance.
+# stays scannable at a glance. The colours are hex, not Rich names: the state
+# colour reaches the screen twice — as `[on <colour>]` in the cluster bar's
+# markup and as a Rich Text style on the matrix label — and Textual only
+# accepts its own CSS color names, which have no `greyNN` entries. `grey61`
+# silently vanished there, leaving idle cells unstyled. #87929a is the
+# $status_muted token.
 _THREAD_STATE: dict[str, tuple[str, str]] = {
-    "IDLE": ("Idle", "grey61"),
-    "RUNNING": ("Active", "cyan"),
-    "SUCCESS": ("Done", "green"),
-    "FAILED": ("Failed", "red"),
-    "CANCELLED": ("Cancelled", "grey61"),
-    "CANCELLING": ("Stopping", "yellow"),
+    "IDLE": ("Ready", "#87929a"),
+    "RUNNING": ("Streaming", "#38bdf8"),
+    "SUCCESS": ("Done", "#56e5a9"),
+    "FAILED": ("Failed", "#ffb4ab"),
+    "CANCELLED": ("Cancelled", "#87929a"),
+    "CANCELLING": ("Stopping", "#c0c1ff"),
 }
 
 
 def _thread_state(status: str) -> tuple[str, str]:
-    """Return the (label, rich-style) pair an engine readout shows for *status*."""
+    """Return the (label, rich-style) pair a THREADS MATRIX cell shows for *status*.
+
+    The two headline labels mirror the mockup's sample cells ("Ready" for an
+    idle slot, "Streaming" for one that is producing output); the terminal
+    states keep the explicit wording the mockup never has to render.
+    """
     return _THREAD_STATE.get(status, _THREAD_STATE["IDLE"])
 
 
@@ -111,20 +121,35 @@ def _format_thread_duration(seconds: float) -> str:
     return f"{int(seconds // 3600)}h {int((seconds % 3600) // 60):02d}m"
 
 
-def _cluster_bar_markup(n_slots: int, stats: dict[int, dict[str, Any]]) -> str:
+def _cluster_bar_markup(n_slots: int, stats: dict[int, dict[str, Any]], width: int = 0) -> str:
     """Render the Overview cluster segment bar as Rich markup.
 
-    The mockups draw a 10-cell bar under the Swarm and Chat cards, each cell
-    tinted by that slot's state. A terminal cannot tint individual cells from a
-    single Label, so each cell is emitted as its own block glyph wrapped in the
-    status colour. The compose tree is built before any slot state exists, so
-    ``stats`` may be empty, which renders every cell as idle.
+    The mockups draw a 10-cell bar under the Swarm and Chat cards that spans
+    the whole card, each cell tinted by that slot's state. A terminal cannot
+    tint individual cells from a single Label, so each cell is emitted as a
+    run of spaces carrying the state colour as a Rich background, separated
+    by a one-column gap the way the mockup spaces its segments. *width* is the
+    bar's rendered width in columns; below 2 columns, or when the layout has
+    not measured the bar yet (compose time), the markup falls back to one
+    block glyph per slot so a first paint never renders an empty strip. The
+    compose tree is built before any slot state exists, so ``stats`` may be
+    empty, which renders every cell as idle.
     """
-    parts: list[str] = []
-    for slot in range(1, n_slots + 1):
-        status = str(stats.get(slot, {}).get("status", "IDLE"))
-        parts.append(f"[{_THREAD_STATE.get(status, _THREAD_STATE['IDLE'])[1]}]█[/]")
-    return "".join(parts)
+    colors = [
+        _THREAD_STATE.get(str(stats.get(slot, {}).get("status", "IDLE")), _THREAD_STATE["IDLE"])[1]
+        for slot in range(1, n_slots + 1)
+    ]
+    if width < 2 * n_slots:
+        return "".join(f"[{color}]█[/]" for color in colors)
+    gap = 1
+    segment = max(1, (width - gap * (n_slots - 1)) // n_slots)
+    # The remainder columns go to the trailing segments so the strip reaches
+    # the card's right edge instead of stopping a few columns short.
+    remainder = width - (segment * n_slots + gap * (n_slots - 1))
+    return (" " * gap).join(
+        f"[on {color}]{' ' * (segment + (1 if index >= n_slots - remainder else 0))}[/on]"
+        for index, color in enumerate(colors)
+    )
 
 
 def _empty_cluster_bar_markup(n_slots: int) -> str:
@@ -193,13 +218,6 @@ class _TuiUtilsMixin:
     COL_FILE = "file"
     COL_DURATION = "duration"
 
-    # THREADS MATRIX columns. The mockup's grid shows a zero-padded index, the
-    # thread's one-word state, and its elapsed time, so those are the three
-    # cells each matrix row carries.
-    COL_MTX_INDEX = "mtx-index"
-    COL_MTX_STATE = "mtx-state"
-    COL_MTX_DURATION = "mtx-duration"
-
     def _init_table(self) -> None:
         with contextlib.suppress(NoMatches):
             table = self.query_one("#slots-table", DataTable)
@@ -213,46 +231,47 @@ class _TuiUtilsMixin:
                 table.add_row(f"Slot {s}", self._format_status("IDLE", "table"), "-", "0.0s", key=f"row-slot-{s}")
 
     def _init_threads_matrix(self) -> None:
-        """Seed the Overview THREADS MATRIX with one idle cell per job slot.
+        """Seed the Overview THREADS MATRIX with one cell per job slot.
 
         The mockup draws the matrix as the Overview's main content: a
         two-column grid of numbered cells, each showing the thread's state
-        and elapsed time. Rows are keyed by slot id so _update_threads_matrix
-        writes cells in place instead of rebuilding the table, which would
-        drop the user's scroll position on every metrics tick.
+        and elapsed time. Cells mount once and carry stable ids so
+        _update_threads_matrix rewrites them in place instead of remounting,
+        which would drop the user's scroll position on every metrics tick.
         """
         with contextlib.suppress(NoMatches):
-            table = self.query_one("#threads-matrix", DataTable)
-            table.add_columns(
-                ("#", self.COL_MTX_INDEX),
-                ("Thread", self.COL_MTX_STATE),
-                ("Elapsed", self.COL_MTX_DURATION),
-            )
-            for s in range(1, self._NUM_SLOTS + 1):
-                table.add_row(
-                    f"{s:02d}",
-                    _thread_state("IDLE")[0],
-                    "0.0s",
-                    key=f"mtx-slot-{s}",
+            grid = self.query_one("#threads-matrix", Vertical)
+            grid.mount(
+                *(
+                    Horizontal(
+                        Label(f"{slot:02d}", classes="thread-chip"),
+                        Label(
+                            _thread_state("IDLE")[0],
+                            id=f"thread-state-{slot}",
+                            classes="thread-state",
+                        ),
+                        Static("", classes="thread-spacer"),
+                        Label("0.0s", id=f"thread-duration-{slot}", classes="thread-duration"),
+                        classes="thread-cell",
+                    )
+                    for slot in range(1, self._NUM_SLOTS + 1)
                 )
+            )
 
     def _update_threads_matrix(self, slot_id: int, status: str, duration: str) -> None:
-        """Write one THREADS MATRIX cell pair (state label, elapsed time).
+        """Write one THREADS MATRIX cell (state label, elapsed time).
 
         The state label is colourised by wrapping it in the Rich style the
-        mockup pairs with that state (cyan for running, green for done, grey
-        for idle), so a glance at the matrix reads the same way the mockup's
+        mockup pairs with that state (cyan for streaming, green for done, grey
+        for ready), so a glance at the matrix reads the same way the mockup's
         cells do.
         """
-        with contextlib.suppress(NoMatches, CellDoesNotExist):
-            table = self.query_one("#threads-matrix", DataTable)
+        with contextlib.suppress(NoMatches):
             state_label, state_color = _thread_state(status)
-            table.update_cell(
-                f"mtx-slot-{slot_id}",
-                self.COL_MTX_STATE,
-                Text(f"{state_label}", style=state_color),
+            self.query_one(f"#thread-state-{slot_id}", Label).update(
+                Text(state_label, style=state_color),
             )
-            table.update_cell(f"mtx-slot-{slot_id}", self.COL_MTX_DURATION, duration)
+            self.query_one(f"#thread-duration-{slot_id}", Label).update(duration)
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
         with contextlib.suppress(NoMatches, CellDoesNotExist):
@@ -337,8 +356,10 @@ class _TuiUtilsMixin:
             swarm_uptime = getattr(self, "_metric_swarm_uptime", None)
             if swarm_uptime is not None:
                 _swarm_active, _swarm_total, uptime = self._swarm_engine_state()
+                # Idle keeps the pinned single-line caption; a live run stacks
+                # the value under it the way the mockup's right-hand block does.
                 swarm_uptime.update(
-                    f"Uptime Elapsed {_format_thread_duration(uptime)}" if uptime > 0 else "Uptime Elapsed —"
+                    f"Uptime Elapsed\n{_format_thread_duration(uptime)}" if uptime > 0 else "Uptime Elapsed —"
                 )
         with contextlib.suppress(NoMatches):
             threads_detail = getattr(self, "_metric_threads_detail", None)
@@ -347,11 +368,11 @@ class _TuiUtilsMixin:
         with contextlib.suppress(NoMatches):
             swarm_bar = getattr(self, "_metric_swarm_bar", None)
             if swarm_bar is not None:
-                swarm_bar.update(_cluster_bar_markup(n_slots, stats))
+                swarm_bar.update(_cluster_bar_markup(n_slots, stats, swarm_bar.region.width))
         with contextlib.suppress(NoMatches):
             threads_bar = getattr(self, "_metric_threads_bar", None)
             if threads_bar is not None:
-                threads_bar.update(_cluster_bar_markup(n_slots, stats))
+                threads_bar.update(_cluster_bar_markup(n_slots, stats, threads_bar.region.width))
         # Per-slot state for the THREADS MATRIX — one cell per job slot.
         with contextlib.suppress(NoMatches):
             for s in range(1, n_slots + 1):

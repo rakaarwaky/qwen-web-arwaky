@@ -11,6 +11,7 @@ import contextlib
 import logging
 from typing import Any
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.css.query import NoMatches
@@ -55,6 +56,7 @@ class _TuiComposeMixin:
     _format_status: Any
     _truncate_name: Any
     _flush_metrics: Any
+    _refresh_metrics: Any
     _refresh_nav_dock: Any
 
     # ── Lifecycle ────────────────────────────────────────────────────────
@@ -88,29 +90,39 @@ class _TuiComposeMixin:
                 # tests/unit_surface_cli_tui_app.py both gate on the log
                 # staying inside the tab pane at every size.
                 with Vertical(id="overview-cards", classes="overview-scroll"):
-                    # Top telemetry banner: ACTIVE ACCOUNTS + MODEL tiles.
-                    with Vertical(classes="screen-card"), Horizontal(classes="login-metric-row"):
-                        yield Label("● ACTIVE", id="metric-active-label", classes="login-metric-label")
-                        yield Label("0", id="metric-active", classes="login-metric-value")
-                        yield Label("│", classes="metric-divider")
-                        yield Label("MODEL", id="metric-model-label", classes="login-metric-label")
-                        yield Label(DEFAULT_MODEL, id="metric-model", classes="login-metric-value")
-                        yield Label("│", classes="metric-divider")
-                        yield Label("SLOTS", id="metric-slots-label", classes="login-metric-label")
-                        yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="login-metric-value")
-                        yield Label("│", classes="metric-divider")
-                        yield Label("DONE", id="metric-done-label", classes="login-metric-label")
-                        yield Label("0", id="metric-done", classes="login-metric-value")
-                        yield Label("│", classes="metric-divider")
-                        yield Label("SESSION", id="metric-session-label", classes="login-metric-label")
-                        yield Label("CHECKING…", id="session-badge", classes="login-metric-value")
+                    # Telemetry banner: two raised tiles (ACTIVE ACCOUNTS,
+                    # MODEL) with the SLOTS / DONE / SESSION cluster tucked
+                    # into the right tile, mirroring the mockup's card.
+                    with Vertical(classes="screen-card metric-card"), Horizontal(classes="metric-tiles"):
+                        with Vertical(classes="metric-tile"):
+                            yield Label(
+                                "● ACTIVE ACCOUNTS",
+                                id="metric-active-label",
+                                classes="metric-tile-label",
+                            )
+                            with Horizontal(classes="metric-tile-value"):
+                                yield Label("0", id="metric-active", classes="metric-tile-number")
+                                yield Label("Active", classes="metric-tile-unit")
+                        with Horizontal(classes="metric-tile metric-tile-model"):
+                            with Vertical(classes="metric-tile-body"):
+                                yield Label("⊕ MODEL", id="metric-model-label", classes="metric-tile-label")
+                                yield Label(DEFAULT_MODEL, id="metric-model", classes="metric-tile-number")
+                            with Horizontal(classes="metric-cluster"):
+                                yield Label("SLOTS", id="metric-slots-label", classes="cluster-key")
+                                yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="cluster-val")
+                                yield Label("DONE", id="metric-done-label", classes="cluster-key")
+                                yield Label("0", id="metric-done", classes="cluster-val")
+                                yield Label("SESSION", id="metric-session-label", classes="cluster-key")
+                                yield Label("CHECKING…", id="session-badge", classes="cluster-badge")
 
-                    # Swarm Status card: ring, name, detail, uptime.
-                    with Vertical(classes="screen-card"):
+                    # Swarm Status card: title chip, ring gauge, state readout,
+                    # trailing uptime, and the full-width cluster bar.
+                    with Vertical(classes="screen-card engine-card"):
+                        yield Label("⌬ Swarm Status", id="metric-swarm-label", classes="card-title")
                         with Horizontal(classes="engine-readout"):
                             yield Label("0/0", id="metric-swarm-ring", classes="engine-ring")
-                            yield Label("SWARM", id="metric-swarm-label", classes="engine-name")
                             yield Label("Idle", id="metric-swarm-detail", classes="engine-detail")
+                            yield Static("", classes="engine-spacer")
                             yield Label(
                                 "Uptime Elapsed —",
                                 id="metric-swarm-uptime",
@@ -123,16 +135,18 @@ class _TuiComposeMixin:
                             markup=True,
                         )
 
-                    # Chat / Threads Status card: ring, name, running/idle split.
-                    with Vertical(classes="screen-card"):
+                    # Chat / Threads Status card: title, ring, running split.
+                    with Vertical(classes="screen-card engine-card"):
+                        yield Label("💬 Chat Status", id="metric-threads-label", classes="card-title")
                         with Horizontal(classes="engine-readout"):
                             yield Label("0/0", id="metric-threads-ring", classes="engine-ring")
-                            yield Label("THREADS", id="metric-threads-label", classes="engine-name")
-                            yield Label(
-                                "0 Running · 0 Idle",
-                                id="metric-threads-detail",
-                                classes="engine-detail",
-                            )
+                            with Vertical(classes="engine-body"):
+                                yield Label("Active Threads", classes="engine-sub")
+                                yield Label(
+                                    "0 Running · 0 Idle",
+                                    id="metric-threads-detail",
+                                    classes="engine-detail",
+                                )
                         yield Label(
                             _empty_cluster_bar_markup(self._NUM_SLOTS),
                             id="metric-threads-bar",
@@ -140,9 +154,9 @@ class _TuiComposeMixin:
                             markup=True,
                         )
 
-                    # THREADS MATRIX.
-                    yield Label("THREADS MATRIX", id="threads-matrix-label", classes="section-label")
-                    yield DataTable(id="threads-matrix")
+                    # THREADS MATRIX: the mockup's two-column cell grid.
+                    yield Label("≡ THREADS MATRIX", id="threads-matrix-label", classes="section-label")
+                    yield Vertical(id="threads-matrix", classes="threads-grid")
 
                     # Job slot table: per-slot prompt file and exact status.
                     yield DataTable(id="slots-table")
@@ -158,10 +172,6 @@ class _TuiComposeMixin:
                     max_lines=2000,
                     auto_scroll=True,
                     wrap=True,
-                )
-                yield Static(
-                    "[dim]Press ? for keyboard shortcuts. Configure a slot tab, then press Enter to run.[/dim]",
-                    classes="metric-item",
                 )
 
             # ─── Screen 2: Login / Session Manager ───────────────
@@ -532,16 +542,15 @@ class _TuiComposeMixin:
                         )
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
+        # The mockup docks icon-over-label cells across the full width with no
+        # key-hint line: the icon row sits above the caption, and the active
+        # cell is marked by a cyan hairline over its top edge.
         with Horizontal(id="nav-dock", classes="nav-dock"):
-            yield Button("▦ OVERVIEW", id="nav-overview", classes="nav-item nav-active")
-            yield Button("⚿ LOGIN", id="nav-login", classes="nav-item nav-inactive")
-            yield Button("▣ CHAT", id="nav-chat", classes="nav-item nav-inactive")
-            yield Button("⚯ SWARM", id="nav-swarm", classes="nav-item nav-inactive")
-            yield Button("⚙ SETTINGS", id="nav-settings", classes="nav-item nav-inactive")
-            yield Label(
-                "alt+0 overview · alt+1..9 slot · ctrl+alt+s swarm · ctrl+comma settings · ? help",
-                classes="nav-hint",
-            )
+            yield Button("▦\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
+            yield Button("⚿\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
+            yield Button("▣\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
+            yield Button("⚯\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
+            yield Button("⚙\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""
@@ -596,6 +605,17 @@ class _TuiComposeMixin:
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
         self.set_timer(0.4, self._deferred_startup)
+
+    def on_resize(self, _event: events.Resize) -> None:
+        """Re-tint the cluster bars once the layout has measured them.
+
+        Each bar is a single Label whose segment widths come from the bar's
+        own column count, and that count only exists after the first layout
+        pass — and changes whenever the terminal is resized. The repaint is
+        routed through the debounced metrics flush, so a drag-resize repaints
+        once at the end instead of on every column.
+        """
+        self._refresh_metrics()
 
     def _deferred_startup(self) -> None:
         """Attach log handler and write initial messages after first paint."""

@@ -140,11 +140,11 @@ Underline {
 }
 
 /* --- Bottom nav dock (redesign v6.5.2) -------------------------------- */
-/* The mockup's dock replaces the key-hint Footer: same single row at the
-   bottom of the screen, but carrying the four section names with the active
-   one underlined. dock: bottom takes it out of the flow, so it costs no
-   layout rows and the Overview keeps its table/log geometry
-   (tests/unit_tui_log_containment.py). */
+/* The mockup's dock replaces the key-hint Footer: five equal cells spread
+   across the full width, each stacking its icon above its caption, with the
+   active cell marked by a cyan hairline. dock: bottom takes the dock out of
+   the flow, so it costs no layout rows and the Overview keeps its table/log
+   geometry (tests/unit_tui_log_containment.py). */
 .nav-dock {
     layout: horizontal;
     height: 4;
@@ -155,29 +155,32 @@ Underline {
     align: center middle;
 }
 
+/* One icon-over-label cell. The top hairline is the active marker, so every
+   cell keeps a hairline of the dock colour instead of no border at all —
+   otherwise an inactive cell would have a third content row and its icon
+   would sit one row above the active cell's. The two content rows are
+   exactly the icon and the caption, with no room left for padding. */
 .nav-item {
-    min-width: 12;
+    width: 1fr;
+    min-width: 8;
     height: 3;
-    padding: 0 1;
-    background: $bg_raised;
+    padding: 0;
+    border: none;
+    border-top: solid $bg_surface;
+    background: $bg_surface;
     color: $fg_muted;
-    border: solid $border;
     text-style: bold;
+    text-align: center;
+    content-align: center middle;
 }
 
-/* Active tab: cyan hairline across its top edge and an accent label, the
-   marker the mockup draws above the current screen. */
 .nav-item.nav-active {
-    background: $bg_active;
     color: $fg_accent;
     border-top: solid $accent;
-    border-bottom: none;
 }
 
 .nav-item.nav-inactive {
-    background: $bg_raised;
     color: $fg_muted;
-    border: solid $border;
 }
 
 .nav-item.nav-active:hover {
@@ -188,14 +191,6 @@ Underline {
 .nav-item.nav-inactive:hover {
     background: $bg_hover;
     color: $fg_accent;
-}
-
-/* Trailing keyboard hint inside the dock, replacing the key list the old
-   Footer rendered. */
-.nav-hint {
-    color: $fg_muted;
-    margin-left: 2;
-    width: auto;
 }
 
 /* --- Obsidian Terminal card language ------------------------------------
@@ -256,7 +251,10 @@ Underline {
 .overview-container {
     height: 1fr;
     width: 100%;
-    padding: 1 2;
+    /* No bottom padding: the log strip sits directly above the dock's
+       hairline, which buys the scroll band the row the THREADS MATRIX needs
+       to show all five of its cell rows on a 42-row terminal. */
+    padding: 1 2 0 2;
     background: $bg_base;
 }
 
@@ -266,9 +264,11 @@ Underline {
     width: 100%;
     height: 1fr;
     overflow-y: auto;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
-
+/* Border-box height: the two border rows and the horizontal padding come out
+   of `height`, so 4 leaves two content rows — enough to keep the last event
+   visible without stealing the row the THREADS MATRIX needs above the fold. */
 #log-view-overview {
     height: 4;
     min-height: 3;
@@ -276,7 +276,7 @@ Underline {
     background: $bg_base;
     border: solid $border;
     color: $fg_primary;
-    padding: 1;
+    padding: 0 1;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -491,7 +491,7 @@ Switch.-on {
 #session-badge {
     color: $status_ok;
     text-style: bold;
-    background: $bg_raised;
+    background: $bg_base;
     padding: 0 1;
 }
 
@@ -736,9 +736,24 @@ HelpScreen {
    THREADS MATRIX below is the element that takes the free space, so a
    fractional height here would let the matrix's scrollable region starve
    the readouts to 0 on a 20-row terminal. */
-.engine-card {
+/* Compound selector: .screen-card is declared later in this file, and equal
+   specificity would let its padding win. The Overview cards drop the vertical
+   padding so the mockup's title / readout / bar stack costs seven rows. */
+.screen-card.engine-card {
     height: auto;
+    padding: 0 2;
     margin-bottom: 1;
+}
+
+/* Card heading ("Swarm Status", "Chat Status") with the mockup's icon chip
+   prefix. Height 1 keeps the heading on its own row so the ring readout
+   below it starts at a predictable offset. */
+.card-title {
+    width: 100%;
+    height: 1;
+    margin-bottom: 0;
+    color: $fg_primary;
+    text-style: bold;
 }
 
 /* The overview's counter row renders a single line of labels, so it takes one
@@ -779,48 +794,88 @@ HelpScreen {
 }
 
 /* Right-aligned uptime readout pinned to the Swarm card's trailing edge,
-   mirroring the mockup's "Uptime Elapsed 21m 53s". */
+   mirroring the mockup's stacked "Uptime Elapsed / 21m 53s". The label and
+   its value share one Label; they split onto two lines only while a run is
+   live, because tests pin the idle text ("Uptime Elapsed —"). A horizontal
+   Textual container top-aligns its children (align only positions the group),
+   so every readout fills the ring's three rows and centres its own text. */
 .engine-uptime {
     color: $fg_muted;
     margin-left: 2;
+    width: auto;
+    height: 100%;
+    content-align: right middle;
 }
 
+/* Ring gauge row: the ring is a bordered 3-row box, so the row matches it
+   and every readout centres against it. */
 .engine-readout {
     layout: horizontal;
     width: 100%;
-    height: 1;
-    padding: 0 1;
+    height: 3;
     margin: 0;
     align: left middle;
 }
 
+/* Terminal ring: an arc cannot be drawn, so the gauge is a bordered box
+   holding the same n/m count the mockup puts inside its circle. The count
+   stays a single centred line, so the ring reads as a dial rather than a
+   badge. */
 .engine-ring {
     color: $accent;
     text-style: bold;
     background: $bg_raised;
+    border: solid $accent;
     padding: 0 1;
     margin-right: 2;
     min-width: 7;
     width: auto;
+    height: 3;
+    text-align: center;
+    content-align: center middle;
 }
 
-.engine-name {
-    color: $fg_primary;
-    text-style: bold;
-    margin-right: 2;
+/* Dim sub-caption the mockup prints above a readout ("Active Threads"). */
+.engine-sub {
     width: auto;
+    height: 1;
+    color: $fg_muted;
 }
 
 .engine-detail {
     color: $fg_muted;
-    width: 1fr;
+    width: auto;
+    height: 100%;
+    content-align: left middle;
 }
 
-/* Cluster bar: one character per slot, coloured by that slot's state. */
+/* Two-line caption block (sub + detail) beside the chat status ring. It
+   fills the readout so the pair hangs from the ring's top edge, which is
+   how the mockup aligns its caption against the gauge. */
+.engine-body {
+    layout: vertical;
+    width: auto;
+    height: 100%;
+    align: left middle;
+}
+
+.engine-body .engine-detail {
+    height: 1;
+}
+
+/* Fills the space between a readout and the trailing uptime block. */
+.engine-spacer {
+    width: 1fr;
+    height: 100%;
+}
+
+/* Cluster bar: one tinted segment per slot, stretched to the bar's own width
+   so the strip reaches both card edges like the mockup's segment row. */
 .cluster-bar {
     width: 100%;
     height: 1;
-    padding: 0 1;
+    margin-top: 0;
+    padding: 0;
     color: $status_muted;
 }
 
@@ -843,16 +898,60 @@ HelpScreen {
     color: $status_muted;
 }
 
-/* Threads Matrix: the mockup renders a 2-column grid of numbered cells
-   (01 Streaming 4m12s). A DataTable keeps the same information readable in a
-   fixed-width terminal while preserving its selectable rows. Height 1fr so
-   it fills the free space between the readouts card above and the two pinned
-   bands below; it scrolls when terminals are too short for every row to fit. */
+/* Threads Matrix: the mockup draws it as a two-column grid of numbered
+   cells (01 Streaming 4m12s | 02 Ready 8m45s) rather than a scrollable
+   table, so the container is a grid whose ten cells mount once and update in
+   place — remounting on a metrics tick would drop the user's scroll. It
+   sizes to its content; the free space stays below it, as in the mockup. */
 #threads-matrix {
-    height: 1fr;
-    background: $bg_surface;
-    border: solid $border;
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    /* Row and column gutters separate the cells the way the mockup spaces
+       them. Cell margins cannot do it: a grid auto-track subtracts a child's
+       margin from its height, which collapses a 1-row cell to nothing. */
+    grid-gutter: 1 1;
+    width: 100%;
+    height: auto;
     margin-bottom: 1;
+}
+
+.threads-grid {
+    background: $bg_base;
+}
+
+/* One cell: number chip, tinted state, and the elapsed time pushed to the
+   cell's trailing edge. */
+.thread-cell {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    background: $bg_raised;
+    align: left middle;
+}
+
+.thread-chip {
+    width: auto;
+    margin-right: 1;
+    padding: 0 1;
+    background: $bg_base;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.thread-state {
+    width: auto;
+}
+
+.thread-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+.thread-duration {
+    width: auto;
+    color: $fg_muted;
 }
 
 .card-caption {
@@ -925,6 +1024,102 @@ HelpScreen {
     text-style: bold;
     width: 100%;
     margin-bottom: 1;
+}
+
+/* Mockup parity: the Overview telemetry card is two raised tiles — ACTIVE
+   ACCOUNTS and MODEL — with the SLOTS / DONE / SESSION cluster tucked into
+   the right tile's trailing edge. Each tile is two content rows (caption
+   over value), and the tiles are split by a one-column gap that shows the
+   card behind them. No vertical card padding: the tiles sit edge to edge so
+   the banner stays four rows tall, as in the mockup. */
+.screen-card.metric-card {
+    padding: 0 2;
+}
+
+.metric-tiles {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    margin-bottom: 0;
+    align: left middle;
+}
+
+.metric-tile {
+    layout: vertical;
+    width: 1fr;
+    height: 2;
+    margin-right: 1;
+    padding: 0 1;
+    background: $bg_raised;
+    align: left middle;
+}
+
+.metric-tile-label {
+    width: auto;
+    height: 1;
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.metric-tile-value {
+    layout: horizontal;
+    width: auto;
+    height: 1;
+    align: left middle;
+}
+
+.metric-tile-number {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.metric-tile-unit {
+    width: auto;
+    color: $fg_muted;
+}
+
+/* The model tile is the trailing one: it holds the telemetry cluster on its
+   right edge instead of stopping at its own value, so the card reads as two
+   tiles the way the mockup does. */
+.metric-tile-model {
+    layout: horizontal;
+    margin-right: 0;
+    align: left middle;
+}
+
+.metric-tile-body {
+    layout: vertical;
+    width: 1fr;
+    height: auto;
+    align: left middle;
+}
+
+/* The trailing telemetry block. A horizontal container aligns its children as
+   one group, so the group's own top margin is what lands the block on the
+   tile's second row: its counts then sit on the same line as the tile values
+   instead of floating between the caption and the value. */
+.metric-cluster {
+    layout: horizontal;
+    width: auto;
+    height: 1;
+    margin-left: 1;
+    margin-top: 1;
+    align: left middle;
+}
+
+.cluster-key {
+    width: auto;
+    color: $fg_muted;
+    margin-right: 1;
+}
+
+.cluster-val {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+    margin-right: 2;
 }
 
 /* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). The overview strip is
