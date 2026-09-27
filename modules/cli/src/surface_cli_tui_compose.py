@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 from typing import Any
 
 from textual.app import ComposeResult
@@ -61,97 +60,92 @@ class _TuiComposeMixin:
     # ── Lifecycle ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        """Build the tabbed layout: overview, swarm, and one pane per slot."""
+        """Build the four-screen layout: Overview, Login, Chat (slots), Swarm.
+
+        A single ``TabbedContent`` carries all sections as tab panes so the
+        bottom nav dock and existing handlers/tests continue to resolve it
+        via ``query_one(TabbedContent)`` (singular, by class). The CHAT pane
+        is the current per-slot tab layout — the nav dock's Chat button
+        routes to the active slot tab.
+
+        Widget IDs from the pre-redesign tree are preserved verbatim so
+        workers, handlers, and ``tests/unit_tui_log_containment.py`` keep
+        resolving without changes.
+        """
         yield Header(show_clock=True)
         with TabbedContent(id="main-tabs"):
-            # ─── Tab 1: Overview ────────────────────────────────
+            # ─── Screen 1: Overview ──────────────────────────────
             with TabPane("Overview", id="tab-overview"), Vertical(classes="overview-container"):
-                # Redesign v6.5.2 (mockup): the Overview is a header strip, a
-                # Swarm Status card, a Chat Status card carrying the THREADS
-                # MATRIX, and a log strip. The terminal keeps the two engine
-                # cards folded into one bordered block and splits the vertical
-                # space the way the mockup does — the matrix is the content
-                # that scrolls, the log is a band pinned to the bottom:
-                #
-                #   readouts card   height auto (4 rows, never compressed)
-                #   THREADS MATRIX  height 1fr  (scrolls when short on rows)
-                #   slot table      height 3    (pinned, scrolls its rows)
-                #   log strip       height 4    (pinned, never squeezed to 0)
-                #
-                # tests/unit_tui_log_containment.py locks the last two so a
-                # table can never take the log's rows again (PR #249/#250).
-                with Vertical(id="overview-engine-card", classes="engine-card"):
-                    # Header strip: the mockup's ACTIVE ACCOUNTS and MODEL
-                    # tiles, flattened onto one row so the cards below keep
-                    # their geometry on short terminals.
-                    with Horizontal(classes="engine-header-strip"):
-                        yield Label("● ACTIVE", id="metric-active-label", classes="section-label")
-                        yield Label("0", id="metric-active", classes="metric-accent")
+                # The engine cards and the THREADS MATRIX live in their own
+                # scroll band. The System Event Log strip stays outside it so
+                # the panel keeps real estate on short terminals —
+                # tests/unit_tui_log_containment.py and
+                # tests/unit_surface_cli_tui_app.py both gate on the log
+                # staying inside the tab pane at every size.
+                with Vertical(id="overview-cards", classes="overview-scroll"):
+                    # Top telemetry banner: ACTIVE ACCOUNTS + MODEL tiles.
+                    with Vertical(classes="screen-card"), Horizontal(classes="login-metric-row"):
+                        yield Label("● ACTIVE", id="metric-active-label", classes="login-metric-label")
+                        yield Label("0", id="metric-active", classes="login-metric-value")
                         yield Label("│", classes="metric-divider")
-                        yield Label("MODEL", id="metric-model-label", classes="section-label")
-                        yield Label(DEFAULT_MODEL, id="metric-model", classes="metric-accent")
+                        yield Label("MODEL", id="metric-model-label", classes="login-metric-label")
+                        yield Label(DEFAULT_MODEL, id="metric-model", classes="login-metric-value")
                         yield Label("│", classes="metric-divider")
-                        yield Label("SLOTS", id="metric-slots-label", classes="section-label")
-                        yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="metric-value")
+                        yield Label("SLOTS", id="metric-slots-label", classes="login-metric-label")
+                        yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="login-metric-value")
                         yield Label("│", classes="metric-divider")
-                        yield Label("DONE", id="metric-done-label", classes="section-label")
-                        yield Label("0", id="metric-done", classes="metric-value")
+                        yield Label("DONE", id="metric-done-label", classes="login-metric-label")
+                        yield Label("0", id="metric-done", classes="login-metric-value")
                         yield Label("│", classes="metric-divider")
-                        yield Label("SESSION", id="metric-session-label", classes="section-label")
-                        yield Label("CHECKING…", id="session-badge", classes="metric-value")
+                        yield Label("SESSION", id="metric-session-label", classes="login-metric-label")
+                        yield Label("CHECKING…", id="session-badge", classes="login-metric-value")
 
-                    # Swarm Status card: ring, name, and the uptime readout the
-                    # mockup pins to the card's right edge.
-                    with Horizontal(classes="engine-readout"):
-                        yield Label("0/0", id="metric-swarm-ring", classes="engine-ring")
-                        yield Label("SWARM", id="metric-swarm-label", classes="engine-name")
-                        yield Label("Idle", id="metric-swarm-detail", classes="engine-detail")
-                        yield Label("Uptime —", id="metric-swarm-uptime", classes="engine-uptime")
+                    # Swarm Status card: ring, name, detail, uptime.
+                    with Vertical(classes="screen-card"):
+                        with Horizontal(classes="engine-readout"):
+                            yield Label("0/0", id="metric-swarm-ring", classes="engine-ring")
+                            yield Label("SWARM", id="metric-swarm-label", classes="engine-name")
+                            yield Label("Idle", id="metric-swarm-detail", classes="engine-detail")
+                            yield Label(
+                                "Uptime Elapsed —",
+                                id="metric-swarm-uptime",
+                                classes="engine-uptime",
+                            )
+                        yield Label(
+                            _empty_cluster_bar_markup(self._NUM_SLOTS),
+                            id="metric-swarm-bar",
+                            classes="cluster-bar",
+                            markup=True,
+                        )
 
-                    # Chat Status card: ring, name, and the running/idle split.
-                    with Horizontal(classes="engine-readout"):
-                        yield Label("0/0", id="metric-threads-ring", classes="engine-ring")
-                        yield Label("THREADS", id="metric-threads-label", classes="engine-name")
-                        yield Label("0 Running · 0 Idle", id="metric-threads-detail", classes="engine-detail")
+                    # Chat / Threads Status card: ring, name, running/idle split.
+                    with Vertical(classes="screen-card"):
+                        with Horizontal(classes="engine-readout"):
+                            yield Label("0/0", id="metric-threads-ring", classes="engine-ring")
+                            yield Label("THREADS", id="metric-threads-label", classes="engine-name")
+                            yield Label(
+                                "0 Running · 0 Idle",
+                                id="metric-threads-detail",
+                                classes="engine-detail",
+                            )
+                        yield Label(
+                            _empty_cluster_bar_markup(self._NUM_SLOTS),
+                            id="metric-threads-bar",
+                            classes="cluster-bar",
+                            markup=True,
+                        )
 
-                    # Per-card segment bars. The mockup draws one 10-cell bar
-                    # under Swarm Status and another under Chat Status; a
-                    # terminal cannot tint single cells from one Label, so
-                    # each cell is wrapped in its own Rich colour tag. The
-                    # compose tree is built before any slot state exists, so
-                    # these render all-idle and _flush_metrics() repaints them
-                    # with live state on first mount.
-                    yield Label(
-                        _empty_cluster_bar_markup(self._NUM_SLOTS),
-                        id="metric-swarm-bar",
-                        classes="cluster-bar",
-                        markup=True,
-                    )
-                    yield Label(
-                        _empty_cluster_bar_markup(self._NUM_SLOTS),
-                        id="metric-threads-bar",
-                        classes="cluster-bar",
-                        markup=True,
-                    )
-                # End .engine-card
+                    # THREADS MATRIX.
+                    yield Label("THREADS MATRIX", id="threads-matrix-label", classes="section-label")
+                    yield DataTable(id="threads-matrix")
 
-                # THREADS MATRIX: the mockup's numbered grid of thread cells
-                # (01 Streaming 4m12s), one per job slot, tinted by that
-                # slot's state. It is the Overview's main content, so it
-                # takes the free height between the readouts above and the
-                # two pinned bands below.
-                yield Label("THREADS MATRIX", id="threads-matrix-label", classes="section-label")
-                yield DataTable(id="threads-matrix")
+                    # Job slot table: per-slot prompt file and exact status.
+                    yield DataTable(id="slots-table")
 
-                # Job slot table: carries the per-slot prompt file and exact
-                # pipeline status that the matrix's one-word state does not.
-                # Its column headers name the columns, so it needs no caption
-                # row of its own.
-                yield DataTable(id="slots-table")
-
+                # System Event Log strip (pinned below the scroll band).
                 with Horizontal(classes="pane-title-compact"):
                     yield Label("System Event Log", classes="field-label")
-                    yield Button("📋 Copy", id="btn-copy-log", classes="btn-copy-log", variant="default")
+                    yield Button("Copy", id="btn-copy-log", classes="btn-copy-log", variant="default")
                 yield QwenTuiRichLog(
                     id="log-view-overview",
                     highlight=True,
@@ -160,25 +154,60 @@ class _TuiComposeMixin:
                     auto_scroll=True,
                     wrap=True,
                 )
-                # A3: help discoverability hint for first-time users
                 yield Static(
                     "[dim]Press ? for keyboard shortcuts. Configure a slot tab, then press Enter to run.[/dim]",
                     classes="metric-item",
                 )
 
-            # ─── Tab 2: Sessions ────────────────────────────────
-            with TabPane("Sessions", id="tab-sessions"), Vertical(classes="overview-container"):
-                with Horizontal(classes="card-inner"):
-                    yield Label("REGISTERED", id="session-total-label", classes="section-label")
-                    yield Label("0", id="session-total", classes="metric-value")
-                    yield Label("HEALTHY", id="session-healthy-label", classes="section-label")
-                    yield Label("0", id="session-healthy", classes="metric-ok")
-                    yield Label("LIMITED", id="session-limited-label", classes="section-label")
-                    yield Label("0", id="session-limited", classes="metric-value")
-                yield Label("Registered Sessions", classes="field-label")
-                yield DataTable(id="sessions-table")
+            # ─── Screen 2: Login / Session Manager ───────────────
+            with TabPane("Sessions", id="tab-sessions"), Vertical(classes="screen-body"):
+                # SESSION POOL STATUS card (dns icon + 3-cell grid).
+                with Vertical(classes="screen-card"):
+                    with Horizontal(classes="pane-title"):
+                        yield Label("dns SESSION POOL STATUS", id="session-pool-title", classes="field-label")
+                    with Horizontal(classes="login-metric-row"):
+                        yield Label("REGISTERED", id="session-total-label", classes="login-metric-label")
+                        yield Label("0", id="session-total", classes="login-metric-value")
+                        yield Label("HEALTHY", id="session-healthy-label", classes="login-metric-label")
+                        yield Label("0", id="session-healthy", classes="login-metric-ok")
+                        yield Label("LIMITED", id="session-limited-label", classes="login-metric-label")
+                        yield Label("0", id="session-limited", classes="login-metric-value")
+
+                # Full-width ADD ACCOUNT button.
+                yield Button(
+                    "add account",
+                    id="btn-session-add",
+                    classes="btn-primary-full",
+                )
+
+                # Hidden expandable auth panel (kept empty — SessionSetupScreen
+                # is pushed via the existing ctrl+l / login_action path).
+                auth_panel = Vertical(id="auth-panel", classes="screen-card")
+                auth_panel.display = False
+                with auth_panel:
+                    yield Label("Fast Auth Panel", classes="field-label")
+                    with Horizontal(classes="toggle-row"):
+                        yield Button("Connect", id="btn-auth-connect", variant="primary")
+                        yield Button("Cancel", id="btn-auth-cancel", classes="btn-ghost")
+
+                # Re-check Tokens row.
                 with Horizontal(classes="toggle-row"):
-                    yield Button("🔄 Refresh", id="btn-sessions-refresh", variant="default")
+                    yield Label("• •", classes="field-label")
+                    yield Button(
+                        "refresh Re-check Tokens",
+                        id="btn-sessions-refresh",
+                        classes="btn-ghost",
+                        variant="default",
+                    )
+
+                # Account cards container.
+                yield Label("Registered Sessions", classes="field-label")
+                with Vertical(id="account-cards", classes="screen-card"):
+                    yield Label("No accounts registered.", id="account-empty", classes="field-label")
+                yield DataTable(id="sessions-table")
+
+                with Horizontal(classes="toggle-row"):
+                    yield Button("🔄 Refresh", id="btn-sessions-rerefresh", variant="default")
                     yield Button("🔐 Add Session", id="btn-sessions-login", variant="primary")
                     yield Button("🏥 Health Check", id="btn-sessions-health", variant="default")
                 yield QwenTuiRichLog(
@@ -190,61 +219,10 @@ class _TuiComposeMixin:
                     wrap=True,
                 )
 
-            # ─── Tab 3: Adaptive Swarm ─────────────────────────
-            with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
-                # Redesign v6.5.2: view-toggle row + Clear, as in the mockup.
-                with Horizontal(classes="toggle-row"):
-                    yield Button("Event Log", id="btn-swarm-event", classes="toggle-active")
-                    yield Button("System Log", id="btn-swarm-system", classes="toggle-inactive")
-
-                yield Label("Attachment File or Folder", classes="section-label")
-                with Horizontal(classes="card-inner"):
-                    yield Input(
-                        value="",
-                        placeholder="path/to/file or folder",
-                        id="input-swarm-file",
-                        classes="field-input",
-                    )
-                    yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
-                with Horizontal(classes="card-inner"):
-                    swarm_env = os.environ.get("QWEN_SWARM_CONCURRENCY", "").strip()
-                    swarm_max = min(10, max(1, int(swarm_env))) if swarm_env.isdigit() and int(swarm_env) > 0 else 10
-                    yield Button("START", variant="primary", id="btn-swarm-start")
-                    yield Button("CANCEL", id="btn-swarm-cancel")
-                    yield Label(f"Adaptive templates · max {swarm_max} browsers", id="swarm-summary")
-                yield DataTable(id="swarm-table")
-                with Horizontal(classes="pane-title"):
-                    yield Label("Swarm Log", classes="field-label")
-                    yield Button("🗑 Clear", id="btn-clear-swarm-log", classes="btn-copy-log", variant="default")
-                    yield Button("📋 Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
-                # Two stacked views; only one visible at a time. The Event
-                # log holds structured slot/broadcast events; the System
-                # log holds raw adapter output. Neither is a layout peer of
-                # #log-view-swarm, so the containment tests are unaffected.
-                yield QwenTuiRichLog(
-                    id="log-view-swarm",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
-                system_log = QwenTuiRichLog(
-                    id="log-view-swarm-system",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
-                # RichLog has no `display` constructor argument in Textual
-                # 8.2.8, so the hidden state is applied post-construction.
-                system_log.display = False
-                yield system_log
-
-            # ─── Tabs 2..N: Job Slots ───────────────────────────
+            # ─── Screen 3: Chat (per-slot tabs) ──────────────────
             for s in range(1, self._NUM_SLOTS + 1):
                 with TabPane(f"Slot {s} ●", id=f"tab-slot-{s}"), Horizontal(classes="slot-container"):
+                    # LEFT PANE: configuration form (preserved from v6.5.2).
                     with ScrollableContainer(classes="left-pane"):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
@@ -256,10 +234,6 @@ class _TuiComposeMixin:
                             id=f"select-template-{s}",
                         )
 
-                        # Redesign v6.5.2: the mockup shows templates as
-                        # one-tap chips. They are shortcuts that drive the
-                        # same Select, so the dropdown and every existing
-                        # keybinding / test keep working.
                         with Horizontal(classes="toggle-row", id=f"chip-row-{s}"):
                             for title, role in self._template_options[:4]:
                                 yield Button(
@@ -272,7 +246,7 @@ class _TuiComposeMixin:
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
-                                placeholder="path/to/prompt.md or role (any .md in modules/templates/)",
+                                placeholder="path/to/prompt.md or role",
                                 id=f"input-prompt-{s}",
                                 classes="field-input",
                             )
@@ -301,22 +275,44 @@ class _TuiComposeMixin:
                         with Horizontal(classes="card-inner"):
                             with Vertical(classes="toggle-label-box"):
                                 yield Label("Headless Browser", classes="section-label")
-                                yield Label("1 independent browser in background", classes="toggle-subtext")
+                                yield Label(
+                                    "1 independent browser in background",
+                                    classes="toggle-subtext",
+                                )
                             yield Switch(value=True, id=f"switch-headless-{s}")
 
                         yield Button(
-                            f"⚡ RUN IN SLOT {s}", variant="primary", id=f"btn-run-{s}", classes="btn-slot-run"
+                            f"⚡ RUN IN SLOT {s}",
+                            variant="primary",
+                            id=f"btn-run-{s}",
+                            classes="btn-slot-run",
                         )
-                        yield Button(f"✕ Cancel Slot {s}", id=f"btn-cancel-{s}", classes="btn-slot-cancel")
-                        yield Button(f"↻ Retry Slot {s}", id=f"btn-retry-{s}", classes="btn-slot-retry")
+                        yield Button(
+                            f"✕ Cancel Slot {s}",
+                            id=f"btn-cancel-{s}",
+                            classes="btn-slot-cancel",
+                        )
+                        yield Button(
+                            f"↻ Retry Slot {s}",
+                            id=f"btn-retry-{s}",
+                            classes="btn-slot-retry",
+                        )
 
+                    # RIGHT PANE: live log view (preserved).
                     with Vertical(classes="right-pane"):
                         with Horizontal(classes="pane-title"):
                             yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
                             yield Label(
-                                self._format_status("IDLE", "badge"), id=f"status-badge-{s}", classes="status-badge"
+                                self._format_status("IDLE", "badge"),
+                                id=f"status-badge-{s}",
+                                classes="status-badge",
                             )
-                            yield Button("📋", id=f"btn-copy-log-{s}", classes="btn-copy-log", tooltip="Copy slot log")
+                            yield Button(
+                                "Copy",
+                                id=f"btn-copy-log-{s}",
+                                classes="btn-copy-log",
+                                tooltip="Copy slot log",
+                            )
                         yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")
                         yield QwenTuiRichLog(
                             id=f"log-view-{s}",
@@ -327,19 +323,102 @@ class _TuiComposeMixin:
                             wrap=True,
                         )
 
-        # Redesign v6.5.2: bottom nav dock. The mockup's dock replaces the
-        # key-hint Footer: four section names at the very bottom of the
-        # screen, the active one carrying the highlight. Key shortcuts
-        # (alt+0, ctrl+alt+s, …) still work through the Header bindings.
+            # ─── Screen 4: Swarm ─────────────────────────────────
+            with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
+                # Attachment File or Folder card.
+                with Vertical(classes="screen-card"), Horizontal(classes="swarm-file-card"):
+                    yield Label("description", id="swarm-file-icon", classes="swarm-file-icon")
+                    yield Label("No file attached", id="swarm-file-name", classes="swarm-file-name")
+                    yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
+
+                # Output Inspection header with segmented toggle.
+                with Horizontal(classes="output-inspection"):
+                    yield Label("Output Inspection", classes="card-caption")
+                    with Horizontal(classes="seg-switch"):
+                        yield Button(
+                            "Event Log",
+                            id="btn-swarm-event",
+                            classes="seg-btn seg-active",
+                        )
+                        yield Button(
+                            "System Log",
+                            id="btn-swarm-system",
+                            classes="seg-btn",
+                        )
+                    yield Label("●", id="live-beacon", classes="live-beacon")
+
+                # Event log (visible by default).
+                yield QwenTuiRichLog(
+                    id="log-view-swarm",
+                    highlight=True,
+                    markup=True,
+                    max_lines=2000,
+                    auto_scroll=True,
+                    wrap=True,
+                )
+                # System log (hidden by default).
+                system_log = QwenTuiRichLog(
+                    id="log-view-swarm-system",
+                    highlight=True,
+                    markup=True,
+                    max_lines=2000,
+                    auto_scroll=True,
+                    wrap=True,
+                )
+                system_log.display = False
+                yield system_log
+
+                # Action deck: Stop / Restart.
+                with Horizontal(classes="swarm-action-deck"):
+                    yield Button(
+                        "stop Stop",
+                        id="btn-swarm-cancel",
+                        classes="btn-stop",
+                    )
+                    yield Button(
+                        "autorenew RESTART",
+                        id="btn-swarm-start",
+                        classes="btn-restart",
+                    )
+
+                # Listener line.
+                yield Label(
+                    "> Listening on unix socket /run/qwen-swarm.sock...",
+                    id="listener-line",
+                    classes="listener-line",
+                )
+
+                # Swarm table.
+                yield DataTable(id="swarm-table")
+                with Horizontal(classes="card-inner"):
+                    yield Label("Adaptive templates · max 10 browsers", id="swarm-summary")
+
+                with Horizontal(classes="pane-title"):
+                    yield Label("Swarm Log", classes="field-label")
+                    yield Button("Clear", id="btn-clear-swarm-log", classes="btn-copy-log", variant="default")
+                    yield Button("Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
+
+                # Input field (read by _run_swarm; hidden by design — the
+                # Browse button in the swarm-file-card above drives the value).
+                swarm_input = Input(
+                    value="",
+                    placeholder="path/to/file or folder",
+                    id="input-swarm-file",
+                    classes="swarm-file-input",
+                )
+                swarm_input.display = False
+                yield swarm_input
+
+        # ─── Bottom Nav Dock ───────────────────────────────────────────────
         with Horizontal(id="nav-dock", classes="nav-dock"):
             yield Button("▦ OVERVIEW", id="nav-overview", classes="nav-item nav-active")
             yield Button("⚿ LOGIN", id="nav-login", classes="nav-item nav-inactive")
             yield Button("▣ CHAT", id="nav-chat", classes="nav-item nav-inactive")
             yield Button("⚯ SWARM", id="nav-swarm", classes="nav-item nav-inactive")
-            # The mockup's dock carries the section names only. The keys the
-            # old Footer listed stay reachable in two ways: the Help overlay
-            # on `?`, and a trailing hint on the dock itself.
-            yield Label("alt+0 overview · alt+1..9 slot · ctrl+alt+s swarm · ? help", classes="nav-hint")
+            yield Label(
+                "alt+0 overview · alt+1..9 slot · ctrl+alt+s swarm · ? help",
+                classes="nav-hint",
+            )
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""

@@ -232,7 +232,15 @@ Underline {
     width: 100%;
     padding: 1 2;
     background: $bg_base;
+}
+
+/* The engine cards + THREADS MATRIX live in this scroll band so the log
+   strip below the band stays inside the tab pane at every terminal size. */
+.overview-scroll {
+    width: 100%;
+    height: 1fr;
     overflow-y: auto;
+    margin-bottom: 1;
 }
 
 #log-view-overview {
@@ -846,6 +854,442 @@ HelpScreen {
 .btn-sessions-login:hover {
     background: $bg_base;
     color: $accent;
+}
+
+/* ═══ Mockup parity: LOGIN (session pool) ═══════════════════════════════ */
+/* The mockup's SESSION POOL STATUS card holds three equal metric tiles and a
+   full-width primary action, then one card per registered account. */
+
+.screen-body {
+    height: 1fr;
+    width: 100%;
+    padding: 1 2;
+    background: $bg_base;
+    overflow-y: auto;
+}
+
+.screen-card {
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+.screen-card-title {
+    color: $fg_muted;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). */
+.login-metric-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+}
+
+.login-metric-cell {
+    width: 1fr;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+}
+
+.login-metric-label {
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.login-metric-value {
+    color: $fg_accent;
+    text-style: bold;
+}
+
+/* Full-width primary call-to-action ("ADD ACCOUNT"). */
+.btn-primary-full {
+    width: 100%;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+.btn-primary-full:hover {
+    background: $bg_base;
+    color: $accent;
+}
+
+.btn-ghost {
+    width: auto;
+    height: 1;
+    background: $bg_base;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.btn-ghost:hover {
+    color: $fg_accent;
+}
+
+/* One account row: avatar, email, status dot, and the two action buttons. */
+.account-card {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.account-avatar {
+    width: 3;
+    height: 3;
+    content-align: center middle;
+    background: $bg_active;
+    color: $fg_accent;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.account-email {
+    width: 1fr;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.account-status {
+    width: auto;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.account-status.state-active {
+    color: $status_ok;
+}
+
+.account-status.state-limited {
+    color: $status_err;
+}
+
+.account-btn {
+    width: 4;
+    min-width: 4;
+    height: 3;
+    border: solid $border;
+    background: $bg_hover;
+    text-style: bold;
+}
+
+.account-btn-test {
+    color: $accent;
+}
+
+.account-btn-disconnect {
+    color: $status_err;
+}
+
+.account-btn:hover {
+    background: $bg_active;
+}
+
+/* ═══ Mockup parity: CHAT (slot console) ═══════════════════════════════ */
+
+/* Horizontal slot picker: one pill per job slot, active one filled. */
+.slot-carousel {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_surface;
+    border: solid $border;
+    padding: 0 1;
+    margin-bottom: 1;
+    overflow-x: auto;
+}
+
+.slot-chip {
+    width: auto;
+    min-width: 11;
+    height: 3;
+    margin-right: 1;
+    background: $bg_raised;
+    color: $fg_muted;
+    border: solid $border;
+    padding: 0 1;
+}
+
+.slot-chip.slot-chip-active {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* Telemetry header: segmented Event/System log switch plus the live beacon. */
+.telemetry-header {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    align: right middle;
+    margin-bottom: 1;
+}
+
+.seg-switch {
+    layout: horizontal;
+    width: auto;
+    height: 3;
+    background: $bg_hover;
+    border: solid $border;
+    margin-right: 1;
+}
+
+.seg-btn {
+    width: auto;
+    min-width: 12;
+    height: 3;
+    background: $bg_hover;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.seg-btn.seg-active {
+    background: $accent;
+    color: $fg_on_accent;
+}
+
+.live-beacon {
+    color: $status_ok;
+    text-style: bold;
+    width: 1;
+}
+
+/* Chat transcript: user prompt on the right, agent response on the left. */
+.chat-stream {
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+.msg {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+.msg-user {
+    align-horizontal: right;
+}
+
+.msg-agent {
+    align-horizontal: left;
+}
+
+.msg-author {
+    color: $fg_accent;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.msg-bubble {
+    width: auto;
+    max-width: 80%;
+    height: auto;
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+    color: $fg_primary;
+}
+
+.msg-bubble.msg-bubble-user {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+}
+
+.msg-chip {
+    color: $fg_muted;
+    background: $bg_active;
+    text-style: bold;
+    padding: 0 1;
+}
+
+.msg-time {
+    color: $status_muted;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.msg-time.msg-time-user {
+    text-align: right;
+}
+
+.msg-attach {
+    width: auto;
+    height: auto;
+    background: $bg_raised;
+    color: $fg_muted;
+    border: solid $border;
+    padding: 0 1;
+    margin-top: 0;
+}
+
+.code-block {
+    width: 100%;
+    height: 3;
+    background: $bg_surface;
+    border: solid $border;
+    color: $fg_muted;
+    padding: 0 1;
+}
+
+/* Action pills above the composer (Upload Prompt / Attach / Templates). */
+.action-pill-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+}
+
+.action-pill {
+    width: auto;
+    height: 3;
+    background: $bg_raised;
+    color: $fg_primary;
+    border: solid $border;
+    padding: 0 1;
+    margin-right: 1;
+    text-style: bold;
+}
+
+.action-pill-templates {
+    background: $bg_hover;
+    color: $fg_accent;
+}
+
+/* Composer row: prompt glyph, free-text input, send button. */
+.composer {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.composer-glyph {
+    color: $fg_accent;
+    text-style: bold;
+    width: 2;
+}
+
+.composer-input {
+    width: 1fr;
+    background: $bg_raised;
+    border: none;
+    color: $fg_primary;
+    height: 1;
+}
+
+.btn-send {
+    width: 5;
+    min-width: 5;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */
+
+/* Attachment drop-card: file icon, resolved filename, Browse button. */
+.swarm-file-card {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.swarm-file-icon {
+    color: $fg_accent;
+    text-style: bold;
+    width: 3;
+}
+
+.swarm-file-name {
+    width: 1fr;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.swarm-file-input {
+    width: 1fr;
+    height: 1;
+    background: $bg_raised;
+    border: solid $border;
+    color: $fg_primary;
+}
+
+/* Output Inspection header: caption on the left, view switch on the right. */
+.output-inspection {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    margin-bottom: 0;
+    align: left middle;
+}
+
+.output-inspection .card-caption {
+    width: 1fr;
+}
+
+/* Stop / Restart action deck pinned under the swarm log. */
+.swarm-action-deck {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-top: 1;
+}
+
+.btn-stop {
+    width: 1fr;
+    height: 3;
+    background: $bg_raised;
+    color: $status_err;
+    border: solid $border;
+    text-style: bold;
+}
+
+.btn-restart {
+    width: 2fr;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* Terminal-style listener line under the swarm log. */
+.listener-line {
+    width: 100%;
+    height: 1;
+    color: $status_muted;
+    text-style: italic;
 }
 """
 )
