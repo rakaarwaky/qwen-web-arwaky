@@ -14,11 +14,11 @@ from typing import Any
 
 from playwright.sync_api import ElementHandle, Page
 
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_event import EventMessage, LifecycleEvent, QwenEventType
 from modules.shared.src.taxonomy_core_vo import (
-    ExitCode,
     FilePath,
     FileSizeBytes,
     ForceFlag,
@@ -26,9 +26,7 @@ from modules.shared.src.taxonomy_core_vo import (
     InjectorConfig,
     JobId,
     JobLimit,
-    JobName,
     JobRecord,
-    LoggerName,
     MaxFileSizeMb,
     MessageCount,
     MinTextLength,
@@ -239,67 +237,6 @@ class ISaverProtocol(ABC):
         config: Any | None = None,
     ) -> None:
         """Write processed output with metadata header + sidecar."""
-
-
-class IObservabilityProtocol(ABC):
-    """Observability capability contract (logging, tracing, hooks)."""
-
-    @abstractmethod
-    def setup_observability(self, log_path: Path, verbose: bool = False, attach_stderr: bool = True) -> None:
-        """Bootstrap Sentry/OTel/structlog + global hooks.
-
-        Parameters
-        ----------
-        attach_stderr:
-            When False, skip attaching the stderr stream handler. Required by
-            the interactive TUI so browser-callback logs do not corrupt the
-            terminal canvas.
-        """
-
-    @abstractmethod
-    def get_logger(self, name: LoggerName = LoggerName("qwen-cli")) -> Any:
-        """Return a bound logger."""
-
-    @abstractmethod
-    def start_span(self, name: LoggerName) -> Any:
-        """Return a span context manager (or no-op)."""
-
-    @abstractmethod
-    def bind_run_context(self, run_id: RunId, **extra: Any) -> None:
-        """Bind run-scoped contextvars."""
-
-    @abstractmethod
-    def clear_run_context(self) -> None:
-        """Clear run-scoped contextvars."""
-
-    @abstractmethod
-    def attach_run_log(self, job_name: JobName, run_id: RunId) -> Path:
-        """Attach a per-run JSONL log file under the jobs directory.
-
-        Parameters
-        ----------
-        job_name : str
-            Logical job/run name (e.g. prompt file stem).
-        run_id : RunId
-            Unique run identifier used as file suffix and correlation key.
-
-        Returns
-        -------
-        Path
-            Path of the created per-run log file.
-        """
-
-    @abstractmethod
-    def detach_run_log(self, run_id: RunId) -> None:
-        """Detach and close the per-run log handler for the given run id."""
-
-    @abstractmethod
-    def exit_code_for(self, exc: BaseException) -> ExitCode:
-        """Map an unhandled exception to a process exit code."""
-
-    @abstractmethod
-    def install_excepthooks(self) -> None:
-        """Install global exception handlers."""
 
 
 class IUpdateProtocol(ABC):

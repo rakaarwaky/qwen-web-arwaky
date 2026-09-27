@@ -32,6 +32,8 @@ from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+
+# agent_logging_orchestrator
 from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
@@ -128,16 +130,12 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
-        # Wire orchestrators so AES505 can trace them back to this container.
-        self.browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(
-            browser=self.browser,
-        )
-        self.logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(
-            observability=self.observability,
-        )
-        self.update_orchestrator: IUpdateAggregate = UpdateOrchestrator(
-            updater=self.updater,
-        )
+        # The three feature agents sit between their capability and the
+        # Surfaces so no caller repeats the sequence each one owns: browser
+        # auth, observability verb routing, and the update rollback gate.
+        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser)
+        self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability)
+        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(self.updater)
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the

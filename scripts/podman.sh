@@ -2,24 +2,13 @@
 # Helper script to build and run qwen-web-arwaky (qwa) in an isolated Podman container.
 set -euo pipefail
 
-IMAGE_NAME="qwen-web-arwaky"
+IMAGE_NAME="qwen-web-arwaky-slim"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VOLUME_DIR="/home/raka/.local/share/containers/storage/volumes/qwen-web-arwaky/_data"
 mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config" "${VOLUME_DIR}/share/finding"
 
-# Source tree mounted so commands like `test`, `lint`, and shell use the same
-# modules/tests that live on the host rather than the wheel copy. Left writable
-# because conftest fixtures and tool caches write into the tree.
-VOLUMES="-v ${REPO_ROOT}:/root/src:Z \
-         -v ${VOLUME_DIR}/share:/root/.local/share/qwen-web-arwaky:Z \
-         -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web-arwaky:Z \
-         -v ${VOLUME_DIR}/config:/root/.config/qwen-web-arwaky:Z"
-FINDING_SRC="${REPO_ROOT}/.agents/finding"
-if [ -d "${FINDING_SRC}" ]; then
-    VOLUMES="${VOLUMES} -v ${FINDING_SRC}:/root/.local/share/qwen-web-arwaky/finding:Z"
-fi
 GUI_ENV="-e DISPLAY=${DISPLAY:-:0} -v /tmp/.X11-unix:/tmp/.X11-unix:ro --net=host"
 
 CONTAINER_NAME="qwen-web-arwaky"
@@ -107,7 +96,7 @@ case "$cmd" in
         ;;
     build)
         echo "==> Building Podman image: ${IMAGE_NAME}..."
-        podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile" "${REPO_ROOT}"
+        podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile.slim" "${REPO_ROOT}"
         echo "==> Image '${IMAGE_NAME}' successfully built!"
         # Recreate the container so it runs the freshly built image.
         # Without this, 'podman start' on the old container keeps using the OLD image.

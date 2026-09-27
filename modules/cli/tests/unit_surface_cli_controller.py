@@ -37,7 +37,7 @@ class TestRunManualLogin:
         with (
             patch("sys.stdin") as mock_stdin,
             patch(
-                "modules.cli.src.surface_cli_login_command.handle",
+                "modules.root_cli_main_entry.handle_login_command",
                 return_value={"success": False, "error": "TTY required"},
             ) as mock_handle,
         ):
@@ -58,7 +58,7 @@ class TestRunManualLogin:
         with (
             patch("sys.stdin") as mock_stdin,
             patch(
-                "modules.cli.src.surface_cli_login_command.handle", return_value={"success": True, "message": "ok"}
+                "modules.root_cli_main_entry.handle_login_command", return_value={"success": True, "message": "ok"}
             ) as mock_handle,
         ):
             mock_stdin.isatty.return_value = True
@@ -76,7 +76,7 @@ class TestRunManualLogin:
 
     def test_failure_prints_error_to_stderr(self, capsys):
         with patch(
-            "modules.cli.src.surface_cli_login_command.handle",
+            "modules.root_cli_main_entry.handle_login_command",
             return_value={"success": False, "error": "Manual login requires an interactive terminal (TTY)"},
         ):
             cfg = AppConfig(

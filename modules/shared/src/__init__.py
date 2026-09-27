@@ -25,6 +25,7 @@ from .contract_jobs_aggregate import IJobManagerAggregate
 from .contract_logging_aggregate import IObservabilityAggregate
 from .contract_prompt_aggregate import IPromptAggregate, IPromptFlowAggregate
 from .contract_session_aggregate import ISessionAggregate
+from .contract_session_protocol import ISessionRotatorProtocol
 from .contract_setup_aggregate import ISetupAggregate
 from .contract_swarm_aggregate import ISwarmAggregate
 from .contract_update_aggregate import IUpdateAggregate
@@ -406,6 +407,7 @@ __all__ = [
     "IUpdateAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
+    "ISessionRotatorProtocol",
     "ISetupAggregate",
     "ISwarmAggregate",
     # Swarm VOs
