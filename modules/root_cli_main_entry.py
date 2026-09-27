@@ -24,14 +24,12 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from modules.cli.src import (
-    surface_cli_init_command,
-    surface_cli_interactive_controller,
-    surface_cli_login_command,
-    surface_cli_run_command,
-    surface_cli_sessions_command,
-    surface_cli_update_command,
-)
+from modules.cli.src.surface_cli_init_command import handle as handle_init_command
+from modules.cli.src.surface_cli_interactive_controller import InteractiveController
+from modules.cli.src.surface_cli_login_command import handle as handle_login_command
+from modules.cli.src.surface_cli_run_command import handle as handle_run_command
+from modules.cli.src.surface_cli_sessions_command import handle_sessions
+from modules.cli.src.surface_cli_update_command import handle as handle_update_command
 from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig
@@ -337,7 +335,7 @@ def _dispatch(
         # handler would write them straight to the terminal, corrupting the UI.
         container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
-        result = surface_cli_interactive_controller.InteractiveController(
+        result = InteractiveController(
             container.workspace,
             container.agent_direct_prompt_orchestrator,
             container.agent_prompt_file_orchestrator,
@@ -369,15 +367,15 @@ def _dispatch(
         return _run_manual_login(cfg, container, json_output=json_output)
 
     if action == "init":
-        result = surface_cli_init_command.handle(args, container.workspace)
+        result = handle_init_command(args, container.workspace)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "update":
-        result = surface_cli_update_command.handle(args, container.updater)
+        result = handle_update_command(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "sessions":
-        return surface_cli_sessions_command.handle_sessions(args)
+        return handle_sessions(args)
 
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
@@ -389,7 +387,7 @@ def _dispatch(
     args._cfg = cfg
     # Resolve session rotation before dispatch
     _resolve_session_for_prompt(args, container)
-    result = surface_cli_run_command.handle(
+    result = handle_run_command(
         args,
         cfg,
         container.agent_direct_prompt_orchestrator,
@@ -435,7 +433,7 @@ def _run_manual_login(cfg: AppConfig, container: SharedContainer | None = None, 
     """Launch visible browser for interactive login."""
     if container is None:
         container = _default_container()
-    result = surface_cli_login_command.handle(
+    result = handle_login_command(
         None,
         container.agent_session_orchestrator,
         container.agent_setup_orchestrator,

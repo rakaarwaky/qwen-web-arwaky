@@ -52,26 +52,9 @@ class ISessionHealthCheckerProtocol(ABC):
         """Health check all sessions and return updated pool."""
 
 
-class ISessionRotatorProtocol(ABC):
-    """Protocol for transparent session rotation."""
-
-    @abstractmethod
-    async def get_next_session(self) -> SessionInfo | None:
-        """Get next healthy session."""
-
-    @abstractmethod
-    async def mark_limited(self, session_id: SessionId) -> None:
-        """Mark session as rate-limited."""
-
-    @abstractmethod
-    async def mark_healthy(self, session_id: SessionId) -> None:
-        """Mark session as healthy."""
-
-
 __all__ = [
     "ISessionManagerProtocol",
     "ISessionHealthCheckerProtocol",
-    "ISessionRotatorProtocol",
     "ISessionRotatorAggregate",
 ]
 

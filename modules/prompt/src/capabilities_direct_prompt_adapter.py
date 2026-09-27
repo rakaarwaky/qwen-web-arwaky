@@ -17,12 +17,12 @@ from modules.shared.src.contract_core_aggregate import IDirectPromptAggregate, I
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
-    IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
     LifecycleObserver,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (

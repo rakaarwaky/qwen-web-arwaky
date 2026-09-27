@@ -239,40 +239,9 @@ and a preferred harness; when adding code, extend the matching pattern.
 - A fix for a race/cancellation bug ships with a regression test capturing
   the interleaving (see issues #331, #360).
 - CI runs `pytest tests/ -v` (see §3); keep the suite under ~2 minutes.
-- **Parallel Browser / Swarm Execution Environment** (issue #329): Each concurrent Chromium instance requires ~300–500 MB RAM and adequate `/dev/shm` (minimum 2 GB recommended for a 10-worker Swarm). In containerized CI or Docker, ensure `--shm-size=2gb` or `--ipc=host` is allocated to prevent Chromium renderer crashes. See §7.5a for the enforced resource gate.
+- **Parallel Browser / Swarm Execution Environment** (issue #329): Each concurrent Chromium instance requires ~300–500 MB RAM and adequate `/dev/shm` (minimum 2 GB recommended for a 10-worker Swarm). In containerized CI or Docker, ensure `--shm-size=2gb` or `--ipc=host` is allocated to prevent Chromium renderer crashes. See §7.5b for the containerised test automation guidelines.
 
 ---
-
-## 7.5a Test Environment Requirements for Parallel Browser Execution — issue #329
-
-The parallel tier launches up to `DEFAULT_MAX_WORKERS` (10) concurrent Chromium
-instances, each cloning the master session profile into an ephemeral directory.
-The host must meet these minimums before the tier will run:
-
-| Resource | Minimum | Where enforced |
-|----------|---------|----------------|
-| Available RAM | 8 GiB recommended / 4 GiB floor | `tests/conftest.py` fixture `parallel_browser_resources` — skips the tier below 4 GiB |
-| Usable CPU cores | 4 | Same fixture (uses `os.sched_getaffinity` when available, falls back to `os.cpu_count()`) |
-| `/dev/shm` (containers) | 2 GB | Documented only; Chromium must start with `--shm-size=2gb` |
-| Disk | ~100 MB per clone | Not enforced; the ephemeral dir lives under `TMPDIR` |
-
-Probe implementation: `modules/shared/src/utility_host_gate.py`
-(stdlib only — Linux `/proc/meminfo`, macOS `vm_stat`, Windows
-`GlobalMemoryStatusEx`). Probing is best-effort: a value the platform will not
-report is `None`, and `None` never skips the tier, so the gate cannot silently
-disable parallel coverage on a host it cannot read.
-
-### Using the resource gate
-
-```python
-@pytest.mark.parallel_browser
-def test_parallel_browser_slot(parallel_browser_resources) -> None:
-    ...
-```
-
-The fixture calls `insufficient_reason(probe())`; a non-`None` return triggers
-`pytest.skip(...)` naming the observed shortfall. The `parallel_browser`
-marker must be registered in `pytest.ini` before use.
 
 ### Session cloning resource edge cases
 

@@ -1,0 +1,93 @@
+# Slim runtime image for qwen-web-arwaky.
+#
+# Replaces mcr.microsoft.com/playwright/python:v1.63.0-noble (2.41 GB) which
+# ships Chromium, Firefox, WebKit, and ffmpeg. The browser adapter only drives
+# Chromium, so this image installs the one browser Playwright needs plus the
+# system libraries Chromium links against. Chromium revision stays pinned to the
+# Playwright revision in uv.lock: every --headless launch fails if the driver
+# and browser revision drift apart.
+#
+# Debian trixie is required for the glibc 2.38+ that the lint-arwaky-cli release
+# binary links against; bookworm ships 2.36 and the binary refuses to start.
+FROM docker.io/library/python:3.12-slim-trixie
+
+WORKDIR /build
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# apt install covers build deps (git, curl, unzip) and runtime deps (Chromium
+# shared libraries). One layer instead of two for a smaller layer cache.
+RUN apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends \
+        ca-certificates curl git tini unzip \
+        libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+        libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+        libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+        libx11-6 libxcb1 libxext6 libxi6 libxtst6 fonts-liberation \
+        libglib2.0-0 libexpat1 libudev1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# uv drives dependency install so the lockfile stays authoritative, matching how
+# CI provisions the project.
+COPY --from=ghcr.io/astral-sh/uv:0.5.24 /uv /usr/local/bin/uv
+
+COPY requirements.txt pyproject.toml uv.lock /build/
+COPY modules/shared/pyproject.toml /build/modules/shared/
+COPY modules/mcp/pyproject.toml /build/modules/mcp/
+COPY modules/cli/pyproject.toml /build/modules/cli/
+
+# Test extras mirror .github/workflows/ci.yml: pytest, pytest-asyncio, pytest-cov,
+# pytest-mock, plus ruff/mypy/bandit for the local ci.sh gates.
+# lint-arwaky-cli comes from the same prebuilt release binary CI downloads, so
+# the AES self-lint gate reports the same violations inside the container as it
+# does on a GitHub runner.
+RUN uv venv /opt/venv && \
+    VIRTUAL_ENV=/opt/venv uv pip install --python /opt/venv/bin/python \
+        -r requirements.txt \
+        pytest pytest-asyncio pytest-cov pytest-mock \
+        ruff mypy bandit && \
+    curl -fsSL \
+        https://github.com/rakaarwaky/lint-arwaky/releases/latest/download/lint-arwaky-cli \
+        -o /opt/venv/bin/lint-arwaky-cli && \
+    chmod +x /opt/venv/bin/lint-arwaky-cli
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    VIRTUAL_ENV=/opt/venv
+
+# Pre-download both Chromium payloads with curl, which handles the large
+# downloads far more reliably than playwright's Node downloader (it hangs on
+# slow links despite the CDN being reachable). `headless=True` launches the
+# headless shell, a separate binary from the full Chromium build, so both are
+# required. The marker files make playwright skip its own installer on first
+# launch, and the versions stay pinned to the Playwright revision in uv.lock.
+ARG CHROMIUM_CFT_VERSION=153.0.8010.12
+ARG HEADLESS_SHELL_CFT_VERSION=153.0.8010.12
+ARG PLAYWRIGHT_REVISION=1243
+ARG CHROME_ZIP_URL=https://cdn.playwright.dev/builds/cft/${CHROMIUM_CFT_VERSION}/linux64/chrome-linux64.zip
+ARG HEADLESS_ZIP_URL=https://cdn.playwright.dev/builds/cft/${HEADLESS_SHELL_CFT_VERSION}/linux64/chrome-headless-shell-linux64.zip
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN install_browser() { \
+        local dir="$1" url="$2" target="$3"; \
+        mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}/${dir}" && \
+        curl -fSL --retry 5 --retry-delay 5 -o /tmp/pw.zip "${url}" && \
+        unzip -qo /tmp/pw.zip -d "${PLAYWRIGHT_BROWSERS_PATH}/${dir}" && \
+        rm -f /tmp/pw.zip && \
+        touch "${PLAYWRIGHT_BROWSERS_PATH}/${dir}/INSTALLATION_COMPLETE" \
+              "${PLAYWRIGHT_BROWSERS_PATH}/${dir}/DEPENDENCIES_VALIDATED"; \
+    } && \
+    install_browser "chromium-${PLAYWRIGHT_REVISION}" "${CHROME_ZIP_URL}" && \
+    install_browser "chromium_headless_shell-${PLAYWRIGHT_REVISION}" "${HEADLESS_ZIP_URL}"
+
+COPY . /build
+RUN uv pip install --python /opt/venv/bin/python . && rm -rf /build
+
+# XDG directories the CLI writes session, state, and config into.
+RUN mkdir -p /root/.local/share/qwen-web /root/.local/state/qwen-web /root/.local/config/qwen-web
+WORKDIR /root
+
+# tini reaps the Chromium and Node child processes the adapter spawns, so a
+# headless run exiting does not leave zombies behind in the container.
+ENTRYPOINT ["/usr/bin/tini", "--", "qwa"]
+CMD ["--help"]
