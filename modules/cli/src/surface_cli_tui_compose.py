@@ -29,9 +29,9 @@ from textual.widgets import (
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
-from modules.shared.src.utility_core_version import get_package_version
 from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL, DEFAULT_OUTPUT
+from modules.shared.src.utility_core_version import get_package_version
 
 
 class _TuiComposeMixin:
@@ -169,21 +169,23 @@ class _TuiComposeMixin:
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
-                # SESSION POOL STATUS card (dns icon + 3-cell grid).
+                # SESSION POOL STATUS card: three stacked metric tiles.
                 with Vertical(classes="screen-card"):
                     with Horizontal(classes="pane-title"):
-                        yield Label("dns SESSION POOL STATUS", id="session-pool-title", classes="field-label")
-                    with Horizontal(classes="login-metric-row"):
-                        yield Label("REGISTERED", id="session-total-label", classes="login-metric-label")
-                        yield Label("0", id="session-total", classes="login-metric-value")
-                        yield Label("HEALTHY", id="session-healthy-label", classes="login-metric-label")
-                        yield Label("0", id="session-healthy", classes="login-metric-ok")
-                        yield Label("LIMITED", id="session-limited-label", classes="login-metric-label")
-                        yield Label("0", id="session-limited", classes="login-metric-value")
+                        yield Label("▤ SESSION POOL STATUS", id="session-pool-title", classes="field-label")
+                    with Horizontal(classes="login-metric-row login-metric-grid"):
+                        for label_text, label_id, value_id, value_cls in (
+                            ("REGISTERED", "session-total-label", "session-total", "login-metric-value"),
+                            ("ACTIVE", "session-healthy-label", "session-healthy", "login-metric-ok"),
+                            ("LIMITED", "session-limited-label", "session-limited", "login-metric-value"),
+                        ):
+                            with Vertical(classes="login-metric-cell"):
+                                yield Label(label_text, id=label_id, classes="login-metric-label")
+                                yield Label("0", id=value_id, classes=value_cls)
 
                 # Full-width ADD ACCOUNT button.
                 yield Button(
-                    "add account",
+                    "⊕ ADD ACCOUNT",
                     id="btn-session-add",
                     classes="btn-primary-full",
                 )
@@ -200,9 +202,9 @@ class _TuiComposeMixin:
 
                 # Re-check Tokens row.
                 with Horizontal(classes="toggle-row"):
-                    yield Label("• •", classes="field-label")
+                    yield Label("· ·", classes="field-label")
                     yield Button(
-                        "refresh Re-check Tokens",
+                        "↻ Re-check Tokens",
                         id="btn-sessions-refresh",
                         classes="btn-ghost",
                         variant="default",
@@ -215,9 +217,24 @@ class _TuiComposeMixin:
                 yield DataTable(id="sessions-table")
 
                 with Horizontal(classes="toggle-row"):
-                    yield Button("🔄 Refresh", id="btn-sessions-rerefresh", variant="default")
-                    yield Button("🔐 Add Session", id="btn-sessions-login", variant="primary")
-                    yield Button("🏥 Health Check", id="btn-sessions-health", variant="default")
+                    yield Button(
+                        "🔄 Refresh",
+                        id="btn-sessions-rerefresh",
+                        classes="btn-sessions-refresh",
+                        variant="default",
+                    )
+                    yield Button(
+                        "🔐 Add Session",
+                        id="btn-sessions-login",
+                        classes="btn-sessions-login",
+                        variant="primary",
+                    )
+                    yield Button(
+                        "🏥 Health Check",
+                        id="btn-sessions-health",
+                        classes="btn-sessions-health",
+                        variant="default",
+                    )
                 yield QwenTuiRichLog(
                     id="log-view-sessions",
                     highlight=True,
@@ -252,6 +269,7 @@ class _TuiComposeMixin:
                         with Horizontal(classes="seg-switch"):
                             yield Button("Event Log", id=f"btn-slot-event-{s}", classes="seg-btn seg-active")
                             yield Button("System Log", id=f"btn-slot-system-{s}", classes="seg-btn")
+                        yield Static("", classes="telemetry-spacer")
                         yield Label(
                             self._format_status("IDLE", "badge"),
                             id=f"status-badge-{s}",
@@ -335,7 +353,7 @@ class _TuiComposeMixin:
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
                 # Attachment File or Folder card.
                 with Vertical(classes="screen-card"), Horizontal(classes="swarm-file-card"):
-                    yield Label("description", id="swarm-file-icon", classes="swarm-file-icon")
+                    yield Label("▤", id="swarm-file-icon", classes="swarm-file-icon")
                     yield Label("No file attached", id="swarm-file-name", classes="swarm-file-name")
                     yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
 
@@ -379,12 +397,12 @@ class _TuiComposeMixin:
                 # Action deck: Stop / Restart.
                 with Horizontal(classes="swarm-action-deck"):
                     yield Button(
-                        "stop Stop",
+                        "■ Stop",
                         id="btn-swarm-cancel",
                         classes="btn-stop",
                     )
                     yield Button(
-                        "autorenew RESTART",
+                        "↻ RESTART",
                         id="btn-swarm-start",
                         classes="btn-restart",
                     )

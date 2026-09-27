@@ -147,7 +147,7 @@ Underline {
    (tests/unit_tui_log_containment.py). */
 .nav-dock {
     layout: horizontal;
-    height: 3;
+    height: 4;
     dock: bottom;
     background: $bg_surface;
     border-top: solid $border;
@@ -165,9 +165,12 @@ Underline {
     text-style: bold;
 }
 
+/* Active tab: cyan hairline across its top edge and an accent label, the
+   marker the mockup draws above the current screen. */
 .nav-item.nav-active {
     background: $bg_active;
-    color: $fg_primary;
+    color: $fg_accent;
+    border-top: solid $accent;
     border-bottom: none;
 }
 
@@ -411,6 +414,12 @@ Underline {
     align: left middle;
 }
 
+/* The leading filler label spans the row so its trailing action sits flush
+   right, as in the mockup. */
+.toggle-row .field-label {
+    width: 1fr;
+}
+
 .toggle-label-box {
     width: 1fr;
 }
@@ -625,9 +634,12 @@ HelpScreen {
     width: auto;
     height: 1;
     margin-left: 1;
-    background: $bg_base;
+    background: $bg_raised;
     color: $fg_accent;
-    border: solid $border;
+    /* Frameless: the card header is one row tall, so a border would leave the
+       label no viewport at all. */
+    border: none;
+    padding: 0 1;
 }
 
 .btn-copy-log:hover {
@@ -854,11 +866,17 @@ HelpScreen {
 .btn-sessions-refresh,
 .btn-sessions-login,
 .btn-sessions-health {
+    /* Ghost geometry: these ride in a 1-row .toggle-row, and a default 3-row
+       Button overflows that single content line and renders as a clipped fill
+       with no label. */
+    width: auto;
+    height: 1;
     min-width: 12;
     padding: 0 1;
+    margin-right: 1;
     background: $bg_raised;
     color: $fg_primary;
-    border: solid $border;
+    border: none;
     text-style: bold;
 }
 
@@ -871,7 +889,7 @@ HelpScreen {
 .btn-sessions-login {
     background: $accent;
     color: $fg_on_accent;
-    border: solid $accent;
+    border: none;
 }
 
 .btn-sessions-login:hover {
@@ -891,7 +909,11 @@ HelpScreen {
     overflow-y: auto;
 }
 
+/* Vertical's default is height: 1fr with overflow hidden, so a card would take
+   an equal share of the pane and clip everything past its first rows. Cards
+   size to their content and let .screen-body scroll instead. */
 .screen-card {
+    height: auto;
     background: $bg_overlay;
     border: solid $border;
     padding: 1 2;
@@ -905,20 +927,29 @@ HelpScreen {
     margin-bottom: 1;
 }
 
-/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). */
+/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). The overview strip is
+   a single row of label/value pairs, so it sizes to its content — a fixed
+   height would add blank rows inside an already bordered card. The login grid
+   stacks label over value inside a tile, so it overrides the height for two
+   content rows. */
 .login-metric-row {
     layout: horizontal;
     width: 100%;
-    height: 3;
-    margin-bottom: 1;
+    height: auto;
+    margin-bottom: 0;
+}
+
+.login-metric-row.login-metric-grid {
+    height: 4;
 }
 
 .login-metric-cell {
     width: 1fr;
-    height: 3;
+    height: 4;
     background: $bg_raised;
     border: solid $border;
     padding: 0 1;
+    margin-right: 1;
 }
 
 .login-metric-label {
@@ -960,14 +991,31 @@ HelpScreen {
     color: $fg_accent;
 }
 
-/* One account row: avatar, email, status dot, and the two action buttons. */
+/* One account card: identity on top, hairline telemetry row underneath with
+   the health state and the two per-account actions (mockup Login). */
 .account-card {
-    layout: horizontal;
+    layout: vertical;
     width: 100%;
-    height: 3;
+    height: auto;
     background: $bg_raised;
     border: solid $border;
     margin-bottom: 1;
+}
+
+.account-card-head {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+.account-card-foot {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    border-top: solid $border;
     align: left middle;
 }
 
@@ -988,7 +1036,7 @@ HelpScreen {
 }
 
 .account-status {
-    width: auto;
+    width: 1fr;
     text-style: bold;
     margin-right: 1;
 }
@@ -1002,16 +1050,17 @@ HelpScreen {
 }
 
 .account-btn {
-    width: 4;
-    min-width: 4;
-    height: 3;
-    border: solid $border;
+    width: 6;
+    min-width: 6;
+    height: 2;
+    border: none;
     background: $bg_hover;
     text-style: bold;
 }
 
 .account-btn-test {
     color: $accent;
+    margin-right: 1;
 }
 
 .account-btn-disconnect {
@@ -1025,26 +1074,32 @@ HelpScreen {
 /* ═══ Mockup parity: CHAT (slot console) ═══════════════════════════════ */
 
 /* Horizontal slot picker: one pill per job slot, active one filled. */
+/* The strip is a bare row of pills in the mockup, so it carries no frame of
+   its own: a border here would eat the two rows the chips need and clip their
+   labels out of the viewport. */
 .slot-carousel {
     layout: horizontal;
     width: 100%;
     height: 3;
     background: $bg_surface;
-    border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
     overflow-x: auto;
 }
 
+/* Width follows the label so all ten pills fit one row at a normal terminal
+   width; a fixed min-width pushed SLOT 10 out under the scroll bar. */
 .slot-chip {
     width: auto;
-    min-width: 11;
+    /* Textual's Button ships min-width: 16, which is wide enough to push the
+       last pills of the carousel past the viewport; override it. */
+    min-width: 0;
     height: 3;
     margin-right: 1;
     background: $bg_raised;
     color: $fg_muted;
     border: solid $border;
-    padding: 0 1;
+    padding: 0;
 }
 
 .slot-chip.slot-chip-active {
@@ -1054,21 +1109,29 @@ HelpScreen {
     text-style: bold;
 }
 
-/* Telemetry header: segmented Event/System log switch plus the live beacon. */
+/* Telemetry header: segmented Event/System log switch plus the live beacon.
+   The switch sits on the left as in the mockup; an auto-width spacer carries
+   the badge and beacon to the right edge. */
 .telemetry-header {
     layout: horizontal;
     width: 100%;
     height: 3;
-    align: right middle;
+    align: left middle;
     margin-bottom: 1;
 }
 
+.telemetry-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+/* Frameless: the two segments abut, so the container only supplies the
+   backing colour. A border would leave the buttons a one-row viewport. */
 .seg-switch {
     layout: horizontal;
     width: auto;
     height: 3;
     background: $bg_hover;
-    border: solid $border;
     margin-right: 1;
 }
 
@@ -1287,14 +1350,14 @@ HelpScreen {
 
 .event-log-slot {
     width: 1fr;
-    color: $fg_muted;
+    color: $status_ok;
     text-style: bold;
 }
 
 .slot-log-time {
     width: 100%;
     height: 1;
-    text-align: right;
+    text-align: left;
     color: $status_muted;
 }
 
@@ -1345,7 +1408,9 @@ HelpScreen {
 .output-inspection {
     layout: horizontal;
     width: 100%;
-    height: 1;
+    /* Three rows: the segmented switch is a 3-row control, and a 1-row header
+       clipped it to a bare fill with no visible label. */
+    height: 3;
     margin-bottom: 0;
     align: left middle;
 }

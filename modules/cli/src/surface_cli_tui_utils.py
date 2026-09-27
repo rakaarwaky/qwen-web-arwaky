@@ -486,10 +486,13 @@ class _TuiUtilsMixin:
         keeps only its newest entries so a long session cannot grow without
         bound in a fixed-height pane.
         """
-        scroll = self._chat_scrolls.get(slot_id)
+        # The caches are populated in ``on_mount``; a worker can outlive the
+        # mount (or a test can drive the mixin without one), so a missing
+        # cache means there is no transcript to write to — not an error.
+        scroll = getattr(self, "_chat_scrolls", {}).get(slot_id)
         if scroll is None:
             return
-        hint = self._chat_hints.pop(slot_id, None)
+        hint = getattr(self, "_chat_hints", {}).pop(slot_id, None)
         if hint is not None and hint.is_attached:
             with contextlib.suppress(Exception):
                 hint.remove()
@@ -571,6 +574,9 @@ class _TuiUtilsMixin:
             if not sessions:
                 container.mount(Static("No accounts registered.", classes="field-label"))
                 return
+            # The card actions are addressed by position, so the handler
+            # resolves them against exactly the list on screen.
+            self._sessions_cache = list(sessions)
             for position, session in enumerate(sessions, start=1):
                 container.mount(self._account_card(session, position))
 

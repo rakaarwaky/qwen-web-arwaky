@@ -1,8 +1,10 @@
-"""Event handlers and keyboard-action methods for the Qwen TUI application.
+"""Screen actions and handler helpers for the Qwen TUI application.
 
-Surface layer (surface_cli): Mixin providing all Textual event callbacks
-(``on_button_pressed``, ``on_select_changed``, ``on_input_changed``) and
-action methods (``action_*``).
+Surface layer (surface_cli): Mixin providing the ``action_*`` methods
+(keyboard bindings, tab navigation, copy, quit) plus the screen-level button
+helpers for the swarm, auth, account, and chat-console controls. The widget
+``on_*`` callbacks that route those controls live in
+:class:`~modules.cli.src.surface_cli_tui_events._TuiEventsMixin`.
 Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 """
 
@@ -33,6 +35,8 @@ class _TuiHandlersMixin:
     _NUM_SLOTS: int
     _run_swarm: Any
     _cancel_swarm: Any
+    _sessions_cache: list[Any]
+    _sessions_loaded_once: bool
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
@@ -53,96 +57,7 @@ class _TuiHandlersMixin:
     _session_manager: Any
     _refresh_sessions_table: Any
     _run_session_health_check: Any
-
-    # ── Widget event callbacks ───────────────────────────────────────────
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Dispatch button presses to slot, swarm, picker, and log-copy handlers."""
-        button_id = event.button.id or ""
-        if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
-            self._swarm_button_pressed(button_id)
-            return
-        if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
-            self._auth_panel_pressed(button_id)
-            return
-        if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm", "nav-settings"):
-            self._nav_dock_go(button_id)
-            return
-        # Mockup parity: the chat console's slot carousel jumps straight to the
-        # selected slot's tab. The id carries both the pane it was pressed in
-        # and the slot it points at (chat-slot-<pane>-<target>).
-        if button_id.startswith("chat-slot-"):
-            _, _, target = button_id.partition("chat-slot-")
-            pane_raw, _, slot_raw = target.partition("-")
-            if pane_raw.isdigit() and slot_raw.isdigit():
-                self._switch_to_slot(int(slot_raw))
-            return
-        # Settings pane: pick which slot's configuration block is displayed.
-        if button_id.startswith("cfg-slot-"):
-            slot_raw = button_id.removeprefix("cfg-slot-")
-            if slot_raw.isdigit():
-                self._show_slot_config(int(slot_raw))
-            return
-        # Chat console: Event/System segmented switch over the slot's logs.
-        if button_id.startswith("btn-slot-event-"):
-            self._show_slot_log(int(button_id.removeprefix("btn-slot-event-")), False)
-            return
-        if button_id.startswith("btn-slot-system-"):
-            self._show_slot_log(int(button_id.removeprefix("btn-slot-system-")), True)
-            return
-        # Chat console action pills: prompt picker, attachment picker, and the
-        # template selector — which lives on the Settings pane.
-        if button_id.startswith("btn-pill-prompt-"):
-            slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
-            self._open_picker(f"input-prompt-{slot_id}")
-            return
-        if button_id.startswith("btn-pill-attach-"):
-            slot_id = int(button_id.removeprefix("btn-pill-attach-"))
-            self._open_picker(f"input-file-{slot_id}", select_directories=True)
-            return
-        if button_id.startswith("btn-pill-templates-"):
-            slot_id = int(button_id.removeprefix("btn-pill-templates-"))
-            self._goto_slot_settings(slot_id)
-            return
-        # Chat console composer: dispatch the typed task as a direct prompt.
-        if button_id.startswith("btn-send-"):
-            self._send_composer(int(button_id.removeprefix("btn-send-")))
-            return
-        for prefix, handler in (
-            ("btn-run-", self._run_slot),
-            ("btn-cancel-", self._cancel_slot),
-            ("btn-retry-", self._run_slot),
-        ):
-            if button_id.startswith(prefix):
-                suffix = button_id.removeprefix(prefix)
-                if suffix.isdigit():
-                    handler(int(suffix))
-                    return
-        if button_id.startswith("chip-"):
-            self._apply_template_chip(button_id)
-            return
-        for field, picker in (("prompt", False), ("file", True), ("output", False)):
-            prefix = f"btn-browse-{field}-"
-            if button_id.startswith(prefix):
-                slot_id = int(button_id.removeprefix(prefix))
-                self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
-                return
-        if button_id in ("btn-copy-log", "btn-copy-swarm-log"):
-            self._copy_log_by_id(button_id)
-            return
-        if button_id.startswith("btn-copy-log-"):
-            slot_id = int(button_id.removeprefix("btn-copy-log-"))
-            self._copy_slot_log(slot_id)
-            return
-        if button_id in ("btn-sessions-refresh", "btn-sessions-rerefresh"):
-            self._refresh_sessions_table()
-            return
-        if button_id == "btn-sessions-login":
-            self._session_login_action()
-            return
-        if button_id == "btn-sessions-health":
-            self._run_session_health_check()
-            return
+    _render_account_cards: Any
 
     def _swarm_button_pressed(self, button_id: str) -> None:
         """Route Swarm-screen button presses to the right handler."""
@@ -208,6 +123,34 @@ class _TuiHandlersMixin:
                 "[{}]Swarm log cleared.[/]".format(THEME["muted"]),
             )
 
+    def _account_button_pressed(self, action: str, position: int) -> None:
+        """Handle an action on the Sessions pane's account card at *position*."""
+        cache: list[Any] = getattr(self, "_sessions_cache", [])
+        session = cache[position - 1] if 0 < position <= len(cache) else None
+        name = str(getattr(session, "name", "") or f"session {position}")
+        if action == "test":
+            # The pool health check is the only real connectivity probe this
+            # build has, so one card's TEST runs it rather than inventing a
+            # single-session result from the last stored state.
+            self._log_msg("[bold {}]TEST:[/] Checking connection for {}.".format(THEME["accent_fg"], escape(name)))
+            self._run_session_health_check()
+            return
+        # Disconnecting drops the stored auth session. That is an approved-
+        # only operation, so the card points at the CLI command instead of
+        # doing it from the UI.
+        self.notify(
+            f"Run 'qwa sessions remove --name {name}' to disconnect.",
+            title="Disconnect",
+            severity="information",
+        )
+
+    def _ensure_sessions_loaded(self) -> None:
+        """Fetch the account pool the first time the Sessions pane is opened."""
+        if getattr(self, "_sessions_loaded_once", False) or getattr(self, "_session_manager", None) is None:
+            return
+        self._sessions_loaded_once = True
+        self._refresh_sessions_table()
+
     def _auth_panel_pressed(self, button_id: str) -> None:
         """Handle the Login screen's auth-panel buttons.
 
@@ -223,45 +166,6 @@ class _TuiHandlersMixin:
                 panel.display = False
                 if button_id == "btn-auth-connect":
                     self.action_login_action()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Fill a slot's prompt input from the chosen role template."""
-        select_id = event.select.id or ""
-        if not select_id.startswith("select-template-"):
-            return
-        slot_id = int(select_id.split("-")[-1])
-        role = event.value
-        if role is None:
-            return
-        with contextlib.suppress(NoMatches):
-            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
-            prompt_input.value = str(role)
-            self._log_msg(
-                "[bold {}]TEMPLATE:[/] Slot {} ← role '{}'".format(THEME["bright"], slot_id, escape(str(role))),
-                slot_id,
-            )
-            # U8: optimistic existence hint when the picked value is a file path.
-            if str(role) not in self._template_roles and not Path(str(role)).exists():
-                self._log_msg(
-                    "[{}]WARNING:[/] '{}' is not a known role and the file does not exist.".format(
-                        THEME["warn"], escape(str(role))
-                    ),
-                    slot_id,
-                )
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """U6: keep the template Select in sync with manual path/role entry."""
-        input_id = event.input.id or ""
-        if not input_id.startswith("input-prompt-"):
-            return
-        slot_id = int(input_id.split("-")[-1])
-        value = event.value.strip()
-        with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)
-            if value in self._template_roles:
-                select.value = value
-            elif select.value not in (None, Select.BLANK) and select.value != value:
-                select.value = Select.BLANK
 
     # ── File picker ──────────────────────────────────────────────────────
 
@@ -307,20 +211,23 @@ class _TuiHandlersMixin:
             chat_btn = self.query_one("#nav-chat", Button)
             swarm_btn = self.query_one("#nav-swarm", Button)
             settings_btn = self.query_one("#nav-settings", Button)
-            # Reset all to inactive; then activate the one that matches.
+            # Reset all to inactive; then activate the one that matches. The
+            # active rule must drop the inactive class too: both classes on one
+            # button makes the later-defined inactive rule win.
             for btn in (overview_btn, login_btn, chat_btn, swarm_btn, settings_btn):
                 btn.set_class(True, "nav-inactive")
                 btn.set_class(False, "nav-active")
-            if active == "tab-overview":
-                overview_btn.set_class(True, "nav-active")
-            elif active == "tab-sessions":
-                login_btn.set_class(True, "nav-active")
-            elif active.startswith("tab-slot-"):
-                chat_btn.set_class(True, "nav-active")
-            elif active == "tab-swarm":
-                swarm_btn.set_class(True, "nav-active")
-            elif active == "tab-settings":
-                settings_btn.set_class(True, "nav-active")
+            active_btn = {
+                "tab-overview": overview_btn,
+                "tab-sessions": login_btn,
+                "tab-swarm": swarm_btn,
+                "tab-settings": settings_btn,
+            }.get(active)
+            if active.startswith("tab-slot-"):
+                active_btn = chat_btn
+            if active_btn is not None:
+                active_btn.set_class(False, "nav-inactive")
+                active_btn.set_class(True, "nav-active")
 
     def _nav_dock_go(self, button_id: str) -> None:
         """Switch the tab bar to whichever section a bottom nav item points at.
@@ -336,6 +243,7 @@ class _TuiHandlersMixin:
                 tabs.active = "tab-overview"
             elif button_id == "nav-login":
                 tabs.active = "tab-sessions"
+                self._ensure_sessions_loaded()
             elif button_id == "nav-chat":
                 active_id = tabs.active or ""
                 tabs.active = active_id if active_id.startswith("tab-slot-") else "tab-slot-1"
@@ -502,14 +410,6 @@ class _TuiHandlersMixin:
             attachment = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
         self._append_chat_message(slot_id, "user", text, attachment=attachment)
         self._run_composer_slot(slot_id, text)
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Enter inside a composer input sends that slot's typed task."""
-        input_id = event.input.id or ""
-        if input_id.startswith("composer-"):
-            slot_raw = input_id.removeprefix("composer-")
-            if slot_raw.isdigit():
-                self._send_composer(int(slot_raw))
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""
