@@ -14,6 +14,7 @@ from typing import Any
 
 from rich.markup import escape
 from textual import work
+from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input, Select, TabbedContent
 
@@ -56,24 +57,12 @@ class _TuiHandlersMixin:
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dispatch button presses to slot, swarm, picker, and log-copy handlers."""
         button_id = event.button.id or ""
-        if button_id == "btn-swarm-start":
-            self._run_swarm()
+        if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
+            self._swarm_button_pressed(button_id)
             return
-        if button_id == "btn-swarm-cancel":
-            self._cancel_swarm()
+        if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
+            self._auth_panel_pressed(button_id)
             return
-        if button_id == "btn-browse-swarm-file":
-            self._open_picker("input-swarm-file", select_directories=True)
-            return
-        if button_id in ("btn-swarm-event", "btn-swarm-system"):
-            self._show_swarm_log(button_id == "btn-swarm-system")
-            return
-        if button_id == "btn-clear-swarm-log":
-            self._clear_swarm_log()
-            return
-        # Redesign v6.5.2: bottom nav dock. Each item is a shortcut to the
-        # top tab it mirrors, so the dock adds a pointer target for the same
-        # navigation the tab bar and the alt+key bindings already provide.
         if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm"):
             self._nav_dock_go(button_id)
             return
@@ -87,9 +76,6 @@ class _TuiHandlersMixin:
                 if suffix.isdigit():
                     handler(int(suffix))
                     return
-        # Redesign v6.5.2: template chips are one-tap shortcuts that drive the
-        # slot's existing Select, so the dropdown path stays the single source
-        # of truth for what a slot is configured with.
         if button_id.startswith("chip-"):
             self._apply_template_chip(button_id)
             return
@@ -106,8 +92,7 @@ class _TuiHandlersMixin:
             slot_id = int(button_id.removeprefix("btn-copy-log-"))
             self._copy_slot_log(slot_id)
             return
-        # Session management buttons
-        if button_id == "btn-sessions-refresh":
+        if button_id in ("btn-sessions-refresh", "btn-sessions-rerefresh"):
             self._refresh_sessions_table()
             return
         if button_id == "btn-sessions-login":
@@ -116,6 +101,19 @@ class _TuiHandlersMixin:
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
             return
+
+    def _swarm_button_pressed(self, button_id: str) -> None:
+        """Route Swarm-screen button presses to the right handler."""
+        if button_id == "btn-swarm-start":
+            self._run_swarm()
+        elif button_id == "btn-swarm-cancel":
+            self._cancel_swarm()
+        elif button_id == "btn-browse-swarm-file":
+            self._open_picker("input-swarm-file", select_directories=True)
+        elif button_id in ("btn-swarm-event", "btn-swarm-system"):
+            self._show_swarm_log(button_id == "btn-swarm-system")
+        elif button_id == "btn-clear-swarm-log":
+            self._clear_swarm_log()
 
     def _apply_template_chip(self, button_id: str) -> None:
         """Route a template-chip press into the slot's Select widget.
@@ -167,6 +165,22 @@ class _TuiHandlersMixin:
             self._log_msg(
                 "[{}]Swarm log cleared.[/]".format(THEME["muted"]),
             )
+
+    def _auth_panel_pressed(self, button_id: str) -> None:
+        """Handle the Login screen's auth-panel buttons.
+
+        ``btn-session-add`` toggles the expandable panel;
+        ``btn-auth-connect`` / ``btn-auth-cancel`` close it (and
+        ``btn-auth-connect`` also fires the login flow).
+        """
+        with contextlib.suppress(NoMatches):
+            panel = self.query_one("#auth-panel", Vertical)
+            if button_id == "btn-session-add":
+                panel.display = not panel.display
+            else:
+                panel.display = False
+                if button_id == "btn-auth-connect":
+                    self.action_login_action()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """Fill a slot's prompt input from the chosen role template."""
