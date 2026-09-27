@@ -136,6 +136,14 @@ class QwenTuiApp(
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
         self._metric_done: Any = None
+        self._metric_model: Any = None
+        self._metric_swarm_ring: Any = None
+        self._metric_swarm_detail: Any = None
+        self._metric_swarm_uptime: Any = None
+        self._metric_threads_ring: Any = None
+        self._metric_threads_detail: Any = None
+        self._metric_swarm_bar: Any = None
+        self._metric_threads_bar: Any = None
         # U4: session-check timeout flag.
         self._session_check_timed_out: bool = False
         # UX-4-2: last resolved session state (VALID/EXPIRED/TIMEOUT) or None
@@ -151,6 +159,8 @@ class QwenTuiApp(
         self._slot_generation: dict[int, int] = {s: 0 for s in range(1, NUM_SLOTS + 1)}
         # Issue #277: input held while the Swarm resource modal is up.
         self._swarm_pending_input: Path | None = None
+        # Redesign v6.5.2: uptime stamp for the Overview Swarm Status card.
+        self._swarm_started_perf: float | None = None
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406

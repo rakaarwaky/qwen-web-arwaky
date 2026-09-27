@@ -423,3 +423,169 @@ def test_stale_confirm_modal_cannot_cancel_successor_run() -> None:
                 assert not spy.called
 
     asyncio.run(_run())
+
+
+# ── Regression: redesign v6.5.2 widget contract must survive ────────────────
+#
+# The redesign adds engine-readout cards to the Overview and a view-toggle
+# + Clear to the Swarm tab. These tests lock the widget IDs the mockups
+# require, the metric-write path, the template-chip shortcut, and the
+# log-visibility invariant at the regression-lock size (100x20).
+
+
+def test_overview_card_ids_exist_on_mount() -> None:
+    """The model, swarm, and threads readout widgets must be queryable."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            from textual.widgets import Label
+
+            assert isinstance(app.query_one("#metric-model", Label), Label)
+            assert isinstance(app.query_one("#metric-swarm-ring", Label), Label)
+            assert isinstance(app.query_one("#metric-swarm-detail", Label), Label)
+            assert isinstance(app.query_one("#metric-threads-ring", Label), Label)
+            assert isinstance(app.query_one("#metric-threads-detail", Label), Label)
+            # Per-card segment bars: the mockup draws one under Swarm Status
+            # and one under Chat Status, so the redesign carries two.
+            assert isinstance(app.query_one("#metric-swarm-bar", Label), Label)
+            assert isinstance(app.query_one("#metric-threads-bar", Label), Label)
+
+    asyncio.run(_run())
+
+
+def test_flush_metrics_writes_engine_readouts() -> None:
+    """_flush_metrics must update the new engine readouts, not only active/done."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)):
+            app._slot_stats[1]["status"] = "RUNNING"
+            app._slot_stats[2]["status"] = "SUCCESS"
+            app._flush_metrics()
+
+            from textual.widgets import Label
+
+            assert str(app.query_one("#metric-active", Label).render()) == "1"
+            assert str(app.query_one("#metric-done", Label).render()) == "1"
+            # Swarm card tracks the swarm engine (0 when idle), not slots.
+            assert str(app.query_one("#metric-swarm-ring", Label).render()) == "0/0"
+            assert str(app.query_one("#metric-swarm-detail", Label).render()) == "Idle"
+            # Uptime is its own trailing readout on the Swarm card, matching
+            # the mockup's right-aligned "Uptime Elapsed 21m 53s".
+            assert str(app.query_one("#metric-swarm-uptime", Label).render()) == "Uptime Elapsed —"
+            # Threads card tracks the per-slot job threads.
+            assert str(app.query_one("#metric-threads-ring", Label).render()) == "1/10"
+            detail = str(app.query_one("#metric-threads-detail", Label).render())
+            assert "1 Running" in detail
+            assert "8 Idle" in detail
+
+    asyncio.run(_run())
+
+
+def test_swarm_toggle_buttons_drive_log_views() -> None:
+    """Event / System toggle buttons swap exactly one log view per press."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            from textual.widgets import Button
+
+            event_btn = app.query_one("#btn-swarm-event", Button)
+            system_btn = app.query_one("#btn-swarm-system", Button)
+            event_log = app.query_one("#log-view-swarm", RichLog)
+            system_log = app.query_one("#log-view-swarm-system", RichLog)
+            assert event_log.display is True
+            assert system_log.display is False
+
+            # Press the system button: only the system log becomes visible and
+            # its button carries the active style.
+            system_btn.press()
+            await pilot.pause()
+            for _ in range(4):
+                await pilot.pause()
+            assert event_log.display is False
+            assert system_log.display is True
+            assert "toggle-active" in system_btn.classes
+            assert "toggle-active" not in event_btn.classes
+
+            # Press the event button: it flips back.
+            event_btn.press()
+            await pilot.pause()
+            for _ in range(4):
+                await pilot.pause()
+            assert event_log.display is True
+            assert system_log.display is False
+            assert "toggle-active" in event_btn.classes
+            assert "toggle-active" not in system_btn.classes
+
+    asyncio.run(_run())
+
+
+def test_swarm_clear_button_emptys_the_active_log() -> None:
+    """Clear writes no logs but the log buffer empties."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            from textual.widgets import Button
+
+            log = app.query_one("#log-view-swarm", RichLog)
+            log.write("hello")
+            assert log.copy_text() == "hello"
+
+            app.query_one("#btn-clear-swarm-log", Button).press()
+            await pilot.pause()
+            assert log.copy_text() == ""
+
+    asyncio.run(_run())
+
+
+def test_template_chip_drives_select_and_prompt_input() -> None:
+    """Pressing a template chip updates the slot's Select and prompt input."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            from textual.widgets import Button, Input, Select
+
+            select = app.query_one("#select-template-1", Select)
+            prompt = app.query_one("#input-prompt-1", Input)
+            # The Select starts in its NULL state, not Python None.
+            assert select.value is Select.NULL
+            assert prompt.value == ""
+
+            # Pressing a chip routes the role through the slot's Select, which
+            # fires Select.Changed and fills the prompt input.
+            app.query_one("#chip-1-backend-engineer", Button).press()
+            await pilot.pause()
+            for _ in range(4):
+                await pilot.pause()
+            assert str(select.value) == "backend-engineer"
+            assert prompt.value == "backend-engineer"
+
+    asyncio.run(_run())
+
+
+def test_overview_at_regression_size_keeps_log_visible() -> None:
+    """The log panel must still be visible at the regression-lock size 100x20."""
+    import asyncio
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 20)) as pilot:
+            await pilot.pause()
+            for _ in range(15):
+                await pilot.pause()
+            from textual.widgets import DataTable, TabbedContent
+
+            pane = app.query_one(TabbedContent).get_pane("tab-overview")
+            log = app.query_one("#log-view-overview", RichLog)
+            table = app.query_one("#slots-table", DataTable)
+            assert log.region.y >= pane.region.y
+            assert log.region.height > 0
+            assert table.region.height < 12
+
+    asyncio.run(_run())

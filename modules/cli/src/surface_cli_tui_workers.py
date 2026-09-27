@@ -52,6 +52,7 @@ class _TuiWorkersMixin:
     _swarm_id: str | None
     _swarm_pending_input: Path | None
     _confirm_or_start_swarm: Any
+    _swarm_started_perf: float | None
     _session_check_timed_out: bool
     _last_session_state: str | None
     _login_in_flight: bool
@@ -314,6 +315,8 @@ class _TuiWorkersMixin:
         try:
             snapshot = self._swarm.start(input_path)
             self._swarm_id = snapshot.swarm_id
+            # Overview Swarm Status card shows Uptime Elapsed from this stamp.
+            self._swarm_started_perf = time.perf_counter()
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
                 self._log_msg,
@@ -327,6 +330,7 @@ class _TuiWorkersMixin:
                 if latest is None:
                     break
                 self.call_from_thread(self._render_swarm_snapshot, latest)
+                self.call_from_thread(self._refresh_metrics)
                 if latest.status in {"completed", "partial", "failed", "cancelled"}:
                     self.call_from_thread(
                         self._log_msg,
@@ -345,6 +349,8 @@ class _TuiWorkersMixin:
             )
         finally:
             self._swarm_id = None
+            self._swarm_started_perf = None
+            self.call_from_thread(self._refresh_metrics)
 
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
