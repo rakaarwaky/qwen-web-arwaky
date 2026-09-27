@@ -15,12 +15,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-)
 from modules.shared.src.contract_core_protocol import IJobStorageProtocol
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IPromptFileProtocol,
+)
 from modules.shared.src.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_error import (
@@ -35,7 +35,6 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_GENERATION_FINISHED,
 )
 from modules.shared.src.taxonomy_core_vo import (
-    AttachmentPath,
     ErrorReason,
     FailureCategory,
     FilePath,
@@ -43,10 +42,10 @@ from modules.shared.src.taxonomy_core_vo import (
     JobId,
     JobLimit,
     JobRecord,
-    OutputPath,
-    PromptPath,
     RetryWaitSec,
 )
+from modules.shared.src.taxonomy_jobs_vo import JobRequest, JobResponse
+from modules.shared.src.taxonomy_prompt_vo import PromptRequest
 from modules.shared.src.utility_core_response import detect_processing_failure
 
 
@@ -60,8 +59,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
     def __init__(
         self,
         storage: IJobStorageProtocol,
-        file_only: IPromptFileAggregate,
-        attachment: IAttachmentPromptAggregate,
+        file_only: IPromptFileProtocol,
+        attachment: IAttachmentPromptProtocol,
         max_workers: int = 1,
         circuit_breaker: CircuitBreaker | None = None,
         rate_limiter: RateLimiter | None = None,
@@ -158,18 +157,42 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         rand = uuid.uuid4().hex[:6]
         return JobId(f"{prefix}_{ts}_{rand}")
 
-    def submit_file_job(
-        self,
-        prompt_file: Path | PromptPath | str,
-        output_file: Path | OutputPath | str | None = None,
-        headless: HeadlessFlag = HeadlessFlag(True),
-    ) -> JobRecord:
-        """Submit a prompt file job for asynchronous background processing."""
-        p_path = Path(prompt_file).expanduser().resolve()
-        out_path = Path(output_file).expanduser().resolve() if output_file else None
-        # Admission first so a refused submission never leaves a persisted
-        # record that no worker will ever pick up. Capacity is checked before
-        # both guards and released if either rejects the submission.
+    # ─── Block 2: Aggregate Method Implementation ──────────
+
+    def execute(self, request: JobRequest) -> JobResponse:
+        """Run the requested job verb and return its outcome.
+
+        Submission verbs admit, persist, and dispatch work on the bounded
+        executor; ``get_job_status`` and ``list_jobs`` read back through
+        storage; ``shutdown`` releases the executor. Admission and circuit
+        guards raise so the caller sees a retryable refusal, while a verb
+        that cannot be answered at all reports the reason on the response.
+        """
+        if request.verb == "submit_file_job":
+            return JobResponse(record=self._submit_file(request))
+        if request.verb == "submit_attachment_job":
+            return JobResponse(record=self._submit_attachment(request))
+        if request.verb == "get_job_status":
+            if request.job_id is None:
+                return JobResponse(error="job_id is required for get_job_status")
+            return JobResponse(record=self._storage.get_job(request.job_id))
+        if request.verb == "list_jobs":
+            return JobResponse(records=self._storage.list_jobs(JobLimit(int(request.limit))))
+        if request.verb == "shutdown":
+            self._executor.shutdown(wait=False, cancel_futures=True)
+            return JobResponse()
+
+    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+
+    def _submit_file(self, request: JobRequest) -> JobRecord:
+        """Admit, persist, and dispatch a prompt-file job.
+
+        Admission runs before both guards so a refused submission never
+        leaves a persisted record that no worker will ever pick up; the
+        reserved slot is returned when either guard rejects it.
+        """
+        p_path = Path(request.prompt_file).expanduser().resolve()
+        out_path = Path(request.output_file).expanduser().resolve() if request.output_file else None
         self._reserve_capacity()
         try:
             self._guard_submit()
@@ -177,11 +200,10 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             self._release_capacity()
             raise
         job_id = self._generate_job_id("file")
-        now = _utc_now_iso()
 
         record = JobRecord(
             job_id=str(job_id),
-            created_at=now,
+            created_at=_utc_now_iso(),
             latest_event=EVENT_DISPATCH_ACKNOWLEDGED.value,
             completed=False,
             input_file=str(p_path),
@@ -196,21 +218,15 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             job_id=job_id,
             prompt_path=p_path,
             output_path=out_path,
-            headless=headless,
+            headless=HeadlessFlag(bool(request.headless)),
         )
         return record
 
-    def submit_attachment_job(
-        self,
-        prompt_file: Path | PromptPath | str,
-        attachment_file: Path | AttachmentPath | str,
-        output_file: Path | OutputPath | str | None = None,
-        headless: HeadlessFlag = HeadlessFlag(True),
-    ) -> JobRecord:
-        """Submit a prompt with attachment job for asynchronous background processing."""
-        p_path = Path(prompt_file).expanduser().resolve()
-        a_path = Path(attachment_file).expanduser().resolve()
-        out_path = Path(output_file).expanduser().resolve() if output_file else None
+    def _submit_attachment(self, request: JobRequest) -> JobRecord:
+        """Admit, persist, and dispatch a prompt-with-attachment job."""
+        p_path = Path(request.prompt_file).expanduser().resolve()
+        a_path = Path(str(request.attachment_file)).expanduser().resolve()
+        out_path = Path(request.output_file).expanduser().resolve() if request.output_file else None
         self._reserve_capacity()
         try:
             self._guard_submit()
@@ -218,11 +234,10 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             self._release_capacity()
             raise
         job_id = self._generate_job_id("att")
-        now = _utc_now_iso()
 
         record = JobRecord(
             job_id=str(job_id),
-            created_at=now,
+            created_at=_utc_now_iso(),
             latest_event=EVENT_DISPATCH_ACKNOWLEDGED.value,
             completed=False,
             input_file=str(p_path),
@@ -238,7 +253,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             prompt_path=p_path,
             attachment_path=a_path,
             output_path=out_path,
-            headless=headless,
+            headless=HeadlessFlag(bool(request.headless)),
         )
         return record
 
@@ -376,13 +391,16 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         record = self._storage.get_job(job_id)
         self._save_started(record, started_at)
         try:
-            result = self._file_only.process_prompt_file_only(
-                prompt_file=FilePath(prompt_path),
-                output_file=FilePath(output_path) if output_path else None,
-                headless=headless,
+            result = self._file_only.execute(
+                PromptRequest(
+                    verb="process_prompt_file_only",
+                    prompt_file=FilePath(prompt_path),
+                    output_file=FilePath(output_path) if output_path else None,
+                    headless=headless,
+                )
             )
             duration = round(time.perf_counter() - start_t, 2)
-            result_text = str(result) if result is not None else ""
+            result_text = str(result.response_text or "") if result.response_text is not None else ""
             failure = detect_processing_failure(result_text) or (
                 result_text if result_text.startswith("ERROR") else None
             )
@@ -399,7 +417,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 started_at,
                 duration,
                 prompt_path,
-                self._preview_result(output_path, result),
+                self._preview_result(output_path, result_text),
                 output_path=output_path,
             )
         except Exception as exc:
@@ -449,14 +467,17 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         record = self._storage.get_job(job_id)
         self._save_started(record, started_at, attachment_path=attachment_path)
         try:
-            result = self._attachment.process_prompt_with_attachment(
-                prompt_file=FilePath(prompt_path),
-                attachment_file=FilePath(attachment_path),
-                output_file=FilePath(output_path) if output_path else None,
-                headless=headless,
+            result = self._attachment.execute(
+                PromptRequest(
+                    verb="process_prompt_with_attachment",
+                    prompt_file=FilePath(prompt_path),
+                    attachment_file=FilePath(attachment_path),
+                    output_file=FilePath(output_path) if output_path else None,
+                    headless=headless,
+                )
             )
             duration = round(time.perf_counter() - start_t, 2)
-            result_text = str(result) if result is not None else ""
+            result_text = str(result.response_text or "") if result.response_text is not None else ""
             failure = detect_processing_failure(result_text) or (
                 result_text if result_text.startswith("ERROR") else None
             )
@@ -482,7 +503,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 started_at,
                 duration,
                 prompt_path,
-                self._preview_result(output_path, result),
+                self._preview_result(output_path, result_text),
                 attachment_path=attachment_path,
                 output_path=output_path,
             )
@@ -499,15 +520,3 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 attachment_path=attachment_path,
                 output_path=output_path,
             )
-
-    def get_job_status(self, job_id: JobId | str) -> JobRecord | None:
-        """Query status and details of a submitted job."""
-        return self._storage.get_job(job_id)
-
-    def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
-        """List recently submitted jobs."""
-        return self._storage.list_jobs(JobLimit(int(limit)))
-
-    def shutdown(self) -> None:
-        """Cancel queued jobs and release executor resources during teardown."""
-        self._executor.shutdown(wait=False, cancel_futures=True)

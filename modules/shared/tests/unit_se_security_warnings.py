@@ -31,6 +31,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
     _format_success_payload,
 )
 from modules.shared.src.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.taxonomy_session_vo import SessionRequest
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files,
     compile_files_to_markdown,
@@ -90,7 +91,9 @@ def test_async_envelope_paths_are_trust_marked() -> None:
         workspace=tools,
         jobs=tools,
     )
-    tools.get_job_status.return_value = JobRecord(
+    from modules.shared.src.taxonomy_jobs_vo import JobResponse
+
+    status_record = JobRecord(
         job_id="job_1",
         latest_event="DONE",
         completed=True,
@@ -104,7 +107,10 @@ def test_async_envelope_paths_are_trust_marked() -> None:
         error=None,
         result_preview="answer",
     )
-    tools.list_jobs.return_value = []
+    tools.execute.side_effect = [
+        JobResponse(record=status_record),
+        JobResponse(records=[]),
+    ]
 
     status_payload = json.loads(command.get_job_status("job_1"))
     list_payload = json.loads(command.list_jobs(5))
@@ -150,7 +156,7 @@ def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> 
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.delete_session()
+            orchestrator.execute(SessionRequest(verb="delete"))
 
     assert (target / "keepme.txt").exists()
 
@@ -165,7 +171,7 @@ def test_delete_session_refuses_qwen_session_named_dir_under_home(tmp_path: Path
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.delete_session()
+            orchestrator.execute(SessionRequest(verb="delete"))
 
     assert target.exists()
 
@@ -183,7 +189,7 @@ def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
-        result = orchestrator.delete_session()
+        result = orchestrator.execute(SessionRequest(verb="delete"))
 
     assert "deleted successfully" in str(result)
     assert not fake_default.exists()

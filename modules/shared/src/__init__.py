@@ -7,15 +7,8 @@ Barrel re-export of all shared types. Layers identified by filename prefix
 from __future__ import annotations
 
 # ─── Contract: aggregates ─────────────────────────────────────
-from .contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    IPromptFlowAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-)
+from .contract_browser_aggregate import IBrowserAggregate
+from .contract_config_aggregate import IConfigAggregate
 
 # ─── Contract: protocols ──────────────────────────────────────
 from .contract_core_protocol import (
@@ -28,7 +21,14 @@ from .contract_core_protocol import (
     IStreamProtocol,
     IUploadProtocol,
 )
+from .contract_jobs_aggregate import IJobManagerAggregate
+from .contract_logging_aggregate import IObservabilityAggregate
+from .contract_prompt_aggregate import IPromptAggregate, IPromptFlowAggregate
+from .contract_session_aggregate import ISessionAggregate
+from .contract_session_protocol import ISessionRotatorProtocol
+from .contract_setup_aggregate import ISetupAggregate
 from .contract_swarm_aggregate import ISwarmAggregate
+from .contract_update_aggregate import IUpdateAggregate
 
 # ─── Taxonomy: constants ──────────────────────────────────────
 from .taxonomy_core_constant import (
@@ -191,6 +191,9 @@ from .taxonomy_core_vo import (
     UserAgent,
     WaitTimeoutMs,
 )
+
+# ─── Taxonomy: Logging VOs ────────────────────────────────────
+from .taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest, ObservabilityResponse
 
 # ─── Taxonomy: Swarm VOs ───────────────────────────────────────
 from .taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmId, SwarmSnapshot
@@ -395,18 +398,26 @@ __all__ = [
     "IBrowserProtocol",
     "ISaverProtocol",
     "IObservabilityProtocol",
-    "IAttachmentPromptAggregate",
-    "IDirectPromptAggregate",
+    "IBrowserAggregate",
+    "IConfigAggregate",
     "IJobManagerAggregate",
-    "IPromptFileAggregate",
+    "IObservabilityAggregate",
+    "IPromptAggregate",
+    "IPromptFlowAggregate",
+    "IUpdateAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
+    "ISessionRotatorProtocol",
     "ISetupAggregate",
     "ISwarmAggregate",
     # Swarm VOs
     "SwarmAgentSnapshot",
     "SwarmId",
     "SwarmSnapshot",
+    # Logging VOs
+    "MetricsSnapshot",
+    "ObservabilityRequest",
+    "ObservabilityResponse",
     # Utilities
     "detect_processing_failure",
     "error_response",

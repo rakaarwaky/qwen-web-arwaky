@@ -6,7 +6,7 @@ import asyncio
 import re
 from typing import TYPE_CHECKING
 
-from modules.shared.src.contract_session_aggregate import ISessionHealthCheckerProtocol, ISessionManagerProtocol
+from modules.shared.src.contract_session_protocol import ISessionHealthCheckerProtocol, ISessionManagerProtocol
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 if TYPE_CHECKING:

@@ -20,11 +20,7 @@ from modules.shared.src.contract_config_protocol import (
     IConfigValidatorProtocol,
 )
 from modules.shared.src.taxonomy_config_vo import ConfigRequest, ConfigResponse
-from modules.shared.src.taxonomy_core_vo import (
-    AppConfig,
-    SlotRunPlan,
-    TimeoutSec,
-)
+from modules.shared.src.taxonomy_core_vo import AppConfig, SlotRunPlan
 
 __all__ = ["ConfigOrchestrator"]
 
@@ -62,32 +58,7 @@ class ConfigOrchestrator(IConfigAggregate):
         self._capacity = capacity
         self._slot_plan = slot_plan
 
-    def for_mode(self, request: ConfigRequest) -> AppConfig:
-        """Build the ``AppConfig`` a *request* describes.
-
-        The sandbox verdict from the environment probe is applied on top
-        of the factory's own probe, so a forced-sandbox host that reports
-        no seccomp filter still launches sandboxed when the operator
-        asked for it.
-        """
-        sandbox = self._environment.sandbox_report()
-        return build_app_config(
-            str(request.mode),
-            input_path=request.input_path,
-            output_path=request.output_path,
-            headless=bool(request.headless),
-            request_timeout=int(self._environment.request_timeout_sec()),
-            disable_sandbox=sandbox.state in ("disabled_by_env", "disabled_by_host"),
-        )
-
-    def request_timeout_sec(self) -> TimeoutSec:
-        """Return the response-wait ceiling this process will enforce.
-
-        Read on every call rather than cached at construction, so a
-        surface that changes the environment mid-session (the login
-        flow sets one) is honored without rebuilding the container.
-        """
-        return self._environment.request_timeout_sec()
+    # ─── Block 2: Aggregate Method Implementation ──────────
 
     def execute(self, request: ConfigRequest) -> ConfigResponse:
         """Run the requested config verb and return one response shape.
@@ -98,7 +69,7 @@ class ConfigOrchestrator(IConfigAggregate):
         """
         if request.verb == "for_mode":
             return ConfigResponse(
-                config=self.for_mode(request),
+                config=self._build_config(request),
                 timeout_sec=self._environment.request_timeout_sec(),
             )
         if request.verb == "sandbox_report":
@@ -116,3 +87,23 @@ class ConfigOrchestrator(IConfigAggregate):
                 return ConfigResponse(config=resolved)
             return ConfigResponse(error=resolved.message)
         return ConfigResponse(error=f"Unknown config verb: {request.verb!r}")
+
+    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+
+    def _build_config(self, request: ConfigRequest) -> AppConfig:
+        """Build the ``AppConfig`` a *request* describes.
+
+        The sandbox verdict from the environment probe is applied on top
+        of the factory's own probe, so a forced-sandbox host that reports
+        no seccomp filter still launches sandboxed when the operator
+        asked for it.
+        """
+        sandbox = self._environment.sandbox_report()
+        return build_app_config(
+            str(request.mode),
+            input_path=request.input_path,
+            output_path=request.output_path,
+            headless=bool(request.headless),
+            request_timeout=int(self._environment.request_timeout_sec()),
+            disable_sandbox=sandbox.state in ("disabled_by_env", "disabled_by_host"),
+        )

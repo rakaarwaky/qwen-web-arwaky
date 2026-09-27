@@ -15,7 +15,6 @@ from modules.config.src.utility_config_app_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.shared.src.contract_core_aggregate import IPromptFileAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
@@ -26,6 +25,8 @@ from modules.shared.src.contract_core_protocol import (
     LifecycleObserver,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_aggregate import IPromptFlowAggregate
+from modules.shared.src.contract_prompt_protocol import IPromptFileProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
@@ -53,7 +54,7 @@ def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
     return RunState()
 
 
-class PromptFileAdapter(IPromptFileAggregate):
+class PromptFileAdapter(IPromptFileProtocol):
     """Orchestrates prompt file execution (without document attachment)."""
 
     def __init__(

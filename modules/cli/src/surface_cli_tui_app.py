@@ -26,16 +26,16 @@ from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-)
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.taxonomy_swarm_vo import SwarmId
@@ -96,9 +96,9 @@ class QwenTuiApp(
     def __init__(
         self,
         workspace: IWorkspaceProtocol,
-        direct: IDirectPromptAggregate,
-        file_only: IPromptFileAggregate,
-        attachment: IAttachmentPromptAggregate,
+        direct: IDirectPromptProtocol,
+        file_only: IPromptFileProtocol,
+        attachment: IAttachmentPromptProtocol,
         slot_config: IConfigSlotPlanProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
@@ -136,6 +136,14 @@ class QwenTuiApp(
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
         self._metric_done: Any = None
+        self._metric_model: Any = None
+        self._metric_swarm_ring: Any = None
+        self._metric_swarm_detail: Any = None
+        self._metric_swarm_uptime: Any = None
+        self._metric_threads_ring: Any = None
+        self._metric_threads_detail: Any = None
+        self._metric_swarm_bar: Any = None
+        self._metric_threads_bar: Any = None
         # U4: session-check timeout flag.
         self._session_check_timed_out: bool = False
         # UX-4-2: last resolved session state (VALID/EXPIRED/TIMEOUT) or None
@@ -151,6 +159,8 @@ class QwenTuiApp(
         self._slot_generation: dict[int, int] = {s: 0 for s in range(1, NUM_SLOTS + 1)}
         # Issue #277: input held while the Swarm resource modal is up.
         self._swarm_pending_input: Path | None = None
+        # Redesign v6.5.2: uptime stamp for the Overview Swarm Status card.
+        self._swarm_started_perf: float | None = None
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406

@@ -16,7 +16,6 @@ from modules.config.src.utility_config_app_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IFolderToAttachmentProtocol,
@@ -29,6 +28,8 @@ from modules.shared.src.contract_core_protocol import (
     LifecycleObserver,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_aggregate import IPromptFlowAggregate
+from modules.shared.src.contract_prompt_protocol import IAttachmentPromptProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE
@@ -58,7 +59,7 @@ def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
     return RunState()
 
 
-class AttachmentPromptAdapter(IAttachmentPromptAggregate):
+class AttachmentPromptAdapter(IAttachmentPromptProtocol):
     """Orchestrates prompt execution with document file attachment."""
 
     def __init__(
