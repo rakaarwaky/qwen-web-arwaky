@@ -60,9 +60,11 @@ class _TuiWorkersMixin:
     _login_in_flight: bool
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
+    _direct: Any
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
+    _append_chat_message: Any
     query_one: Any
     notify: Any
     _set_slot_tab_title: Any
@@ -119,6 +121,10 @@ class _TuiWorkersMixin:
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
 
+        # The chat console's transcript mirrors what this slot was asked to
+        # do, so a run started from Settings still shows up in the Chat view.
+        self._append_chat_message(slot_id, "user", p_name, attachment=file_val)
+
         # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
         # never touches another slot's in-flight browser context.
         self._slot_cancel_events[slot_id] = threading.Event()
@@ -140,6 +146,52 @@ class _TuiWorkersMixin:
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
+
+    def _run_composer_slot(self, slot_id: int, text: str) -> None:
+        """Dispatch a chat-console task as a direct text prompt.
+
+        The composer is the mockup's inline execution surface: it takes a
+        typed task instead of a prompt file, so it runs through the direct
+        prompt capability while reusing the same per-slot status, table, and
+        finalize plumbing every other run uses.
+        """
+        if self._slot_workers.get(slot_id) is not None:
+            self._log_msg("[bold {}]WARNING:[/] Slot {} already running.".format(THEME["warn"], slot_id), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
+            return
+        if getattr(self, "_direct", None) is None:
+            msg = f"Direct prompt capability is not available for Slot {slot_id}."
+            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(msg, severity="error", title=f"Slot {slot_id}")
+            return
+
+        headless = True
+        out_val = ""
+        with contextlib.suppress(Exception):
+            headless = self.query_one(f"#switch-headless-{slot_id}", Switch).value
+            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
+
+        filename = self._truncate_name(text, 24)
+        self._slot_cancel_events[slot_id] = threading.Event()
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {filename} ▶")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = False
+        self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
+        self._slot_stats[slot_id] = {
+            "status": "RUNNING",
+            "file": filename,
+            "duration": 0.0,
+            "event": "EVENT_WEB_LOADED",
+            "_start_perf": time.perf_counter(),
+        }
+        self._update_table_row(slot_id, self._format_status("RUNNING", "table"), filename, "running…")
+        self._refresh_metrics()
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
+
+        self._slot_workers[slot_id] = self._execute_direct_worker(slot_id, text, headless, out_val)
 
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
@@ -355,6 +407,44 @@ class _TuiWorkersMixin:
             self._swarm_started_perf = None
             self.call_from_thread(self._refresh_metrics)
 
+    def _install_slot_ticker(self, slot_id: int) -> list[Any]:
+        """Start the 5s elapsed-time ticker for a running slot.
+
+        ``set_interval`` belongs to the event loop thread, so the worker
+        thread queues the installation. ``call_from_thread`` blocks until the
+        callback has run, which is what makes returning the holder safe: the
+        caller's ``finally`` can stop the timer immediately after.
+        """
+        holder: list[Any] = []
+
+        def _create_timer() -> None:
+            holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
+
+        self.call_from_thread(_create_timer)
+        return holder
+
+    @staticmethod
+    def _stop_slot_ticker(holder: list[Any]) -> None:
+        """Stop a ticker started by :meth:`_install_slot_ticker`, if any."""
+        if holder:
+            # Stopping a timer is thread-safe, but keep the call off the
+            # worker's failure path: a dead handle must not mask the result.
+            with contextlib.suppress(Exception):
+                holder[0].stop()
+
+    def _observe_slot_event(self, slot_id: int) -> Any:
+        """Build the lifecycle observer that mirrors pipeline events into the UI."""
+
+        def _on_event(_event_type: Any, _event: Any) -> None:
+            # Event-level status: render the actual pipeline event (thinking /
+            # streaming / prompting) in the slot badge and overview table so a
+            # running slot is never just "RUNNING".
+            event_name = str(_event.name)
+            self._slot_stats.setdefault(slot_id, {})["event"] = event_name
+            self.call_from_thread(self._update_slot_event_status, slot_id, event_name)
+
+        return _on_event
+
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
         threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
@@ -374,21 +464,8 @@ class _TuiWorkersMixin:
         # U7: capture the generation at worker start for finalize guard
         gen = self._slot_generation.get(slot_id, 0)
         # U4: start periodic elapsed-time updater via call_from_thread
-        # (set_timer must be called from the main event loop thread)
-        timer_holder: list[Any] = []
-
-        def _create_timer() -> None:
-            timer_holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
-
-        self.call_from_thread(_create_timer)
-
-        def _on_event(_event_type: Any, _event: Any) -> None:
-            # Event-level status: render the actual pipeline event (thinking /
-            # streaming / prompting) in the slot badge and overview table so a
-            # running slot is never just "RUNNING".
-            event_name = str(_event.name)
-            self._slot_stats.setdefault(slot_id, {})["event"] = event_name
-            self.call_from_thread(self._update_slot_event_status, slot_id, event_name)
+        timer_holder = self._install_slot_ticker(slot_id)
+        _on_event = self._observe_slot_event(slot_id)
 
         try:
             if cfg.file_path:
@@ -429,6 +506,7 @@ class _TuiWorkersMixin:
                     "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
+                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True, gen)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
@@ -439,8 +517,77 @@ class _TuiWorkersMixin:
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
         finally:
-            if timer_holder:
-                self.call_from_thread(timer_holder[0].stop)
+            self._stop_slot_ticker(timer_holder)
+
+    @work(thread=True)
+    def _execute_direct_worker(
+        self,
+        slot_id: int,
+        prompt: str,
+        headless: bool,
+        output_val: str,
+    ) -> None:
+        """Run one composer task through the direct prompt capability.
+
+        Mirrors ``_execute_slot_worker``: the worker thread takes the slot's
+        name so the log handler routes its records into that slot's event
+        log, and every UI write crosses threads through ``call_from_thread``
+        behind the same generation guard a file run uses.
+        """
+        threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
+        self._ensure_log_handler()
+        filename = self._truncate_name(prompt, 24)
+        start_t = time.perf_counter()
+        gen = self._slot_generation.get(slot_id, 0)
+        timer_holder = self._install_slot_ticker(slot_id)
+        _on_event = self._observe_slot_event(slot_id)
+
+        self.call_from_thread(
+            self._log_msg,
+            "[bold {}]>>> [Slot {}] Direct prompt: {}[/]".format(
+                THEME["accent_fg"], slot_id, escape(filename)
+            ),
+            slot_id,
+        )
+
+        try:
+            res = self._direct.process_direct_prompt(
+                prompt=PromptText(prompt),
+                timeout_sec=600,
+                output_file=Path(output_val) if output_val.strip() else None,
+                headless=HeadlessFlag(headless),
+                event_observer=_on_event,
+            )
+            dur = round(time.perf_counter() - start_t, 1)
+            res_str = str(res)
+            fail_reason = detect_processing_failure(res_str)
+            if fail_reason is not None:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}][Slot {}] FAILED:[/] {}".format(
+                        THEME["err"], slot_id, escape(str(fail_reason))
+                    ),
+                    slot_id,
+                )
+                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
+            else:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
+                    slot_id,
+                )
+                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
+                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", filename, dur, True, gen)
+        except Exception as exc:
+            dur = round(time.perf_counter() - start_t, 1)
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(exc))),
+                slot_id,
+            )
+            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
+        finally:
+            self._stop_slot_ticker(timer_holder)
 
     # ── Login worker ─────────────────────────────────────────────────────
 
@@ -560,6 +707,7 @@ class _TuiWorkersMixin:
                 total = pool.total_count
                 healthy = sum(1 for s in sessions if s.is_healthy)
                 limited = sum(1 for s in sessions if s.is_limited)
+                self._render_account_cards(list(sessions))
                 with contextlib.suppress(NoMatches):
                     self.query_one("#session-total", Label).update(f"{total}")
                     self.query_one("#session-healthy", Label).update(f"{healthy}")

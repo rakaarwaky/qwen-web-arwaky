@@ -37,6 +37,8 @@ class _TuiHandlersMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
+    _append_chat_message: Any
+    _run_composer_slot: Any
     query_one: Any
     _log_msg: Any
     copy_to_clipboard: Any
@@ -63,8 +65,48 @@ class _TuiHandlersMixin:
         if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
             self._auth_panel_pressed(button_id)
             return
-        if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm"):
+        if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm", "nav-settings"):
             self._nav_dock_go(button_id)
+            return
+        # Mockup parity: the chat console's slot carousel jumps straight to the
+        # selected slot's tab. The id carries both the pane it was pressed in
+        # and the slot it points at (chat-slot-<pane>-<target>).
+        if button_id.startswith("chat-slot-"):
+            _, _, target = button_id.partition("chat-slot-")
+            pane_raw, _, slot_raw = target.partition("-")
+            if pane_raw.isdigit() and slot_raw.isdigit():
+                self._switch_to_slot(int(slot_raw))
+            return
+        # Settings pane: pick which slot's configuration block is displayed.
+        if button_id.startswith("cfg-slot-"):
+            slot_raw = button_id.removeprefix("cfg-slot-")
+            if slot_raw.isdigit():
+                self._show_slot_config(int(slot_raw))
+            return
+        # Chat console: Event/System segmented switch over the slot's logs.
+        if button_id.startswith("btn-slot-event-"):
+            self._show_slot_log(int(button_id.removeprefix("btn-slot-event-")), False)
+            return
+        if button_id.startswith("btn-slot-system-"):
+            self._show_slot_log(int(button_id.removeprefix("btn-slot-system-")), True)
+            return
+        # Chat console action pills: prompt picker, attachment picker, and the
+        # template selector — which lives on the Settings pane.
+        if button_id.startswith("btn-pill-prompt-"):
+            slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
+            self._open_picker(f"input-prompt-{slot_id}")
+            return
+        if button_id.startswith("btn-pill-attach-"):
+            slot_id = int(button_id.removeprefix("btn-pill-attach-"))
+            self._open_picker(f"input-file-{slot_id}", select_directories=True)
+            return
+        if button_id.startswith("btn-pill-templates-"):
+            slot_id = int(button_id.removeprefix("btn-pill-templates-"))
+            self._goto_slot_settings(slot_id)
+            return
+        # Chat console composer: dispatch the typed task as a direct prompt.
+        if button_id.startswith("btn-send-"):
+            self._send_composer(int(button_id.removeprefix("btn-send-")))
             return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
@@ -264,8 +306,9 @@ class _TuiHandlersMixin:
             login_btn = self.query_one("#nav-login", Button)
             chat_btn = self.query_one("#nav-chat", Button)
             swarm_btn = self.query_one("#nav-swarm", Button)
+            settings_btn = self.query_one("#nav-settings", Button)
             # Reset all to inactive; then activate the one that matches.
-            for btn in (overview_btn, login_btn, chat_btn, swarm_btn):
+            for btn in (overview_btn, login_btn, chat_btn, swarm_btn, settings_btn):
                 btn.set_class(True, "nav-inactive")
                 btn.set_class(False, "nav-active")
             if active == "tab-overview":
@@ -276,13 +319,16 @@ class _TuiHandlersMixin:
                 chat_btn.set_class(True, "nav-active")
             elif active == "tab-swarm":
                 swarm_btn.set_class(True, "nav-active")
+            elif active == "tab-settings":
+                settings_btn.set_class(True, "nav-active")
 
     def _nav_dock_go(self, button_id: str) -> None:
         """Switch the tab bar to whichever section a bottom nav item points at.
 
         CHAT has no single tab of its own: it stands for every per-slot job
         tab, so it lands on the slot the user is already on (slot 1 when the
-        active tab is not a slot tab).
+        active tab is not a slot tab). SETTINGS follows the same rule — it
+        opens on whichever slot is currently on screen.
         """
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
@@ -295,6 +341,9 @@ class _TuiHandlersMixin:
                 tabs.active = active_id if active_id.startswith("tab-slot-") else "tab-slot-1"
             elif button_id == "nav-swarm":
                 tabs.active = "tab-swarm"
+            elif button_id == "nav-settings":
+                self.action_switch_tab_settings()
+                return
         self._refresh_nav_dock()
 
     # ── Keyboard actions ─────────────────────────────────────────────────
@@ -346,13 +395,20 @@ class _TuiHandlersMixin:
         self._copy_rich_log(view)
 
     def _copy_slot_log(self, slot_id: int) -> None:
-        """Copy the per-slot log buffer identified by its slot number."""
+        """Copy whichever of the slot's two log buffers is on screen."""
         log_views: dict[Any, Any] = getattr(self, "_log_views", {})
+        system_views: dict[Any, Any] = getattr(self, "_system_log_views", {})
         view = log_views.get(slot_id)
-        if view is None:
+        system_view = system_views.get(slot_id)
+        if view is not None and not view.display:
+            view = None
+        if system_view is not None and not system_view.display:
+            system_view = None
+        target = view or system_view
+        if target is None:
             self._log_msg(f"[yellow]Slot {slot_id} log view not found.[/]")
             return
-        self._copy_rich_log(view)
+        self._copy_rich_log(target)
 
     def _copy_rich_log(self, view: QwenTuiRichLog) -> None:
         text = view.copy_text()
@@ -374,10 +430,86 @@ class _TuiHandlersMixin:
             self.query_one(TabbedContent).active = "tab-swarm"
         self._refresh_nav_dock()
 
+    def action_switch_tab_settings(self) -> None:
+        """Switch to the Settings tab (ctrl+comma), keeping the slot on screen.
+
+        Arriving from another tab picks the slot the user was just looking at;
+        pressing the shortcut while already on Settings leaves the configured
+        slot alone instead of snapping back to slot 1.
+        """
+        with contextlib.suppress(Exception):
+            tabs = self.query_one(TabbedContent)
+            if tabs.active != "tab-settings":
+                self._show_slot_config(self._get_active_slot_id())
+                tabs.active = "tab-settings"
+        self._refresh_nav_dock()
+
     def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
         self._refresh_nav_dock()
+
+    # ── Chat console / Settings pane ─────────────────────────────────────
+
+    def _show_slot_log(self, slot_id: int, show_system: bool) -> None:
+        """Swap a chat console between the slot's Event log and System log.
+
+        The two share one panel, so exactly one view stays visible and only
+        the pressed button keeps the active fill.
+        """
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#log-view-{slot_id}", QwenTuiRichLog).display = not show_system
+            self.query_one(f"#log-view-{slot_id}-system", QwenTuiRichLog).display = show_system
+        with contextlib.suppress(NoMatches):
+            event_btn = self.query_one(f"#btn-slot-event-{slot_id}", Button)
+            system_btn = self.query_one(f"#btn-slot-system-{slot_id}", Button)
+            event_btn.set_class(show_system, "seg-active")
+            system_btn.set_class(not show_system, "seg-active")
+
+    def _show_slot_config(self, slot_id: int) -> None:
+        """Display one slot's configuration block and mark its picker pill."""
+        for s in range(1, self._NUM_SLOTS + 1):
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#slot-config-{s}", Vertical).display = s == slot_id
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#cfg-slot-{s}", Button).set_class(s == slot_id, "slot-chip-active")
+
+    def _goto_slot_settings(self, slot_id: int) -> None:
+        """Open the Settings pane on *slot_id*'s form — the Templates pill."""
+        self._show_slot_config(slot_id)
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-settings"
+        self._refresh_nav_dock()
+
+    def _send_composer(self, slot_id: int) -> None:
+        """Echo the typed task into the transcript and dispatch it."""
+        text = ""
+        with contextlib.suppress(NoMatches):
+            composer = self.query_one(f"#composer-{slot_id}", Input)
+            text = composer.value.strip()
+            if text:
+                composer.value = ""
+        if not text:
+            with contextlib.suppress(Exception):
+                self.notify(
+                    "Type a task before sending.",
+                    severity="warning",
+                    title=f"Slot {slot_id}",
+                )
+            return
+        attachment = ""
+        with contextlib.suppress(NoMatches):
+            attachment = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
+        self._append_chat_message(slot_id, "user", text, attachment=attachment)
+        self._run_composer_slot(slot_id, text)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter inside a composer input sends that slot's typed task."""
+        input_id = event.input.id or ""
+        if input_id.startswith("composer-"):
+            slot_raw = input_id.removeprefix("composer-")
+            if slot_raw.isdigit():
+                self._send_composer(int(slot_raw))
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""

@@ -255,20 +255,18 @@ def test_active_tab_label_renders_on_screen() -> None:
 
             strips = list(app.screen._compositor.render_strips())
             rendered = "".join(s.text for s in strips)
-            # Load-bearing: the label is drawn somewhere on screen.
-            assert "deep-review" in rendered
-
-            # …and specifically on the tab row (the strip holding "Overview").
-            tab_row = next(s.text for s in strips if "Overview" in s.text)
-            assert "deep-review" in tab_row
-
-            # Geometry: the active Tab keeps a full text row; inactive ones are
-            # unchanged.
+            # Load-bearing: the label reaches the Tab widget, not just the model.
             active_tab = app.query_one("#--content-tab-tab-slot-1", Tab)
-            assert active_tab.content_region.height > 0
+            assert "deep-review" in str(active_tab.label)
+
+            # The tab strip is hidden (design has no tab bar), so no Tab paints
+            # a text row and none of the pane names leak onto screen.
             for w in app.query(Tab):
-                if w.id != "--content-tab-tab-slot-1":
-                    assert w.content_region.height == 1, w.id
+                assert w.content_region.height == 0, w.id
+            for name in ("Overview", "Sessions", "Swarm", "Settings"):
+                assert name not in rendered, f"{name} tab label must not paint"
+            # The in-page brand row is visible and carries the identity block.
+            assert "QWEN-CLI" in rendered
 
             # The accent active-indicator survives on Textual's Underline.
             underline = tabs.query_one(Underline)

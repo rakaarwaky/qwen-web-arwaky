@@ -11,12 +11,15 @@ from __future__ import annotations
 import contextlib
 import logging
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from rich.markup import escape
 from rich.text import Text
+from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.content import Content
 from textual.css.query import NoMatches
-from textual.widgets import DataTable, Label, TabbedContent
+from textual.widgets import Button, DataTable, Label, Static, TabbedContent
 from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
@@ -129,6 +132,25 @@ def _empty_cluster_bar_markup(n_slots: int) -> str:
     return _cluster_bar_markup(n_slots, {})
 
 
+# Transcript budget: one entry is capped so a single huge model answer cannot
+# blow up a Static, and the pane keeps only its newest messages so the
+# fixed-height chat console never accumulates unbounded widgets.
+_MAX_TRANSCRIPT_CHARS = 4000
+_MAX_TRANSCRIPT_MESSAGES = 40
+
+
+def _attachment_chip(path_str: str) -> str:
+    """Format an attachment the way the mockup's chip does (name, size, tick)."""
+    path = Path(path_str)
+    label = path.name or path_str
+    try:
+        if path.is_file():
+            label = f"{label} ({path.stat().st_size // 1024}KB)"
+    except OSError:
+        pass
+    return f"📄 {label} ✓ ATTACHED"
+
+
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
 
@@ -148,6 +170,10 @@ class _TuiUtilsMixin:
     _metric_threads_bar: Any
     _log_handler: logging.Handler
     _log_views: dict[int, QwenTuiRichLog]
+    _system_log_views: dict[int, QwenTuiRichLog]
+    _chat_scrolls: dict[int, ScrollableContainer]
+    _chat_hints: dict[int, Static]
+    _slot_log_times: dict[int, Label]
     _swarm_id: str | None
     _swarm: Any
     _swarm_started_perf: float | None
@@ -425,13 +451,128 @@ class _TuiUtilsMixin:
             view = views.get(slot_id)
             if view is not None:
                 view.write(msg)
+            self._stamp_slot_log(slot_id)
             return
         overview = views.get(0)
         if overview is not None:
             overview.write(msg)
-        active = views.get(self._get_active_slot_id())
-        if active is not None and active is not overview:
-            active.write(msg)
+        # Mockup parity: a chat console carries two buffers. Slot-scoped
+        # writes above feed the EVENT LOG; unscoped application records feed
+        # the SYSTEM LOG of whichever slot is on screen.
+        active = self._get_active_slot_id()
+        system = getattr(self, "_system_log_views", {}).get(active)
+        if system is not None:
+            system.write(msg)
+        self._stamp_slot_log(active)
+
+    def _stamp_slot_log(self, slot_id: int) -> None:
+        """Advance the chat console's trailing log clock (mockup's 09:46:31)."""
+        label = getattr(self, "_slot_log_times", {}).get(slot_id)
+        if label is not None:
+            label.update(time.strftime("%H:%M:%S"))
+
+    def _append_chat_message(
+        self,
+        slot_id: int,
+        role: str,
+        text: str,
+        attachment: str = "",
+    ) -> None:
+        """Render one transcript entry in a slot's chat console.
+
+        ``role`` is ``user`` (right-aligned operator prompt) or ``agent``
+        (left-aligned Qwen answer). The empty-state hint sits in the
+        transcript until the first message replaces it, and the transcript
+        keeps only its newest entries so a long session cannot grow without
+        bound in a fixed-height pane.
+        """
+        scroll = self._chat_scrolls.get(slot_id)
+        if scroll is None:
+            return
+        hint = self._chat_hints.pop(slot_id, None)
+        if hint is not None and hint.is_attached:
+            with contextlib.suppress(Exception):
+                hint.remove()
+        stamp = time.strftime("%H:%M:%S")
+        if len(text) > _MAX_TRANSCRIPT_CHARS:
+            text = text[: _MAX_TRANSCRIPT_CHARS - 1] + "…"
+        body = escape(text)
+        if role == "user":
+            blocks: list[Static] = [
+                Static("DEV OPERATOR", classes="msg-author msg-author-right"),
+                Static(body, classes="msg-bubble msg-bubble-user"),
+            ]
+            if attachment:
+                blocks.append(Static(_attachment_chip(attachment), classes="msg-attach"))
+            blocks.append(Static(stamp, classes="msg-time msg-time-user"))
+            message = Vertical(*blocks, classes="msg msg-user")
+        else:
+            message = Vertical(
+                Static("QWEN3.8-MAX", classes="msg-author"),
+                Static(body, classes="msg-bubble"),
+                Static(stamp, classes="msg-time"),
+                classes="msg msg-agent",
+            )
+        with contextlib.suppress(Exception):
+            scroll.mount(message)
+            # Removal is deferred by one message pump, so stop as soon as the
+            # head of the list stops changing instead of looping on a stale
+            # children tuple.
+            while len(scroll.children) > _MAX_TRANSCRIPT_MESSAGES:
+                head = scroll.children[0]
+                head.remove()
+                if head in scroll.children:
+                    break
+            scroll.scroll_end(animate=False)
+
+    # ── Sessions: mockup account cards ───────────────────────────────────
+
+    @staticmethod
+    def _account_card(session: Any, position: int) -> Vertical:
+        """Build one mockup account card from a stored session record.
+
+        The card mirrors the Login mockup: identity on top, then a hairline
+        row carrying the health state and the two per-account actions. The
+        actions ride on ``Button.name`` rather than ``id`` so a re-check can
+        rebuild the whole list without ever registering a duplicate id.
+        """
+        name = str(getattr(session, "name", "") or getattr(session, "session_id", "") or f"session-{position}")
+        healthy = bool(getattr(session, "is_healthy", False))
+        status = getattr(getattr(session, "status", None), "value", "") or ""
+        if healthy:
+            label, state_class = "ACTIVE", "state-active"
+        else:
+            label, state_class = str(status).upper() or "LIMITED", "state-limited"
+        return Vertical(
+            Horizontal(
+                Static(name[:1].upper() or "◍", classes="account-avatar"),
+                Static(escape(name), classes="account-email"),
+                classes="account-card-head",
+            ),
+            Horizontal(
+                Static(f"● {label}", classes=f"account-status {state_class}"),
+                Button("TEST", name=f"account-test-{position}", classes="account-btn account-btn-test"),
+                Button("EXIT", name=f"account-disconnect-{position}", classes="account-btn account-btn-disconnect"),
+                classes="account-card-foot",
+            ),
+            classes="account-card",
+        )
+
+    def _render_account_cards(self, sessions: list[Any]) -> None:
+        """Replace the Sessions pane's card list with one card per session.
+
+        The list is rebuilt rather than diffed: a token re-check rewrites the
+        health state of every account at once, so incremental updates would
+        have to reconcile states that all change together anyway.
+        """
+        with contextlib.suppress(NoMatches):
+            container = self.query_one("#account-cards", Vertical)
+            container.remove_children()
+            if not sessions:
+                container.mount(Static("No accounts registered.", classes="field-label"))
+                return
+            for position, session in enumerate(sessions, start=1):
+                container.mount(self._account_card(session, position))
 
 
 __all__ = ["_TuiUtilsMixin", "SlotStatus", "format_event_label"]

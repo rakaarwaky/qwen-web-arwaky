@@ -74,12 +74,31 @@ Screen {
     layers: base modal;
 }
 
-Header {
+/* --- In-page brand row (replaces the docked Header) ------------------------
+   The mockups carry no top bar: `>_ QWEN-CLI` plus the `v6.5.2` chip sit as
+   the first row inside the page canvas, on the surface color with no border
+   below. Every screen yields this row as its first child, so the identity
+   block is integrated into the page rather than docked above it. */
+.app-brand-row {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
     background: $bg_base;
-    color: $fg_accent;
-    border-bottom: solid $border;
-    height: 3;
-    dock: top;
+    align: left middle;
+}
+
+.app-brand-title {
+    color: $fg_primary;
+    text-style: bold;
+    width: auto;
+}
+
+.app-brand-version {
+    color: $status_muted;
+    background: $bg_hover;
+    width: auto;
+    height: 1;
+    padding: 0 1;
 }
 
 Footer {
@@ -99,6 +118,10 @@ Tabs {
     border-bottom: solid $border;
     height: 3;
     overflow-x: auto;
+    /* No tab strip in the mockups: navigation is via the bottom nav dock
+       and the slot carousel inside the Chat pane. Hide the strip so slot
+       tabs do not appear on Overview, Sessions, Swarm, or Settings. */
+    display: none;
 }
 
 Tab {
@@ -133,7 +156,7 @@ Underline {
 }
 
 .nav-item {
-    min-width: 14;
+    min-width: 12;
     height: 3;
     padding: 0 1;
     background: $bg_raised;
@@ -1210,6 +1233,79 @@ HelpScreen {
     color: $fg_on_accent;
     border: solid $accent;
     text-style: bold;
+}
+
+/* The console shell: a vertical stack of carousel, telemetry header,
+   transcript, log card, action pills, and composer. The transcript takes the
+   slack (1fr) while the log card keeps a fixed block so a chatty run cannot
+   squeeze the composer off the pane. */
+.chat-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2;
+}
+
+.chat-hint {
+    width: 100%;
+    height: auto;
+    color: $fg_muted;
+    text-style: italic;
+    text-align: center;
+}
+
+.msg-author.msg-author-right {
+    text-align: right;
+}
+
+/* EVENT LOG [SLOT #N] card: header row, the buffer, and the trailing clock. */
+.event-log-card {
+    layout: vertical;
+    width: 100%;
+    height: 10;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 0 1;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.event-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    align: left middle;
+}
+
+.event-log-title {
+    width: auto;
+    margin-right: 1;
+    color: $fg_accent;
+    text-style: bold;
+}
+
+.event-log-slot {
+    width: 1fr;
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.slot-log-time {
+    width: 100%;
+    height: 1;
+    text-align: right;
+    color: $status_muted;
+}
+
+/* Settings: one configuration block per slot, only the chosen one shown. */
+.slot-config {
+    width: 100%;
+    height: auto;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 1 2;
+    margin-bottom: 1;
 }
 
 /* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */

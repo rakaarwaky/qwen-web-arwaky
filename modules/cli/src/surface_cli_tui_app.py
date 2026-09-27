@@ -68,6 +68,7 @@ class QwenTuiApp(
     BINDINGS = [
         Binding("alt+0", "switch_tab_overview", "Overview"),
         Binding("ctrl+alt+s", "switch_tab_swarm", "Swarm"),
+        Binding("ctrl+comma", "switch_tab_settings", "Settings"),
         *[
             Binding(
                 f"alt+{s}" if s <= 9 else _EXTRA_SLOT_KEYS[s],

@@ -17,7 +17,6 @@ from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
     DataTable,
-    Header,
     Input,
     Label,
     LoadingIndicator,
@@ -30,6 +29,7 @@ from textual.widgets import (
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
+from modules.shared.src.utility_core_version import get_package_version
 from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL, DEFAULT_OUTPUT
 
@@ -72,10 +72,15 @@ class _TuiComposeMixin:
         workers, handlers, and ``tests/unit_tui_log_containment.py`` keep
         resolving without changes.
         """
-        yield Header(show_clock=True)
+        # Design parity: no separate Top Bar. The brand row lives inside the
+        # page canvas and matches the mockup's fixed header markup.
         with TabbedContent(id="main-tabs"):
             # ─── Screen 1: Overview ──────────────────────────────
             with TabPane("Overview", id="tab-overview"), Vertical(classes="overview-container"):
+                # In-page brand row (replaces the docked Header bar).
+                with Horizontal(classes="app-brand-row"):
+                    yield Label(">_ QWEN-CLI", classes="app-brand-title")
+                    yield Label(f"v{get_package_version()}", classes="app-brand-version")
                 # The engine cards and the THREADS MATRIX live in their own
                 # scroll band. The System Event Log strip stays outside it so
                 # the panel keeps real estate on short terminals —
@@ -161,6 +166,9 @@ class _TuiComposeMixin:
 
             # ─── Screen 2: Login / Session Manager ───────────────
             with TabPane("Sessions", id="tab-sessions"), Vertical(classes="screen-body"):
+                with Horizontal(classes="app-brand-row"):
+                    yield Label(">_ QWEN-CLI", classes="app-brand-title")
+                    yield Label(f"v{get_package_version()}", classes="app-brand-version")
                 # SESSION POOL STATUS card (dns icon + 3-cell grid).
                 with Vertical(classes="screen-card"):
                     with Horizontal(classes="pane-title"):
@@ -219,101 +227,58 @@ class _TuiComposeMixin:
                     wrap=True,
                 )
 
-            # ─── Screen 3: Chat (per-slot tabs) ──────────────────
+            # ─── Screen 3: Chat (per-slot console) ─────────────────
+            # The mockup's chat console carries no configuration form: it is a
+            # slot carousel, a transcript, the slot's event log, three action
+            # pills, and a composer. The form moved to the Settings pane below,
+            # so every widget id the run/cancel workers resolve still exists.
             for s in range(1, self._NUM_SLOTS + 1):
-                with TabPane(f"Slot {s} ●", id=f"tab-slot-{s}"), Horizontal(classes="slot-container"):
-                    # LEFT PANE: configuration form (preserved from v6.5.2).
-                    with ScrollableContainer(classes="left-pane"):
-                        yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
+                with TabPane(f"Slot {s} ●", id=f"tab-slot-{s}"), Vertical(classes="chat-screen"):
+                    with Horizontal(classes="app-brand-row"):
+                        yield Label(">_ QWEN-CLI", classes="app-brand-title")
+                        yield Label(f"v{get_package_version()}", classes="app-brand-version")
+                    # Horizontal slot picker: one pill per job slot, this pane's
+                    # own slot filled — the mockup's SLOT 01 … SLOT 10 row.
+                    with Horizontal(classes="slot-carousel"):
+                        for i in range(1, self._NUM_SLOTS + 1):
+                            yield Button(
+                                f"● SLOT {i:02d}",
+                                id=f"chat-slot-{s}-{i}",
+                                classes="slot-chip slot-chip-active" if i == s else "slot-chip",
+                            )
 
-                        yield Label("Prompt Template (Quick Select)", classes="section-label")
-                        yield Select(
-                            self._template_options,
-                            prompt="Select a template or type file path below",
-                            allow_blank=True,
-                            id=f"select-template-{s}",
+                    # Telemetry header: Event/System switch, live badge, beacon.
+                    with Horizontal(classes="telemetry-header"):
+                        with Horizontal(classes="seg-switch"):
+                            yield Button("Event Log", id=f"btn-slot-event-{s}", classes="seg-btn seg-active")
+                            yield Button("System Log", id=f"btn-slot-system-{s}", classes="seg-btn")
+                        yield Label(
+                            self._format_status("IDLE", "badge"),
+                            id=f"status-badge-{s}",
+                            classes="status-badge",
+                        )
+                        yield Label("●", id=f"live-beacon-{s}", classes="live-beacon")
+
+                    # Transcript: prompts right-aligned, answers left-aligned.
+                    with ScrollableContainer(classes="chat-stream", id=f"chat-scroll-{s}"):
+                        yield Static(
+                            "Pick a prompt file, or type a task below to get started.",
+                            id=f"chat-transcript-{s}",
+                            classes="chat-hint",
                         )
 
-                        with Horizontal(classes="toggle-row", id=f"chip-row-{s}"):
-                            for title, role in self._template_options[:4]:
-                                yield Button(
-                                    self._truncate_name(title, 18),
-                                    id=f"chip-{s}-{role}",
-                                    classes="template-chip",
-                                )
-
-                        yield Label("Prompt File / Role (Required) *", classes="section-label")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value="",
-                                placeholder="path/to/prompt.md or role",
-                                id=f"input-prompt-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
-
-                        yield Label("Attachment File or Folder (Optional)", classes="section-label")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value="",
-                                placeholder="path/to/file or folder",
-                                id=f"input-file-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
-
-                        yield Label("Output Destination", classes="section-label")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value=str(DEFAULT_OUTPUT),
-                                placeholder="path/to/output.md",
-                                id=f"input-output-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
-
-                        with Horizontal(classes="card-inner"):
-                            with Vertical(classes="toggle-label-box"):
-                                yield Label("Headless Browser", classes="section-label")
-                                yield Label(
-                                    "1 independent browser in background",
-                                    classes="toggle-subtext",
-                                )
-                            yield Switch(value=True, id=f"switch-headless-{s}")
-
-                        yield Button(
-                            f"⚡ RUN IN SLOT {s}",
-                            variant="primary",
-                            id=f"btn-run-{s}",
-                            classes="btn-slot-run",
-                        )
-                        yield Button(
-                            f"✕ Cancel Slot {s}",
-                            id=f"btn-cancel-{s}",
-                            classes="btn-slot-cancel",
-                        )
-                        yield Button(
-                            f"↻ Retry Slot {s}",
-                            id=f"btn-retry-{s}",
-                            classes="btn-slot-retry",
-                        )
-
-                    # RIGHT PANE: live log view (preserved).
-                    with Vertical(classes="right-pane"):
-                        with Horizontal(classes="pane-title"):
-                            yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
-                            yield Label(
-                                self._format_status("IDLE", "badge"),
-                                id=f"status-badge-{s}",
-                                classes="status-badge",
-                            )
+                    # Event log block: mockup's "EVENT LOG [SLOT #N]" card.
+                    with Vertical(classes="event-log-card"):
+                        with Horizontal(classes="event-log-head"):
+                            yield Label("EVENT LOG", classes="event-log-title")
+                            yield Label(f"[SLOT #{s}]", classes="event-log-slot")
+                            yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")
                             yield Button(
                                 "Copy",
                                 id=f"btn-copy-log-{s}",
                                 classes="btn-copy-log",
                                 tooltip="Copy slot log",
                             )
-                        yield LoadingIndicator(id=f"loading-{s}", classes="slot-loading")
                         yield QwenTuiRichLog(
                             id=f"log-view-{s}",
                             highlight=True,
@@ -322,9 +287,52 @@ class _TuiComposeMixin:
                             max_lines=2000,
                             wrap=True,
                         )
+                        system_log = QwenTuiRichLog(
+                            id=f"log-view-{s}-system",
+                            highlight=True,
+                            markup=True,
+                            classes="slot-log-view",
+                            max_lines=1000,
+                            wrap=True,
+                        )
+                        system_log.display = False
+                        yield system_log
+                        yield Label("--:--:--", id=f"slot-log-time-{s}", classes="slot-log-time")
+
+                    # Action pills: the mockup's Upload / Attach / Templates row.
+                    with Horizontal(classes="action-pill-row"):
+                        yield Button(
+                            "⬆ Upload Prompt (.md)",
+                            id=f"btn-pill-prompt-{s}",
+                            classes="action-pill",
+                        )
+                        yield Button(
+                            "📎 Attach File / Folder",
+                            id=f"btn-pill-attach-{s}",
+                            classes="action-pill",
+                        )
+                        yield Button(
+                            "✨ Templates",
+                            id=f"btn-pill-templates-{s}",
+                            classes="action-pill action-pill-templates",
+                        )
+
+                    # Composer: prompt glyph, free-text task, send button.
+                    with Horizontal(classes="composer"):
+                        yield Label(">", classes="composer-glyph")
+                        yield Input(
+                            value="",
+                            placeholder="Type automated task or command...",
+                            id=f"composer-{s}",
+                            classes="composer-input",
+                        )
+                        yield Button("Send", id=f"btn-send-{s}", classes="btn-send")
 
             # ─── Screen 4: Swarm ─────────────────────────────────
             with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
+                with Horizontal(classes="app-brand-row"):
+                    yield Label(">_ QWEN-CLI", classes="app-brand-title")
+                    yield Label(f"v{get_package_version()}", classes="app-brand-version")
                 # Attachment File or Folder card.
                 with Vertical(classes="screen-card"), Horizontal(classes="swarm-file-card"):
                     yield Label("description", id="swarm-file-icon", classes="swarm-file-icon")
@@ -409,14 +417,111 @@ class _TuiComposeMixin:
                 swarm_input.display = False
                 yield swarm_input
 
+            # ─── Screen 5: Settings (slot configuration) ───────────
+            # The mockup's chat console has no form, so the per-slot
+            # configuration moved here: one picker row for the slot being
+            # configured plus one form block per slot (only the selected
+            # block is displayed). Every widget id the run/cancel workers
+            # resolve lives in these blocks, so their behavior is unchanged.
+            with TabPane("Settings", id="tab-settings"), Vertical(classes="screen-body"):
+                with Horizontal(classes="app-brand-row"):
+                    yield Label(">_ QWEN-CLI", classes="app-brand-title")
+                    yield Label(f"v{get_package_version()}", classes="app-brand-version")
+                with Horizontal(classes="slot-carousel"):
+                    for i in range(1, self._NUM_SLOTS + 1):
+                        yield Button(
+                            f"● SLOT {i:02d}",
+                            id=f"cfg-slot-{i}",
+                            classes="slot-chip slot-chip-active" if i == 1 else "slot-chip",
+                        )
+
+                for s in range(1, self._NUM_SLOTS + 1):
+                    config_block = Vertical(classes="slot-config", id=f"slot-config-{s}")
+                    config_block.display = s == 1
+                    with config_block:
+                        yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
+
+                        yield Label("Prompt Template (Quick Select)", classes="section-label")
+                        yield Select(
+                            self._template_options,
+                            prompt="Select a template or type file path below",
+                            allow_blank=True,
+                            id=f"select-template-{s}",
+                        )
+
+                        with Horizontal(classes="toggle-row", id=f"chip-row-{s}"):
+                            for title, role in self._template_options[:4]:
+                                yield Button(
+                                    self._truncate_name(title, 18),
+                                    id=f"chip-{s}-{role}",
+                                    classes="template-chip",
+                                )
+
+                        yield Label("Prompt File / Role (Required) *", classes="section-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value="",
+                                placeholder="path/to/prompt.md or role",
+                                id=f"input-prompt-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
+
+                        yield Label("Attachment File or Folder (Optional)", classes="section-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value="",
+                                placeholder="path/to/file or folder",
+                                id=f"input-file-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
+
+                        yield Label("Output Destination", classes="section-label")
+                        with Horizontal(classes="field-row"):
+                            yield Input(
+                                value=str(DEFAULT_OUTPUT),
+                                placeholder="path/to/output.md",
+                                id=f"input-output-{s}",
+                                classes="field-input",
+                            )
+                            yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
+
+                        with Horizontal(classes="card-inner"):
+                            with Vertical(classes="toggle-label-box"):
+                                yield Label("Headless Browser", classes="section-label")
+                                yield Label(
+                                    "1 independent browser in background",
+                                    classes="toggle-subtext",
+                                )
+                            yield Switch(value=True, id=f"switch-headless-{s}")
+
+                        yield Button(
+                            f"⚡ RUN IN SLOT {s}",
+                            variant="primary",
+                            id=f"btn-run-{s}",
+                            classes="btn-slot-run",
+                        )
+                        yield Button(
+                            f"✕ Cancel Slot {s}",
+                            id=f"btn-cancel-{s}",
+                            classes="btn-slot-cancel",
+                        )
+                        yield Button(
+                            f"↻ Retry Slot {s}",
+                            id=f"btn-retry-{s}",
+                            classes="btn-slot-retry",
+                        )
+
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         with Horizontal(id="nav-dock", classes="nav-dock"):
             yield Button("▦ OVERVIEW", id="nav-overview", classes="nav-item nav-active")
             yield Button("⚿ LOGIN", id="nav-login", classes="nav-item nav-inactive")
             yield Button("▣ CHAT", id="nav-chat", classes="nav-item nav-inactive")
             yield Button("⚯ SWARM", id="nav-swarm", classes="nav-item nav-inactive")
+            yield Button("⚙ SETTINGS", id="nav-settings", classes="nav-item nav-inactive")
             yield Label(
-                "alt+0 overview · alt+1..9 slot · ctrl+alt+s swarm · ? help",
+                "alt+0 overview · alt+1..9 slot · ctrl+alt+s swarm · ctrl+comma settings · ? help",
                 classes="nav-hint",
             )
 
@@ -450,9 +555,26 @@ class _TuiComposeMixin:
             self._log_views[0] = self.query_one("#log-view-overview", QwenTuiRichLog)
         with contextlib.suppress(NoMatches):
             self._log_views[-1] = self.query_one("#log-view-swarm", QwenTuiRichLog)
+
+        # Mockup parity: each chat console caches its transcript container, its
+        # system-log twin, its clock label, and the empty-state hint that the
+        # first message replaces. All four sit on the per-slot hot paths, so
+        # they are resolved once here instead of per write.
+        self._system_log_views: dict[int, QwenTuiRichLog] = {}
+        self._chat_scrolls: dict[int, ScrollableContainer] = {}
+        self._chat_hints: dict[int, Static] = {}
+        self._slot_log_times: dict[int, Label] = {}
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
+            with contextlib.suppress(NoMatches):
+                self._system_log_views[s] = self.query_one(f"#log-view-{s}-system", QwenTuiRichLog)
+            with contextlib.suppress(NoMatches):
+                self._chat_scrolls[s] = self.query_one(f"#chat-scroll-{s}", ScrollableContainer)
+            with contextlib.suppress(NoMatches):
+                self._chat_hints[s] = self.query_one(f"#chat-transcript-{s}", Static)
+            with contextlib.suppress(NoMatches):
+                self._slot_log_times[s] = self.query_one(f"#slot-log-time-{s}", Label)
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
         self.set_timer(0.4, self._deferred_startup)
@@ -477,12 +599,13 @@ class _TuiComposeMixin:
         )
         self._log_msg(f"[{muted}]Each slot runs an independent Chromium process sharing login state.[/]")
 
-        # U5: seed per-slot log views with an empty-state hint.
+        # U5: the per-slot event logs start empty — the transcript hint above
+        # carries the empty-state guidance, so nothing is seeded here beyond
+        # the auto-scroll the streaming path depends on.
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
                 log_view.auto_scroll = True
-                log_view.write(f"[{muted}]Set a prompt file, then press Enter or RUN.[/]")
 
         self._refresh_session_badge()
 
