@@ -1,0 +1,146 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "background": "#0f131c", "secondary-fixed": "#e1e0ff", "on-tertiary": "#003824", "error-container": "#93000a", "on-secondary-fixed": "#07006c", "on-primary": "#00354a", "surface-container-high": "#262a33", "outline": "#87929a", "secondary": "#c0c1ff", "on-secondary-fixed-variant": "#2f2ebe", "tertiary-fixed": "#6ffbbe", "on-secondary": "#1000a9", "tertiary-container": "#30c88f", "secondary-fixed-dim": "#c0c1ff", "on-tertiary-container": "#004e34", "on-error": "#690005", "outline-variant": "#3e484f", "on-surface-variant": "#bdc8d1", "tertiary-fixed-dim": "#4edea3", "on-secondary-container": "#b0b2ff", "primary-fixed": "#c4e7ff", "surface-bright": "#353942", "on-error-container": "#ffdad6", "on-surface": "#dfe2ee", "surface": "#0f131c", "surface-container": "#1c2028", "inverse-on-surface": "#2c3039", "on-primary-container": "#004965", "surface-container-lowest": "#0a0e16", "on-tertiary-fixed": "#002113", "secondary-container": "#3131c0", "primary-fixed-dim": "#7bd0ff", "surface-container-low": "#181c24", "on-background": "#dfe2ee", "inverse-surface": "#dfe2ee", "surface-variant": "#31353e", "tertiary": "#56e5a9", "on-primary-fixed": "#001e2c", "surface-tint": "#7bd0ff", "primary": "#8ed5ff", "surface-dim": "#0f131c", "on-primary-fixed-variant": "#004c69", "inverse-primary": "#00668a", "primary-container": "#38bdf8", "error": "#ffb4ab", "surface-container-highest": "#31353e", "on-tertiary-fixed-variant": "#005236" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-sm": "0.5rem", "margin": "1rem", "space-md": "0.75rem", "space-lg": "1rem", "gutter": "0.75rem", "space-xl": "1.5rem", "space-xs": "0.25rem" }, fontFamily: { "body-lg": ["Inter"], "label-lg": ["JetBrains Mono"], "headline-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "label-sm": ["JetBrains Mono"], "body-sm": ["Inter"], "headline-sm": ["Inter"], "label-md": ["JetBrains Mono"], "headline-md": ["Inter"], "body-md": ["Inter"] }, fontSize: { "body-lg": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0f131c;color:#dfe2ee;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style></head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.5)] pt-safe"><div class="h-16 px-margin flex items-center gap-space-sm"><div class="flex items-center gap-2"><svg class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 7 5 5-5 5"></path><path d="m13 17 6 0"></path></svg><span class="font-label-md text-xs font-bold font-mono tracking-wider text-slate-200 uppercase">QWEN-CLI</span><span class="text-[11px] font-mono text-slate-500 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">v6.5.2</span></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<div class="px-margin pt-space-md pb-space-lg flex flex-col gap-space-md">
+<!-- Top System Pulse & Telemetry Card -->
+<div class="bg-surface-container p-space-md rounded-xl shadow-lg flex flex-col gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">dns</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">SESSION POOL STATUS</span>
+</div>
+
+</div>
+<div class="grid grid-cols-3 gap-space-xs pt-space-xs">
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">REGISTERED</span>
+<span class="font-headline-md text-headline-md text-primary font-semibold mt-0.5">3</span>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase">ACTIVE</span><span class="font-headline-md text-headline-md text-tertiary font-semibold mt-0.5">3</span></div>
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">LIMITED</span>
+<span class="font-headline-md text-headline-md text-outline font-semibold mt-0.5">0</span>
+</div>
+</div>
+<!-- Quick TUI Progress Spectrum -->
+
+</div>
+<!-- Main Action: Add / Login Trigger -->
+<div class="flex flex-col gap-space-xs">
+<button class="w-full bg-primary-container text-on-primary-container p-space-md rounded-xl font-label-lg text-label-lg uppercase tracking-wider flex items-center justify-center gap-space-sm shadow-md active:scale-[0.98] transition-transform" id="btn-add-account">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span class="">add account</span>
+</button>
+<!-- Expandable Terminal Fast-Auth Panel (Hidden by Default) -->
+
+</div>
+<!-- Active Accounts List Header -->
+<div class="flex items-center justify-between pt-space-xs"><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-outline-variant">•</span><span class="font-label-sm text-label-sm text-outline-variant">•</span></div><button class="text-on-surface-variant flex items-center gap-1 font-label-sm text-label-sm hover:text-primary transition-colors"><span class="material-symbols-outlined text-[14px]">refresh</span><span class="">Re-check Tokens</span></button></div>
+<!-- Account List Items -->
+<div class="flex flex-col gap-space-sm">
+<!-- Account Card 1 -->
+<div class="bg-surface-container p-space-md rounded-xl shadow-md flex flex-col gap-space-sm relative"><div class="flex items-start justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary"><span class="material-symbols-outlined text-[20px]">account_circle</span></div><div class="flex flex-col min-w-0"><span class="font-body-md text-body-md text-on-surface font-medium truncate">primary.engineer@qwen.ai</span><div class="flex items-center gap-space-xs mt-0.5"></div></div></div></div><div class="flex items-center justify-between pt-space-xs border-t border-outline-variant/30"><div class="flex items-center gap-1.5"><span class="relative flex h-2 w-2"><span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span></span><span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider font-medium">ACTIVE</span></div><div class="flex items-center gap-space-xs"><button title="Test Connection" class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary-container hover:bg-primary-container/20 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">science</span></button><button title="Disconnect" onclick="confirmLogout('primary.engineer@qwen.ai')" class="w-8 h-8 rounded-lg bg-error-container/20 flex items-center justify-center text-error hover:bg-error-container/40 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">power_settings_new</span></button></div></div></div>
+<!-- Account Card 2 -->
+<div class="bg-surface-container p-space-md rounded-xl shadow-md flex flex-col gap-space-sm relative">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary-container">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md text-body-md text-on-surface font-medium truncate">user_enterprise_02@cloud.org</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+
+
+
+</div>
+</div>
+</div>
+
+</div>
+<!-- Telemetry Data & Actions -->
+<div class="flex items-center justify-between pt-space-xs border-t border-outline-variant/30"><div class="flex items-center gap-1.5"><span class="relative flex h-2 w-2"><span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span></span><span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider font-medium">ACTIVE</span></div><div class="flex items-center gap-space-xs"><button title="Test Connection" class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary-container hover:bg-primary-container/20 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">science</span></button><button title="Disconnect" onclick="confirmLogout('user_enterprise_02@cloud.org')" class="w-8 h-8 rounded-lg bg-error-container/20 flex items-center justify-center text-error hover:bg-error-container/40 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">power_settings_new</span></button></div></div>
+</div>
+<!-- Account Card 3 -->
+<div class="bg-surface-container p-space-md rounded-xl shadow-md flex flex-col gap-space-sm relative"><div class="flex items-start justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary"><span class="material-symbols-outlined text-[20px]">account_circle</span></div><div class="flex flex-col min-w-0"><span class="font-body-md text-body-md text-on-surface font-medium truncate">automated_bot_03@daemon.local</span><div class="flex items-center gap-space-xs mt-0.5"></div></div></div></div><div class="flex items-center justify-between pt-space-xs border-t border-outline-variant/30"><div class="flex items-center gap-1.5"><span class="relative flex h-2 w-2"><span class="relative inline-flex rounded-full h-2 w-2 bg-error"></span></span><span class="font-label-sm text-label-sm text-error uppercase tracking-wider font-medium">LIMITED</span></div><div class="flex items-center gap-space-xs"><button title="Test Connection" class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary-container hover:bg-primary-container/20 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">science</span></button><button title="Disconnect" onclick="confirmLogout('automated_bot_03@daemon.local')" class="w-8 h-8 rounded-lg bg-error-container/20 flex items-center justify-center text-error hover:bg-error-container/40 transition-colors shadow-sm active:scale-[0.98]"><span class="material-symbols-outlined text-[18px]">power_settings_new</span></button></div></div></div>
+</div>
+<!-- Cluster Console & Health Telemetry Card -->
+
+</div>
+<!-- Logout Confirmation Modal Sheet -->
+<div class="fixed inset-0 z-50 bg-surface-container-lowest/80 backdrop-blur-sm hidden items-end sm:items-center justify-center p-margin" id="logout-dialog">
+<div class="bg-surface-container-high w-full max-w-sm rounded-xl p-space-md shadow-2xl flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-error-container/30 flex items-center justify-center text-error flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-on-surface">Putuskan Akun?</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant truncate" id="target-account-name">user@qwen.ai</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+        Sesi ini akan dinonaktifkan dari cluster swarm. Slot eksekusi terkait akan beralih ke mode siaga.
+      </p>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="px-space-md py-2 rounded-lg bg-surface-variant text-on-surface-variant font-label-sm text-label-sm uppercase font-medium" id="btn-cancel-logout">Batal</button>
+<button class="px-space-md py-2 rounded-lg bg-error text-on-error font-label-sm text-label-sm uppercase font-semibold" id="btn-do-logout">Logout Sesi</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const btnAdd = document.getElementById('btn-add-account');
+    const authPanel = document.getElementById('auth-panel');
+    const btnCloseAuth = document.getElementById('btn-close-auth');
+    const btnCancelAuth = document.getElementById('btn-cancel-auth');
+
+    if (btnAdd && authPanel) {
+      btnAdd.addEventListener('click', () => {
+        authPanel.classList.toggle('hidden');
+        authPanel.classList.toggle('flex');
+      });
+    }
+
+    const hideAuth = () => {
+      if (authPanel) {
+        authPanel.classList.add('hidden');
+        authPanel.classList.remove('flex');
+      }
+    };
+
+    if (btnCloseAuth) btnCloseAuth.addEventListener('click', hideAuth);
+    if (btnCancelAuth) btnCancelAuth.addEventListener('click', hideAuth);
+
+    const logoutDialog = document.getElementById('logout-dialog');
+    const targetAccountName = document.getElementById('target-account-name');
+    const btnCancelLogout = document.getElementById('btn-cancel-logout');
+    const btnDoLogout = document.getElementById('btn-do-logout');
+
+    window.confirmLogout = function(accountEmail) {
+      if (targetAccountName) targetAccountName.textContent = accountEmail;
+      if (logoutDialog) {
+        logoutDialog.classList.remove('hidden');
+        logoutDialog.classList.add('flex');
+      }
+    };
+
+    const closeLogoutDialog = () => {
+      if (logoutDialog) {
+        logoutDialog.classList.add('hidden');
+        logoutDialog.classList.remove('flex');
+      }
+    };
+
+    if (btnCancelLogout) btnCancelLogout.addEventListener('click', closeLogoutDialog);
+    if (btnDoLogout) {
+      btnDoLogout.addEventListener('click', () => {
+        closeLogoutDialog();
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.6)]" data-active-classes="text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]"><div class="grid grid-cols-4 items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Overview</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] transition-colors text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]" data-path="login" href="#"><span class="material-symbols-outlined text-[20px]">key</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Login</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="chat" href="#"><span class="material-symbols-outlined text-[20px]">terminal</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Chat</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="swarm" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Swarm</span></a></div></nav>
+
+
+
+</body></html>

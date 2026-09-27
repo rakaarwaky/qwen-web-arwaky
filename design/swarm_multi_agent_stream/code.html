@@ -1,0 +1,185 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "background": "#0f131c", "secondary-fixed": "#e1e0ff", "on-tertiary": "#003824", "error-container": "#93000a", "on-secondary-fixed": "#07006c", "on-primary": "#00354a", "surface-container-high": "#262a33", "outline": "#87929a", "secondary": "#c0c1ff", "on-secondary-fixed-variant": "#2f2ebe", "tertiary-fixed": "#6ffbbe", "on-secondary": "#1000a9", "tertiary-container": "#30c88f", "secondary-fixed-dim": "#c0c1ff", "on-tertiary-container": "#004e34", "on-error": "#690005", "outline-variant": "#3e484f", "on-surface-variant": "#bdc8d1", "tertiary-fixed-dim": "#4edea3", "on-secondary-container": "#b0b2ff", "primary-fixed": "#c4e7ff", "surface-bright": "#353942", "on-error-container": "#ffdad6", "on-surface": "#dfe2ee", "surface": "#0f131c", "surface-container": "#1c2028", "inverse-on-surface": "#2c3039", "on-primary-container": "#004965", "surface-container-lowest": "#0a0e16", "on-tertiary-fixed": "#002113", "secondary-container": "#3131c0", "primary-fixed-dim": "#7bd0ff", "surface-container-low": "#181c24", "on-background": "#dfe2ee", "inverse-surface": "#dfe2ee", "surface-variant": "#31353e", "tertiary": "#56e5a9", "on-primary-fixed": "#001e2c", "surface-tint": "#7bd0ff", "primary": "#8ed5ff", "surface-dim": "#0f131c", "on-primary-fixed-variant": "#004c69", "inverse-primary": "#00668a", "primary-container": "#38bdf8", "error": "#ffb4ab", "surface-container-highest": "#31353e", "on-tertiary-fixed-variant": "#005236" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-sm": "0.5rem", "margin": "1rem", "space-md": "0.75rem", "space-lg": "1rem", "gutter": "0.75rem", "space-xl": "1.5rem", "space-xs": "0.25rem" }, fontFamily: { "body-lg": ["Inter"], "label-lg": ["JetBrains Mono"], "headline-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "label-sm": ["JetBrains Mono"], "body-sm": ["Inter"], "headline-sm": ["Inter"], "label-md": ["JetBrains Mono"], "headline-md": ["Inter"], "body-md": ["Inter"] }, fontSize: { "body-lg": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0f131c;color:#dfe2ee;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.5)] pt-safe"><div class="h-16 px-margin flex items-center gap-space-sm"><svg class="w-4 h-4 text-primary flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 7 5 5-5 5"></path><path d="m13 17 6 0"></path></svg><span class="font-mono font-bold text-xs tracking-wider text-slate-200 uppercase">QWEN-CLI</span><span class="text-[11px] font-mono text-slate-500 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">v6.5.2</span></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full px-margin pb-6 gap-space-md">
+<!-- Top Telemetry Status Card (10 Agents Synchronized) -->
+
+<!-- Upload File & Attachment Control -->
+<section class="bg-surface-container-low rounded-xl p-space-sm shadow-md flex items-center justify-between gap-space-sm">
+<label class="group flex flex-1 items-center justify-between p-space-sm bg-surface-container rounded-lg cursor-pointer transition-colors hover:bg-surface-container-high active:scale-[0.99]" id="dropZone">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="material-symbols-outlined text-primary text-[18px] flex-shrink-0">description</span>
+<span class="font-label-md text-label-md text-on-surface truncate" id="fileNameDisplay">dataset-chunk-qwen-eval.json</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-highest px-space-sm py-1 rounded text-on-surface-variant group-hover:text-primary transition-colors flex-shrink-0 ml-space-sm">
+<span class="material-symbols-outlined text-[16px]">upload_file</span>
+<span class="font-label-sm text-label-sm font-medium">Browse</span>
+</div>
+<input class="hidden" id="swarmFileInput" type="file">
+</label>
+</section>
+<!-- View Toggle Header (Compact Event vs Complete System Log) -->
+<section class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Output Inspection</span>
+<!-- Switch Toggle Segment -->
+<div class="bg-surface-container-lowest p-0.5 rounded-lg flex items-center shadow-inner">
+<button class="px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all" id="btnStreamView" onclick="switchView('stream')">
+          Event Log</button>
+<button class="px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-primary bg-primary shadow-sm font-medium transition-all" id="btnLogView" onclick="switchView('log')">
+          log system</button>
+</div>
+</div>
+<!-- Panel 1: Event Ringkas (Unified Parallel Stream) -->
+<div class="flex flex-col gap-space-sm hidden" id="unifiedStreamContainer">
+<!-- Agent Response Unit 1 -->
+
+<!-- Agent Response Unit 2 (Streaming / Live) -->
+<article class="bg-surface-container rounded-xl p-space-md shadow-md flex flex-col gap-space-xs relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">Swarm&nbsp;</span>
+</div>
+<span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-label-sm text-label-sm">STREAMING</span>
+</div>
+<div class="font-body-md text-body-md text-on-surface leading-relaxed"><div class="bg-surface-container-low rounded-lg p-space-sm mt-space-xs flex flex-col gap-1.5 font-label-sm text-label-sm text-on-surface-variant"><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 01</span><span class="text-tertiary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>Streaming</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 02</span><span class="text-tertiary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>Streaming</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 03</span><span class="text-primary-container flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Authenticated</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 04</span><span class="text-tertiary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>Streaming</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 05</span><span class="text-primary-container flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Authenticated</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 06</span><span class="text-tertiary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>Streaming</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 07</span><span class="text-primary-container flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Authenticated</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 08</span><span class="text-tertiary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>Streaming</span></div><div class="flex justify-between items-center py-0.5 border-b border-surface-container-high/40"><span class="font-medium text-on-surface">Slot 09</span><span class="text-outline flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-outline"></span>Idle</span></div><div class="flex justify-between items-center py-0.5"><span class="font-medium text-on-surface">Slot 10</span><span class="text-outline flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-outline"></span>Idle</span></div></div>
+</div>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-primary pt-1">
+<span class="inline-block w-1.5 h-3.5 bg-primary animate-pulse"></span>
+
+</div>
+</article>
+<!-- Agent Response Unit 3 -->
+<article class="bg-surface-container rounded-xl p-space-md shadow-md flex flex-col gap-space-xs">
+
+
+</article>
+</div>
+<!-- Panel 2: Log System Lengkap (Terminal Raw Stream - Hidden by default) -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl p-space-md font-label-sm text-label-sm shadow-inner gap-2 max-h-96 overflow-y-auto" id="fullLogContainer">
+<div class="flex items-center justify-between pb-1 border-b border-surface-container-high/40">
+<span class="text-outline uppercase tracking-wider font-semibold">/var/log/qwen-swarm.pool.log</span>
+<button class="text-on-surface-variant hover:text-error text-xs flex items-center gap-0.5" onclick="clearTerminalLogs()">
+<span class="material-symbols-outlined text-[14px]">delete</span>
+<span class="">Clear</span>
+</button>
+</div>
+<div class="flex flex-col gap-1 text-on-surface-variant font-label-sm leading-tight" id="terminalOutput">
+<div class="text-outline">[10:42:01.002] [SWARM_INIT] Master process spawned PID: 84920</div>
+<div class="text-on-surface-variant">[10:42:01.218] [HEADLESS_POOL] Initializing 10 sandboxed context profiles...</div>
+<div class="text-tertiary">[10:42:02.040] [SLOT_01..10] &gt;&gt; Ready. Memory footprint 412MB total.</div>
+<div class="text-on-surface-variant">[10:42:05.112] [BROADCAST] Template auto-bound to nodes [1,2,3,4,5,6,7,8,9,10]</div>
+<div class="text-primary-container">[10:42:09.431] [ATTACHMENT] dataset-chunk-qwen-eval.json checksum verified (sha256:7f3a09..)</div>
+<div class="text-on-surface">[10:42:12.890] [STEP_01] Invoking concurrent prompt generation via Qwen-Max pipeline</div>
+<div class="text-outline">[10:42:15.340] [SLOT_03] Network request GET /api/v2/handshake completed 18ms</div>
+<div class="text-tertiary">[10:42:18.789] [SLOT_07] Token stream delta parsed. State: COMPLIANT</div>
+<div class="text-primary">[10:42:22.012] [STREAM_GATEWAY] Aggregator merged 10 parallel outputs into primary frame</div>
+<div class="text-outline">[10:42:25.109] [HEARTBEAT] 10/10 workers reporting stable ping 42ms</div>
+<div class="text-tertiary">[10:46:11.811] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div><div class="text-tertiary">[10:46:31.544] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div><div class="text-tertiary">[10:46:39.258] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div><div class="text-error">[10:46:55.835] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:46:57.244] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:46:59.426] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:47:02.955] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:47:03.113] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:47:06.283] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:47:09.787] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-error">[10:47:19.852] [SIGINT] &gt;&gt; Interrupted by operator. Halting 10 sandboxes gracefully.</div><div class="text-tertiary">[10:47:34.677] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div><div class="text-tertiary">[10:50:12.764] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div><div class="text-tertiary">[10:50:28.993] [USER_CMD] &gt;&gt; Swarm re-trigger: Dispatching 10 parallel browser sessions.</div></div>
+<div class="flex items-center gap-1 text-primary pt-1">
+<span class="animate-pulse">&gt;</span>
+<span class="text-on-surface-variant italic">Listening on unix socket /run/qwen-swarm.sock...</span>
+</div>
+</div>
+</section>
+<!-- Sticky-Safe Bottom Action Deck: Quick Start / Stop Swarm -->
+<section class="sticky bottom-2 z-40 bg-surface-container/95 backdrop-blur-md p-space-sm rounded-xl shadow-2xl flex items-center justify-between gap-space-sm">
+<!-- Abort / Kill Switch -->
+<button class="flex-1 bg-surface-container-high active:bg-surface-container-highest text-error font-label-md text-label-md py-2.5 px-space-md rounded-lg flex items-center justify-center gap-space-xs transition-transform active:scale-95 shadow-sm" id="btnStopSwarm" onclick="toggleSwarmState(false)">
+<span class="material-symbols-outlined text-[18px]">stop_circle</span>
+<span class="font-semibold">Stop</span>
+</button>
+<!-- Execute / Start Swarm Switch -->
+<button class="flex-[1.4] bg-primary-container text-on-primary-container active:brightness-110 font-label-md text-label-md py-2.5 px-space-md rounded-lg flex items-center justify-center gap-space-xs transition-transform active:scale-95 shadow-[0_0_16px_rgba(56,189,248,0.35)]" id="btnStartSwarm" onclick="toggleSwarmState(true)">
+<span class="material-symbols-outlined text-[18px]" id="startBtnIcon">autorenew</span>
+<span class="font-semibold" id="startBtnText">RESTART</span>
+</button>
+</section>
+</div>
+<script>
+  let isSwarmActive = true;
+
+  function switchView(mode) {
+    const streamContainer = document.getElementById('unifiedStreamContainer');
+    const logContainer = document.getElementById('fullLogContainer');
+    const btnStream = document.getElementById('btnStreamView');
+    const btnLog = document.getElementById('btnLogView');
+
+    if (mode === 'stream') {
+      streamContainer.classList.remove('hidden');
+      logContainer.classList.add('hidden');
+
+      btnStream.className = 'px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-primary bg-primary shadow-sm font-medium transition-all';
+      btnLog.className = 'px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all';
+    } else {
+      streamContainer.classList.add('hidden');
+      logContainer.classList.remove('hidden');
+
+      btnLog.className = 'px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-primary bg-primary shadow-sm font-medium transition-all';
+      btnStream.className = 'px-space-sm py-1 rounded-md font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all';
+    }
+  }
+
+  function toggleSwarmState(start) {
+    const startBtnText = document.getElementById('startBtnText');
+    const startBtnIcon = document.getElementById('startBtnIcon');
+    const terminalOutput = document.getElementById('terminalOutput');
+    const time = new Date().toTimeString().split(' ')[0] + '.' + Math.floor(Math.random() * 900 + 100);
+
+    if (start) {
+      isSwarmActive = true;
+      startBtnText.textContent = 'Restart Swarm (10x)';
+      startBtnIcon.textContent = 'autorenew';
+      
+      const newLog = document.createElement('div');
+      newLog.className = 'text-tertiary';
+      newLog.textContent = `[${time}] [USER_CMD] >> Swarm re-trigger: Dispatching 10 parallel browser sessions.`;
+      terminalOutput.appendChild(newLog);
+    } else {
+      isSwarmActive = false;
+      startBtnText.textContent = 'Resume Swarm';
+      startBtnIcon.textContent = 'play_arrow';
+
+      const newLog = document.createElement('div');
+      newLog.className = 'text-error';
+      newLog.textContent = `[${time}] [SIGINT] >> Interrupted by operator. Halting 10 sandboxes gracefully.`;
+      terminalOutput.appendChild(newLog);
+    }
+  }
+
+  function clearTerminalLogs() {
+    const terminalOutput = document.getElementById('terminalOutput');
+    terminalOutput.innerHTML = '<div class="text-outline italic">[Logs flushed by user]</div>';
+  }
+
+  // File Upload listener simulation
+  const fileInput = document.getElementById('swarmFileInput');
+  const fileNameDisplay = document.getElementById('fileNameDisplay');
+  const fileMetaDisplay = document.getElementById('fileMetaDisplay');
+  const dropZone = document.getElementById('dropZone');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      fileNameDisplay.textContent = file.name;
+      fileMetaDisplay.textContent = `${(file.size / 1024).toFixed(1)} KB &bull; Auto-synced across 10 agents`;
+      
+      const time = new Date().toTimeString().split(' ')[0];
+      const terminalOutput = document.getElementById('terminalOutput');
+      const newLog = document.createElement('div');
+      newLog.className = 'text-primary-container';
+      newLog.textContent = `[${time}] [ATTACH_DISPATCH] Broadcasted ${file.name} to all 10 worker nodes.`;
+      terminalOutput.appendChild(newLog);
+    }
+  });
+</script></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.6)]" data-active-classes="text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]"><div class="grid grid-cols-4 items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Overview</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="login" href="#"><span class="material-symbols-outlined text-[20px]">key</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Login</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="chat" href="#"><span class="material-symbols-outlined text-[20px]">terminal</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Chat</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] transition-colors text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]" data-path="swarm" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Swarm</span></a></div></nav>
+
+
+
+</body></html>
