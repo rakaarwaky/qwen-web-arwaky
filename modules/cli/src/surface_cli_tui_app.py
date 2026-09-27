@@ -25,6 +25,7 @@ from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
+from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -33,7 +34,7 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
 from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
@@ -98,7 +99,7 @@ class QwenTuiApp(
         direct: IDirectPromptAggregate,
         file_only: IPromptFileAggregate,
         attachment: IAttachmentPromptAggregate,
-        slot_config: ISlotRunPlanProtocol,
+        slot_config: IConfigSlotPlanProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,

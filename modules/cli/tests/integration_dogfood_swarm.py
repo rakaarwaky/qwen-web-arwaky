@@ -1,7 +1,7 @@
 """Dogfood swarm pipeline tests — structure validation for swarm orchestration.
 
 These tests verify the swarm pipeline structure and templates:
-1. SwarmOrchestrator can be imported
+1. SwarmAdapter can be imported
 2. Role templates are discoverable
 3. Input files are valid
 4. Output structure is correct
@@ -37,7 +37,7 @@ class TestSwarmPipelineStructure:
 
     def test_swarm_orchestrator_exists(self):
         """Verify SwarmOrchestrator can be imported."""
-        from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
+        from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 
         assert SwarmOrchestrator is not None
 
@@ -75,17 +75,17 @@ class TestSwarmOutputStructure:
 
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency is capacity-derived and capped (issue #291)."""
-        from modules.core.src.agent_swarm_orchestrator import SwarmOrchestrator
         from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
         from modules.shared.src.utility_core_capacity import recommended_max_workers
+        from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
         assert DEFAULT_MAX_WORKERS == 10
         capacity = recommended_max_workers()
         assert 1 <= capacity <= DEFAULT_MAX_WORKERS
         print(f"\n[SWARM-TEST] Concurrency: capacity {capacity} / cap {DEFAULT_MAX_WORKERS}")
 
-        orchestrator = SwarmOrchestrator(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
-        assert orchestrator._browser_concurrency <= capacity
+        runner = SwarmRunner(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
+        assert int(runner.browser_concurrency) <= capacity
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ OutputPath = NewType("OutputPath", Path)
 FilePath = NewType("FilePath", Path)
 RunId = NewType("RunId", str)
 RunIdHex = NewType("RunIdHex", str)
+CompileDepth = NewType("CompileDepth", int)
 JobName = NewType("JobName", str)
 RunContextId = NewType("RunContextId", str)
 MessageCount = NewType("MessageCount", int)
@@ -324,6 +325,20 @@ class SlotRunPlan:
     prompt_path: Path
     attachment_path: Path | None
     config: AppConfig
+
+
+@dataclass(frozen=True)
+class BatchPromptOutcome:
+    """Result of discovering batch prompt files in a directory.
+
+    Either ``files`` carries the discovered ``.md`` paths (success) or
+    ``error`` carries a ``SlotInputValue`` describing what went wrong
+    (directory missing, empty, or not specified). The two fields are
+    mutually exclusive; the surface layer only forwards the message.
+    """
+
+    files: list[Path] | None = None
+    error: SlotInputValue | None = None
 
 
 @dataclass
@@ -631,6 +646,7 @@ __all__ = [
     "FilePath",
     "RunId",
     "RunIdHex",
+    "CompileDepth",
     "RunContextId",
     "MessageCount",
     "FailureCategory",
@@ -699,6 +715,7 @@ __all__ = [
     "MCPServerConfig",
     "SlotInputValue",
     "SlotRunPlan",
+    "BatchPromptOutcome",
     "QwenClientConfig",
     "BrowserConfig",
     "SenderConfig",

@@ -570,7 +570,7 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
             return
         try:
-            from modules.core.src.capabilities_session_health_checker import SessionHealthChecker
+            from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 
             results = SessionHealthChecker(timeout_seconds=10).check_pool_sync(
                 self._session_manager.load_pool(),

@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src import surface_cli_update_command
-from modules.core.src.capabilities_update_manager import UpdateManager, compare_versions
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
@@ -17,6 +16,7 @@ from modules.shared.src.taxonomy_core_vo import (
     UpdateStepResult,
     VersionString,
 )
+from modules.update.src.capabilities_update_manager import UpdateManager, compare_versions
 
 
 class TestVersionComparison(unittest.TestCase):
@@ -108,8 +108,8 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
     def setUp(self) -> None:
         self.manager = UpdateManager()
 
-    @patch("modules.core.src.capabilities_update_manager.UpdateManager._fetch_json")
-    @patch("modules.core.src.capabilities_update_manager.get_package_version")
+    @patch("modules.update.src.capabilities_update_manager.UpdateManager._fetch_json")
+    @patch("modules.update.src.capabilities_update_manager.get_package_version")
     def test_check_update_discovers_4_5_2(self, mock_get_ver: MagicMock, mock_fetch_json: MagicMock) -> None:
         mock_get_ver.return_value = "4.5.1"
         mock_fetch_json.return_value = {"tag_name": "v4.5.2", "name": "v4.5.2"}
@@ -135,7 +135,7 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
 
     def test_run_subprocess_rejects_insecure_repo_url(self) -> None:
         """Non-github pip upgrade sources must be refused before subprocess."""
-        from modules.core.src.capabilities_update_manager import DEFAULT_GITHUB_REPO
+        from modules.update.src.capabilities_update_manager import DEFAULT_GITHUB_REPO
 
         manager = self.manager
         with patch.object(manager, "_editable_source_dir", return_value=None):
@@ -263,7 +263,7 @@ class TestUpdateManagerRealFlow(unittest.TestCase):
     @patch.object(UpdateManager, "upgrade_package")
     @patch.object(UpdateManager, "sync_browser")
     @patch.object(UpdateManager, "_postflight_health_checks")
-    @patch("modules.core.src.capabilities_update_manager.UpdateManager.check_update")
+    @patch("modules.update.src.capabilities_update_manager.UpdateManager.check_update")
     @patch.object(UpdateManager, "_resolve_installed_version")
     def test_perform_update_executes_pipeline(
         self,

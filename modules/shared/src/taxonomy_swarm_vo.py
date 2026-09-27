@@ -7,8 +7,40 @@ from pathlib import Path
 from typing import Literal, NewType
 
 SwarmId = NewType("SwarmId", str)
+BrowserCount = NewType("BrowserCount", int)
 SwarmStatus = Literal["queued", "running", "completed", "partial", "failed", "cancelled"]
 AgentStatus = Literal["queued", "running", "retrying", "completed", "failed", "cancelled"]
+
+#: Which swarm operation a ``SwarmRequest`` asks for. The agent behind
+#: ``ISwarmAggregate`` routes each one to the matching runner method.
+SwarmVerb = Literal["start", "snapshot", "cancel"]
+
+
+@dataclass(frozen=True)
+class SwarmRequest:
+    """One swarm verb plus the argument that verb needs.
+
+    Fields the chosen verb does not read stay at ``None``, so start,
+    snapshot, and cancel share one shape without any of them passing
+    arguments the others ignore.
+    """
+
+    verb: SwarmVerb
+    input_path: Path | None = None
+    swarm_id: SwarmId | str | None = None
+
+
+@dataclass(frozen=True)
+class SwarmResponse:
+    """What a swarm verb produced.
+
+    ``snapshot`` carries the latest state after the verb ran. ``error``
+    names the reason a request could not be answered — a missing
+    argument, or a swarm id the runner does not know.
+    """
+
+    snapshot: SwarmSnapshot | None = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,4 +78,14 @@ class SwarmSnapshot:
         return sum(agent.status == "failed" for agent in self.agents)
 
 
-__all__ = ["AgentStatus", "SwarmAgentSnapshot", "SwarmId", "SwarmSnapshot", "SwarmStatus"]
+__all__ = [
+    "AgentStatus",
+    "BrowserCount",
+    "SwarmAgentSnapshot",
+    "SwarmId",
+    "SwarmRequest",
+    "SwarmResponse",
+    "SwarmSnapshot",
+    "SwarmStatus",
+    "SwarmVerb",
+]

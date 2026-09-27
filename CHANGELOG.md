@@ -110,7 +110,7 @@ or documentation; no user-facing interface changed except two new capabilities n
   detector does not resolve names used inside f-strings, dotted imports, or import aliases. All
   26 imports are retained; their call sites were rewritten to forms the detector resolves.
   Upstream bug report: `rakaarwaky/lint-arwaky#277` (#458)
-- Test artifacts `test.jsonl/` and `modules/core/tests/fixtures/.last_run_ts` are untracked (#459)
+- Test artifacts `test.jsonl/` and `.last_run_ts` fixtures are untracked (#459)
 
 ## [6.5.0] - 2026-09-24
 

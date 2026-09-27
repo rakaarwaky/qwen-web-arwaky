@@ -97,7 +97,7 @@ class TestTuiPromptTemplateIntegration:
 
     def test_tui_action_run_action_with_role(self) -> None:
         from modules.cli.src.surface_cli_tui_app import QwenTuiApp
-        from modules.core.src.capabilities_slot_plan_resolver import SlotRunPlanResolver
+        from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 
         # AR-1: 5th positional arg is slot_config (ISlotRunPlanProtocol),
         # injected from the Root container instead of being constructed

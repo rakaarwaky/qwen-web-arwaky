@@ -23,16 +23,16 @@ sys.path.insert(0, str(ROOT))
 
 import contextlib
 
-from modules.core.src.agent_direct_prompt_orchestrator import DirectPromptOrchestrator
-from modules.core.src.capabilities_browser_adapter import BrowserAdapter
-from modules.core.src.capabilities_metrics_counter import MetricsCounter
-from modules.core.src.capabilities_observability_setup import ObservabilitySetup
-from modules.core.src.capabilities_prompt_injector import PromptInjector
-from modules.core.src.capabilities_send_dispatcher import SendDispatcher
-from modules.core.src.capabilities_status_writer import StatusFileWriter
-from modules.core.src.capabilities_stream_monitor import StreamMonitor
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.utility_browser_async_loop import isolate_thread_event_loop
+from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.shared.src import AppConfig, RunContext
-from modules.shared.src.utility_async_loop import isolate_thread_event_loop
 from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_host_gate import insufficient_reason, probe
 from tests.pipeline_fixtures import restore_fixture_state
@@ -69,7 +69,7 @@ def page(browser_ctx: BrowserContext):
 
 
 @pytest.fixture
-def client(browser_ctx: BrowserContext, page) -> DirectPromptOrchestrator:
+def client(browser_ctx: BrowserContext, page) -> DirectPromptAdapter:
     cfg = AppConfig(
         mode="batch",
         input_path=ROOT / "input",
@@ -77,7 +77,7 @@ def client(browser_ctx: BrowserContext, page) -> DirectPromptOrchestrator:
         session_path=ROOT / "qwen_session",
         headless=True,
     )
-    return DirectPromptOrchestrator(
+    return DirectPromptAdapter(
         browser=BrowserAdapter(),
         injector=PromptInjector(),
         sender=SendDispatcher(),

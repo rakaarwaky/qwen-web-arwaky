@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.63.0-noble
 
 WORKDIR /build
 
@@ -10,15 +10,16 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Copy package manifests first for optimal layer caching
 COPY requirements.txt pyproject.toml /build/
-COPY modules/core/pyproject.toml /build/modules/core/
 COPY modules/shared/pyproject.toml /build/modules/shared/
 COPY modules/mcp/pyproject.toml /build/modules/mcp/
 COPY modules/cli/pyproject.toml /build/modules/cli/
 
-# Install base dependencies, testing toolchain, and matching chromium browser
+# Install base dependencies and testing toolchain. The base image tag must track
+# the Playwright version pinned in uv.lock: the image ships the matching
+# chromium and chrome-headless-shell revisions under /ms-playwright, and every
+# --headless launch fails if those revisions drift from the installed driver.
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir pytest pytest-mock ruff && \
-    python3 -m playwright install chromium
+    pip install --no-cache-dir pytest pytest-mock ruff
 
 # Copy full codebase, install pure standalone wheel, and clean build directory
 COPY . /build
@@ -31,4 +32,3 @@ WORKDIR /root
 # Default entrypoint to qwa (qwen-web-arwaky)
 ENTRYPOINT ["qwa"]
 CMD ["--help"]
-

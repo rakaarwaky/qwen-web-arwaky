@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from modules.core.src.root_core_container import SharedContainer
+from modules.root_core_container import SharedContainer
 from modules.shared.src import DEFAULT_JOBS_DIR, DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION, SWARM_OUTPUT_ROOT
 
 

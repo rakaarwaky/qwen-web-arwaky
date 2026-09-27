@@ -1,0 +1,105 @@
+"""Unit tests for DirectPromptAdapter (AES405)."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
+from modules.shared.src.taxonomy_core_event import (
+    EVENT_DISPATCH_ACKNOWLEDGED,
+    EVENT_LOGIN_VERIFIED,
+    EVENT_MODEL_VERIFIED,
+    EVENT_SEND_CLICKED,
+    EVENT_WEB_LOADED,
+    STANDARD_PROMPT_EVENTS,
+)
+from modules.shared.src.taxonomy_core_vo import MessageCount
+
+
+def _browser_stub(emitter_events: tuple = ()) -> MagicMock:
+    """A browser mock whose navigate_to_chat emits the page-phase lifecycle events."""
+    bctx = MagicMock()
+    bctx.pages = [MagicMock()]
+
+    def navigate_to_chat(_page, emitter):
+        emitter.emit(EVENT_WEB_LOADED, {"url": "test"})
+        emitter.emit(EVENT_LOGIN_VERIFIED, {"url": "test"})
+        emitter.emit(EVENT_MODEL_VERIFIED, {"model": "Qwen3.8-Max"})
+
+    browser = MagicMock()
+    browser.browser_session.return_value.__enter__.return_value = bctx
+    browser.navigate_to_chat.side_effect = navigate_to_chat
+    return browser
+
+
+def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMock]]:
+    browser = _browser_stub()
+    injector = MagicMock()
+    sender = MagicMock()
+    sender.count_messages.return_value = MessageCount(2)
+    streamer = MagicMock()
+    saver = MagicMock()
+
+    def write_output(path, *_args, **_kwargs):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("saved output", encoding="utf-8")
+
+    saver.write_output.side_effect = write_output
+    observability = MagicMock()
+    observability.get_logger.return_value = MagicMock()
+
+    orchestrator = DirectPromptAdapter(
+        browser=browser,
+        injector=injector,
+        sender=sender,
+        streamer=streamer,
+        saver=saver,
+        observability=observability,
+        flow=MagicMock(),
+    )
+    mocks = {
+        "browser": browser,
+        "injector": injector,
+        "sender": sender,
+        "streamer": streamer,
+        "saver": saver,
+        "observability": observability,
+        "flow": orchestrator._flow,
+    }
+    return orchestrator, mocks
+
+
+def test_process_direct_prompt_happy_path() -> None:
+    orch, mocks = _make_direct_orchestrator()
+
+    def flow_stub(*, emitter, **_kwargs):
+        for event in STANDARD_PROMPT_EVENTS[3:-1]:
+            emitter.emit(event)
+        return "Hello from Qwen AI!"
+
+    mocks["flow"].dispatch_and_wait_for_response.side_effect = flow_stub
+
+    response = orch.process_direct_prompt("What is Python?", timeout_sec=30, headless=True)
+
+    assert str(response) == "Hello from Qwen AI!"
+    mocks["flow"].dispatch_and_wait_for_response.assert_called_once()
+    assert mocks["flow"].dispatch_and_wait_for_response.call_args.kwargs["prompt"] == "What is Python?"
+
+
+def test_process_direct_prompt_timeout_error() -> None:
+    orch, mocks = _make_direct_orchestrator()
+
+    def click_send_stub(*, emitter, **_kwargs):
+        emitter.emit(EVENT_SEND_CLICKED)
+        emitter.emit(EVENT_DISPATCH_ACKNOWLEDGED)
+        return None
+
+    mocks["sender"].click_send.side_effect = click_send_stub
+    mocks["flow"].dispatch_and_wait_for_response.side_effect = ResponseDetectionTimeoutError(
+        "Timeout waiting for response"
+    )
+
+    response = orch.process_direct_prompt("Test prompt", timeout_sec=10)
+
+    assert "Timeout waiting for response" in str(response)
