@@ -441,7 +441,7 @@ class _TuiWorkersMixin:
         # U5: update session badge to show login in progress
         with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-            badge.update("SESSION: LOGGING IN…")
+            badge.update("LOGGING IN…")
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
@@ -465,9 +465,9 @@ class _TuiWorkersMixin:
         with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
             if getattr(self, "_session", None) is None:
-                badge.update("SESSION: N/A")
+                badge.update("N/A")
             else:
-                badge.update("SESSION: CHECKING…")
+                badge.update("CHECKING…")
         self._session_check_timed_out = False
         timer = getattr(self, "_session_check_timer", None)
         if timer is not None:
@@ -486,7 +486,7 @@ class _TuiWorkersMixin:
             # Only show TIMEOUT if the badge is still in CHECKING state.
             if "CHECKING" not in str(badge.render() or ""):
                 return
-            badge.update("⚠ SESSION: TIMEOUT")
+            badge.update("TIMEOUT")
             badge.set_classes("invalid")
         self._log_msg("[bold {}]WARNING:[/] {}".format(THEME["warn"], msg))
         with contextlib.suppress(Exception):
@@ -507,7 +507,7 @@ class _TuiWorkersMixin:
         self._last_session_state = "VALID" if valid else "EXPIRED"
         with contextlib.suppress(*_BADGE_UNAVAILABLE):
             badge = self.query_one("#session-badge", Label)
-            badge.update("SESSION: VALID" if valid else "SESSION: EXPIRED")
+            badge.update("VALID" if valid else "EXPIRED")
             badge.set_classes("invalid" if not valid else "")
         # BUG FIX: cancel the timeout timer when the worker completes.
         # Without this, a 15s timer can fire AFTER the badge is already
@@ -546,9 +546,9 @@ class _TuiWorkersMixin:
                 healthy = sum(1 for s in sessions if s.is_healthy)
                 limited = sum(1 for s in sessions if s.is_limited)
                 with contextlib.suppress(NoMatches):
-                    self.query_one("#session-total", Label).update(f"TOTAL: {total}")
-                    self.query_one("#session-healthy", Label).update(f"HEALTHY: {healthy}")
-                    self.query_one("#session-limited", Label).update(f"LIMITED: {limited}")
+                    self.query_one("#session-total", Label).update(f"{total}")
+                    self.query_one("#session-healthy", Label).update(f"{healthy}")
+                    self.query_one("#session-limited", Label).update(f"{limited}")
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(

@@ -175,9 +175,9 @@ class _TuiUtilsMixin:
             active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
             done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
             if self._metric_active is not None:
-                self._metric_active.update(f"ACTIVE: {active}")
+                self._metric_active.update(f"{active}")
             if self._metric_done is not None:
-                self._metric_done.update(f"DONE: {done}")
+                self._metric_done.update(f"{done}")
 
     # ── Slot status / tab title ──────────────────────────────────────────
 
