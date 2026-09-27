@@ -7,12 +7,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VOLUME_DIR="/home/raka/.local/share/containers/storage/volumes/qwen-web-arwaky/_data"
-mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config" "${VOLUME_DIR}/finding"
+mkdir -p "${VOLUME_DIR}/share" "${VOLUME_DIR}/state" "${VOLUME_DIR}/config" "${VOLUME_DIR}/share/finding"
 
-VOLUMES="-v ${VOLUME_DIR}/share:/root/.local/share/qwen-web:Z \
-         -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web:Z \
-         -v ${VOLUME_DIR}/config:/root/.config/qwen-web:Z \
-         -v "${REPO_ROOT}/.agents/finding:/root/.local/share/qwen-web/finding:Z""
+# Source tree mounted so commands like `test`, `lint`, and shell use the same
+# modules/tests that live on the host rather than the wheel copy. Left writable
+# because conftest fixtures and tool caches write into the tree.
+VOLUMES="-v ${REPO_ROOT}:/root/src:Z \
+         -v ${VOLUME_DIR}/share:/root/.local/share/qwen-web-arwaky:Z \
+         -v ${VOLUME_DIR}/state:/root/.local/state/qwen-web-arwaky:Z \
+         -v ${VOLUME_DIR}/config:/root/.config/qwen-web-arwaky:Z"
+FINDING_SRC="${REPO_ROOT}/.agents/finding"
+if [ -d "${FINDING_SRC}" ]; then
+    VOLUMES="${VOLUMES} -v ${FINDING_SRC}:/root/.local/share/qwen-web-arwaky/finding:Z"
+fi
 GUI_ENV="-e DISPLAY=${DISPLAY:-:0} -v /tmp/.X11-unix:/tmp/.X11-unix:ro --net=host"
 
 CONTAINER_NAME="qwen-web-arwaky"
@@ -111,27 +118,31 @@ case "$cmd" in
         xhost +local:root 2>/dev/null || xhost +local: 2>/dev/null || true
         start_container
         echo "==> Opening headed browser in Podman for Qwen login..."
-        podman exec ${TTY_FLAGS} -e DISPLAY="${DISPLAY:-:0}" "${CONTAINER_NAME}" qwa login "${@:2}"
+        podman exec ${TTY_FLAGS} -e DISPLAY="${DISPLAY:-:0}" --workdir /root/src "${CONTAINER_NAME}" qwa login "${@:2}"
         ;;
     doctor)
         start_container
         echo "==> Running doctor health checks in Podman..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" qwa doctor "${@:2}"
+        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" qwa doctor "${@:2}"
         ;;
     test)
         start_container
         echo "==> Running pytest test suite inside Podman..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" pytest tests/ -m "not e2e and not slow" "${@:2}"
+        podman exec ${TTY_FLAGS} --workdir /root/src \
+            -e PYTEST_ADDOPTS="--cache-clear" \
+            "${CONTAINER_NAME}" pytest tests/ -m "not e2e and not slow" "${@:2}"
         ;;
     lint)
         start_container
         echo "==> Running ruff inside Podman..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" ruff check modules/ tests/ "${@:2}"
+        podman exec ${TTY_FLAGS} --workdir /root/src \
+            -e RUFF_CACHE_DIR="/tmp/.ruff_cache" \
+            "${CONTAINER_NAME}" ruff check modules/ tests/ "${@:2}"
         ;;
     shell)
         start_container
         echo "==> Opening interactive shell in container..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" bash
+        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" bash
         ;;
     prompt)
         if [ -z "${2:-}" ]; then
@@ -140,11 +151,11 @@ case "$cmd" in
         fi
         start_container
         echo "==> Running prompt inside Podman..."
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" qwa prompt-direct -t "$2" --headless "${@:3}"
+        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" qwa prompt-direct -t "$2" --headless "${@:3}"
         ;;
     run)
         start_container
-        podman exec ${TTY_FLAGS} "${CONTAINER_NAME}" qwa "${@:2}"
+        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" qwa "${@:2}"
         ;;
     help|--help|-h)
         usage

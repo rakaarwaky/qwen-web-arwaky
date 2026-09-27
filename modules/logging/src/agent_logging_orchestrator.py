@@ -16,9 +16,11 @@ from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
+    RunId,
+)
+from modules.shared.src.taxonomy_logging_vo import (
     ObservabilityRequest,
     ObservabilityResponse,
-    RunId,
 )
 
 __all__ = ["LoggingOrchestrator"]

@@ -20,8 +20,15 @@ mcp:
 
 core:
   - changed-files:
-      - any-glob-to-any-file: modules/core/**
       - any-glob-to-any-file: modules/shared/**
+      - any-glob-to-any-file: modules/browser/**
+      - any-glob-to-any-file: modules/config/**
+      - any-glob-to-any-file: modules/jobs/**
+      - any-glob-to-any-file: modules/logging/**
+      - any-glob-to-any-file: modules/prompt/**
+      - any-glob-to-any-file: modules/session/**
+      - any-glob-to-any-file: modules/swarm/**
+      - any-glob-to-any-file: modules/update/**
 
 # CI / Workflows
 ci:

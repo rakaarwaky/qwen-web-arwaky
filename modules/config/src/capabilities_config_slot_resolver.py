@@ -16,7 +16,7 @@ from modules.config.src.utility_config_app_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol
+from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 from modules.shared.src.taxonomy_core_vo import (
     BatchPromptOutcome,
     FilePath,
@@ -51,7 +51,7 @@ def _output_dir_write_error(out_path: Path) -> str | None:
     return None
 
 
-class SlotRunPlanResolver(ISlotRunPlanProtocol):
+class SlotRunPlanResolver(IConfigSlotPlanProtocol):
     """Resolve raw slot widget values into an executable run plan."""
 
     def resolve_slot_run_plan(

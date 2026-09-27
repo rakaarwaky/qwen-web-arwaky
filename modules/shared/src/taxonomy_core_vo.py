@@ -327,6 +327,20 @@ class SlotRunPlan:
     config: AppConfig
 
 
+@dataclass(frozen=True)
+class BatchPromptOutcome:
+    """Result of discovering batch prompt files in a directory.
+
+    Either ``files`` carries the discovered ``.md`` paths (success) or
+    ``error`` carries a ``SlotInputValue`` describing what went wrong
+    (directory missing, empty, or not specified). The two fields are
+    mutually exclusive; the surface layer only forwards the message.
+    """
+
+    files: list[Path] | None = None
+    error: SlotInputValue | None = None
+
+
 @dataclass
 class StatusRecordVO:
     """Status payload recorded for systemd/monitoring integration."""
@@ -701,6 +715,7 @@ __all__ = [
     "MCPServerConfig",
     "SlotInputValue",
     "SlotRunPlan",
+    "BatchPromptOutcome",
     "QwenClientConfig",
     "BrowserConfig",
     "SenderConfig",

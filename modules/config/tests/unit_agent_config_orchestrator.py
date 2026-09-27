@@ -18,22 +18,25 @@ from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
 from modules.config.src.capabilities_config_capacity import ConfigCapacityAdvisor
 from modules.config.src.capabilities_config_environment import ConfigEnvironment
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
+from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
-from modules.shared.src.taxonomy_core_vo import ConfigRequest, Mode, TimeoutSec
+from modules.shared.src.taxonomy_config_vo import ConfigRequest
+from modules.shared.src.taxonomy_core_vo import Mode, TimeoutSec
 
 
 def _orchestrator() -> ConfigOrchestrator:
-    """Return an orchestrator wired to the four real capability seams.
+    """Return an orchestrator wired to the five real capability seams.
 
-    Each seam is a stateless read of the process environment, so a test
-    that sets an env var with ``monkeypatch`` is exercising the real
-    resolution path rather than a stub's echo.
+    Each seam is a stateless read of the process environment or the
+    filesystem, so a test that sets an env var with ``monkeypatch`` is
+    exercising the real resolution path rather than a stub's echo.
     """
     return ConfigOrchestrator(
         environment=ConfigEnvironment(),
         validator=ConfigValidator(),
         path_resolver=ConfigPathResolver(),
         capacity=ConfigCapacityAdvisor(),
+        slot_plan=SlotRunPlanResolver(),
     )
 
 

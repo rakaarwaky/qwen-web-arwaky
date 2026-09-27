@@ -15,12 +15,12 @@ from abc import ABC, abstractmethod
 
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
-    RollbackSteps,
     UpdateCheckResult,
     UpdateReport,
     UpdateStepResult,
     VersionString,
 )
+from modules.shared.src.taxonomy_update_vo import RollbackSteps
 
 
 class IUpdateProtocol(ABC):

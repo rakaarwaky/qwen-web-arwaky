@@ -47,8 +47,8 @@ def test_rollback_editable_install_returns_skipped_message(monkeypatch: pytest.M
 
 def test_rollback_refuses_when_release_cannot_be_pinned(monkeypatch: pytest.MonkeyPatch) -> None:
     """An unpinnable release fails closed rather than installing a mutable tag."""
-    monkeypatch.setattr(UpdateManager, "_editable_source_dir", lambda self: None)
-    monkeypatch.setattr(UpdateManager, "_github_pinned_url", lambda self, v: None)
+    monkeypatch.setattr(UpdateManager, "_editable_source_dir", lambda _self: None)
+    monkeypatch.setattr(UpdateManager, "_github_pinned_url", lambda _self, _v: None)
 
     steps = UpdateManager().rollback_to("6.4.0")
 

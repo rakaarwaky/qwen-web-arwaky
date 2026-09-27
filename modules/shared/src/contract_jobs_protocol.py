@@ -28,10 +28,9 @@ from modules.shared.src.taxonomy_core_vo import (
     JobId,
     JobLimit,
     JobRecord,
-    StatusRecordMap,
     StatusRecordVO,
 )
-from modules.shared.src.taxonomy_jobs_vo import JobCount
+from modules.shared.src.taxonomy_jobs_vo import JobCount, StatusRecordMap
 
 
 class IJobStorageProtocol(ABC):

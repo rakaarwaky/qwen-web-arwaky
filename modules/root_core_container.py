@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 
@@ -18,7 +19,14 @@ from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
+from modules.config.src.capabilities_config_capacity import ConfigCapacityAdvisor
+from modules.config.src.capabilities_config_environment import ConfigEnvironment
+from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
+from modules.config.src.capabilities_config_validator import ConfigValidator
+
+# agent_job_orchestrator
+from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.jobs.src.capabilities_job_storage import JobStorage
@@ -49,8 +57,9 @@ from modules.session.src.capabilities_session_manager import SessionManager
 
 # capabilities_setup_adapter
 from modules.session.src.capabilities_setup_adapter import SetupAdapter
-from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
 from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+from modules.shared.src.contract_config_aggregate import IConfigAggregate
+from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
     IDirectPromptAggregate,
@@ -60,18 +69,22 @@ from modules.shared.src.contract_core_aggregate import (
     ISessionAggregate,
     ISetupAggregate,
 )
-from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol, IUpdateProtocol
+from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
     SWARM_CONCURRENCY_ENV,
+    SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 from modules.shared.src.utility_core_capacity import recommended_max_workers
 from modules.shared.src.utility_core_status import status_path_for
+from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 from modules.update.src.capabilities_update_manager import UpdateManager
 
 
@@ -113,9 +126,22 @@ class SharedContainer:
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
-        # Surface (QwenTuiApp) can consume it through ISlotRunPlanProtocol
+        # Surface (QwenTuiApp) can consume it through IConfigSlotPlanProtocol
         # instead of importing the Capabilities class directly.
-        self.slot_plan: ISlotRunPlanProtocol = SlotRunPlanResolver()
+        self.slot_plan: IConfigSlotPlanProtocol = SlotRunPlanResolver()
+
+        # AR-2: the config feature reaches Surfaces and sibling orchestrators
+        # as one aggregate, so every AppConfig a caller receives went through
+        # the same sandbox probe and the same timeout ceiling. The five
+        # capabilities stay injectable seams for tests that need to steer
+        # the environment or the host-capacity verdict.
+        self.config: IConfigAggregate = ConfigOrchestrator(
+            environment=ConfigEnvironment(),
+            validator=ConfigValidator(),
+            path_resolver=ConfigPathResolver(),
+            capacity=ConfigCapacityAdvisor(),
+            slot_plan=self.slot_plan,
+        )
 
         # Shared prompt-flow agent (injected into the three prompt orchestrators)
         self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
@@ -190,13 +216,16 @@ class SharedContainer:
         # Issue #277: the Swarm fan-out must respect the same shared resource
         # guards as the job pipeline — the shared breaker and limiter are
         # injected so 10 concurrent agent attempts cannot bypass them.
-        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmAdapter(
-            attachment=self.agent_attachment_prompt_orchestrator,
+        self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
+            runner=SwarmRunner(
+                attachment=cast(IPromptAggregate, self.agent_attachment_prompt_orchestrator),
+                output_root=SWARM_OUTPUT_ROOT,
+                browser_concurrency=swarm_workers,
+                headless=swarm_headless,
+                circuit_breaker=self.cb,
+                rate_limiter=self.rl,
+            ),
             folder_adapter=self.folder_adapter,
-            browser_concurrency=swarm_workers,
-            headless=swarm_headless,
-            circuit_breaker=self.cb,
-            rate_limiter=self.rl,
         )
 
     def wire(self) -> None:

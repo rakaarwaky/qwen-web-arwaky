@@ -2,8 +2,8 @@
 
 Locks the three-party chain TUI Surface → Root Container → Capabilities
 (SlotRunPlanResolver): the container exposes the resolver as
-ISlotRunPlanProtocol, and QwenTuiApp receives it through its constructor
-— never by importing the capability directly.
+IConfigSlotPlanProtocol, and QwenTuiApp receives it through its
+constructor — never by importing the capability directly.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_core_container import SharedContainer
-from modules.shared.src.contract_core_protocol import ISlotRunPlanProtocol
+from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 
 
 def test_container_exposes_slot_config_protocol() -> None:
-    """SharedContainer.slot_plan must satisfy ISlotRunPlanProtocol."""
+    """SharedContainer.slot_plan must satisfy IConfigSlotPlanProtocol."""
     container = SharedContainer()
-    assert isinstance(container.slot_plan, ISlotRunPlanProtocol)
+    assert isinstance(container.slot_plan, IConfigSlotPlanProtocol)
 
 
 def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
@@ -47,15 +47,15 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
 
     assert result["success"] is True
     mock_app.assert_called_once()
-    # 5th positional constructor argument is slot_config (ISlotRunPlanProtocol).
+    # 5th positional constructor argument is slot_config (IConfigSlotPlanProtocol).
     injected = mock_app.call_args.args[4]
     assert injected is container.slot_plan
-    assert isinstance(injected, ISlotRunPlanProtocol)
+    assert isinstance(injected, IConfigSlotPlanProtocol)
 
 
 def test_controller_forwards_slot_config_without_capability_import() -> None:
     """InteractiveController must forward the injected resolver unchanged."""
-    slot_config = MagicMock(spec=ISlotRunPlanProtocol)
+    slot_config = MagicMock(spec=IConfigSlotPlanProtocol)
     controller = InteractiveController(
         MagicMock(),
         MagicMock(),

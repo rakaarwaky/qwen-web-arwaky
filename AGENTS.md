@@ -98,7 +98,14 @@ layer and name before you write.
 
 ```text
 modules/shared/src/   taxonomy_*, contract_*, utility_*
-modules/core/src/     agent_* orchestrators, capabilities_*
+modules/browser/src/  agent_browser_orchestrator, capabilities_browser_adapter
+modules/config/src/   agent_config_orchestrator, capabilities_config_*
+modules/jobs/src/     agent_job_orchestrator, capabilities_folder_compiler, capabilities_job_storage
+modules/logging/src/  agent_logging_orchestrator, capabilities_metrics_counter
+modules/prompt/src/   agent_prompt_orchestrator, agent_shared_flow_orchestrator, capabilities_*
+modules/session/src/  agent_session_orchestrator, capabilities_session_*
+modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
+modules/update/src/   agent_update_orchestrator, capabilities_update_manager
 modules/cli/src/      surface_cli_*, root_cli_container
 modules/mcp/src/      surface_mcp_*, root_mcp_container
 modules/templates/    role templates (must not contain HTML-escaped tokens)
@@ -149,10 +156,13 @@ Releases flow through `release/vX.Y.Z` PRs; tags trigger the auto-build and
 
 ```bash
 # Tests
-uv run python -m pytest tests/ modules/shared/tests/ modules/core/tests/ \
-  modules/cli/tests/ modules/mcp/tests/ \
+uv run python -m pytest tests/ modules/shared/tests/ \
+  modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ \
+  modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ \
+  modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ \
+  modules/update/tests/ \
   --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v   # matches ci.yml "Tests (pytest)"
-uv run python -m pytest modules/core/tests/ -v                # one module
+uv run python -m pytest modules/<name>/tests/ -v              # one module
 uv run python -m pytest tests/test_<name>.py -v               # one file
 uv run python -m pytest tests/ -m e2e -v                      # live network + auth session, not in CI
 uv run python -m pytest benches/ -m benchmark -v              # benchmarks, not in CI

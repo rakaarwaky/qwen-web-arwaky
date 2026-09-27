@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TypeAlias
+from typing import NewType, TypeAlias
 
 
 class SessionStatus(str, Enum):
@@ -163,8 +163,44 @@ class SessionPool:
         )
 
 
+#: The session records a listing verb returned, in pool order. Declared as
+#: a NewType so the contract signature carries one named domain type
+#: rather than a bare list primitive (AES402).
+SessionList = NewType("SessionList", list[SessionInfo])
+
+
+@dataclass(frozen=True)
+class RotatorRequest:
+    """One rotation verb plus the selection policy to apply.
+
+    ``exclude_ids`` names sessions a caller already tried in this turn,
+    so a rotation can step past them instead of re-picking the session
+    that just failed.
+    """
+
+    verb: str = "rotate"
+    exclude_ids: tuple[SessionId, ...] = ()
+
+
+@dataclass(frozen=True)
+class RotatorResponse:
+    """What a rotation verb produced.
+
+    ``session`` carries the selected healthy session. It is ``None`` when
+    every pooled session is rate-limited, which is a normal exhausted
+    result rather than a failure; ``error`` is reserved for a rotation
+    that could not be attempted at all.
+    """
+
+    session: SessionInfo | None = None
+    error: str | None = None
+
+
 __all__ = [
+    "RotatorRequest",
+    "RotatorResponse",
     "SessionInfo",
+    "SessionList",
     "SessionPool",
     "SessionStatus",
     "SessionId",

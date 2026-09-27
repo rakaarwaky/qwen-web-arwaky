@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from modules.shared.src.taxonomy_core_vo import UpdateRequest, UpdateResponse
+from modules.shared.src.taxonomy_update_vo import UpdateRequest, UpdateResponse
 
 
 class IUpdateAggregate(ABC):

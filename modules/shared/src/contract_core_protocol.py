@@ -33,15 +33,12 @@ from modules.shared.src.taxonomy_core_vo import (
     MessageCount,
     MinTextLength,
     OutputChars,
-    OutputPath,
     PollIntervalSec,
     PromptText,
     ResponseText,
     RunContext,
     RunId,
     RunState,
-    SlotInputValue,
-    SlotRunPlan,
     StabilityChecks,
     StatusRecordVO,
     TimeoutSec,
@@ -408,25 +405,6 @@ class IJobStorageProtocol(ABC):
         """List recently recorded jobs."""
 
 
-class ISlotRunPlanProtocol(ABC):
-    """Contract for surface-agnostic slot-input resolution (surface → capability bridge)."""
-
-    @abstractmethod
-    def resolve_slot_run_plan(
-        self,
-        prompt_val: PromptText,
-        file_val: PromptText,
-        output_val: OutputPath,
-        headless: HeadlessFlag,
-    ) -> SlotRunPlan | SlotInputValue:
-        """Resolve raw slot widget values into an executable run plan."""
-
-    @abstractmethod
-    def discover_batch_prompts(self, batch_dir: FilePath) -> object:
-        """Return a list of prompt files, or an error descriptor, for a batch dir."""
-        ...
-
-
 class IRunCancelProtocol(ABC):
     """Contract for the shared targeted-cancel registry of in-flight runs.
 
@@ -482,7 +460,6 @@ __all__ = [
     "IStatusProtocol",
     "IMetricsProtocol",
     "IJobStorageProtocol",
-    "ISlotRunPlanProtocol",
     "IRunCancelProtocol",
     "LifecycleObserver",
 ]

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.contract_jobs_protocol import IFolderToAttachmentProtocol
+from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_swarm_protocol import ISwarmProtocol
 from modules.shared.src.taxonomy_core_vo import FilePath
@@ -79,12 +79,12 @@ class SwarmOrchestrator(ISwarmAggregate):
         if request.verb == "snapshot":
             if request.swarm_id is None:
                 return SwarmResponse(error="snapshot requires swarm_id")
-            return SwarmResponse(snapshot=self.snapshot(request.swarm_id))
+            return SwarmResponse(snapshot=self.snapshot(SwarmId(request.swarm_id)))
         if request.verb == "cancel":
             if request.swarm_id is None:
                 return SwarmResponse(error="cancel requires swarm_id")
-            self.cancel(request.swarm_id)
-            return SwarmResponse(snapshot=self.snapshot(request.swarm_id))
+            self.cancel(SwarmId(request.swarm_id))
+            return SwarmResponse(snapshot=self.snapshot(SwarmId(request.swarm_id)))
         raise ValueError(f"Unknown swarm verb: {request.verb!r}")
 
     def start(self, input_path: Path) -> SwarmSnapshot:

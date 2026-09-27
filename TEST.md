@@ -17,20 +17,20 @@ that mirrors the exact DOM structure verified live on `chat.qwen.ai`.
 
 | Module | Method | Verified behavior | Source of truth |
 |--------|--------|-------------------|-----------------|
-| `core/src/capabilities_prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
-| `core/src/capabilities_prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
-| `core/src/capabilities_file_uploader.py` | `upload_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
-| `core/src/capabilities_file_uploader.py` | `validate_file` | Rejects oversized files before the chooser opens | Live probe 2026-08-09 |
-| `core/src/capabilities_send_dispatcher.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
-| `core/src/capabilities_send_dispatcher.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
-| `core/src/capabilities_send_dispatcher.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
+| `prompt/src/capabilities_prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
+| `prompt/src/capabilities_prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
+| `prompt/src/capabilities_file_uploader.py` | `upload_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
+| `prompt/src/capabilities_file_uploader.py` | `validate_file` | Rejects oversized files before the chooser opens | Live probe 2026-08-09 |
+| `prompt/src/capabilities_send_dispatcher.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
+| `prompt/src/capabilities_send_dispatcher.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
+| `prompt/src/capabilities_send_dispatcher.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
 | `shared/src/utility_core_validation.py` | `validate_response_content` | Detects CAPTCHA challenges, server error pages, empty responses | Live probe 2026-08-09 |
-| `core/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
-| `core/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
-| `core/src/capabilities_browser_adapter.py` | `SessionCheck.is_alive` | Verifies page readiness and textarea presence | Live probe 2026-08-09 |
-| `core/src/capabilities_browser_adapter.py` | `SessionCheck.check_auth` | Detects login redirects and missing textarea | Live probe 2026-08-09 |
-| `core/src/agent_attachment_prompt_orchestrator.py` | `process_prompt_with_attachment` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
-| `core/src/agent_prompt_file_orchestrator.py` | `process_prompt_file_only` | Same pipeline without attachment | Live probe 2026-08-09 |
+| `prompt/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
+| `prompt/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
+| `browser/src/capabilities_browser_adapter.py` | `SessionCheck.is_alive` | Verifies page readiness and textarea presence | Live probe 2026-08-09 |
+| `browser/src/capabilities_browser_adapter.py` | `SessionCheck.check_auth` | Detects login redirects and missing textarea | Live probe 2026-08-09 |
+| `prompt/src/capabilities_attachment_prompt_adapter.py` | `process_prompt_with_attachment` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
+| `prompt/src/capabilities_prompt_file_adapter.py` | `process_prompt_file_only` | Same pipeline without attachment | Live probe 2026-08-09 |
 
 > Paths are relative to `modules/`. Method names in this table must always
 > resolve against the current tree — if a rename lands, update this table in the
@@ -207,10 +207,10 @@ tests/
 └── manual_probe.py                      # Ad-hoc headed probe for live UI debugging
 modules/
 ├── shared/src/taxonomy_core_constant.py  # Selectors & constants
-├── core/src/capabilities_prompt_injector.py
-├── core/src/capabilities_send_dispatcher.py
-├── core/src/capabilities_stream_monitor.py
-└── core/src/agent_shared_flow_orchestrator.py
+├── prompt/src/capabilities_prompt_injector.py
+├── prompt/src/capabilities_send_dispatcher.py
+├── prompt/src/capabilities_stream_monitor.py
+└── prompt/src/agent_shared_flow_orchestrator.py
 ```
 
 ---
@@ -228,7 +228,7 @@ and a preferred harness; when adding code, extend the matching pattern.
 | TUI surface | `tests/unit_surface_cli_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
 | MCP surface | `tests/integration_surface_mcp.py`, `tests/unit_mcp_hardening.py`, `tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
 | CLI surface | `tests/integration_surface_*.py`, `tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
-| Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/core/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
+| Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/update/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
 | Swarm | `tests/unit_agent_swarm_orchestrator.py` | fake `IAttachmentPromptAggregate`, real `ThreadPoolExecutor` on tmp dirs | New transition: manifest snapshot after each state change. |
 | End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/pipeline_fixtures.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |
 
@@ -256,7 +256,7 @@ The host must meet these minimums before the tier will run:
 | `/dev/shm` (containers) | 2 GB | Documented only; Chromium must start with `--shm-size=2gb` |
 | Disk | ~100 MB per clone | Not enforced; the ephemeral dir lives under `TMPDIR` |
 
-Probe implementation: `modules/core/src/utility_core_host_gate.py`
+Probe implementation: `modules/shared/src/utility_host_gate.py`
 (stdlib only — Linux `/proc/meminfo`, macOS `vm_stat`, Windows
 `GlobalMemoryStatusEx`). Probing is best-effort: a value the platform will not
 report is `None`, and `None` never skips the tier, so the gate cannot silently
@@ -276,7 +276,7 @@ marker must be registered in `pytest.ini` before use.
 
 ### Session cloning resource edge cases
 
-`modules/core/tests/unit_utility_session_cloner_extra.py` covers:
+`modules/shared/tests/unit_utility_session_cloner_extra.py` covers:
 
 - Destination already exists → merge, not overwrite
 - Live symlinks are materialised as regular files; dangling ones are skipped
@@ -378,15 +378,15 @@ the rolling-24h execution metrics is written by ``ObservabilitySetup.write_quali
 
 | AC | What ships | File |
 |----|------------|------|
-| 1 — ``MetricsCounter.record_failure(category)`` | bumps one occurrence for *category*; unknown keys are silently dropped | `modules/core/src/capabilities_observability_setup.py` |
-| 2 — ``status.json`` includes ``failure_categories`` | an optional ``{category: count}`` map written atomically alongside status/mode/headless | `modules/core/src/capabilities_observability_setup.py` |
-| 3 — ``write_quality_report()`` aggregates from ``app.jsonl`` | fields ``error_records``, ``error_distribution`` (ranked desc), ``defect_density`` (errors / total_executions), plus a full ``executions`` snapshot | `modules/core/src/capabilities_observability_setup.py` |
+| 1 — ``MetricsCounter.record_failure(category)`` | bumps one occurrence for *category*; unknown keys are silently dropped | `modules/logging/src/capabilities_observability_setup.py` |
+| 2 — ``status.json`` includes ``failure_categories`` | an optional ``{category: count}`` map written atomically alongside status/mode/headless | `modules/logging/src/capabilities_observability_setup.py` |
+| 3 — ``write_quality_report()`` aggregates from ``app.jsonl`` | fields ``error_records``, ``error_distribution`` (ranked desc), ``defect_density`` (errors / total_executions), plus a full ``executions`` snapshot | `modules/logging/src/capabilities_observability_setup.py` |
 | 4 — ``CircuitBreaker.trip_category`` surfaces the dominant category | `FailureCategory | None`; ``None`` when failures are mixed or uncategorised | `modules/shared/src/taxonomy_core_entity.py` |
 
 **Acceptance-criterion test mapping**
 
-- AC1, AC2, AC3, AC4 are all covered in ``modules/core/tests/unit_capability_quality_report.py``.
-- The orchestrator wiring (AC4) is asserted in ``modules/core/tests/unit_concurrency_guards.py``.
+- AC1, AC2, AC3, AC4 are all covered in ``modules/shared/tests/unit_capability_quality_report.py``.
+- The orchestrator wiring (AC4) is asserted in ``modules/jobs/tests/unit_concurrency_guards.py``.
 
 **Guardrails**
 

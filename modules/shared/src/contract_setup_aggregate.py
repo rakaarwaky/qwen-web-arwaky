@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from modules.shared.src.taxonomy_core_vo import SetupRequest, SetupResponse
+from modules.shared.src.taxonomy_setup_vo import SetupRequest, SetupResponse
 
 
 class ISetupAggregate(ABC):

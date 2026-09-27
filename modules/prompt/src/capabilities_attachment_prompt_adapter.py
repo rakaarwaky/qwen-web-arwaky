@@ -45,6 +45,7 @@ from modules.shared.src.taxonomy_core_vo import (
     RunState,
     SenderConfig,
 )
+from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
@@ -221,6 +222,38 @@ class AttachmentPromptAdapter(IAttachmentPromptAggregate):
             document_parsed=state.document_parsed,
             cancel_event=cancel_event,
         )
+
+    def execute(self, request: PromptRequest) -> PromptResponse:
+        """Run one prompt verb and return the answer, with failures carried.
+
+        The verb methods on this class raise so a direct caller sees the
+        real error. A surface going through the aggregate gets the
+        failure text in the response instead, so it renders the problem
+        without a try/except around every submit.
+        """
+        if request.verb == "process_prompt_with_attachment":
+            if request.attachment_file is None:
+                return PromptResponse(
+                    response_text=ResponseText("ERROR: process_prompt_with_attachment requires attachment_file")
+                )
+            try:
+                return PromptResponse(
+                    response_text=self.process_prompt_with_attachment(
+                        prompt_file=request.prompt_file,
+                        attachment_file=request.attachment_file,
+                        output_file=request.output_file,
+                        headless=request.headless,
+                        cancel_event=request.cancel_event,
+                        event_observer=request.event_observer,
+                    )
+                )
+            except Exception as exc:
+                return PromptResponse(response_text=ResponseText(f"ERROR: {exc}"))
+        if request.verb == "request_cancel":
+            if request.cancel_event is not None:
+                self.request_cancel(request.cancel_event)
+            return PromptResponse(cancelled=True)
+        return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 
 __all__ = ["AttachmentPromptAdapter"]

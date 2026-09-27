@@ -40,6 +40,7 @@ from modules.shared.src.taxonomy_core_vo import (
     RunId,
     RunState,
 )
+from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
@@ -182,6 +183,29 @@ class PromptFileAdapter(IPromptFileAggregate):
             active_cfg=active_cfg,
             cancel_event=cancel_event,
         )
+
+    def execute(self, request: PromptRequest) -> PromptResponse:
+        """Run one prompt verb and return the answer, with failures carried.
+
+        The verb method on this class already reports errors as error-text
+        responses, so the aggregate seam forwards the result unchanged; a
+        surface renders the problem without a try/except.
+        """
+        if request.verb == "process_prompt_file_only":
+            return PromptResponse(
+                response_text=self.process_prompt_file_only(
+                    prompt_file=request.prompt_file,
+                    output_file=request.output_file,
+                    headless=request.headless,
+                    cancel_event=request.cancel_event,
+                    event_observer=request.event_observer,
+                )
+            )
+        if request.verb == "request_cancel":
+            if request.cancel_event is not None:
+                self.request_cancel(request.cancel_event)
+            return PromptResponse(cancelled=True)
+        return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 
 __all__ = ["PromptFileAdapter"]

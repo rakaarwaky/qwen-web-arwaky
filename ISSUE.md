@@ -80,7 +80,7 @@ Verifikasi setelah merge — run `20260926_023444_f5705c` dengan input yang sama
 
 Regression test: 6 marker-sanity + 5 env-override + 2 live-Chromium DOM
 (`TestThinkingCardIsNotAnAnswer`, `TestRequestTimeoutBudget`,
-`TestThinkingCardDomExtraction`) di `modules/core/tests/unit_capability_stream_monitor.py`.
+`TestThinkingCardDomExtraction`) di `modules/prompt/tests/unit_capability_stream_monitor.py`.
 Total suite: 809 passed, 1 xfailed.
 
 Belum terselesaikan dari kasus ini: **thinking *detection* masih salah baca** —

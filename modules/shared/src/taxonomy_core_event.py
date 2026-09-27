@@ -14,7 +14,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import NewType, TypeAlias
 
-from . import taxonomy_core_vo as _vo
+from . import taxonomy_core_vo
 from .taxonomy_core_vo import (
     EventDetailsMapping,
     EventId,
@@ -22,9 +22,6 @@ from .taxonomy_core_vo import (
     EventOrderMapping,
     EventTimestamp,
 )
-
-EventDetailsValue = _vo.EventDetails
-EventOrderMapValue = _vo.EventOrderMap
 
 EventDetails: TypeAlias = EventDetailsMapping
 EventOrderMap: TypeAlias = EventOrderMapping
@@ -97,9 +94,7 @@ STANDARD_PROMPT_EVENTS: tuple[QwenEventType, ...] = (
     QwenEventType.OUTPUT_COPIED,
 )
 
-EVENT_ORDER: EventOrderMapValue = EventOrderMapValue(
-    {event: index for index, event in enumerate(PIPELINE_EVENT_SEQUENCE)}
-)
+EVENT_ORDER: EventOrderMap = EventOrderMap({event: index for index, event in enumerate(PIPELINE_EVENT_SEQUENCE)})
 
 
 @dataclass(frozen=True)
@@ -109,11 +104,11 @@ class LifecycleEvent:
     name: EventName
     timestamp: EventTimestamp = field(default_factory=time.time)
     event_id: EventId = field(default_factory=lambda: uuid.uuid4().hex)
-    details: EventDetails = field(default_factory=dict)
+    details: taxonomy_core_vo.EventDetails = field(default_factory=taxonomy_core_vo.EventDetails)
 
     def __post_init__(self) -> None:
         """Freeze detail payloads so callbacks observe the same event state."""
-        immutable_details = MappingProxyType(EventDetailsValue(self.details))
+        immutable_details = MappingProxyType(taxonomy_core_vo.EventDetails(self.details))
         object.__setattr__(self, "details", immutable_details)
 
 

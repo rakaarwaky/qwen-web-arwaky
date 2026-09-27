@@ -36,6 +36,7 @@ from modules.shared.src.taxonomy_core_vo import (
     RunId,
     TimeoutSec,
 )
+from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
@@ -140,6 +141,27 @@ class DirectPromptAdapter(IDirectPromptAggregate):
             timeout_sec=timeout_sec,
             active_cfg=active_cfg,
         )
+
+    def execute(self, request: PromptRequest) -> PromptResponse:
+        """Run one prompt verb and return the answer, with failures carried.
+
+        The verb method on this class reports a failure as an error-text
+        response, so the aggregate seam returns that text unchanged; a
+        surface renders the problem without a try/except.
+        """
+        if request.verb == "process_direct_prompt":
+            return PromptResponse(
+                response_text=self.process_direct_prompt(
+                    prompt=request.prompt,
+                    timeout_sec=request.timeout_sec,
+                    output_file=request.output_file,
+                    headless=request.headless,
+                    event_observer=request.event_observer,
+                )
+            )
+        if request.verb == "request_cancel":
+            return PromptResponse(cancelled=True)
+        return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 
 __all__ = ["DirectPromptAdapter"]

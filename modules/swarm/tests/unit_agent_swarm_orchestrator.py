@@ -7,12 +7,20 @@ from pathlib import Path
 from threading import Event
 
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, ResponseText, WindowSec
+from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
 
 class FakeAttachmentAggregate:
+    """Stand-in for the prompt aggregate the Swarm runner fans out over.
+
+    Implements the single ``execute`` seam the runner calls and routes it
+    to the verb the test is exercising, so the test drives the same path
+    production does rather than a private method.
+    """
+
     def __init__(self, failures: dict[str, int] | None = None) -> None:
         self.failures = failures or {}
         self.calls: list[tuple[str, Path]] = []
@@ -24,33 +32,32 @@ class FakeAttachmentAggregate:
         remaining = self.failures.get(role, 0)
         if remaining:
             self.failures[role] = remaining - 1
-            return "ERROR [transient timeout]"
+            return ResponseText("ERROR [transient timeout]")
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         Path(output_file).write_text(f"result for {role}", encoding="utf-8")
-        return f"Successfully processed {role}"
+        return ResponseText(f"Successfully processed {role}")
 
     def request_cancel(self, event: Event) -> None:
         self.cancelled.append(event)
         event.set()
 
-    def execute(self, request):
+    def execute(self, request: PromptRequest) -> PromptResponse:
         """Route the aggregate execute() verb to the verb this fake implements."""
-        from modules.shared.src.taxonomy_prompt_vo import PromptResponse
-
-        verb = request.verb
-        if verb == "process_prompt_with_attachment":
-            text = self.process_prompt_with_attachment(
-                prompt_file=request.prompt_file,
-                attachment_file=request.attachment_file,
-                output_file=request.output_file,
-                headless=request.headless,
-                cancel_event=request.cancel_event,
+        if request.verb == "process_prompt_with_attachment":
+            return PromptResponse(
+                response_text=self.process_prompt_with_attachment(
+                    prompt_file=request.prompt_file,
+                    attachment_file=request.attachment_file,
+                    output_file=request.output_file,
+                    headless=request.headless,
+                    cancel_event=request.cancel_event,
+                )
             )
-            return PromptResponse(response_text=text)
-        if verb == "request_cancel":
-            self.request_cancel(request.cancel_event)
+        if request.verb == "request_cancel":
+            if request.cancel_event is not None:
+                self.request_cancel(request.cancel_event)
             return PromptResponse(cancelled=True)
-        raise AssertionError(f"unsupported verb {verb}")
+        raise AssertionError(f"unsupported verb {request.verb}")
 
 
 def _wait_for_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
@@ -133,7 +140,7 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
         remaining = aggregate.failures.get(role, 0)
         if remaining > 0:
             aggregate.failures[role] = remaining - 1
-            return "ERROR [stuck] Stuck detected: no forward lifecycle event for 300s"
+            return ResponseText("ERROR [stuck] Stuck detected: no forward lifecycle event for 300s")
         return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
 
     aggregate.process_prompt_with_attachment = process_with_stuck
@@ -167,8 +174,8 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
         remaining = aggregate.failures.get(role, 0)
         if remaining > 0:
             aggregate.failures[role] = remaining - 1
-            return "ERROR [auth] Login session expired — run qwa login"
-        return f"Successfully processed {role}"
+            return ResponseText("ERROR [auth] Login session expired — run qwa login")
+        return ResponseText(f"Successfully processed {role}")
 
     aggregate.process_prompt_with_attachment = process_with_auth_error
 
@@ -196,7 +203,10 @@ def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> 
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"architect": 3, "security-reviewer": 3})
 
-    gate_error = "ERROR [RuntimeError] Lifecycle gate rejected EVENT_PROMPT_INJECTED: requires successful predecessor EVENT_DOCUMENT_PARSED"
+    gate_error = (
+        "ERROR [RuntimeError] Lifecycle gate rejected EVENT_PROMPT_INJECTED: "
+        "requires successful predecessor EVENT_DOCUMENT_PARSED"
+    )
     original_process = aggregate.process_prompt_with_attachment
 
     def process_with_gate_rejection(prompt_file, attachment_file, output_file, headless, cancel_event=None):
@@ -204,7 +214,7 @@ def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> 
         remaining = aggregate.failures.get(role, 0)
         if remaining > 0:
             aggregate.failures[role] = remaining - 1
-            return gate_error
+            return ResponseText(gate_error)
         return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
 
     aggregate.process_prompt_with_attachment = process_with_gate_rejection

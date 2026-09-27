@@ -1,6 +1,6 @@
 """Config-domain capability contract (AES102 `_protocol`).
 
-Four capability seams back the config feature, each owning one kind of
+Five capability seams back the config feature, each owning one kind of
 self-inspection that the CLI surface used to perform inline:
 
 - ``IConfigEnvironmentProtocol`` — what the host's environment resolves to
@@ -8,6 +8,8 @@ self-inspection that the CLI surface used to perform inline:
 - ``IConfigPathResolverProtocol`` — where the config's paths point and
   whether the host can write them
 - ``IConfigCapacityProtocol``     — how many browsers the host can carry
+- ``IConfigSlotPlanProtocol``     — what a slot's raw widget values resolve
+  to as an executable run plan
 
 ``IConfigAggregate`` in ``contract_config_aggregate.py`` is the outward
 export surface for outer layers: the CLI and the sibling orchestrators
@@ -26,7 +28,17 @@ from modules.shared.src.taxonomy_config_vo import (
     SandboxReport,
     WorkerCount,
 )
-from modules.shared.src.taxonomy_core_vo import AppConfig, TimeoutSec
+from modules.shared.src.taxonomy_core_vo import (
+    AppConfig,
+    BatchPromptOutcome,
+    FilePath,
+    HeadlessFlag,
+    OutputPath,
+    PromptText,
+    SlotInputValue,
+    SlotRunPlan,
+    TimeoutSec,
+)
 
 
 class IConfigEnvironmentProtocol(ABC):
@@ -134,10 +146,44 @@ class IConfigCapacityProtocol(ABC):
         ...
 
 
+class IConfigSlotPlanProtocol(ABC):
+    """Turn raw slot widget values into an executable run plan.
+
+    A slot form is a passive surface: it collects three strings and a
+    headless flag. This seam owns everything between those raw values and
+    an ``AppConfig`` a run can execute — role-template materialization,
+    attachment-stem output naming, output-directory pre-flight, and batch
+    prompt discovery. A surface that resolved any of this itself would
+    have to re-implement the same timestamp-collision rule per form.
+    """
+
+    @abstractmethod
+    def resolve_slot_run_plan(
+        self,
+        prompt_val: PromptText,
+        file_val: PromptText,
+        output_val: OutputPath,
+        headless: HeadlessFlag,
+    ) -> SlotRunPlan | SlotInputValue:
+        """Resolve raw slot widget values into an executable run plan.
+
+        A missing or unusable input returns a ``SlotInputValue`` carrying
+        the message rather than raising, so a surface renders the problem
+        in place without a try/except around every submit.
+        """
+        ...
+
+    @abstractmethod
+    def discover_batch_prompts(self, batch_dir: FilePath) -> BatchPromptOutcome:
+        """Return the sorted ``.md`` prompt files in a batch directory, or the reason there are none."""
+        ...
+
+
 __all__ = [
     "IConfigCapacityProtocol",
     "IConfigEnvironmentProtocol",
     "IConfigPathResolverProtocol",
+    "IConfigSlotPlanProtocol",
     "IConfigValidatorProtocol",
 ]
 
@@ -146,5 +192,6 @@ _layer_symbols: dict[str, object] = {
     "IConfigCapacityProtocol": IConfigCapacityProtocol,
     "IConfigEnvironmentProtocol": IConfigEnvironmentProtocol,
     "IConfigPathResolverProtocol": IConfigPathResolverProtocol,
+    "IConfigSlotPlanProtocol": IConfigSlotPlanProtocol,
     "IConfigValidatorProtocol": IConfigValidatorProtocol,
 }

@@ -33,7 +33,7 @@ Success is the final message `All gates passed`. The script runs formatting and 
 To mirror the CI test job directly:
 
 ```bash
-python -m pytest tests/ modules/shared/tests/ modules/core/tests/ modules/cli/tests/ modules/mcp/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
+python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
 ```
 
 Success is a pytest passed summary and exit status 0. Tests requiring a live authenticated Qwen session are excluded from this command.

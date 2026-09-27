@@ -13,6 +13,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NewType, TypeAlias
 
+from modules.shared.src.taxonomy_core_vo import (
+    HeadlessFlag,
+    Mode,
+    OutputPath,
+    PromptText,
+    TimeoutSec,
+)
+
 #: How a config finding should be surfaced. ``error`` blocks a run;
 #: ``warning`` describes a working-but-undesirable state.
 ConfigSeverity = Literal["error", "warning"]
@@ -154,6 +162,45 @@ class CapacityReport:
     over_capacity: bool = False
 
 
+@dataclass(frozen=True)
+class ConfigRequest:
+    """One config verb plus everything the orchestrator needs to run it.
+
+    The ``for_mode`` verb reads ``mode`` / ``input_path`` /
+    ``output_path``; the ``slot_plan`` verb reads the three raw slot
+    strings. Fields the chosen verb does not read stay at their defaults,
+    so no verb passes arguments another ignores.
+    """
+
+    verb: str
+    mode: Mode = Mode("")
+    input_path: Path | None = None
+    output_path: Path | None = None
+    headless: HeadlessFlag = HeadlessFlag(True)
+    prompt_val: PromptText = PromptText("")
+    file_val: PromptText = PromptText("")
+    output_val: OutputPath = OutputPath(Path(""))
+
+
+@dataclass(frozen=True)
+class ConfigResponse:
+    """What a config verb produced.
+
+    ``config`` carries the built runtime configuration; the reporting
+    verbs put their finding in ``issues``, ``paths``, ``sandbox``, or
+    ``capacity`` instead. ``error`` names the reason a request could not
+    be answered at all.
+    """
+
+    config: object | None = None
+    timeout_sec: TimeoutSec | None = None
+    issues: ConfigIssues | None = None
+    paths: ResolvedConfigPaths | None = None
+    sandbox: SandboxReport | None = None
+    capacity: CapacityReport | None = None
+    error: str | None = None
+
+
 __all__ = [
     "ByteCount",
     "CapacityReport",
@@ -161,6 +208,8 @@ __all__ = [
     "ConfigIssue",
     "ConfigIssueText",
     "ConfigIssues",
+    "ConfigRequest",
+    "ConfigResponse",
     "ConfigSeverity",
     "ModelName",
     "ResolvedConfigPath",

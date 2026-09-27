@@ -29,9 +29,9 @@ from modules.shared.src.taxonomy_core_vo import (
     JobName,
     LoggerName,
     MessageCount,
-    MetricsSnapshot,
     RunId,
 )
+from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot
 
 
 class IObservabilityProtocol(ABC):

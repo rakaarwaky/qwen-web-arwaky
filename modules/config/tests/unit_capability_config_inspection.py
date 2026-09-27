@@ -133,7 +133,7 @@ def _config(**overrides: object) -> AppConfig:
         "session_path": Path("/tmp/qwa_session"),
     }
     base.update(overrides)
-    return AppConfig(**base)  # type: ignore[arg-type]
+    return AppConfig(**base)
 
 
 def test_validator_reports_nothing_for_a_usable_config(tmp_path: Path) -> None:

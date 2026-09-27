@@ -24,7 +24,6 @@ from modules.shared.src.taxonomy_core_vo import (
     ResponseText,
     WindowSec,
 )
-from modules.shared.src.taxonomy_prompt_vo import PromptResponse
 
 
 class TestJobStorage(unittest.TestCase):
@@ -108,7 +107,7 @@ class TestAgentJobOrchestrator(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_submit_file_job(self) -> None:
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("Test response output"))
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("Test response output")
 
         prompt_file = Path(self.temp_dir.name) / "prompt.md"
         prompt_file.write_text("Hello", encoding="utf-8")
@@ -133,7 +132,7 @@ class TestAgentJobOrchestrator(unittest.TestCase):
 
     def test_submit_record_carries_owner_pid(self) -> None:
         """Issue #376: submit must set ``owner_pid`` so zombies are identifiable."""
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("Test"))
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("Test")
 
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
@@ -166,7 +165,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         """``_save_started`` must preserve the submitted record's ownership."""
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
 
         rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
         pid = rec.owner_pid
@@ -185,7 +184,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         correctly skips it (alive owner = not a zombie)."""
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
 
         rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
         pid = rec.owner_pid
@@ -210,7 +209,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
 
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
+        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
 
         # Open the breaker up front — the submit-time guard must refuse immediately.
         throttled = AgentJobOrchestrator(

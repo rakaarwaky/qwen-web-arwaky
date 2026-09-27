@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, NewType
+from typing import Literal, NewType, TypeAlias
 
 from modules.shared.src.taxonomy_core_vo import (
     AttachmentPath,
@@ -82,12 +82,19 @@ class JobResponse:
     error: str | None = None
 
 
+#: A parsed status file's top-level mapping, or None when the file was
+#: absent, empty, or invalid JSON. Keys are the status fields defined in
+#: ``StatusRecordVO``; extra keys that external monitors add are ignored.
+StatusRecordMap: TypeAlias = dict[str, object] | None
+
+
 __all__ = [
     "JobCount",
     "JobList",
     "JobRequest",
     "JobResponse",
     "JobVerb",
+    "StatusRecordMap",
     "TtlDays",
     "TtlHours",
 ]

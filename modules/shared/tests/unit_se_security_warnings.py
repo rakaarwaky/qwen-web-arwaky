@@ -77,37 +77,34 @@ def test_async_envelope_paths_are_trust_marked() -> None:
     """The job-status and list payloads must be trust marked too."""
     from modules.mcp.src.surface_mcp_tool_command import STATUS_COMPLETED
     from modules.shared.src.taxonomy_core_vo import JobRecord
-    from modules.shared.src.taxonomy_jobs_vo import JobResponse
 
     tools = MagicMock()
     from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 
     command = McpToolCommand(
-        prompt=tools,
+        direct=tools,
+        file_only=tools,
+        attachment=tools,
         session=tools,
         setup=tools,
         workspace=tools,
         jobs=tools,
     )
-    tools.execute.side_effect = [
-        JobResponse(
-            record=JobRecord(
-                job_id="job_1",
-                latest_event="DONE",
-                completed=True,
-                created_at="2026-09-25T00:00:00Z",
-                started_at="2026-09-25T00:00:01Z",
-                completed_at="2026-09-25T00:00:02Z",
-                duration_sec=1.0,
-                input_file="/ws/p.md",
-                attachment_file=None,
-                output_file="/ws/o.md",
-                error=None,
-                result_preview="answer",
-            )
-        ),
-        JobResponse(records=[]),
-    ]
+    tools.get_job_status.return_value = JobRecord(
+        job_id="job_1",
+        latest_event="DONE",
+        completed=True,
+        created_at="2026-09-25T00:00:00Z",
+        started_at="2026-09-25T00:00:01Z",
+        completed_at="2026-09-25T00:00:02Z",
+        duration_sec=1.0,
+        input_file="/ws/p.md",
+        attachment_file=None,
+        output_file="/ws/o.md",
+        error=None,
+        result_preview="answer",
+    )
+    tools.list_jobs.return_value = []
 
     status_payload = json.loads(command.get_job_status("job_1"))
     list_payload = json.loads(command.list_jobs(5))

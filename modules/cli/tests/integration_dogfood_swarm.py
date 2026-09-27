@@ -36,10 +36,10 @@ class TestSwarmPipelineStructure:
     """Test swarm pipeline structure and discoverability."""
 
     def test_swarm_orchestrator_exists(self):
-        """Verify SwarmAdapter can be imported."""
-        from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
+        """Verify SwarmOrchestrator can be imported."""
+        from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 
-        assert SwarmAdapter is not None
+        assert SwarmOrchestrator is not None
 
     def test_swarm_templates_discoverable(self):
         """Verify role templates are discoverable."""
@@ -75,17 +75,17 @@ class TestSwarmOutputStructure:
 
     def test_swarm_concurrency_config(self):
         """Verify swarm concurrency is capacity-derived and capped (issue #291)."""
-        from modules.session.src.capabilities_swarm_adapter import SwarmAdapter
         from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
         from modules.shared.src.utility_core_capacity import recommended_max_workers
+        from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
         assert DEFAULT_MAX_WORKERS == 10
         capacity = recommended_max_workers()
         assert 1 <= capacity <= DEFAULT_MAX_WORKERS
         print(f"\n[SWARM-TEST] Concurrency: capacity {capacity} / cap {DEFAULT_MAX_WORKERS}")
 
-        orchestrator = SwarmAdapter(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
-        assert orchestrator._browser_concurrency <= capacity
+        runner = SwarmRunner(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
+        assert int(runner.browser_concurrency) <= capacity
 
 
 if __name__ == "__main__":

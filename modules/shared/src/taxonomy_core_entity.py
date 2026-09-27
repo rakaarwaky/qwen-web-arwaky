@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 from collections import Counter, deque
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol
 
 from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS
@@ -17,13 +17,13 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_DESCRIPTIONS,
     PIPELINE_EVENT_SEQUENCE,
     CallbackRegistry,
-    EventDetails,
     EventMessage,
     LifecycleCallback,
     LifecycleEvent,
     QwenEventType,
 )
 from modules.shared.src.taxonomy_core_vo import (
+    EventDetails,
     EventSequenceVO,
     EventTimestamp,
     FailureCategory,
@@ -426,15 +426,24 @@ class LifecycleEmitter:
         for event_name in QwenEventType:
             self.on(event_name, _dispatch)
 
-    def emit(self, event_name: QwenEventType | str, details: EventDetails | None = None) -> LifecycleEvent:
-        """Emit a lifecycle event to all registered callbacks."""
+    def emit(
+        self,
+        event_name: QwenEventType | str,
+        details: Mapping[str, object] | None = None,
+    ) -> LifecycleEvent:
+        """Emit a lifecycle event to all registered callbacks.
+
+        ``details`` accepts any string-keyed mapping; the payload is
+        normalized to ``EventDetails`` so callbacks always observe one
+        frozen, typed dict regardless of what the caller passed.
+        """
         key = str(event_name)
         if self._gate is not None:
             self._gate.validate(event_name)
         evt = LifecycleEvent(
             name=key,
             timestamp=time.time(),
-            details=details or {},
+            details=EventDetails(details) if details else EventDetails(),
         )
         enum_member = event_name if isinstance(event_name, QwenEventType) else None
         label = EVENT_DESCRIPTIONS.get(enum_member, key) if enum_member else key

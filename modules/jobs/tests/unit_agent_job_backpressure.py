@@ -21,37 +21,44 @@ from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, JobQ
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
 
 
-def _orchestrator(tmp_path: Path, max_workers: int, **kwargs) -> AgentJobOrchestrator:
-    """Build an orchestrator whose workers never actually run a browser."""
+def _orchestrator(tmp_path: Path, max_workers: int, **kwargs) -> tuple[AgentJobOrchestrator, threading.Event]:
+    """Build an orchestrator whose workers hold their slot until released.
+
+    Returns the orchestrator plus the event that releases its workers, so a
+    test can assert on full admission state and then let teardown finish
+    instead of leaving a thread parked forever.
+    """
     storage = MagicMock()
     storage.save_job.return_value = None
-    blocked = threading.Event()
+    release = threading.Event()
 
-    def _block_forever(*_args, **_kwargs) -> None:
-        blocked.wait(timeout=30)
+    def _block_until_released(*_args, **_kwargs) -> None:
+        release.wait()
 
-    return AgentJobOrchestrator(
+    orchestrator = AgentJobOrchestrator(
         storage=storage,
-        file_only=MagicMock(execute=_block_forever),
-        attachment=MagicMock(execute=_block_forever),
+        file_only=MagicMock(process_prompt_file_only=_block_until_released),
+        attachment=MagicMock(process_prompt_with_attachment=_block_until_released),
         max_workers=max_workers,
         **kwargs,
     )
+    return orchestrator, release
 
 
 def test_default_capacity_covers_running_and_queued_work(tmp_path: Path) -> None:
     """One pending slot per worker is the default backlog, not an open queue."""
-    orchestrator = _orchestrator(tmp_path, max_workers=2)
+    orchestrator, release = _orchestrator(tmp_path, max_workers=2)
 
     try:
         assert orchestrator.max_pending_jobs() == 4
     finally:
+        release.set()
         orchestrator.shutdown()
 
 
 def test_submission_beyond_capacity_is_refused_with_retry_hint(tmp_path: Path) -> None:
     """An over-capacity submit raises a retryable error, never a silent queue."""
-    orchestrator = _orchestrator(tmp_path, max_workers=1, max_pending_jobs=1)
+    orchestrator, release = _orchestrator(tmp_path, max_workers=1, max_pending_jobs=1)
 
     try:
         prompt = tmp_path / "p.md"
@@ -65,12 +72,13 @@ def test_submission_beyond_capacity_is_refused_with_retry_hint(tmp_path: Path) -
         assert float(caught.value.retry_after_sec) > 0
         assert "capacity" in str(caught.value).lower()
     finally:
+        release.set()
         orchestrator.shutdown()
 
 
 def test_refused_submission_persists_no_job_record(tmp_path: Path) -> None:
     """A refused submit must leave no orphan record that no worker will claim."""
-    orchestrator = _orchestrator(tmp_path, max_workers=1, max_pending_jobs=1)
+    orchestrator, release = _orchestrator(tmp_path, max_workers=1, max_pending_jobs=1)
     storage = orchestrator._storage
 
     try:
@@ -84,12 +92,13 @@ def test_refused_submission_persists_no_job_record(tmp_path: Path) -> None:
 
         assert storage.save_job.call_count == saved_before
     finally:
+        release.set()
         orchestrator.shutdown()
 
 
 def test_queue_depth_tracks_admitted_work(tmp_path: Path) -> None:
     """Queue depth is observable so callers can report over-capacity state."""
-    orchestrator = _orchestrator(tmp_path, max_workers=2, max_pending_jobs=2)
+    orchestrator, release = _orchestrator(tmp_path, max_workers=2, max_pending_jobs=2)
 
     try:
         assert orchestrator.queue_depth() == 0
@@ -98,6 +107,7 @@ def test_queue_depth_tracks_admitted_work(tmp_path: Path) -> None:
         orchestrator.submit_file_job(prompt)
         assert orchestrator.queue_depth() == 1
     finally:
+        release.set()
         orchestrator.shutdown()
 
 
@@ -111,7 +121,7 @@ def test_exhausted_rate_limiter_does_not_block_the_submitting_thread(tmp_path: P
     """
     limiter = RateLimiter(MaxPerMinute(1))
     assert limiter.try_acquire() is None  # the only slot is already taken
-    orchestrator = _orchestrator(tmp_path, max_workers=1, rate_limiter=limiter)
+    orchestrator, release = _orchestrator(tmp_path, max_workers=1, rate_limiter=limiter)
 
     try:
         prompt = tmp_path / "p.md"
@@ -133,6 +143,7 @@ def test_exhausted_rate_limiter_does_not_block_the_submitting_thread(tmp_path: P
         assert not errors, f"submit raised: {errors}"
         assert len(submitted) == 1
     finally:
+        release.set()
         orchestrator.shutdown()
 
 
@@ -143,7 +154,7 @@ def test_rate_limited_rejection_returns_the_slot_to_admission_control(tmp_path: 
     (``_guard_submit``, the circuit breaker) refuses, the reserved slot is
     returned so the next submission is admitted rather than queue-full forever.
     """
-    orchestrator = _orchestrator(
+    orchestrator, release = _orchestrator(
         tmp_path,
         max_workers=1,
         max_pending_jobs=1,
@@ -164,4 +175,5 @@ def test_rate_limited_rejection_returns_the_slot_to_admission_control(tmp_path: 
             orchestrator.submit_file_job(prompt)
         assert orchestrator.queue_depth() == 0
     finally:
+        release.set()
         orchestrator.shutdown()

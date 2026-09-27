@@ -18,7 +18,6 @@ from modules.shared.src.taxonomy_core_vo import (
     HeadlessFlag,
     ResponseText,
 )
-from modules.shared.src.taxonomy_prompt_vo import PromptResponse
 
 
 def test_shared_container_wires_max_workers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -42,11 +41,11 @@ def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
         file_only = MagicMock()
         attachment = MagicMock()
 
-        def fake_execute(*_a: Any, **_kw: Any) -> PromptResponse:
+        def fake_execute(*_a: Any, **_kw: Any) -> ResponseText:
             time.sleep(0.5)
-            return PromptResponse(response_text=ResponseText("ok"))
+            return ResponseText("ok")
 
-        file_only.execute.side_effect = fake_execute
+        file_only.process_prompt_file_only.side_effect = fake_execute
 
         orch = AgentJobOrchestrator(
             storage=storage,
