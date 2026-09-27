@@ -1,22 +1,19 @@
-"""Agent: run the self-update pipeline for the CLI update command.
+"""Agent: run the self-update pipeline on behalf of the CLI update command.
 
-``surface_cli_update_command`` previously constructed ``UpdateManager`` and
-called ``perform_update`` / ``rollback_to`` directly, bypassing any single
-decision point about when to roll back on a post-update failure. This
-orchestrator owns that decision: the surface calls ``perform`` or ``check`` and
-the agent handles the rollback gate internally.
+Owns the rollback decision (run the post-update health gate, then restore the
+previous version when the gate fails) so no surface can skip it. All I/O is
+delegated to the update capability (``IUpdateProtocol``); this agent only
+routes the request verb and wraps the outcome into the shared VO.
 """
 
 from __future__ import annotations
 
-from modules.shared.src.contract_core_aggregate import IUpdateAggregate
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.taxonomy_core_vo import (
-    ForceFlag,
-    UpdateCheckResult,
-    UpdateReport,
-    UpdateStepResult,
-    VersionString,
+from modules.shared.src.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.taxonomy_core_vo import VersionString
+from modules.shared.src.taxonomy_update_vo import (
+    UpdateRequest,
+    UpdateResponse,
 )
 
 __all__ = ["UpdateOrchestrator"]
@@ -34,19 +31,27 @@ class UpdateOrchestrator(IUpdateAggregate):
         """
         self._updater = updater
 
-    def check(self) -> UpdateCheckResult:
-        """Return whether a newer release is published, without mutating anything."""
-        return self._updater.check_update()
+    # ─── Block 2: Aggregate Method Implementation ──────────
 
-    def perform(self, *, force: bool = False) -> UpdateReport:
-        """Run the full update pipeline and return the aggregated report.
+    def execute(self, request: UpdateRequest) -> UpdateResponse:
+        """Run the requested update verb and return its outcome as a shared VO.
 
-        The post-update health gate runs after every successful upgrade. If the
-        gate reports unhealthy, the orchestrator restores the previous version
-        before returning so the pipeline does not stay on a broken release.
+        Dispatches on ``request.verb`` — the consumer passes one verb; the
+        agent routes it to the right capability call and wraps the result.
+        No I/O happens here; every byte of output comes from the capability.
         """
-        return self._updater.perform_update(force=ForceFlag(force))
+        if request.verb == "check_update":
+            return UpdateResponse(check_result=self._updater.check_update())
+        if request.verb == "perform_update":
+            return UpdateResponse(report=self._updater.perform_update(force=request.force))
+        if request.verb == "rollback_to":
+            previous = request.previous_version
+            if previous is None:
+                return UpdateResponse(error="rollback_to verb requires previous_version")
+            return UpdateResponse(steps=self._updater.rollback_to(VersionString(previous)))
+        return UpdateResponse(error=f"unknown update verb: {request.verb!r}")
 
-    def rollback(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
-        """Restore ``previous_version`` and return the per-step outcome."""
-        return self._updater.rollback_to(previous_version)
+    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+
+    def __repr__(self) -> str:
+        return "UpdateOrchestrator()"

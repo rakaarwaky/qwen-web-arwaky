@@ -9,15 +9,19 @@ import shutil
 from pathlib import Path
 
 from modules.config.src.utility_config_app_factory import build_app_config
-from modules.shared.src.contract_core_aggregate import ISessionAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
-    IObservabilityProtocol,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_core_vo import AppConfig, ResponseText
+from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.taxonomy_session_vo import (
+    SessionRequest,
+    SessionResponse,
+)
 from modules.shared.src.utility_core_session_backup import refuse_delete_without_backup
 from modules.shared.src.utility_session_guard import is_safe_session_target
 
@@ -33,7 +37,27 @@ class SessionOrchestrator(ISessionAggregate):
         self._browser = browser
         self._observability = observability
 
-    def validate_session(self, session_path: Path | None = None) -> tuple[bool, str]:
+    # ─── Block 2: Aggregate Method Implementation ──────────
+
+    def execute(self, request: SessionRequest) -> SessionResponse:
+        """Run the requested session verb and return its outcome.
+
+        Routes on ``request.verb``: ``validate`` runs the headless auth
+        check and returns the verdict; ``delete`` runs the path-safety
+        guard, then removes the profile. All I/O is delegated to the
+        browser capability — this agent only routes and wraps results.
+        """
+        if request.verb == "validate":
+            valid, message = self._validate(request.session_path)
+            return SessionResponse(valid=valid, message=message)
+        if request.verb == "delete":
+            message = self._delete(request.session_path, force=request.force)
+            return SessionResponse(deleted=True, message=message)
+        return SessionResponse(error=f"unknown session verb: {request.verb!r}")
+
+    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+
+    def _validate(self, session_path: Path | None) -> tuple[bool, str]:
         """Validate an existing saved Qwen browser session in headless mode."""
         cfg = build_app_config(
             mode="session-check",
@@ -48,7 +72,7 @@ class SessionOrchestrator(ISessionAggregate):
             return True, "Saved Qwen session is valid and ready to use."
         return False, "Saved Qwen session is invalid or expired. Please log in again."
 
-    def delete_session(self, session_path: Path | None = None, *, force: bool = False) -> ResponseText:
+    def _delete(self, session_path: Path | None, *, force: bool) -> str:
         """Delete persistent session profile from disk after path safety checks.
 
         The target must be an existing directory that clears every rule in
@@ -70,7 +94,7 @@ class SessionOrchestrator(ISessionAggregate):
         )
         target = cfg.session_path.resolve()
         if not target.exists():
-            return ResponseText("No session found to delete.")
+            return "No session found to delete."
 
         # Refuse before touching the filesystem: roots, near-root paths,
         # non-directories, home itself, and any path outside the allow-list.
@@ -84,7 +108,7 @@ class SessionOrchestrator(ISessionAggregate):
 
         try:
             shutil.rmtree(target)
-            return ResponseText("Session deleted successfully.")
+            return "Session deleted successfully."
         except Exception as exc:
             # A partial rmtree leaves the profile in an inconsistent state;
             # surface the failure and the residue so the operator can remove

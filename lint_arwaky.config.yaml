@@ -19,7 +19,11 @@ adapters:
 
 ignored_rules: []
 
-ignored_paths: []
+ignored_paths:
+  # Test-infrastructure utility: consumed only by conftest.py and its own
+  # test module to decide whether the parallel browser tier can run.
+  # It is deliberately unreachable from any _entry file.
+  - "modules/shared/src/utility_host_gate.py"
 
 architecture:
   enabled: true

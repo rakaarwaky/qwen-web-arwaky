@@ -7,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
     pass
@@ -94,9 +94,9 @@ class SessionManager(ISessionManagerProtocol):
             return True
         return False
 
-    def list_sessions(self) -> list[SessionInfo]:
+    def list_sessions(self) -> SessionList:
         """List all sessions."""
-        return self.load_pool().sessions
+        return SessionList(self.load_pool().sessions)
 
     def get_session(self, session_id: str) -> SessionInfo | None:
         """Get a session by ID."""

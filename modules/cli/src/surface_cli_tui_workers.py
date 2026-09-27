@@ -21,6 +21,7 @@ from textual.widgets import DataTable, Input, Label, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.utility_core_response import detect_processing_failure
 
 # A badge write can land while the app is tearing down: the worker thread's
@@ -451,10 +452,13 @@ class _TuiWorkersMixin:
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
-            res = self._setup.setup_session()
+            res = self._setup.execute(SetupRequest())
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]LOGIN RESULT:[/] {}".format(THEME["ok"], escape(str(res))),
+                "[bold {}]LOGIN RESULT:[/] {}".format(
+                    THEME["ok"],
+                    escape(str(res.error or res.message or res.profile_path or "")),
+                ),
             )
             self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
@@ -504,7 +508,10 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._apply_session_badge, False)
             return
         try:
-            valid, _msg = self._session.validate_session()
+            from modules.shared.src.taxonomy_session_vo import SessionRequest
+
+            response = self._session.execute(SessionRequest(verb="validate"))
+            valid = response.valid
         except Exception:
             valid = False
         self.call_from_thread(self._apply_session_badge, valid)

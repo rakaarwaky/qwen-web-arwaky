@@ -12,13 +12,13 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.shared.src.contract_core_aggregate import IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IInjectionProtocol,
-    IObservabilityProtocol,
     ISendProtocol,
     IStreamProtocol,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_aggregate import IPromptFlowAggregate
 from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS, RETRY_BASE_DELAY_SEC
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import (

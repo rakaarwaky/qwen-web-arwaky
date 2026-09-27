@@ -14,9 +14,8 @@ from contextlib import contextmanager
 
 from playwright.sync_api import BrowserContext, Page
 
-from modules.shared.src.contract_core_aggregate import IBrowserAggregate
+from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_core_protocol import IBrowserProtocol
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_vo import AppConfig
 
 __all__ = ["BrowserOrchestrator"]
@@ -48,14 +47,6 @@ class BrowserOrchestrator(IBrowserAggregate):
         with self._browser.browser_session(cfg) as bctx:
             yield self._first_page(bctx)
 
-    def check_session(self, page: Page) -> bool:
-        """Return True when ``page`` shows the authenticated chat UI.
-
-        Callers use this to report a session's state without raising, unlike
-        the auth check inside :meth:`open_session`.
-        """
-        return self._browser.check_session(page)
-
     def _first_page(self, bctx: BrowserContext) -> Page:
         """Return the context's first page, creating one when it has none.
 
@@ -66,13 +57,3 @@ class BrowserOrchestrator(IBrowserAggregate):
         if getattr(bctx, "pages", None):
             return bctx.pages[0]
         return bctx.new_page()
-
-    def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
-        """Navigate ``page`` to the chat and verify the session is signed in.
-
-        Exposed for the flows that already hold a page (session validation,
-        manual login) and therefore do not enter :meth:`open_session`, so the
-        auth check stays in one place for those paths too.
-        """
-        self._browser.navigate_to_chat(page, emitter)
-        self._browser.check_auth(page)

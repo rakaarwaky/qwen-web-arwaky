@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import cast
 
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 
 # Root is the composition layer, so it wires the functional doctor gate into
@@ -31,6 +32,7 @@ from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
@@ -51,28 +53,30 @@ from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 
 # agent_session_orchestrator
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+
+# agent_setup_orchestrator
+from modules.session.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
-
-# capabilities_setup_adapter
-from modules.session.src.capabilities_setup_adapter import SetupAdapter
 from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    IPromptFlowAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-)
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
-from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
+from modules.shared.src.contract_prompt_aggregate import IPromptAggregate, IPromptFlowAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, ISessionRotatorProtocol
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.contract_update_aggregate import IUpdateAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -85,6 +89,7 @@ from modules.shared.src.utility_core_capacity import recommended_max_workers
 from modules.shared.src.utility_core_status import status_path_for
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_manager import UpdateManager
 
 
@@ -123,6 +128,16 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
+        # Wire orchestrators so AES505 can trace them back to this container.
+        self.browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(
+            browser=self.browser,
+        )
+        self.logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(
+            observability=self.observability,
+        )
+        self.update_orchestrator: IUpdateAggregate = UpdateOrchestrator(
+            updater=self.updater,
+        )
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
@@ -150,7 +165,7 @@ class SharedContainer:
         self.run_cancel_registry: CapabilitiesRunCancelRegistry = CapabilitiesRunCancelRegistry()
 
         # The 5 specialized agent orchestrators
-        self.agent_direct_prompt_orchestrator: IDirectPromptAggregate = DirectPromptAdapter(
+        self.agent_direct_prompt_orchestrator: IDirectPromptProtocol = DirectPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -159,7 +174,7 @@ class SharedContainer:
             observability=self.observability,
             flow=self.agent_shared_flow_orchestrator,
         )
-        self.agent_prompt_file_orchestrator: IPromptFileAggregate = PromptFileAdapter(
+        self.agent_prompt_file_orchestrator: IPromptFileProtocol = PromptFileAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -169,7 +184,7 @@ class SharedContainer:
             flow=self.agent_shared_flow_orchestrator,
             cancel=self.run_cancel_registry,
         )
-        self.agent_attachment_prompt_orchestrator: IAttachmentPromptAggregate = AttachmentPromptAdapter(
+        self.agent_attachment_prompt_orchestrator: IAttachmentPromptProtocol = AttachmentPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -191,11 +206,11 @@ class SharedContainer:
         self.session_health_checker = SessionHealthChecker()
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 
-        self.session_rotator: ISessionRotatorAggregate = SessionRotationAdapter(
+        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = SetupAdapter(
+        self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
             browser=self.browser,
             observability=self.observability,
         )

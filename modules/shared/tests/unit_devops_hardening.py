@@ -23,6 +23,7 @@ from modules.config.src.utility_config_app_factory import build_app_config, sand
 from modules.logging.src.capabilities_observability_setup import effective_telemetry_mode
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.taxonomy_session_vo import SessionRequest
 from modules.update.src.capabilities_update_manager import UpdateManager
 
 # ─── #290: sandbox is on by default ─────────────────────────────────────────
@@ -329,7 +330,7 @@ def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
 
     with pytest.raises(Exception, match="no session backup is retained"):
-        orch.delete_session(session)
+        orch.execute(SessionRequest(verb="delete", session_path=session))
 
 
 def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
@@ -342,7 +343,7 @@ def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
     (session / "Cookies").write_text("x", encoding="utf-8")
     monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
 
-    result = orch.delete_session(session, force=True)
+    result = orch.execute(SessionRequest(verb="delete", session_path=session, force=True))
 
     assert "deleted successfully" in str(result)
     assert not session.exists()

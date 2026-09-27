@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_doctor_command import run_doctor
 from modules.root_cli_main_entry import _parse_args
+from modules.shared.src.taxonomy_session_vo import SessionResponse
 
 
 def test_parse_args_accepts_smoke_flag() -> None:
@@ -24,10 +25,10 @@ def test_parse_args_accepts_smoke_flag() -> None:
 def test_smoke_appends_sixth_check_and_maps_result(capsys) -> None:
     """A valid session yields a sixth passing check (issue #322 acceptance)."""
     session = MagicMock()
-    session.validate_session.return_value = (True, "Saved Qwen session is valid and ready to use.")
+    session.execute.return_value = SessionResponse(valid=True, message="Saved Qwen session is valid and ready to use.")
 
     run_doctor(json_output=True, smoke=True, session=session)
-    session.validate_session.assert_called_once()
+    session.execute.assert_called_once()
 
     data = json.loads(capsys.readouterr().out)
     names = [check["name"] for check in data["checks"]]
@@ -38,7 +39,9 @@ def test_smoke_appends_sixth_check_and_maps_result(capsys) -> None:
 def test_smoke_failure_flags_check_unhealthy(capsys) -> None:
     """An invalid session marks the check failed and the run unhealthy."""
     session = MagicMock()
-    session.validate_session.return_value = (False, "Saved Qwen session is invalid or expired. Please log in again.")
+    session.execute.return_value = SessionResponse(
+        valid=False, message="Saved Qwen session is invalid or expired. Please log in again."
+    )
 
     assert run_doctor(json_output=True, smoke=True, session=session) == 1
 
@@ -53,7 +56,7 @@ def test_smoke_failure_flags_check_unhealthy(capsys) -> None:
 def test_smoke_aggregate_exception_reports_failure(capsys) -> None:
     """A launch failure is reported as a failed check, not a traceback."""
     session = MagicMock()
-    session.validate_session.side_effect = RuntimeError("browser launch exploded")
+    session.execute.side_effect = RuntimeError("browser launch exploded")
 
     assert run_doctor(json_output=True, smoke=True, session=session) == 1
 
@@ -77,7 +80,7 @@ def test_smoke_disabled_keeps_five_checks(capsys) -> None:
     """Without --smoke the report runs but the Browser Smoke Test check is absent."""
     session = MagicMock()
     run_doctor(json_output=True, smoke=False, session=session)
-    session.validate_session.assert_not_called()
+    session.execute.assert_not_called()
     names = [c["name"] for c in json.loads(capsys.readouterr().out)["checks"]]
     assert "Browser Smoke Test" not in names
 

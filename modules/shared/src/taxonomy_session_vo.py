@@ -196,12 +196,46 @@ class RotatorResponse:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class SessionRequest:
+    """One session verb plus everything the agent needs to run it.
+
+    ``validate`` reads ``session_path`` to locate the profile;
+    ``delete`` reads it and ``force`` to bypass the no-backup guard that
+    protects the master profile from accidental deletion. Fields the chosen
+    verb does not read stay at their defaults, so no verb passes arguments
+    another ignores.
+    """
+
+    verb: str = "validate"
+    session_path: Path | None = None
+    force: bool = False
+
+
+@dataclass(frozen=True)
+class SessionResponse:
+    """What a session verb produced.
+
+    ``valid`` carries the auth verdict for ``validate``; ``message`` carries
+    the human-readable outcome of either verb; ``deleted`` reports whether
+    ``delete`` removed a profile. ``error`` names the reason a request could
+    not be answered at all.
+    """
+
+    valid: bool = False
+    message: str = ""
+    deleted: bool = False
+    error: str | None = None
+
+
 __all__ = [
     "RotatorRequest",
     "RotatorResponse",
     "SessionInfo",
     "SessionList",
     "SessionPool",
+    "SessionRequest",
+    "SessionResponse",
     "SessionStatus",
     "SessionId",
     "SessionName",

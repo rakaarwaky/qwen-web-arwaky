@@ -13,16 +13,17 @@ from pathlib import Path
 from playwright.sync_api import Page
 
 from modules.config.src.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
-from modules.shared.src.contract_core_aggregate import IDirectPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
-    IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
     LifecycleObserver,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_aggregate import IPromptFlowAggregate
+from modules.shared.src.contract_prompt_protocol import IDirectPromptProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
@@ -42,7 +43,7 @@ from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
 
 
-class DirectPromptAdapter(IDirectPromptAggregate):
+class DirectPromptAdapter(IDirectPromptProtocol):
     """Orchestrates direct string text prompt execution."""
 
     def __init__(

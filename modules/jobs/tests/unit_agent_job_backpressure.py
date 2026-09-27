@@ -19,6 +19,7 @@ from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, JobQueueFullError
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.taxonomy_jobs_vo import JobRequest
 
 
 def _orchestrator(tmp_path: Path, max_workers: int, **kwargs) -> tuple[AgentJobOrchestrator, threading.Event]:
@@ -37,8 +38,8 @@ def _orchestrator(tmp_path: Path, max_workers: int, **kwargs) -> tuple[AgentJobO
 
     orchestrator = AgentJobOrchestrator(
         storage=storage,
-        file_only=MagicMock(process_prompt_file_only=_block_until_released),
-        attachment=MagicMock(process_prompt_with_attachment=_block_until_released),
+        file_only=MagicMock(execute=_block_until_released),
+        attachment=MagicMock(execute=_block_until_released),
         max_workers=max_workers,
         **kwargs,
     )
@@ -53,7 +54,7 @@ def test_default_capacity_covers_running_and_queued_work(tmp_path: Path) -> None
         assert orchestrator.max_pending_jobs() == 4
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))
 
 
 def test_submission_beyond_capacity_is_refused_with_retry_hint(tmp_path: Path) -> None:
@@ -63,17 +64,17 @@ def test_submission_beyond_capacity_is_refused_with_retry_hint(tmp_path: Path) -
     try:
         prompt = tmp_path / "p.md"
         prompt.write_text("hello", encoding="utf-8")
-        orchestrator.submit_file_job(prompt)
+        orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
         # The single slot is now held by a worker that never finishes.
         with pytest.raises(JobQueueFullError) as caught:
-            orchestrator.submit_file_job(prompt)
+            orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
 
         assert caught.value.retry_after_sec is not None
         assert float(caught.value.retry_after_sec) > 0
         assert "capacity" in str(caught.value).lower()
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))
 
 
 def test_refused_submission_persists_no_job_record(tmp_path: Path) -> None:
@@ -84,16 +85,16 @@ def test_refused_submission_persists_no_job_record(tmp_path: Path) -> None:
     try:
         prompt = tmp_path / "p.md"
         prompt.write_text("hello", encoding="utf-8")
-        orchestrator.submit_file_job(prompt)
+        orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
         saved_before = storage.save_job.call_count
 
         with pytest.raises(JobQueueFullError):
-            orchestrator.submit_file_job(prompt)
+            orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
 
         assert storage.save_job.call_count == saved_before
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))
 
 
 def test_queue_depth_tracks_admitted_work(tmp_path: Path) -> None:
@@ -104,11 +105,11 @@ def test_queue_depth_tracks_admitted_work(tmp_path: Path) -> None:
         assert orchestrator.queue_depth() == 0
         prompt = tmp_path / "p.md"
         prompt.write_text("hello", encoding="utf-8")
-        orchestrator.submit_file_job(prompt)
+        orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
         assert orchestrator.queue_depth() == 1
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))
 
 
 def test_exhausted_rate_limiter_does_not_block_the_submitting_thread(tmp_path: Path) -> None:
@@ -131,7 +132,7 @@ def test_exhausted_rate_limiter_does_not_block_the_submitting_thread(tmp_path: P
 
         def _submit() -> None:
             try:
-                submitted.append(orchestrator.submit_file_job(prompt))
+                submitted.append(orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt)))
             except BaseException as exc:
                 errors.append(exc)
 
@@ -144,7 +145,7 @@ def test_exhausted_rate_limiter_does_not_block_the_submitting_thread(tmp_path: P
         assert len(submitted) == 1
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))
 
 
 def test_rate_limited_rejection_returns_the_slot_to_admission_control(tmp_path: Path) -> None:
@@ -168,12 +169,12 @@ def test_rate_limited_rejection_returns_the_slot_to_admission_control(tmp_path: 
         orchestrator._circuit_breaker.record_failure()
 
         with pytest.raises(CircuitBreakerOpenError):
-            orchestrator.submit_file_job(prompt)
+            orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
         # The slot was released, so the next submit is admitted past admission
         # control and refused by the same guard — not by JobQueueFullError.
         with pytest.raises(CircuitBreakerOpenError):
-            orchestrator.submit_file_job(prompt)
+            orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
         assert orchestrator.queue_depth() == 0
     finally:
         release.set()
-        orchestrator.shutdown()
+        orchestrator.execute(JobRequest(verb="shutdown"))

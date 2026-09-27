@@ -1,92 +1,36 @@
-"""Session protocol contracts — multi-account rotation."""
+"""Session-domain aggregate contract (AES101 `_aggregate`).
+
+The single entry point over the session feature: the consumer (surface,
+root, CLI, MCP) calls :meth:`execute` with a :class:`SessionRequest`;
+the agent behind the aggregate dispatches to the capability seams in
+``contract_session_protocol.py``.
+
+Adding a consumer verb means adding a variant to ``SessionRequest``,
+never a second aggregate method.
+"""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 
-from modules.shared.src.taxonomy_session_vo import SessionId, SessionInfo, SessionName, SessionPool
+from modules.shared.src.taxonomy_session_vo import SessionRequest, SessionResponse
 
 
-class ISessionManagerProtocol(ABC):
-    """Protocol for session storage and management."""
+class ISessionAggregate(ABC):
+    """Single entry point over the session feature.
 
-    @abstractmethod
-    def load_pool(self) -> SessionPool:
-        """Load session pool from disk."""
+    Exactly one method: the door consumers knock on.
+    """
 
     @abstractmethod
-    def save_pool(self, pool: SessionPool) -> None:
-        """Persist session pool to disk."""
-
-    @abstractmethod
-    def add_session(self, name: SessionName, profile_path: Path) -> SessionInfo:
-        """Create and save a new session."""
-
-    @abstractmethod
-    def remove_session(self, session_id: SessionId) -> bool:
-        """Remove a session by ID."""
-
-    @abstractmethod
-    def list_sessions(self) -> list[SessionInfo]:
-        """List all sessions."""
-
-    @abstractmethod
-    def mark_healthy(self, session_id: SessionId) -> None:
-        """Mark session as healthy."""
-
-    @abstractmethod
-    def mark_limited(self, session_id: SessionId) -> None:
-        """Mark session as rate-limited."""
+    def execute(self, request: SessionRequest) -> SessionResponse:
+        """Run the requested session verb and return its outcome."""
+        ...
 
 
-class ISessionHealthCheckerProtocol(ABC):
-    """Protocol for session health checking via ping test."""
+__all__ = ["ISessionAggregate"]
 
-    @abstractmethod
-    async def check_session(self, session: SessionInfo) -> bool:
-        """Check if session is healthy. Returns True if OK, False if limited."""
-
-    @abstractmethod
-    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
-        """Health check all sessions and return updated pool."""
-
-
-class ISessionRotatorProtocol(ABC):
-    """Protocol for transparent session rotation."""
-
-    @abstractmethod
-    async def get_next_session(self) -> SessionInfo | None:
-        """Get next healthy session."""
-
-    @abstractmethod
-    async def mark_limited(self, session_id: SessionId) -> None:
-        """Mark session as rate-limited."""
-
-    @abstractmethod
-    async def mark_healthy(self, session_id: SessionId) -> None:
-        """Mark session as healthy."""
-
-
-__all__ = [
-    "ISessionManagerProtocol",
-    "ISessionHealthCheckerProtocol",
-    "ISessionRotatorProtocol",
-    "ISessionRotatorAggregate",
-]
-
-
-class ISessionRotatorAggregate(ABC):
-    """Session rotator aggregate contract."""
-
-    @abstractmethod
-    async def get_next_session(self) -> SessionInfo | None:
-        """Get next healthy session."""
-
-    @abstractmethod
-    async def mark_limited(self, session_id: SessionId) -> None:
-        """Mark session as rate-limited."""
-
-    @abstractmethod
-    async def mark_healthy(self, session_id: SessionId) -> None:
-        """Mark session as healthy."""
+# Layer-symbol registry (runtime reference for harness/loader introspection).
+_layer_symbols = {
+    "ISessionAggregate": ISessionAggregate,
+}
