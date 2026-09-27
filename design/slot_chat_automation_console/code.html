@@ -1,0 +1,380 @@
+<!DOCTYPE html><html class="dark" lang="en" style="width: 982px; height: 884px; overflow: hidden; position: relative;"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "background": "#0f131c", "secondary-fixed": "#e1e0ff", "on-tertiary": "#003824", "error-container": "#93000a", "on-secondary-fixed": "#07006c", "on-primary": "#00354a", "surface-container-high": "#262a33", "outline": "#87929a", "secondary": "#c0c1ff", "on-secondary-fixed-variant": "#2f2ebe", "tertiary-fixed": "#6ffbbe", "on-secondary": "#1000a9", "tertiary-container": "#30c88f", "secondary-fixed-dim": "#c0c1ff", "on-tertiary-container": "#004e34", "on-error": "#690005", "outline-variant": "#3e484f", "on-surface-variant": "#bdc8d1", "tertiary-fixed-dim": "#4edea3", "on-secondary-container": "#b0b2ff", "primary-fixed": "#c4e7ff", "surface-bright": "#353942", "on-error-container": "#ffdad6", "on-surface": "#dfe2ee", "surface": "#0f131c", "surface-container": "#1c2028", "inverse-on-surface": "#2c3039", "on-primary-container": "#004965", "surface-container-lowest": "#0a0e16", "on-tertiary-fixed": "#002113", "secondary-container": "#3131c0", "primary-fixed-dim": "#7bd0ff", "surface-container-low": "#181c24", "on-background": "#dfe2ee", "inverse-surface": "#dfe2ee", "surface-variant": "#31353e", "tertiary": "#56e5a9", "on-primary-fixed": "#001e2c", "surface-tint": "#7bd0ff", "primary": "#8ed5ff", "surface-dim": "#0f131c", "on-primary-fixed-variant": "#004c69", "inverse-primary": "#00668a", "primary-container": "#38bdf8", "error": "#ffb4ab", "surface-container-highest": "#31353e", "on-tertiary-fixed-variant": "#005236" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-sm": "0.5rem", "margin": "1rem", "space-md": "0.75rem", "space-lg": "1rem", "gutter": "0.75rem", "space-xl": "1.5rem", "space-xs": "0.25rem" }, fontFamily: { "body-lg": ["Inter"], "label-lg": ["JetBrains Mono"], "headline-lg": ["Inter"], "headline-lg-mobile": ["Inter"], "label-sm": ["JetBrains Mono"], "body-sm": ["Inter"], "headline-sm": ["Inter"], "label-md": ["JetBrains Mono"], "headline-md": ["Inter"], "body-md": ["Inter"] }, fontSize: { "body-lg": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }], "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0f131c;color:#dfe2ee;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style></head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.5)] pt-safe"><div class="h-16 px-margin flex items-center gap-space-sm"><div class="flex items-center gap-space-sm"><svg class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 7 5 5-5 5"></path><path d="m13 17 6 0"></path></svg><span class="font-mono font-bold text-xs tracking-wider text-slate-200 uppercase">QWEN-CLI</span><span class="text-[11px] font-mono text-slate-500 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">v6.5.2</span></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full text-on-surface">
+<!-- TOP CONTEXT & SYSTEM METRICS -->
+<div class="px-margin pt-space-xs pb-space-sm flex items-center justify-between bg-surface-container-lowest">
+
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1 px-space-xs py-0.5 rounded bg-surface-container text-primary font-label-sm text-label-sm transition-all active:scale-95 shadow-sm" id="toggle-console-btn">
+
+
+</button>
+</div>
+</div>
+<!-- HORIZONTAL SLOT SELECTOR (Slots 1 to 10) -->
+<div class="w-full bg-surface-container-low py-space-xs px-margin overflow-x-auto no-scrollbar shadow-inner">
+<div class="flex items-center gap-space-xs w-max" id="slot-carousel">
+<!-- Active Slot 1 -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="1">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 01</span>
+</button>
+<!-- Slot 2 Busy -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="2">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 02</span>
+</button>
+<!-- Slot 3 Error/Warning -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="3">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 03</span>
+</button>
+<!-- Slot 4 Idle -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="4">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 04</span>
+</button>
+<!-- Slot 5 Running -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="5">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 05</span>
+</button>
+<!-- Slot 6 Idle -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="6">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 06</span>
+</button>
+<!-- Slot 7 Idle -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="7">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 07</span>
+</button>
+<!-- Slot 8 Idle -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="8">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 08</span>
+</button>
+<!-- Slot 9 Idle -->
+<button class="slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high" data-slot="9">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="">SLOT 09</span>
+</button>
+<!-- Slot 10 Idle -->
+<button class="slot-tab active-slot flex items-center gap-1.5 px-space-md py-1.5 rounded bg-primary text-on-primary font-label-md text-label-md transition-all shrink-0 shadow-sm" data-slot="10">
+<span class="w-2 h-2 rounded-full bg-on-primary"></span>
+<span class="">SLOT 10</span>
+</button>
+</div>
+</div>
+<!-- COLLAPSIBLE TELEMETRY LOG VIEWER (Toggleable panel) -->
+<div class="transition-all duration-300 bg-surface-container-lowest px-margin py-space-sm shadow-md" id="telemetry-panel">
+<!-- Log Filter Segmented Slider -->
+<div class="flex items-center justify-between mb-space-xs">
+<div class="flex p-0.5 rounded-lg bg-surface-container-high w-full max-w-[280px]">
+<button class="w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center bg-primary text-on-primary transition-all font-medium" id="toggle-summary">
+          Event Log</button>
+<button class="w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center text-on-surface-variant hover:text-on-surface transition-all" id="toggle-full">
+          SYSTEM LOG</button>
+</div>
+<div class="flex items-center gap-1 text-tertiary font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+
+</div>
+</div>
+<!-- Mini Log Terminal Screen -->
+<div class="rounded bg-surface-dim p-space-sm font-label-sm text-label-sm text-on-surface-variant max-h-36 overflow-y-auto font-mono flex flex-col gap-1 shadow-inner" id="log-console-container">
+<!-- Short summary logs -->
+<div class="flex flex-col gap-1" id="view-summary">
+
+
+
+</div>
+<!-- Full verbose raw logs (initial hidden state) -->
+<div class="flex flex-col gap-1 text-label-sm hidden" id="view-full">
+<div class="text-error">[WARNING][browser] browser_request_failed net::ERR_FAILED</div>
+<div class="text-on-surface-variant">[browser] browser_mutation_request POST https://aplus.qwen.ai/service.stability</div>
+<div class="text-tertiary">[browser] browser_mutation_response 200 OK (latency: 114ms)</div>
+<div class="text-secondary">[browser] chat_textarea_identified payload_size: 4.8kb</div>
+<div class="text-on-surface-variant">[browser] browser_mutation_response 200 https://chat.qwen.ai/api/v2/users/status</div>
+</div>
+</div>
+</div>
+<!-- CHAT CONVERSATION STREAM -->
+<div class="flex flex-col px-margin py-space-md gap-space-lg" id="chat-stream">
+<!-- Time Break / Session Pill -->
+<div class="flex items-center justify-center my-space-xs">
+
+</div>
+<!-- USER MESSAGE BUBBLE -->
+<div class="flex flex-col items-end gap-1 ml-auto max-w-[90%]">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm pr-1">
+<span class="">DEV OPERATOR</span>
+<span class="material-symbols-outlined text-[14px] text-primary">terminal</span>
+</div>
+<div class="bg-primary text-on-primary rounded-xl rounded-tr-none px-space-md py-space-sm shadow-md">
+<p class="font-body-md text-body-md leading-relaxed">THIS IS MY PROMPT</p>
+</div>
+<!-- Attachment meta pill attached by operator -->
+<div class="flex items-center gap-1.5 px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[12px] text-tertiary">description</span>
+<span class="truncate">dataset_sample_v3.csv (42KB)</span>
+<span class="text-tertiary">✓ ATTACHED</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline pr-1">09:46:28</span>
+</div>
+<!-- AGENT / QWEN-CLI RESPONSE BUBBLE -->
+<div class="flex flex-col items-start gap-1 mr-auto max-w-[95%] w-full">
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant pl-1">
+<div class="w-4 h-4 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[11px]">hub</span>
+</div>
+<span class="text-primary font-medium">EVENT LOG</span>
+<span class="px-1 py-0.2 rounded bg-surface-container-high text-tertiary font-label-sm text-label-sm">SLOT #1&nbsp;</span>
+</div>
+<div class="w-full bg-surface-container rounded-xl rounded-tl-none p-space-md shadow-md text-on-surface flex flex-col gap-space-sm">
+<p class="font-body-md text-body-md leading-relaxed"><br></p>
+<!-- Monospace Code Output Snippet -->
+<div class="rounded bg-surface-container-lowest p-space-sm flex flex-col gap-1 shadow-inner">
+<div class="flex items-center justify-between pb-1 text-on-surface-variant font-label-sm text-label-sm">
+
+
+</div>
+
+</div>
+
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant">
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm">
+
+
+</div>
+<div class="flex items-center gap-space-sm text-outline">
+<button class="hover:text-primary transition-colors"></button>
+<button class="hover:text-error transition-colors"></button>
+<button class="hover:text-tertiary transition-colors"></button>
+</div>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-outline pl-1">09:46:31</span>
+</div>
+<!-- Active Inference Indicator -->
+
+</div>
+<!-- FIXED-POSITION BOTTOM SHEETS / DRAWER FOR TEMPLATES -->
+<div class="hidden fixed inset-x-0 bottom-24 z-40 px-margin" id="template-modal">
+<div class="bg-surface-container-high rounded-xl p-space-md shadow-2xl flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">auto_stories</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Prompt Templates</span>
+</div>
+<button class="text-outline hover:text-on-surface" id="close-templates">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<div class="grid grid-cols-1 gap-space-xs font-label-sm text-label-sm">
+<button class="template-item flex items-center justify-between p-space-sm rounded bg-surface-container hover:bg-surface-bright text-left transition-colors" data-prompt="Auto-Summarize latest browser logs and return categorized alert states:">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">⚡ Auto-Summarize</span>
+<span class="text-outline text-label-sm">Categorize runtime events &amp; alerts</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-primary">arrow_forward</span>
+</button>
+<button class="template-item flex items-center justify-between p-space-sm rounded bg-surface-container hover:bg-surface-bright text-left transition-colors" data-prompt="Extract all DOM elements with matching selectors into clean structured JSON:">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">📦 Code / Data Extraction</span>
+<span class="text-outline text-label-sm">Sanitize raw DOM payload to schema</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-primary">arrow_forward</span>
+</button>
+<button class="template-item flex items-center justify-between p-space-sm rounded bg-surface-container hover:bg-surface-bright text-left transition-colors" data-prompt="Initiate parallel worker threads across Slots 1-5 for multi-URL target crawl:">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">🕷️ Parallel Web Scraper</span>
+<span class="text-outline text-label-sm">Scale browser context across pool</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-primary">arrow_forward</span>
+</button>
+<button class="template-item flex items-center justify-between p-space-sm rounded bg-surface-container hover:bg-surface-bright text-left transition-colors" data-prompt="Deep-step reasoning: analyze runtime mutation stack traces for memory leak vectors:">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">🧠 Qwen Reasoning Prompt</span>
+<span class="text-outline text-label-sm">High-compute step-by-step audit</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-primary">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- ERGONOMIC MOBILE DOCK CHAT INPUT CONTAINER -->
+<div class="w-full bg-surface-container-lowest/95 backdrop-blur-md px-margin py-space-sm mt-auto shadow-2xl flex flex-col gap-space-xs">
+<!-- Action Pills Toolbelt (Prompt, Attachment, Template) -->
+<div class="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-0.5">
+<!-- Action 1: Upload File as Prompt -->
+<button class="flex items-center gap-1.5 px-space-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm transition-all shrink-0 active:scale-95" id="btn-upload-prompt">
+<span class="material-symbols-outlined text-[15px] text-primary">description</span>
+<span class="">Upload Prompt (.md)</span>
+</button>
+<!-- Action 2: Upload File as Attachment -->
+<button class="flex items-center gap-1.5 px-space-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm transition-all shrink-0 active:scale-95" id="btn-upload-attach">
+<span class="material-symbols-outlined text-[15px] text-tertiary">attachment</span>
+<span class="">Attach File / Folder</span>
+</button>
+<!-- Action 3: Use Template -->
+<button class="flex items-center gap-1.5 px-space-sm py-1 rounded-full bg-surface-container-high text-primary hover:bg-surface-bright font-label-sm text-label-sm transition-all shrink-0 active:scale-95" id="btn-use-template">
+<span class="material-symbols-outlined text-[15px]">auto_awesome</span>
+<span class="">Templates</span>
+</button>
+</div>
+<!-- Active Attachment Notification (Hidden by default, activated on action) -->
+<div class="hidden flex items-center justify-between px-space-sm py-1 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm" id="file-indicator">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-tertiary">check_circle</span>
+<span id="file-name-label" class="">prompt_worker_slot1.md staged</span>
+</div>
+<button class="text-outline hover:text-error" id="remove-file-btn">
+<span class="material-symbols-outlined text-[14px]">cancel</span>
+</button>
+</div>
+<!-- Text Input Bar -->
+<div class="flex items-center gap-space-xs bg-surface-container rounded-xl p-space-xs">
+<div class="pl-2 font-mono text-primary font-bold text-headline-sm select-none">&gt;</div>
+<textarea class="w-full bg-transparent text-on-surface font-body-md text-body-md placeholder:text-outline focus:outline-none resize-none px-space-xs py-1.5" id="chat-input" placeholder="Type automated task or command..." rows="1"></textarea>
+<!-- Send Button -->
+<button class="w-9 h-9 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0 transition-transform active:scale-90 hover:bg-primary-container" id="send-btn">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+<div class="flex items-center justify-between px-1 text-label-sm font-label-sm text-outline">
+
+
+</div>
+</div>
+</div>
+<!-- Micro-Interactions Script -->
+<script>
+  (function() {
+    // DOM Cache
+    const toggleConsoleBtn = document.getElementById('toggle-console-btn');
+    const telemetryPanel = document.getElementById('telemetry-panel');
+    const toggleSummary = document.getElementById('toggle-summary');
+    const toggleFull = document.getElementById('toggle-full');
+    const viewSummary = document.getElementById('view-summary');
+    const viewFull = document.getElementById('view-full');
+
+    const templateModal = document.getElementById('template-modal');
+    const btnUseTemplate = document.getElementById('btn-use-template');
+    const closeTemplates = document.getElementById('close-templates');
+    const templateItems = document.querySelectorAll('.template-item');
+
+    const btnUploadPrompt = document.getElementById('btn-upload-prompt');
+    const btnUploadAttach = document.getElementById('btn-upload-attach');
+    const fileIndicator = document.getElementById('file-indicator');
+    const fileNameLabel = document.getElementById('file-name-label');
+    const removeFileBtn = document.getElementById('remove-file-btn');
+
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatStream = document.getElementById('chat-stream');
+
+    const slotTabs = document.querySelectorAll('.slot-tab');
+
+    // Toggle Telemetry Drawer
+    toggleConsoleBtn?.addEventListener('click', () => {
+      telemetryPanel.classList.toggle('hidden');
+    });
+
+    // Telemetry Segmented Switcher
+    toggleSummary?.addEventListener('click', () => {
+      toggleSummary.className = 'w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center bg-primary text-on-primary transition-all font-medium';
+      toggleFull.className = 'w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center text-on-surface-variant hover:text-on-surface transition-all';
+      viewSummary.classList.remove('hidden');
+      viewFull.classList.add('hidden');
+    });
+
+    toggleFull?.addEventListener('click', () => {
+      toggleFull.className = 'w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center bg-primary text-on-primary transition-all font-medium';
+      toggleSummary.className = 'w-1/2 py-1 px-space-xs rounded font-label-sm text-label-sm text-center text-on-surface-variant hover:text-on-surface transition-all';
+      viewFull.classList.remove('hidden');
+      viewSummary.classList.add('hidden');
+    });
+
+    // Template Bottom Sheet Trigger
+    btnUseTemplate?.addEventListener('click', () => {
+      templateModal.classList.toggle('hidden');
+    });
+
+    closeTemplates?.addEventListener('click', () => {
+      templateModal.classList.add('hidden');
+    });
+
+    templateItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const text = item.getAttribute('data-prompt');
+        chatInput.value = text;
+        templateModal.classList.add('hidden');
+        chatInput.focus();
+      });
+    });
+
+    // File Mock Interactions
+    btnUploadPrompt?.addEventListener('click', () => {
+      fileIndicator.classList.remove('hidden');
+      fileNameLabel.textContent = "prompt_worker_slot1.md staged";
+    });
+
+    btnUploadAttach?.addEventListener('click', () => {
+      fileIndicator.classList.remove('hidden');
+      fileNameLabel.textContent = "extracted_data_source.tar.gz attached";
+    });
+
+    removeFileBtn?.addEventListener('click', () => {
+      fileIndicator.classList.add('hidden');
+    });
+
+    // Slot Switching Simulation
+    slotTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        slotTabs.forEach(t => {
+          t.className = 'slot-tab flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container text-on-surface-variant font-label-md text-label-md transition-all shrink-0 hover:bg-surface-container-high';
+          const dot = t.querySelector('span:first-child');
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-outline-variant';
+        });
+        tab.className = 'slot-tab active-slot flex items-center gap-1.5 px-space-md py-1.5 rounded bg-primary text-on-primary font-label-md text-label-md transition-all shrink-0 shadow-sm';
+        const activeDot = tab.querySelector('span:first-child');
+        if (activeDot) activeDot.className = 'w-2 h-2 rounded-full bg-on-primary';
+      });
+    });
+
+    // Submit Chat
+    const handleSend = () => {
+      const val = chatInput.value.trim();
+      if (!val) return;
+
+      const userBubble = document.createElement('div');
+      userBubble.className = 'flex flex-col items-end gap-1 ml-auto max-w-[90%] animate-fadeIn';
+      userBubble.innerHTML = `
+        <div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm pr-1">
+          <span>DEV OPERATOR</span>
+          <span class="material-symbols-outlined text-[14px] text-primary">terminal</span>
+        </div>
+        <div class="bg-primary text-on-primary rounded-xl rounded-tr-none px-space-md py-space-sm shadow-md">
+          <p class="font-body-md text-body-md leading-relaxed">${val}</p>
+        </div>
+        <span class="font-label-sm text-label-sm text-outline pr-1">Just now</span>
+      `;
+      chatStream.appendChild(userBubble);
+      chatInput.value = '';
+      chatStream.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    };
+
+    sendBtn?.addEventListener('click', handleSend);
+    chatInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+
+  })();
+</script></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.6)]" data-active-classes="text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]"><div class="grid grid-cols-4 items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Overview</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="login" href="#"><span class="material-symbols-outlined text-[20px]">key</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Login</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] transition-colors text-primary-container relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:w-8 after:h-0.5 after:bg-primary-container after:shadow-[0_0_8px_#38bdf8]" data-path="chat" href="#"><span class="material-symbols-outlined text-[20px]">terminal</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Chat</span></a><a class="flex flex-col items-center justify-center gap-0.5 h-full min-h-[44px] min-w-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="swarm" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-label-sm text-label-sm uppercase tracking-wide">Swarm</span></a></div></nav>
+
+
+
+</body></html>
