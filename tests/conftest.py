@@ -4,10 +4,6 @@ Fixtures layered cleanly across:
 1. Browser Layer (browser_ctx, page, client)
 2. Pipeline Layer (fixture_root, cfg, audit, run_ctx)
 3. E2E Layer (e2e_cfg)
-4. Host Gate (parallel_browser_resources) for the concurrent-browser tier
-
-Parallel browser tiers (marked ``parallel_browser``) gate on host resources
-via the ``parallel_browser_resources`` fixture (issue #329; see TEST.md 7.5a).
 """
 
 from __future__ import annotations
@@ -23,18 +19,8 @@ sys.path.insert(0, str(ROOT))
 
 import contextlib
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.browser.src.utility_browser_async_loop import isolate_thread_event_loop
-from modules.jobs.src.capabilities_status_writer import StatusFileWriter
-from modules.logging.src.capabilities_metrics_counter import MetricsCounter
-from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.shared.src import AppConfig, RunContext
 from modules.shared.src.utility_core_status import status_path_for
-from modules.shared.src.utility_host_gate import insufficient_reason, probe
 from tests.pipeline_fixtures import restore_fixture_state
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
@@ -136,19 +122,3 @@ def e2e_cfg(fixture_root: Path, reset_fixture_state) -> AppConfig:
         headless=True,
         timeout=300,
     )
-
-
-@pytest.fixture
-def parallel_browser_resources():
-    """Skip a parallel-browser test when the host cannot support it (issue #329).
-
-    Ten concurrent Chromium instances each clone the master profile into an
-    ephemeral directory, which needs documented headroom (see TEST.md
-    "Test Environment Requirements").  The tier is skipped with a reason rather
-    than failing, so a small container still runs the rest of the suite.  A
-    platform that cannot report its own memory never skips, so the gate cannot
-    silently disable the tier everywhere.
-    """
-    reason = insufficient_reason(probe())
-    if reason:
-        pytest.skip(f"Insufficient host resources for parallel browser tests: {reason}")
