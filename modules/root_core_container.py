@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import cast
 
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 
 # Root is the composition layer, so it wires the functional doctor gate into
@@ -31,6 +32,9 @@ from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.jobs.src.capabilities_folder_to_attachment import FolderToAttachmentAdapter
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+
+# agent_logging_orchestrator
+from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
@@ -62,14 +66,17 @@ from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 from modules.shared.src.contract_core_aggregate import (
     IAttachmentPromptAggregate,
+    IBrowserAggregate,
     IDirectPromptAggregate,
     IJobManagerAggregate,
     IPromptFileAggregate,
     IPromptFlowAggregate,
     ISessionAggregate,
     ISetupAggregate,
+    IUpdateAggregate,
 )
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
@@ -85,6 +92,7 @@ from modules.shared.src.utility_core_capacity import recommended_max_workers
 from modules.shared.src.utility_core_status import status_path_for
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_manager import UpdateManager
 
 
@@ -123,6 +131,12 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
+        # The three feature agents sit between their capability and the
+        # Surfaces so no caller repeats the sequence each one owns: browser
+        # auth, observability verb routing, and the update rollback gate.
+        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser)
+        self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability)
+        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(self.updater)
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the

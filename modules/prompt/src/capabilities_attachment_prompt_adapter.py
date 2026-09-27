@@ -21,7 +21,6 @@ from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IFolderToAttachmentProtocol,
     IInjectionProtocol,
-    IObservabilityProtocol,
     IRunCancelProtocol,
     ISaverProtocol,
     ISendProtocol,
@@ -29,6 +28,7 @@ from modules.shared.src.contract_core_protocol import (
     IUploadProtocol,
     LifecycleObserver,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE

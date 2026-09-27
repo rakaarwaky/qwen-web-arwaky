@@ -12,8 +12,8 @@ from modules.config.src.utility_config_app_factory import build_app_config
 from modules.shared.src.contract_core_aggregate import ISessionAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
-    IObservabilityProtocol,
 )
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError

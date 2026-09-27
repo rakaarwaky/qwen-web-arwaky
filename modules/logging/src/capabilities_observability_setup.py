@@ -46,7 +46,8 @@ with suppress(ImportError):
     OTelBatchSpanProcessor = BatchSpanProcessor
 
 from modules.shared.src import utility_core_exit
-from modules.shared.src.contract_core_protocol import IMetricsProtocol, IObservabilityProtocol, IStatusProtocol
+from modules.shared.src.contract_core_protocol import IMetricsProtocol, IStatusProtocol
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
 from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
