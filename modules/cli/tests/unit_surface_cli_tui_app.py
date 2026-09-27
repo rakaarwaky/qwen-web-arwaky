@@ -241,7 +241,7 @@ def test_active_tab_label_renders_on_screen() -> None:
     from textual.widgets import Tab
     from textual.widgets._tabs import Underline
 
-    accent = Color.parse("#8083ff")  # _COLORS["accent"] in surface_cli_tui_css
+    accent = Color.parse("#38bdf8")  # _COLORS["accent"] in surface_cli_tui_css
     app = _make_app()
 
     async def _run() -> None:
@@ -301,9 +301,9 @@ def test_session_badge_survives_teardown_state() -> None:
             # except-clause must not swallow real work).
             app._session = None
             app._refresh_session_badge()
-            assert str(app.query_one("#session-badge", _Label).render()) == "SESSION: N/A"
+            assert str(app.query_one("#session-badge", _Label).render()) == "N/A"
             app._apply_session_badge(True)
-            assert str(app.query_one("#session-badge", _Label).render()) == "SESSION: VALID"
+            assert str(app.query_one("#session-badge", _Label).render()) == "VALID"
 
             # Teardown state: badge unmounted while a queued callback still
             # targets it. Before the fix each of these raised NoMatches.

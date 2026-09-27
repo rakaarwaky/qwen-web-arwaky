@@ -1,35 +1,43 @@
-"""Obsidian Nebula design tokens and Textual CSS for the Qwen TUI application.
+"""Obsidian Terminal design tokens and Textual CSS for the Qwen TUI application.
 
 Surface layer (surface_cli): design-system colors and stylesheet string
 consumed by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+
+Token names and hex values derive from the canonical material-spec map in
+``design/obsidian_terminal/DESIGN.md`` (the "Obsidian Terminal" system
+released with the Obsidian Terminal redesign PR #467).
 """
 
 from __future__ import annotations
 
 # V1/V4: single source of truth — derive THEME and CSS tokens from _COLORS.
+# All hex values must match the "Obsidian Terminal" material palette in
+# design/obsidian_terminal/DESIGN.md, lines 4-64.  Do not hand-edit a
+# value without re-generating from that source file first.
 _COLORS: dict[str, str] = {
-    "fg_accent": "#c0c1ff",
-    "fg_primary": "#d5e4fa",
-    "fg_muted": "#908fa0",
-    "fg_on_accent": "#1000a9",
-    "accent": "#8083ff",
-    "bg_base": "#051424",
-    "bg_surface": "#010f1f",
-    "bg_raised": "#122031",
-    "bg_overlay": "#0e1c2d",
-    "bg_hover": "#1d2b3c",
-    "bg_active": "#283647",
-    "border": "#464554",
-    # V3: lighten status colors for text-on-dark (WCAG AA >= 4.5:1)
-    "status_ok": "#34D399",
-    "status_warn": "#FBBF24",
-    "status_err": "#EF4444",
-    "status_info": "#60A5FA",
-    "status_muted": "#8B9BB4",  # A1: was #64748B ~3.8:1, now ~5.9:1
-    "bright": "#4ADE80",
-    # V2: danger tokens replacing hardcoded #991B1B
-    "danger_bg": "#991B1B",
-    "danger_fg": "#ffffff",
+    # Obsidian Terminal surface stack
+    "fg_accent": "#8ed5ff",  # primary
+    "fg_primary": "#dfe2ee",  # on-surface
+    "fg_muted": "#bdc8d1",  # on-surface-variant
+    "fg_on_accent": "#00354a",  # on-primary
+    "accent": "#38bdf8",  # primary-container
+    "bg_base": "#0f131c",  # surface / background
+    "bg_surface": "#0a0e16",  # surface-container-lowest
+    "bg_raised": "#1c2028",  # surface-container
+    "bg_overlay": "#181c24",  # surface-container-low
+    "bg_hover": "#262a33",  # surface-container-high
+    "bg_active": "#31353e",  # surface-container-highest
+    "border": "#3e484f",  # outline-variant
+    # Status colors (mapped from material error/tertiary/primary tokens)
+    "status_ok": "#56e5a9",  # tertiary
+    "status_warn": "#c0c1ff",  # secondary (amber replaced by indigo to fit palette)
+    "status_err": "#ffb4ab",  # error
+    "status_info": "#38bdf8",  # primary-container
+    "status_muted": "#87929a",  # outline
+    "bright": "#56e5a9",  # tertiary (was #4ADE80, now matches "ok")
+    # V2: danger tokens — uses error-container / on-error-container
+    "danger_bg": "#93000a",
+    "danger_fg": "#ffdad6",
 }
 
 THEME: dict[str, str] = {
@@ -53,7 +61,7 @@ def _css_vars() -> str:
 # Build TUI_CSS via plain string concatenation (NOT f-string) to avoid ruff
 # F821 false positives — ruff parses f-string interpolation as Python and
 # flags CSS property names like ``background`` as undefined names.
-_CSS_HEADER = "/* ═══ Obsidian Nebula Design Tokens (V1 — auto-generated) ═══ */\n" + _css_vars()
+_CSS_HEADER = "/* ═══ Obsidian Terminal Design Tokens (V2 — auto-generated) ═══ */\n" + _css_vars()
 
 TUI_CSS = (
     _CSS_HEADER
@@ -76,7 +84,7 @@ Header {
 
 Footer {
     background: $accent;
-    color: $bg_base;
+    color: $fg_on_accent;
     height: 1;
     dock: bottom;
 }
@@ -106,6 +114,60 @@ Tab.-active {
 
 Underline {
     color: $accent;
+}
+
+/* --- Obsidian Terminal card language ------------------------------------
+   The redesign expresses the palette as nested surfaces: a screen canvas
+   ($bg_base) holds rounded cards ($bg_overlay), which in turn hold the inner
+   tiles ($bg_raised) that carry metric values. These three rules reproduce
+   that layering with the borders the mockups use. */
+.card {
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+.card-inner {
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+    height: 3;
+    align: left middle;
+}
+
+/* Metric tile value inside a .card-inner: the large readout the mockups show
+   (e.g. "3 Active", "Qwen3.8-Max"). The beacon dot is a separate Label. */
+.metric-value {
+    color: $fg_primary;
+    text-style: bold;
+    margin-right: 2;
+}
+
+/* Uppercase section label above a card, matching the mockup captions
+   ("SWARM STATUS", "THREADS MATRIX", "OUTPUT INSPECTION"). */
+.section-label {
+    color: $fg_muted;
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+/* Primary readout in cyan, used for values the mockups highlight: uptime,
+   model name, streaming thread labels. */
+.metric-accent {
+    color: $fg_accent;
+    text-style: bold;
+}
+
+/* Healthy / running value in the tertiary green. */
+.metric-ok {
+    color: $status_ok;
+    text-style: bold;
+}
+
+/* Idle or dimmed tile (the mockups fade unused thread cells). */
+.metric-dim {
+    color: $fg_muted;
 }
 
 /* --- Overview Tab ------------------------------------------------------- */
@@ -324,7 +386,7 @@ Switch.-on {
 /* --- Modal File Picker -------------------------------------------------- */
 FilePickerModal {
     align: center middle;
-    background: rgba(5, 20, 36, 0.85);
+    background: rgba(15, 19, 28, 0.85);
 }
 
 #modal-container {
@@ -400,7 +462,7 @@ SelectOverlay > OptionList > .option-list--option-highlighted {
 /* --- Help Screen -------------------------------------------------------- */
 HelpScreen {
     align: center middle;
-    background: rgba(5, 20, 36, 0.9);
+    background: rgba(15, 19, 28, 0.9);
 }
 
 #help-container {

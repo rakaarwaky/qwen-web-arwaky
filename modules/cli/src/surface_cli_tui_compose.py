@@ -65,12 +65,16 @@ class _TuiComposeMixin:
         yield Header(show_clock=True)
         with TabbedContent(id="main-tabs"):
             # ─── Tab 1: Overview ────────────────────────────────
-            with TabPane("Overview 📊", id="tab-overview"), Vertical(classes="overview-container"):
-                with Horizontal(classes="metrics-bar"):
-                    yield Label(f"SLOTS: {self._NUM_SLOTS}", id="metric-slots", classes="metric-item")
-                    yield Label("ACTIVE: 0", id="metric-active", classes="metric-item")
-                    yield Label("DONE: 0", id="metric-done", classes="metric-item")
-                    yield Label("SESSION: CHECKING…", id="session-badge", classes="metric-item")
+            with TabPane("Overview", id="tab-overview"), Vertical(classes="overview-container"):
+                with Horizontal(classes="card-inner"):
+                    yield Label("SLOTS", id="metric-slots-label", classes="section-label")
+                    yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="metric-value")
+                    yield Label("ACTIVE", id="metric-active-label", classes="section-label")
+                    yield Label("0", id="metric-active", classes="metric-accent")
+                    yield Label("DONE", id="metric-done-label", classes="section-label")
+                    yield Label("0", id="metric-done", classes="metric-value")
+                    yield Label("SESSION", id="metric-session-label", classes="section-label")
+                    yield Label("CHECKING…", id="session-badge", classes="metric-value")
 
                 yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
                 yield DataTable(id="slots-table")
@@ -92,13 +96,15 @@ class _TuiComposeMixin:
                     classes="metric-item",
                 )
 
-            # ─── Tab 2: Session Pool ────────────────────────
-            with TabPane("Sessions 👤", id="tab-sessions"), Vertical(classes="overview-container"):
-                with Horizontal(classes="metrics-bar"):
-                    yield Label("SESSION POOL STATUS", classes="metric-item")
-                    yield Label("TOTAL: 0", id="session-total", classes="metric-item")
-                    yield Label("HEALTHY: 0", id="session-healthy", classes="metric-item")
-                    yield Label("LIMITED: 0", id="session-limited", classes="metric-item")
+            # ─── Tab 2: Sessions ────────────────────────────────
+            with TabPane("Sessions", id="tab-sessions"), Vertical(classes="overview-container"):
+                with Horizontal(classes="card-inner"):
+                    yield Label("REGISTERED", id="session-total-label", classes="section-label")
+                    yield Label("0", id="session-total", classes="metric-value")
+                    yield Label("HEALTHY", id="session-healthy-label", classes="section-label")
+                    yield Label("0", id="session-healthy", classes="metric-ok")
+                    yield Label("LIMITED", id="session-limited-label", classes="section-label")
+                    yield Label("0", id="session-limited", classes="metric-value")
                 yield Label("Registered Sessions", classes="field-label")
                 yield DataTable(id="sessions-table")
                 with Horizontal(classes="toggle-row"):
@@ -115,9 +121,9 @@ class _TuiComposeMixin:
                 )
 
             # ─── Tab 3: Adaptive Swarm ─────────────────────────
-            with TabPane("Swarm ◈", id="tab-swarm"), Vertical(classes="overview-container"):
-                yield Label("Attachment File or Folder", classes="field-label")
-                with Horizontal(classes="field-row"):
+            with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
+                yield Label("Attachment File or Folder", classes="section-label")
+                with Horizontal(classes="card-inner"):
                     yield Input(
                         value="",
                         placeholder="path/to/file or folder",
@@ -125,12 +131,12 @@ class _TuiComposeMixin:
                         classes="field-input",
                     )
                     yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
-                with Horizontal(classes="toggle-row"):
+                with Horizontal(classes="card-inner"):
                     swarm_env = os.environ.get("QWEN_SWARM_CONCURRENCY", "").strip()
                     swarm_max = min(10, max(1, int(swarm_env))) if swarm_env.isdigit() and int(swarm_env) > 0 else 10
-                    yield Button("⚡ START SWARM", variant="primary", id="btn-swarm-start")
-                    yield Button("✕ CANCEL SWARM", id="btn-swarm-cancel")
-                    yield Label(f"Adaptive templates · maximum {swarm_max} browsers", id="swarm-summary")
+                    yield Button("START", variant="primary", id="btn-swarm-start")
+                    yield Button("CANCEL", id="btn-swarm-cancel")
+                    yield Label(f"Adaptive templates · max {swarm_max} browsers", id="swarm-summary")
                 yield DataTable(id="swarm-table")
                 with Horizontal(classes="pane-title"):
                     yield Label("Swarm Log", classes="field-label")
@@ -150,7 +156,7 @@ class _TuiComposeMixin:
                     with ScrollableContainer(classes="left-pane"):
                         yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
 
-                        yield Label("Prompt Template (Quick Select)", classes="field-label")
+                        yield Label("Prompt Template (Quick Select)", classes="section-label")
                         yield Select(
                             self._template_options,
                             prompt="Select a template or type file path below",
@@ -158,7 +164,7 @@ class _TuiComposeMixin:
                             id=f"select-template-{s}",
                         )
 
-                        yield Label("Prompt File / Role (Required) *", classes="field-label")
+                        yield Label("Prompt File / Role (Required) *", classes="section-label")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
@@ -168,7 +174,7 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
 
-                        yield Label("Attachment File or Folder (Optional)", classes="field-label")
+                        yield Label("Attachment File or Folder (Optional)", classes="section-label")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
@@ -178,7 +184,7 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
 
-                        yield Label("Output Destination", classes="field-label")
+                        yield Label("Output Destination", classes="section-label")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value=str(DEFAULT_OUTPUT),
@@ -188,9 +194,9 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
 
-                        with Horizontal(classes="toggle-row"):
+                        with Horizontal(classes="card-inner"):
                             with Vertical(classes="toggle-label-box"):
-                                yield Label("Headless Browser", classes="field-label")
+                                yield Label("Headless Browser", classes="section-label")
                                 yield Label("1 independent browser in background", classes="toggle-subtext")
                             yield Switch(value=True, id=f"switch-headless-{s}")
 
