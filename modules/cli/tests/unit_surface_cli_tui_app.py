@@ -423,3 +423,262 @@ def test_stale_confirm_modal_cannot_cancel_successor_run() -> None:
                 assert not spy.called
 
     asyncio.run(_run())
+
+
+# ── Regression: mobile-web mockup port widgets ────────────────────────────────
+#
+# These tests pin the new widget IDs introduced by the redesign from
+# design/overview_engine_status, design/login_session_manager,
+# design/slot_chat_automation_console, and design/swarm_multi_agent_stream:
+#   - Overview: #segment-bar + one Static per slot
+#   - Sessions: #btn-sessions-login (full-width ADD ACCOUNT)
+#   - Swarm:    #btn-stream-view / #btn-log-view / #log-view-swarm-system
+#               #unified-stream-container / #full-log-container
+#               #btn-clear-swarm-log
+#   - Slots:    #btn-templates-{s}
+#
+# Existing assertions (metrics, tables, log views) must stay green; these
+# are additive only.
+
+
+def test_overview_tab_has_segment_bar_with_one_gfx_per_slot() -> None:
+    """#segment-bar renders a block glyph for every configured slot."""
+    from textual.containers import Horizontal
+    from textual.widgets import Static
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)):
+            bar = app.query_one("#segment-bar", Horizontal)
+            fills = list(bar.query(Static))
+            assert len(fills) == NUM_SLOTS
+            for fill in fills:
+                assert fill.classes == {"segment-fill", "segment-idle"}
+
+    asyncio.run(_run())
+
+
+def test_overview_slots_label_stays_outside_the_metric_card() -> None:
+    """`Active Job Slots` is its own row, not absorbed into the metric tile.
+
+    Moving the label inside the `.card-inner` Horizontal merged it onto the
+    same rendered line as the metric tiles, which is what the mockup's
+    separate caption row calls for.
+    """
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+
+            labels = [w for w in app.query(Label) if "Active Job Slots" in str(w.render())]
+            assert len(labels) == 1, "slot caption missing or duplicated"
+            caption = labels[0]
+
+            bar = app.query_one("#segment-bar")
+            card = next(iter(app.query(".card-inner")))
+            # The caption is a sibling of the bar, not a descendant of a card.
+            assert caption.parent is not card
+            assert caption.parent is bar.parent
+
+            # Distinct rendered rows, caption above the bar.
+            assert caption.region.y < bar.region.y
+
+    asyncio.run(_run())
+
+
+def test_sessions_tab_has_full_width_login_button() -> None:
+    """#btn-sessions-login is the full-width primary action above the pool."""
+    from textual.widgets import Button
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-sessions"
+            await pilot.pause()
+
+            btn = app.query_one("#btn-sessions-login", Button)
+            assert btn.label == "＋ ADD ACCOUNT"
+            assert "btn-primary-full" in btn.classes
+            assert "btn-copy-log" not in btn.classes
+
+    asyncio.run(_run())
+
+
+def test_sessions_pool_title_row_carries_refresh_button() -> None:
+    """#btn-sessions-refresh lives in the ACCOUNT POOL title row."""
+    from textual.widgets import Button, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-sessions"
+            await pilot.pause()
+
+            btn = app.query_one("#btn-sessions-refresh", Button)
+            assert "🔄 Re-check Tokens" in str(btn.label)
+            assert "btn-copy-log" in btn.classes
+
+    asyncio.run(_run())
+
+
+def test_swarm_tab_has_segmented_log_toggle() -> None:
+    """#btn-stream-view is active by default; #btn-log-view is inactive."""
+    from textual.widgets import Button, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-swarm"
+            await pilot.pause()
+
+            stream_btn = app.query_one("#btn-stream-view", Button)
+            log_btn = app.query_one("#btn-log-view", Button)
+
+            assert "segswitch-active" in stream_btn.classes
+            assert "segswitch-active" not in log_btn.classes
+            assert "segswitch-btn" in stream_btn.classes
+            assert "segswitch-btn" in log_btn.classes
+
+    asyncio.run(_run())
+
+
+def test_swarm_system_log_is_hidden_by_default() -> None:
+    """#full-log-container starts display:none so the system log is invisible."""
+    from textual.widgets import TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-swarm"
+            await pilot.pause()
+
+            container = app.query_one("#full-log-container")
+            assert not container.display
+
+            event_container = app.query_one("#unified-stream-container")
+            assert event_container.display
+
+    asyncio.run(_run())
+
+
+def test_swarm_segmented_toggle_switches_panes() -> None:
+    """Clicking SYSTEM LOG shows #full-log-container and hides #unified-stream-container."""
+    from textual.widgets import Button, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-swarm"
+            await pilot.pause()
+
+            log_btn = app.query_one("#btn-log-view", Button)
+            await pilot.click(log_btn)
+            await pilot.pause()
+
+            assert app.query_one("#full-log-container").display
+            assert not app.query_one("#unified-stream-container").display
+            assert "segswitch-active" in app.query_one("#btn-log-view").classes
+            assert "segswitch-active" not in app.query_one("#btn-stream-view").classes
+
+    asyncio.run(_run())
+
+
+def test_swarm_clear_system_log_flushes_and_writes_receipt() -> None:
+    """#btn-clear-swarm-log empties #log-view-swarm-system and writes a receipt."""
+    from textual.widgets import Button, RichLog, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-swarm"
+            await pilot.pause()
+
+            # Switch to system log so the pane is visible.
+            log_btn = app.query_one("#btn-log-view", Button)
+            await pilot.click(log_btn)
+            await pilot.pause()
+
+            view = app.query_one("#log-view-swarm-system", RichLog)
+            view.write("[red]pre-existing line[/red]")
+            assert len(view.lines) > 0
+
+            clear_btn = app.query_one("#btn-clear-swarm-log", Button)
+            await pilot.click(clear_btn)
+            await pilot.pause()
+
+            text = view.copy_text()
+            assert "Logs flushed by user" in text
+            assert "pre-existing line" not in text
+
+    asyncio.run(_run())
+
+
+def test_slot_template_sheet_button_exists_and_logs() -> None:
+    """#btn-templates-{s} reports the role count into that slot's own log.
+
+    The button lives below the fold in the scrollable left pane, so the
+    click path can't reach it at this terminal size; the handler is driven
+    directly, which is the same code path the button press takes.
+    """
+    from textual.widgets import Button, RichLog, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-slot-1"
+            await pilot.pause()
+
+            btn = app.query_one("#btn-templates-1", Button)
+            assert btn.label == "OPEN"
+            assert "btn-copy-log" in btn.classes
+
+            slot_log = app.query_one("#log-view-1", RichLog)
+            assert "TEMPLATES: Slot 1" not in slot_log.copy_text()
+
+            app._open_template_sheet(1)
+            await pilot.pause()
+
+            after = slot_log.copy_text()
+            assert "TEMPLATES: Slot 1" in after
+            assert "roles available" in after
+
+    asyncio.run(_run())
+
+
+def test_swarm_action_deck_buttons_exist() -> None:
+    """#btn-swarm-start and #btn-swarm-cancel are wired inside the swarm pane."""
+    from textual.widgets import Button, TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            tabs = app.query_one(TabbedContent)
+            tabs.active = "tab-swarm"
+            await pilot.pause()
+
+            start = app.query_one("#btn-swarm-start", Button)
+            cancel = app.query_one("#btn-swarm-cancel", Button)
+
+            assert start.label == "▶ START"
+            assert "btn-start" in start.classes
+            assert cancel.label == "■ STOP"
+            assert "btn-stop" in cancel.classes
+
+    asyncio.run(_run())

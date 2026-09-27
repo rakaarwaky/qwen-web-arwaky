@@ -77,6 +77,9 @@ class _TuiComposeMixin:
                     yield Label("CHECKING…", id="session-badge", classes="metric-value")
 
                 yield Label("Active Job Slots (1 Browser per Job)", classes="field-label")
+                with Horizontal(classes="segment-bar", id="segment-bar"):
+                    for _ in range(self._NUM_SLOTS):
+                        yield Static("█", classes="segment-fill segment-idle")
                 yield DataTable(id="slots-table")
 
                 with Horizontal(classes="pane-title"):
@@ -105,11 +108,20 @@ class _TuiComposeMixin:
                     yield Label("0", id="session-healthy", classes="metric-ok")
                     yield Label("LIMITED", id="session-limited-label", classes="section-label")
                     yield Label("0", id="session-limited", classes="metric-value")
-                yield Label("Registered Sessions", classes="field-label")
+                # Design: full-width primary "add account" action above the pool.
+                yield Button(
+                    "＋ ADD ACCOUNT",
+                    id="btn-sessions-login",
+                    classes="btn-primary-full",
+                    variant="primary",
+                )
+                with Horizontal(classes="pane-title"):
+                    yield Label("ACCOUNT POOL", classes="field-label")
+                    yield Button(
+                        "🔄 Re-check Tokens", id="btn-sessions-refresh", classes="btn-copy-log", variant="default"
+                    )
                 yield DataTable(id="sessions-table")
                 with Horizontal(classes="toggle-row"):
-                    yield Button("🔄 Refresh", id="btn-sessions-refresh", variant="default")
-                    yield Button("🔐 Add Session", id="btn-sessions-login", variant="primary")
                     yield Button("🏥 Health Check", id="btn-sessions-health", variant="default")
                 yield QwenTuiRichLog(
                     id="log-view-sessions",
@@ -122,7 +134,8 @@ class _TuiComposeMixin:
 
             # ─── Tab 3: Adaptive Swarm ─────────────────────────
             with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
-                yield Label("Attachment File or Folder", classes="section-label")
+                with Horizontal(classes="card-inner"):
+                    yield Label("ATTACHMENT", classes="section-label")
                 with Horizontal(classes="card-inner"):
                     yield Input(
                         value="",
@@ -131,24 +144,44 @@ class _TuiComposeMixin:
                         classes="field-input",
                     )
                     yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
+                # Design: segmented Output Inspection toggle + dual log panes.
                 with Horizontal(classes="card-inner"):
+                    yield Label("OUTPUT INSPECTION", classes="section-label")
+                with Horizontal(classes="card-inner"):
+                    yield Button("EVENT LOG", id="btn-stream-view", classes="segswitch-btn segswitch-active")
+                    yield Button("SYSTEM LOG", id="btn-log-view", classes="segswitch-btn")
+                with Vertical(id="unified-stream-container"):
+                    with Horizontal(classes="pane-title"):
+                        yield Label("Event Log — Parallel Stream", classes="field-label")
+                        yield Button("📋 Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
+                    yield QwenTuiRichLog(
+                        id="log-view-swarm",
+                        highlight=True,
+                        markup=True,
+                        max_lines=2000,
+                        auto_scroll=True,
+                        wrap=True,
+                    )
+                with Vertical(id="full-log-container", classes="hidden"):
+                    with Horizontal(classes="pane-title"):
+                        yield Label("/var/log/qwen-swarm.pool.log", classes="field-label")
+                        yield Button("Clear", id="btn-clear-swarm-log", classes="btn-copy-log", variant="default")
+                    yield QwenTuiRichLog(
+                        id="log-view-swarm-system",
+                        highlight=True,
+                        markup=True,
+                        max_lines=1000,
+                        auto_scroll=True,
+                        wrap=True,
+                    )
+                yield DataTable(id="swarm-table")
+                # Sticky action deck: stop / start.
+                with Horizontal(classes="card-inner swarm-actions"):
+                    yield Button("■ STOP", id="btn-swarm-cancel", classes="btn-stop")
                     swarm_env = os.environ.get("QWEN_SWARM_CONCURRENCY", "").strip()
                     swarm_max = min(10, max(1, int(swarm_env))) if swarm_env.isdigit() and int(swarm_env) > 0 else 10
-                    yield Button("START", variant="primary", id="btn-swarm-start")
-                    yield Button("CANCEL", id="btn-swarm-cancel")
+                    yield Button("▶ START", variant="primary", id="btn-swarm-start", classes="btn-start")
                     yield Label(f"Adaptive templates · max {swarm_max} browsers", id="swarm-summary")
-                yield DataTable(id="swarm-table")
-                with Horizontal(classes="pane-title"):
-                    yield Label("Swarm Log", classes="field-label")
-                    yield Button("📋 Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
-                yield QwenTuiRichLog(
-                    id="log-view-swarm",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
 
             # ─── Tabs 2..N: Job Slots ───────────────────────────
             for s in range(1, self._NUM_SLOTS + 1):
@@ -206,6 +239,11 @@ class _TuiComposeMixin:
                         yield Button(f"✕ Cancel Slot {s}", id=f"btn-cancel-{s}", classes="btn-slot-cancel")
                         yield Button(f"↻ Retry Slot {s}", id=f"btn-retry-{s}", classes="btn-slot-retry")
 
+                        # Design: prompt-template quick sheet above the log pane.
+                        with Horizontal(classes="card-inner"):
+                            yield Label("PROMPT TEMPLATES", classes="section-label")
+                            yield Button("OPEN", id=f"btn-templates-{s}", classes="btn-copy-log")
+
                     with Vertical(classes="right-pane"):
                         with Horizontal(classes="pane-title"):
                             yield Label(f"[ LIVE LOG: BROWSER #{s} ]", classes="field-label")
@@ -235,11 +273,16 @@ class _TuiComposeMixin:
         self._metric_done = self.query_one("#metric-done", Label)
 
         # P1: cache RichLog widget refs at mount time — hot render path.
-        self._log_views: dict[int, QwenTuiRichLog] = {}
+        # Keys are int slot ids plus the reserved sentinels: 0 = overview
+        # log, -1 = swarm event log, and "swarm-system" = the raw system-log
+        # pane introduced by the Swarm screen redesign.
+        self._log_views: dict[Any, QwenTuiRichLog] = {}
         with contextlib.suppress(NoMatches):
             self._log_views[0] = self.query_one("#log-view-overview", QwenTuiRichLog)
         with contextlib.suppress(NoMatches):
             self._log_views[-1] = self.query_one("#log-view-swarm", QwenTuiRichLog)
+        with contextlib.suppress(NoMatches):
+            self._log_views["swarm-system"] = self.query_one("#log-view-swarm-system", QwenTuiRichLog)
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", QwenTuiRichLog)

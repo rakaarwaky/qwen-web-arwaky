@@ -555,6 +555,149 @@ HelpScreen {
     background: $bg_base;
     color: $accent;
 }
+
+/* --- Screen redesign: card accents and segmented controls -------------------
+   The four redesign screens (Overview, Login, Chat, Swarm) express their
+   primary actions as full-width filled bars and their mode switches as a
+   paired segmented control. Both patterns reuse the existing surface stack
+   so no new palette entries are required. */
+
+/* Full-width primary action ("ADD ACCOUNT", "START"), matching the
+   mobile card language, in which one dominant action fills the row. */
+.btn-primary-full {
+    width: 100%;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.btn-primary-full:hover {
+    background: $fg_accent;
+    border: solid $fg_accent;
+}
+
+/* Segmented switch (Event Log / System Log, Summary / Full). The active
+   segment is filled with the accent; the inactive one stays on a raised
+   surface so the current mode is readable at a glance. */
+.segswitch-btn {
+    width: auto;
+    min-width: 14;
+    height: 3;
+    margin-right: 1;
+    background: $bg_raised;
+    color: $fg_muted;
+    border: solid $border;
+}
+
+.segswitch-btn:hover {
+    background: $bg_hover;
+    color: $fg_primary;
+}
+
+.segswitch-btn.segswitch-active {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* Cluster health bar: one cell per slot, recoloured per slot status to
+   mirror the segmented meter in the Swarm Status card. */
+.segment-bar {
+    layout: horizontal;
+    height: 1;
+    width: 100%;
+    background: $bg_base;
+    margin-bottom: 1;
+}
+
+.segment-fill {
+    width: 1fr;
+    height: 1;
+    color: $bg_active;
+    text-style: bold;
+}
+
+.segment-idle {
+    color: $bg_active;
+}
+
+.segment-running {
+    color: $status_ok;
+}
+
+.segment-done {
+    color: $accent;
+}
+
+.segment-failed {
+    color: $status_err;
+}
+
+.segment-cancelled {
+    color: $status_warn;
+}
+
+/* Raw system-log pane: a terminal-styled surface, visually distinct vs the event
+   log, so the two Swarm views never read as the same widget. */
+#log-view-swarm-system {
+    height: 1fr;
+    min-height: 3;
+    background: $bg_surface;
+    border: solid $border;
+    color: $status_muted;
+    padding: 1;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#unified-stream-container {
+    height: 1fr;
+    min-height: 3;
+}
+
+#full-log-container {
+    height: 1fr;
+    min-height: 3;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Swarm action deck: stop sits left at natural width, start takes the
+   remaining row so the destructive action never dominates the row. */
+.swarm-actions {
+    height: 3;
+    margin-top: 1;
+}
+
+.btn-stop {
+    width: 16;
+    min-width: 16;
+    height: 3;
+    background: $danger_bg;
+    color: $danger_fg;
+    border: solid $status_err;
+    text-style: bold;
+}
+
+.btn-stop:hover {
+    background: $bg_base;
+    color: $status_err;
+}
+
+.btn-start {
+    width: 1fr;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
 """
 )
 

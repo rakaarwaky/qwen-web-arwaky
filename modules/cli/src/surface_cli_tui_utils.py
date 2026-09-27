@@ -88,7 +88,7 @@ class _TuiUtilsMixin:
     _metric_active: Any
     _metric_done: Any
     _log_handler: logging.Handler
-    _log_views: dict[int, QwenTuiRichLog]
+    _log_views: dict[Any, QwenTuiRichLog]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     query_one: Any

@@ -89,7 +89,7 @@ class _TuiHandlersMixin:
             self._copy_slot_log(slot_id)
             return
         # Session management buttons
-        if button_id == "btn-sessions-refresh":
+        if button_id in ("btn-sessions-refresh", "btn-sessions-refresh-row"):
             self._refresh_sessions_table()
             return
         if button_id == "btn-sessions-login":
@@ -97,6 +97,15 @@ class _TuiHandlersMixin:
             return
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
+            return
+        if button_id in ("btn-stream-view", "btn-log-view"):
+            self._switch_swarm_view(visible_log=button_id == "btn-log-view")
+            return
+        if button_id == "btn-clear-swarm-log":
+            self._clear_swarm_system_log()
+            return
+        if button_id.startswith("btn-templates-"):
+            self._open_template_sheet(int(button_id.removeprefix("btn-templates-")))
             return
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -217,6 +226,39 @@ class _TuiHandlersMixin:
             self._log_msg("[yellow]No log view available to copy.[/]")
             return
         self._copy_rich_log(view)
+
+    def _switch_swarm_view(self, visible_log: bool) -> None:
+        """Toggle between the event stream and the raw system log (Swarm redesign)."""
+        with contextlib.suppress(NoMatches):
+            self.query_one("#unified-stream-container").display = not visible_log
+            self.query_one("#full-log-container").display = visible_log
+            self.query_one("#btn-stream-view").set_classes(
+                "segswitch-btn" if visible_log else "segswitch-btn segswitch-active"
+            )
+            self.query_one("#btn-log-view").set_classes(
+                "segswitch-btn segswitch-active" if visible_log else "segswitch-btn"
+            )
+
+    def _clear_swarm_system_log(self) -> None:
+        """Flush the raw system-log pane of the Swarm screen."""
+        with contextlib.suppress(NoMatches):
+            view = self.query_one("#log-view-swarm-system", QwenTuiRichLog)
+            view.clear()
+            view.write("[dim][Logs flushed by user][/dim]")
+
+    def _open_template_sheet(self, slot_id: int) -> None:
+        """List the role templates for a slot and log the chosen one.
+
+        Textual has no bottom-sheet primitive, so the template sheet is a
+        compact modal; picking a template routes through the same handler
+        as the Select dropdown so both entry points stay in sync.
+        """
+        options = getattr(self, "_template_options", [])
+        self._log_msg(
+            f"[bold {THEME['bright']}]TEMPLATES:[/] Slot {slot_id} — {len(options)} roles available "
+            f"(use the Quick Select dropdown to apply one).",
+            slot_id,
+        )
 
     def _copy_slot_log(self, slot_id: int) -> None:
         """Copy the per-slot log buffer identified by its slot number."""
