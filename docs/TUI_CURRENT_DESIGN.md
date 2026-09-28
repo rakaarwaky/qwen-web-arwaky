@@ -182,67 +182,85 @@ to this panel through `_log_swarm_msg`, not to the Overview log.
 
 ---
 
-## 6. Tabs 4…N — Job Slots (`tab-slot-1` … `tab-slot-N`)
+## 6. Tabs 4…N — Job Slot Consoles, and the Settings pane
 
-Each slot tab is a horizontal split:
+### 6.1 Slot console (`tab-slot-N`)
+
+Each slot tab is the chat console from `design/slot_chat_automation_console`:
 
 ```text
-┌─ left-pane (48%, min 30 cols, bg_surface, right border, pad 1×2) ─┐
-│  [ CONFIGURATION: SLOT N ]                     ← pane title       │
-│  Prompt Template (Quick Select)               ← section-label     │
-│  [Select: "Select a template or type file path below"]            │
-│  Prompt File / Role (Required) *                                   │
-│  [input path/to/prompt.md or role …]              [Browse]        │
-│  Attachment File or Folder (Optional)                              │
-│  [input path/to/file or folder]                   [Browse]        │
-│  Output Destination                                                │
-│  [input .qwen-web/output/…]                       [Browse]        │
-│  ┌─ card-inner (headless toggle) ─────────────────────────────┐   │
-│  │ Headless Browser                          [Switch ● on]     │   │
-│  │ 1 independent browser in background                         │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  [ RUN IN SLOT N ]              ← primary, full width, height 3   │
-│  [ Cancel Slot N ]              ← danger red, full width          │
-│  [ ↻ Retry Slot N ]             ← indigo, hidden unless FAILED    │
-│  ┌─ card-inner (template sheet) ──────────────────────────────┐   │
-│  │ PROMPT TEMPLATES          [ OPEN ]   ← design mockup row    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-├─ right-pane (52%, min 30 cols, bg_overlay, pad 1×2) ───────────────┤
-│  [ LIVE LOG: BROWSER #N ]   [● READY]   [📋]   ← title + badge    │
-│  (LoadingIndicator, hidden unless running)                         │
-│  ┌─ slot log (RichLog, wrap, 2000 lines) ──────────────────────┐   │
-│  │ Set a prompt file, then press Enter or RUN.    ← empty hint │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+┌ slot carousel (3 rows, ten 1fr pills, no scrollbar) ──────────────┐
+│  ● 01  ● 02  ● 03 …                                             │
+├──────────────────────────────────────────────────────────────────┤
+│ [Event Log] [System Log]                        ● READY ●         │  ← telemetry header
+│ Pick a prompt file, or type a task below to get started.          │  ← transcript
+│ ┌ EVENT LOG [SLOT #1]  Copy ────────────────────────────────────┐ │  ← event log card (1fr)
+│ └────────────────────────────── 12:04:30 ───────────────────────┘ │
+│ [⬆ Upload Prompt (.md)] [📎 Attach File / Folder] [✨ Templates]  │
+│ [ > Type automated task or command...                    ]      │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Slot form fields
+- The pills split the row (`width: 1fr`, carousel `overflow-x: hidden`) and
+  relabel themselves: `● SLOT 07` while the row has the twelve columns a
+  pill needs, `● 07` below that (`_refresh_slot_chips`).
+- The transcript sizes to its content up to 12 rows; the log card takes
+  every leftover row, so the console fills the screen and the composer stays
+  put. The whole console needs about 29 rows; below that the pane clips.
+- A pill press switches the slot in one click and carries the focus with it
+  (`_switch_to_slot`), because Textual makes the pane holding the focused
+  widget the active tab.
+
+### 6.2 Settings pane (`tab-settings`)
+
+Per-slot configuration. No mockup ships for this screen, so it follows the
+same card language as the Overview and Swarm consoles; every id the workers
+and tests resolve is preserved.
+
+```text
+┌ slot carousel (same ten pills, #cfg-slot-N) ─────────────────────┐
+│ ⚙ SLOT 01 CONFIGURATION                     ← card title + chip   │
+│ PROMPT TEMPLATE                                                 │
+│ [ Select a template or type a file path below ▼ ]                │
+│ [Backend Engineer] [Business Analyst] [Devops…] [Frontend…]      │
+│ PROMPT FILE / ROLE (REQUIRED) *                                  │
+│ [path/to/prompt.md or role]                          [Browse]    │
+│ ATTACHMENT (OPTIONAL)                                            │
+│ [path/to/file or folder]                           [Browse]    │
+│ OUTPUT DESTINATION                                               │
+│ [.local/share/qwen-web-arwaky/output]               [Browse]    │
+│ HEADLESS BROWSER  1 independent browser in background   [Switch]  │
+│ [⚡ RUN IN SLOT 01] [✕ Cancel Slot 01] [↻ Retry Slot 01]          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+One card per slot; only the selected one is displayed (`#slot-config-N`).
+A carousel pill (`#cfg-slot-N`) swaps which card is shown.
+
+#### Slot form fields
 
 | Field | Widget | Default / placeholder | Notes |
 | --- | --- | --- | --- |
-| Prompt Template | `Select` (dropdown) | blank; prompt `Select a template or type file path below` | Options = role templates from `modules/templates/*.md` (backend-engineer, business-analyst, devops-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, software-architect, system-analyst, ui-ux-designer) with human titles. Selecting one fills the Prompt File input and logs `TEMPLATE: Slot N ← role 'x'`. Unknown path logs a WARNING. |
-| Prompt File / Role (Required) `*` | `Input` + Browse | placeholder `path/to/prompt.md or role (any .md in modules/templates/)` | Manual edits desync the Select back to blank. |
+| Prompt Template | `Select` | blank; prompt `Select a template or type a file path below` | Options = role templates from `modules/templates/*.md` (backend-engineer, business-analyst, devops-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, software-architect, system-analyst, ui-ux-designer). Selecting one fills the Prompt File input and logs `TEMPLATE: Slot N ← role 'x'`. Unknown path logs a WARNING. |
+| Prompt Template quick select | chips `chip-N-role` (one row, frameless) | first four roles | Labelled from the role (`backend-engineer` → `Backend Engineer`): every shipped template opens with `## Summary`, so the manifest titles are all identical. Selecting a chip sets the `Select`. |
+| Prompt File / Role (Required) `*` | `Input` + Browse | placeholder `path/to/prompt.md or role` | Manual edits desync the Select back to blank. |
 | Attachment File or Folder (Optional) | `Input` + Browse | placeholder `path/to/file or folder` | Browse opens picker in directory mode. |
-| Output Destination | `Input` + Browse | default `.qwen-web/output/` (DEFAULT_OUTPUT) | Browse opens picker in file mode. |
+| Output Destination | `Input` + Browse | default `.local/share/qwen-web-arwaky/output` (DEFAULT_OUTPUT) | Browse opens picker in file mode. |
 | Headless Browser | `Switch` (default ON) | subtext `1 independent browser in background` | |
 
-### Slot action buttons (all full-width, height 3)
+Two Textual geometry traps are handled here: the Browse buttons are ten
+columns wide (at eight, minus the border and the default padding, "Browse"
+wrapped onto two rows) and the chips are frameless (a one-row box with a
+border has no content row left for the label). `SelectCurrent`'s own `tall`
+border is suppressed so the `Select` does not paint `▔▔▔` inside our border.
+
+#### Slot action buttons (one row, height 3)
 
 | Button | id | Style | Behavior |
 | --- | --- | --- | --- |
-| `RUN IN SLOT N` | `btn-run-N` | accent fill `fg_accent`/`fg_on_accent`, bold; hover inverts to outline | Validates inputs via resolver; starts worker; disabled state = already-running warning toast + log. Also bound to Enter/Ctrl+R. |
-| `Cancel Slot N` | `btn-cancel-N` | `danger_bg` fill, `status_err` border, bold; hover inverts | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"` ("Slot N has been running for Xs. Cancelling will lose the current progress."). Confirms only if same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
-| `↻ Retry Slot N` | `btn-retry-N` | `bg_raised` fill, `status_warn` text+border; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
-| `OPEN` | `btn-templates-N` | `.btn-copy-log`, inside a `.card-inner` row labeled `PROMPT TEMPLATES` | Surfaces the template sheet from `design/slot_chat_automation_console`: counts the configured role templates and logs `TEMPLATES: Slot N — K roles available (use the Quick Select dropdown to apply one).` into that slot's own log pane. |
-
-### Slot right pane
-
-- Title: `[ LIVE LOG: BROWSER #N ]` (`fg_accent`, bold).
-- Status badge (`#status-badge-N`, bold): shows live event badges
-  (section 8) while running; terminal statuses otherwise.
-- Copy button `📋` (icon-only, tooltip `Copy slot log`).
-- `LoadingIndicator` visible only while the slot runs.
-- Empty-state hint: `Set a prompt file, then press Enter or RUN.`
+| `⚡ RUN IN SLOT NN` | `btn-run-N` | accent fill, 2fr | Validates inputs via resolver; starts worker; already-running gives a warning toast + log. Also bound to Enter/Ctrl+R. |
+| `✕ Cancel Slot NN` | `btn-cancel-N` | `danger_bg` fill, 1fr | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"`. Confirms only if the same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
+| `↻ Retry Slot NN` | `btn-retry-N` | `bg_raised` fill, `status_warn` text; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
 
 ---
 

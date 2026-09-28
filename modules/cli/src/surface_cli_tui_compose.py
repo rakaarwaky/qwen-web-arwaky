@@ -30,7 +30,7 @@ from textual.widgets import (
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
-from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
+from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup, _template_label
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL, DEFAULT_OUTPUT
 from modules.shared.src.utility_core_version import get_package_version
 
@@ -458,16 +458,17 @@ class _TuiComposeMixin:
                 swarm_input.display = False
                 yield swarm_input
 
-            # ─── Screen 5: Settings (slot configuration) ───────────
-            # The mockup's chat console has no form, so the per-slot
-            # configuration moved here: one picker row for the slot being
-            # configured plus one form block per slot (only the selected
-            # block is displayed). Every widget id the run/cancel workers
-            # resolve lives in these blocks, so their behavior is unchanged.
-            with TabPane("Settings", id="tab-settings"), Vertical(classes="screen-body"):
+            # ─── Screen 5: Settings ──────────────────────────────
+            # No mockup ships for this screen, so it follows the same card
+            # language as the Overview and Swarm consoles: one card per slot,
+            # captions over fields, a one-row Browse chip beside every input,
+            # and the run controls on the card's last row so nothing hides
+            # below the fold. Every id the workers and tests resolve is kept.
+            with TabPane("Settings", id="tab-settings"), Vertical(classes="settings-screen"):
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
+
                 with Horizontal(classes="slot-carousel"):
                     for i in range(1, self._NUM_SLOTS + 1):
                         yield Button(
@@ -477,28 +478,36 @@ class _TuiComposeMixin:
                         )
 
                 for s in range(1, self._NUM_SLOTS + 1):
-                    config_block = Vertical(classes="slot-config", id=f"slot-config-{s}")
+                    config_block = Vertical(classes="settings-card", id=f"slot-config-{s}")
                     config_block.display = s == 1
                     with config_block:
-                        yield Static(f"[ CONFIGURATION: SLOT {s} ]", classes="pane-title")
+                        with Horizontal(classes="card-title-row"):
+                            yield Static("⚙", classes="card-icon")
+                            yield Label(
+                                f"SLOT {s:02d} CONFIGURATION",
+                                id=f"cfg-title-{s}",
+                                classes="card-title",
+                            )
 
-                        yield Label("Prompt Template (Quick Select)", classes="section-label")
+                        yield Label("PROMPT TEMPLATE", classes="settings-caption")
                         yield Select(
                             self._template_options,
-                            prompt="Select a template or type file path below",
+                            prompt="Select a template or type a file path below",
                             allow_blank=True,
                             id=f"select-template-{s}",
                         )
 
-                        with Horizontal(classes="toggle-row", id=f"chip-row-{s}"):
-                            for title, role in self._template_options[:4]:
+                        # Quick-select chips: one row, one line of overflow
+                        # hidden, so a long template list never grows the card.
+                        with Horizontal(classes="settings-chips", id=f"chip-row-{s}"):
+                            for _title, role in self._template_options[:4]:
                                 yield Button(
-                                    self._truncate_name(title, 18),
+                                    self._truncate_name(_template_label(role), 18),
                                     id=f"chip-{s}-{role}",
                                     classes="template-chip",
                                 )
 
-                        yield Label("Prompt File / Role (Required) *", classes="section-label")
+                        yield Label("PROMPT FILE / ROLE (REQUIRED) *", classes="settings-caption")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
@@ -508,7 +517,7 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
 
-                        yield Label("Attachment File or Folder (Optional)", classes="section-label")
+                        yield Label("ATTACHMENT (OPTIONAL)", classes="settings-caption")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value="",
@@ -518,7 +527,7 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
 
-                        yield Label("Output Destination", classes="section-label")
+                        yield Label("OUTPUT DESTINATION", classes="settings-caption")
                         with Horizontal(classes="field-row"):
                             yield Input(
                                 value=str(DEFAULT_OUTPUT),
@@ -528,31 +537,29 @@ class _TuiComposeMixin:
                             )
                             yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
 
-                        with Horizontal(classes="card-inner"):
-                            with Vertical(classes="toggle-label-box"):
-                                yield Label("Headless Browser", classes="section-label")
-                                yield Label(
-                                    "1 independent browser in background",
-                                    classes="toggle-subtext",
-                                )
+                        with Horizontal(classes="settings-toggle"):
+                            yield Label("HEADLESS BROWSER", classes="settings-caption")
+                            yield Static("1 independent browser in background", classes="toggle-subtext")
+                            yield Static("", classes="settings-toggle-spacer")
                             yield Switch(value=True, id=f"switch-headless-{s}")
 
-                        yield Button(
-                            f"⚡ RUN IN SLOT {s}",
-                            variant="primary",
-                            id=f"btn-run-{s}",
-                            classes="btn-slot-run",
-                        )
-                        yield Button(
-                            f"✕ Cancel Slot {s}",
-                            id=f"btn-cancel-{s}",
-                            classes="btn-slot-cancel",
-                        )
-                        yield Button(
-                            f"↻ Retry Slot {s}",
-                            id=f"btn-retry-{s}",
-                            classes="btn-slot-retry",
-                        )
+                        with Horizontal(classes="settings-actions"):
+                            yield Button(
+                                f"⚡ RUN IN SLOT {s:02d}",
+                                variant="primary",
+                                id=f"btn-run-{s}",
+                                classes="btn-slot-run",
+                            )
+                            yield Button(
+                                f"✕ Cancel Slot {s:02d}",
+                                id=f"btn-cancel-{s}",
+                                classes="btn-slot-cancel",
+                            )
+                            yield Button(
+                                f"↻ Retry Slot {s:02d}",
+                                id=f"btn-retry-{s}",
+                                classes="btn-slot-retry",
+                            )
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no

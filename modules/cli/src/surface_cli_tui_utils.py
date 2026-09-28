@@ -111,6 +111,17 @@ def _thread_state(status: str) -> tuple[str, str]:
     return _THREAD_STATE.get(status, _THREAD_STATE["IDLE"])
 
 
+def _template_label(role: str) -> str:
+    """Return a human label for a template role: ``backend-engineer`` -> ``Backend Engineer``.
+
+    The manifest title comes from a template's first ``##`` heading, and every
+    shipped template opens with ``## Summary`` — so the titles all read
+    "Summary" and the quick-select row was four identical pills. The role is
+    the identity the Select already uses, so the chips show that instead.
+    """
+    return role.replace("-", " ").title()
+
+
 def _format_thread_duration(seconds: float) -> str:
     """Format a thread duration the way the mockup does (4m12s, 0.0s, 1h 2m)."""
     if seconds < 60:

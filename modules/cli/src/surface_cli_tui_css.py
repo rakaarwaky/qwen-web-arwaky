@@ -470,9 +470,11 @@ Underline {
     border: solid $fg_accent;
 }
 
+/* Ten columns: the border and the default padding leave six for the label,
+   which is exactly "Browse". At eight it wrapped into "Brow" / "se". */
 .btn-browse {
-    width: 8;
-    min-width: 8;
+    width: 10;
+    min-width: 10;
     background: $bg_hover;
     color: $fg_accent;
     border: solid $border;
@@ -632,6 +634,14 @@ Select {
 
 Select:focus {
     border: solid $fg_accent;
+}
+
+/* Textual's SelectCurrent ships a `tall` border of its own, which painted
+   ▔▔▔ / ▁▁▁ / ▎ inside the Select's own border. The Select already has one. */
+SelectCurrent {
+    border: none;
+    background: transparent;
+    padding: 0 1;
 }
 
 SelectOverlay {
@@ -1745,6 +1755,114 @@ HelpScreen {
     height: 1;
     color: $fg_muted;
     text-style: italic;
+}
+
+/* ═══ SETTINGS (per-slot configuration) ═══════════════════════════════ */
+
+/* Same shell as the chat and swarm consoles: brand row, slot carousel, and
+   one card per slot with only the selected one displayed. */
+.settings-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2 0 2;
+}
+
+/* Compound selector: .screen-card is declared later with `height: auto`, and
+   at equal specificity that would stop the card from filling the pane. */
+.screen-card.settings-card {
+    height: 1fr;
+    min-height: 26;
+    background: $bg_overlay;
+    margin-bottom: 0;
+}
+
+/* Uppercase field captions, the mockup's label treatment. */
+.settings-caption {
+    width: auto;
+    height: 1;
+    color: $status_muted;
+    text-style: bold;
+}
+
+/* Quick-select chips share one row; a long template list is clipped rather
+   than growing the card. */
+.settings-chips {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    margin-bottom: 1;
+    overflow-x: hidden;
+}
+
+/* Frameless: a one-row chip cannot carry a border — the border would eat the
+   row and the label would vanish (that is what the empty boxes were). */
+.settings-chips .template-chip {
+    height: 1;
+    min-width: 0;
+    padding: 0 1;
+    margin-right: 1;
+    border: none;
+    background: $bg_raised;
+}
+
+/* Headless row: caption, subtext, switch on the trailing edge. */
+.settings-toggle {
+    layout: horizontal;
+    width: 100%;
+    /* Three rows: Textual's Switch is a three-row control, and squeezed into
+       one row it rendered as a bare ▊ ▔▔▔ stub. */
+    height: 3;
+    align: left middle;
+    margin-bottom: 1;
+}
+
+.settings-toggle .settings-caption {
+    width: auto;
+    height: 3;
+    content-align: left middle;
+}
+
+.settings-toggle .toggle-subtext {
+    width: auto;
+    height: 3;
+    content-align: left middle;
+    margin-left: 1;
+}
+
+.settings-toggle-spacer {
+    width: 1fr;
+    height: 3;
+}
+
+.settings-toggle Switch {
+    width: 4;
+    height: 3;
+}
+
+/* Run controls on the card's last row: the primary takes half, the other two
+   share the rest, so nothing hides below the fold. */
+.settings-actions {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+}
+
+/* margin-top: 0 — the slot buttons carry a one-row top margin for the old
+   stacked form, and inside this row it pushed each button down a row. */
+.settings-actions .btn-slot-run {
+    width: 2fr;
+    height: 3;
+    margin-top: 0;
+}
+
+.settings-actions .btn-slot-cancel,
+.settings-actions .btn-slot-retry {
+    width: 1fr;
+    height: 3;
+    margin-top: 0;
+    margin-left: 1;
 }
 
 /* Stop / Restart action deck under the log card. */
