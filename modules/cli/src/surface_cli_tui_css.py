@@ -294,8 +294,15 @@ Underline {
 }
 
 /* Realtime System Log card: the mockup's bordered panel with a header row
-   (live pips + LIVE STREAM) above the stream itself. */
+   (live pips + LIVE STREAM) above the stream itself. It is the only 1fr child
+   of the scroll band, so it takes every row the cards above it leave over and
+   the stream reaches the nav dock instead of leaving a dead gap. min-height
+   is the card's own content height (2 border + 2 padding + 2 header + 3 log
+   rows), so a short terminal scrolls the band rather than flattening the
+   panel. */
 .log-card {
+    height: 1fr;
+    min-height: 9;
     background: $bg_surface;
     margin-bottom: 0;
 }
@@ -342,12 +349,11 @@ Underline {
     height: 1;
 }
 
-/* The card carries the border, so the view only paints the stream rows.
-   Textual's height is border-box: 7 leaves six content rows, the mockup's
-   log depth, and min-height 3 keeps the panel visible on a 20-row terminal
-   (tests/unit_tui_log_containment.py). */
+/* The card carries the border, so the view only paints the stream rows. It
+   fills the card's leftover height, and min-height 3 keeps the panel visible
+   on a 20-row terminal (tests/unit_tui_log_containment.py). */
 #log-view-overview {
-    height: 7;
+    height: 1fr;
     min-height: 3;
     max-width: 100%;
     background: transparent;

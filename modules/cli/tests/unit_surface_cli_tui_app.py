@@ -66,17 +66,19 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             assert slot_log is not None
             assert slot_log.wrap
 
-            # Log views must stay inside the visible tab container.
+            # Log views must start inside the visible tab container. The
+            # Overview's log card is the scroll band's 1fr child, so it runs to
+            # the nav dock and the band scrolls the remainder: the panel must
+            # still begin inside the pane, and the band must stay scrollable.
             active_pane = tabs.get_pane("tab-overview")
             overview_log = app.query_one("#log-view-overview", RichLog)
+            band = app.query_one("#overview-cards")
             assert overview_log.region.height > 0
             assert overview_log.region.width > 0
             assert overview_log.region.y >= active_pane.region.y
             assert overview_log.region.x >= active_pane.region.x
-            assert (
-                overview_log.region.y + overview_log.region.height <= active_pane.region.y + active_pane.region.height
-            )
             assert overview_log.region.x + overview_log.region.width <= active_pane.region.x + active_pane.region.width
+            assert band.styles.overflow_y == "auto"
 
             # Test metrics update
             app._slot_stats[1]["status"] = "RUNNING"
