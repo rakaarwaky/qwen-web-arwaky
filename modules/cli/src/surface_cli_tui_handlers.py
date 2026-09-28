@@ -49,6 +49,7 @@ class _TuiHandlersMixin:
     _run_composer_slot: Any
     query: Any
     query_one: Any
+    set_focus: Any
     _log_msg: Any
     copy_to_clipboard: Any
     push_screen: Any
@@ -380,8 +381,21 @@ class _TuiHandlersMixin:
         self._refresh_nav_dock()
 
     def _switch_to_slot(self, slot_id: int) -> None:
+        """Show a slot's tab and carry the keyboard focus into it.
+
+        Clicking a pill focuses that pill, and Textual reacts to a focus
+        landing in a pane by making THAT pane the active tab — which undid
+        the switch and sent the console back to the slot the click came from.
+        Moving the focus into the new pane keeps the tab and the focus in
+        step, so one click lands and the keyboard follows.
+        """
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
+            tabs = self.query_one(TabbedContent)
+            tab_id = f"tab-slot-{slot_id}"
+            tabs.active = tab_id
+            pane = tabs.get_pane(tab_id)
+            focusable = [widget for widget in pane.query("*") if widget.focusable]
+            self.set_focus(focusable[0] if focusable else None, scroll_visible=False)
         self._refresh_nav_dock()
 
     # ── Chat console / Settings pane ─────────────────────────────────────

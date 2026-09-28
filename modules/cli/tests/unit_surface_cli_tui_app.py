@@ -411,6 +411,45 @@ def test_swarm_clear_button_emptys_the_active_log() -> None:
     asyncio.run(_run())
 
 
+# ── Regression: one pill click must land on the slot it names ──────────────
+#
+# Clicking a slot pill focuses that pill, and Textual makes the pane holding
+# the focused widget the active tab. Without carrying the focus into the new
+# pane, TabPane.Focused pulled the tab straight back to the slot the click
+# came from, so the console only moved after several clicks.
+
+
+def test_slot_pill_click_switches_the_pane_in_one_click() -> None:
+    """A pill press shows that slot's pane, and the focus follows it."""
+    from textual.widgets import TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(120, 45)) as pilot:
+            await pilot.pause()
+            await pilot.click("#nav-chat")
+            await pilot.pause()
+            tabs = app.query_one(TabbedContent)
+            assert tabs.active == "tab-slot-1"
+
+            # Each pill press comes from the pane that is currently on screen.
+            current = 1
+            for target in (5, 2, 7, 1):
+                await pilot.click(f"#chat-slot-{current}-{target}")
+                for _ in range(3):
+                    await pilot.pause(0.02)
+                assert tabs.active == f"tab-slot-{target}", target
+                current = target
+
+            # The keyboard path is unaffected.
+            await pilot.press("alt+9")
+            await pilot.pause()
+            assert tabs.active == "tab-slot-9"
+
+    asyncio.run(_run())
+
+
 def test_template_chip_drives_select_and_prompt_input() -> None:
     """Pressing a template chip updates the slot's Select and prompt input."""
     app = _make_app()
