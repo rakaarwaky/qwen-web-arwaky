@@ -138,7 +138,7 @@ class _TuiEventsMixin:
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
-        if button_id in ("btn-copy-log", "btn-copy-swarm-log"):
+        if button_id == "btn-copy-log":
             self._copy_log_by_id(button_id)
             return
         if button_id.startswith("btn-copy-log-"):

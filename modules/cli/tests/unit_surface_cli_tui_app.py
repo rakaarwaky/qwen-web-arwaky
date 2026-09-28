@@ -392,8 +392,8 @@ def test_swarm_toggle_buttons_drive_log_views() -> None:
     asyncio.run(_run())
 
 
-def test_swarm_clear_button_emptys_the_active_log() -> None:
-    """Clear writes no logs but the log buffer empties."""
+def test_swarm_clear_button_empties_the_active_log() -> None:
+    """Clear drops the buffer and leaves the mockup's flush notice behind."""
     app = _make_app()
 
     async def _run() -> None:
@@ -406,7 +406,11 @@ def test_swarm_clear_button_emptys_the_active_log() -> None:
 
             app.query_one("#btn-clear-swarm-log", Button).press()
             await pilot.pause()
-            assert log.copy_text() == ""
+            # The mockup replaces the terminal content with a flushed notice,
+            # and the notice is written into the panel that was just cleared.
+            flushed = log.copy_text()
+            assert "hello" not in flushed
+            assert "cleared" in flushed
 
     asyncio.run(_run())
 

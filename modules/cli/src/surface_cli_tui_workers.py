@@ -80,7 +80,7 @@ class _TuiWorkersMixin:
     _ensure_log_handler: Any
     push_screen: Any
     _session_check_timer: Any
-    _render_swarm_snapshot: Any
+    _log_swarm_msg: Any
 
     # ── Slot run / cancel ────────────────────────────────────────────────
 
@@ -319,6 +319,47 @@ class _TuiWorkersMixin:
         self._swarm_pending_input = input_path
         self._confirm_or_start_swarm(input_path)
 
+    def _render_swarm_snapshot(self, snapshot: Any) -> None:
+        """Report a swarm snapshot to the log panel.
+
+        The mockup's Swarm screen has no agent table: the panel is a single
+        log, so per-agent progress and the aggregate line are written there
+        instead. The worker polls once a second and a run rarely changes
+        every tick, so a line is only written when the agent states or the
+        aggregate actually move — otherwise an idle swarm would add a line
+        every second.
+        """
+        states: dict[str, tuple[str, int]] = getattr(self, "_swarm_agent_states", None) or {}
+        for agent in snapshot.agents:
+            state = (str(agent.status), int(agent.attempt))
+            if states.get(agent.agent_id) != state:
+                states[agent.agent_id] = state
+                self._log_swarm_msg(
+                    "[bold {}]{}[/] {} · attempt {}/{}".format(
+                        THEME["accent_fg"],
+                        agent.agent_id,
+                        state[0].upper(),
+                        state[1],
+                        snapshot.max_attempts,
+                    )
+                )
+        self._swarm_agent_states = states
+        total = len(snapshot.agents)
+        aggregate = (str(snapshot.status), int(snapshot.completed_count), int(snapshot.failed_count))
+        if aggregate == getattr(self, "_swarm_aggregate", None):
+            return
+        self._swarm_aggregate = aggregate
+        self._log_swarm_msg(
+            "[bold {}]SWARM:[/] {} · {}/{} completed · {} failed · max {} browsers".format(
+                THEME["ok"] if aggregate[0] == "completed" else THEME["warn"],
+                aggregate[0].upper(),
+                aggregate[1],
+                total,
+                aggregate[2],
+                snapshot.browser_concurrency,
+            )
+        )
+
     def _cancel_swarm(self) -> None:
         if self._swarm_id is None or self._swarm is None:
             self.notify("No Swarm is currently running.", severity="warning")
@@ -327,7 +368,7 @@ class _TuiWorkersMixin:
         snapshot = self._swarm.execute(SwarmRequest(verb="snapshot", swarm_id=self._swarm_id)).snapshot
         if snapshot is not None:
             self._render_swarm_snapshot(snapshot)
-        self._log_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
+        self._log_swarm_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
 
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
@@ -339,7 +380,7 @@ class _TuiWorkersMixin:
             self._swarm_started_perf = time.perf_counter()
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
-                self._log_msg,
+                self._log_swarm_msg,
                 "[bold {}]SWARM:[/] started {} with {} agents.".format(
                     THEME["accent_fg"], snapshot.swarm_id, len(snapshot.agents)
                 ),
@@ -353,7 +394,7 @@ class _TuiWorkersMixin:
                 self.call_from_thread(self._refresh_metrics)
                 if latest.status in {"completed", "partial", "failed", "cancelled"}:
                     self.call_from_thread(
-                        self._log_msg,
+                        self._log_swarm_msg,
                         "[bold {}]SWARM:[/] {} ({}/{} completed).".format(
                             THEME["ok"] if latest.status == "completed" else THEME["warn"],
                             latest.status,
@@ -364,7 +405,7 @@ class _TuiWorkersMixin:
                     break
         except Exception as exc:
             self.call_from_thread(
-                self._log_msg,
+                self._log_swarm_msg,
                 "[bold {}]SWARM ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
         finally:

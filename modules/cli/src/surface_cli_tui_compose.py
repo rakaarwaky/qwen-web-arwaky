@@ -46,7 +46,6 @@ class _TuiComposeMixin:
     _log_handler: logging.Handler
 
     # Stubs for methods provided by other mixins / App at runtime.
-    _init_swarm_table: Any
     query_one: Any
     set_timer: Any
     _log_msg: Any
@@ -360,54 +359,82 @@ class _TuiComposeMixin:
                         yield Button("Send", id=f"btn-send-{s}", classes="btn-send")
 
             # ─── Screen 4: Swarm ─────────────────────────────────
-            with TabPane("Swarm", id="tab-swarm"), Vertical(classes="overview-container"):
+            # design/swarm_multi_agent_stream: attachment card, view toggle,
+            # one log card (path header + Clear, the stream, the socket
+            # footer) and the Stop/RESTART deck. The mockup has no agent
+            # table, so per-agent state is reported to the log instead.
+            with TabPane("Swarm", id="tab-swarm"), Vertical(classes="swarm-screen"):
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
-                # Attachment File or Folder card.
-                with Vertical(classes="screen-card"), Horizontal(classes="swarm-file-card"):
+
+                # Attachment card: resolved file on the left, Browse chip right.
+                with Horizontal(classes="screen-card swarm-file-card"):
                     yield Label("▤", id="swarm-file-icon", classes="swarm-file-icon")
                     yield Label("No file attached", id="swarm-file-name", classes="swarm-file-name")
-                    yield Button("Browse", id="btn-browse-swarm-file", classes="btn-browse")
+                    yield Button(
+                        "⇪ Browse",
+                        id="btn-browse-swarm-file",
+                        classes="swarm-browse-chip",
+                    )
 
-                # Output Inspection header with segmented toggle.
+                # View toggle: OUTPUT INSPECTION caption, switch on the right.
                 with Horizontal(classes="output-inspection"):
-                    yield Label("Output Inspection", classes="card-caption")
-                    with Horizontal(classes="seg-switch"):
+                    yield Label("OUTPUT INSPECTION", classes="card-caption")
+                    with Horizontal(classes="seg-switch swarm-seg"):
                         yield Button(
                             "Event Log",
                             id="btn-swarm-event",
                             classes="seg-btn seg-active",
                         )
                         yield Button(
-                            "System Log",
+                            "log system",
                             id="btn-swarm-system",
                             classes="seg-btn",
                         )
-                    yield Label("●", id="live-beacon", classes="live-beacon")
 
-                # Event log (visible by default).
-                yield QwenTuiRichLog(
-                    id="log-view-swarm",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
-                # System log (hidden by default).
-                system_log = QwenTuiRichLog(
-                    id="log-view-swarm-system",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
-                system_log.display = False
-                yield system_log
+                # Log card. Both streams live in this one panel, so the toggle
+                # swaps them in place and the card keeps its height.
+                with Vertical(classes="screen-card swarm-log-card"):
+                    with Horizontal(classes="swarm-log-head"):
+                        yield Label(
+                            "/var/log/qwen-swarm.pool.log",
+                            classes="swarm-log-path",
+                        )
+                        yield Button(
+                            "🗑 Clear",
+                            id="btn-clear-swarm-log",
+                            classes="swarm-clear-chip",
+                        )
+                    yield QwenTuiRichLog(
+                        id="log-view-swarm",
+                        highlight=True,
+                        markup=True,
+                        classes="swarm-log-view",
+                        max_lines=2000,
+                        auto_scroll=True,
+                        wrap=True,
+                    )
+                    system_log = QwenTuiRichLog(
+                        id="log-view-swarm-system",
+                        highlight=True,
+                        markup=True,
+                        classes="swarm-log-view",
+                        max_lines=2000,
+                        auto_scroll=True,
+                        wrap=True,
+                    )
+                    system_log.display = False
+                    yield system_log
+                    with Horizontal(classes="swarm-log-foot"):
+                        yield Label(">", classes="swarm-caret")
+                        yield Label(
+                            "Listening on unix socket /run/qwen-swarm.sock...",
+                            id="listener-line",
+                            classes="listener-line",
+                        )
 
-                # Action deck: Stop / Restart.
+                # Action deck: Stop on the left, the primary on the right.
                 with Horizontal(classes="swarm-action-deck"):
                     yield Button(
                         "■ Stop",
@@ -420,25 +447,8 @@ class _TuiComposeMixin:
                         classes="btn-restart",
                     )
 
-                # Listener line.
-                yield Label(
-                    "> Listening on unix socket /run/qwen-swarm.sock...",
-                    id="listener-line",
-                    classes="listener-line",
-                )
-
-                # Swarm table.
-                yield DataTable(id="swarm-table")
-                with Horizontal(classes="card-inner"):
-                    yield Label("Adaptive templates · max 10 browsers", id="swarm-summary")
-
-                with Horizontal(classes="pane-title"):
-                    yield Label("Swarm Log", classes="field-label")
-                    yield Button("Clear", id="btn-clear-swarm-log", classes="btn-copy-log", variant="default")
-                    yield Button("Copy", id="btn-copy-swarm-log", classes="btn-copy-log", variant="default")
-
                 # Input field (read by _run_swarm; hidden by design — the
-                # Browse button in the swarm-file-card above drives the value).
+                # Browse chip in the swarm-file-card above drives the value).
                 swarm_input = Input(
                     value="",
                     placeholder="path/to/file or folder",
@@ -566,7 +576,6 @@ class _TuiComposeMixin:
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""
-        self._init_swarm_table()
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)

@@ -147,55 +147,38 @@ action.
 
 ## 5. Tab 3 — Swarm (`tab-swarm`)
 
-Layout follows `design/swarm_multi_agent_stream`: attachment input at the
-top, a segmented log inspector in the middle, the agent table below it, and
-a stop/start action deck at the bottom.
+Vertical stack inside `.swarm-screen`, in the mockup's order.
 
-1. **Section label**: `ATTACHMENT` (`.section-label` in a `.card-inner` row)
-2. **Field row** (`.card-inner`): Input `#input-swarm-file` (placeholder
-   `path/to/file or folder`) + button **`Browse`** (`#btn-browse-swarm-file`,
-   width 8) → opens FilePickerModal in directory-select mode.
-3. **Section label**: `OUTPUT INSPECTION` (`.section-label` in a `.card-inner`
-   row)
-4. **Segmented log toggle** (`.card-inner` row) — two `.segswitch-btn`
-   buttons; the active one also carries `.segswitch-active`:
-   - **`EVENT LOG`** (`#btn-stream-view`, active by default) — shows
-     `#unified-stream-container`.
-   - **`SYSTEM LOG`** (`#btn-log-view`) — shows `#full-log-container`.
-   Toggling swaps which container has `display: true` and moves the
-   `.segswitch-active` class between the two buttons.
-5. **Event log pane** (`#unified-stream-container`, visible by default):
-   - Pane title row: `Event Log — Parallel Stream` + **`📋 Copy`**
-     (`#btn-copy-swarm-log`).
-   - RichLog `#log-view-swarm`, 2000 lines, wrap, auto-scroll. This is the
-     pane the swarm workers stream into.
-6. **System log pane** (`#full-log-container`, `.hidden` — `display: none`
-   until the toggle switches to SYSTEM LOG):
-   - Pane title row: `/var/log/qwen-swarm.pool.log` + **`Clear`**
-     (`#btn-clear-swarm-log`).
-   - RichLog `#log-view-swarm-system`, 1000 lines, wrap, auto-scroll, rendered
-     in a raw terminal treatment (`#log-view-swarm-system` CSS: raised
-     background, borderless rows). Registered in the app's `_log_views` map
-     under the reserved key `"swarm-system"` so stdlib log lines land in it
-     alongside the event log. `Clear` flushes the buffer and writes
-     `[Logs flushed by user]`.
-7. **Swarm table** (`#swarm-table`): `Agent` | `Status` | `Attempt` |
-   `Output`. Empty state row: `—` | `IDLE` | `—` | `No active swarm —
-   select an attachment above and click START SWARM`.
-8. **Action deck** (`.card-inner.swarm-actions`) — the mockup's sticky
-   bottom bar, rendered inline as the last row of the pane:
-   - **`■ STOP`** (`#btn-swarm-cancel`, `.btn-stop`) — cancels the running
-     swarm.
-   - **`▶ START`** (`#btn-swarm-start`, `.btn-start`, `variant="primary"`) —
-     validates input; if the resource warning threshold is reached (≥4
-     browsers) shows `ConfirmModal "Swarm Resource Usage"` first, then starts
-     `swarm.start()`.
-   - Label `#swarm-summary` — `Adaptive templates · max N browsers`; live
-     updates to e.g. `COMPLETED · 8/10 completed · 1 failed · max 10
-     browsers`.
+1. **Attachment card** (`.screen-card.swarm-file-card`, 3 rows): file icon
+   (`#swarm-file-icon`) + resolved name (`#swarm-file-name`, starts as
+   `No file attached`) + **`⇪ Browse`** chip (`#btn-browse-swarm-file`) →
+   FilePickerModal in directory-select mode. The chip is a one-row ghost
+   because the default three-row Button overflowed the card and rendered as
+   an empty box.
+2. **View toggle row** (`.output-inspection`, 1 row): caption
+   `OUTPUT INSPECTION` + segmented switch `#btn-swarm-event` (Event Log) /
+   `#btn-swarm-system` (`log system`). Exactly one of the two log views in
+   the card below stays visible.
+3. **Log card** (`.screen-card.swarm-log-card`, `1fr`, min-height 8):
+   - header row `.swarm-log-head` — path `/var/log/qwen-swarm.pool.log` +
+     **`🗑 Clear`** (`#btn-clear-swarm-log`), hairline under it;
+   - `#log-view-swarm` (event, visible by default) and
+     `#log-view-swarm-system`, both `.swarm-log-view` (wrap, auto-scroll,
+     2000 lines);
+   - footer row — `>` caret + `Listening on unix socket
+     /run/qwen-swarm.sock...` (`#listener-line`).
+4. **Action deck** (`.swarm-action-deck`, 3 rows): **`■ Stop`**
+   (`#btn-swarm-cancel`, raised surface, error text) + **`↻ RESTART`**
+   (`#btn-swarm-start`, accent fill, twice the width). RESTART validates the
+   attachment; at ≥4 browsers it confirms through `ConfirmModal "Swarm
+   Resource Usage"` first.
+5. Hidden `#input-swarm-file` — the Browse chip drives its value.
 
-Concurrency from env `QWEN_SWARM_CONCURRENCY` (default 10, clamped 1–10); the
-clamped value is what `#swarm-summary` reports at compose time.
+The mockup has no agent table, so per-agent progress is reported to the log
+instead: `_render_swarm_snapshot` writes a line per agent whose status or
+attempt changed, plus an aggregate line, and skips an unchanged snapshot
+because the worker polls once a second. The swarm worker's own status lines go
+to this panel through `_log_swarm_msg`, not to the Overview log.
 
 ---
 

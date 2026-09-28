@@ -19,7 +19,7 @@ from rich.text import Text
 from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.content import Content
 from textual.css.query import NoMatches
-from textual.widgets import Button, DataTable, Label, Static, TabbedContent
+from textual.widgets import Button, Label, Static, TabbedContent
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
@@ -208,42 +208,6 @@ class _TuiUtilsMixin:
     set_timer: Any
     _get_active_slot_id: Any
 
-    def _init_swarm_table(self) -> None:
-        with contextlib.suppress(NoMatches):
-            table = self.query_one("#swarm-table", DataTable)
-            table.add_columns(
-                ("Agent", "swarm-agent"),
-                ("Status", "swarm-status"),
-                ("Attempt", "swarm-attempt"),
-                ("Output", "swarm-output"),
-            )
-            table.add_row(
-                "—",
-                "IDLE",
-                "—",
-                "No active swarm — select an attachment above and click START SWARM",
-                key="swarm-empty",
-            )
-
-    def _render_swarm_snapshot(self, snapshot: Any) -> None:
-        with contextlib.suppress(NoMatches):
-            table = self.query_one("#swarm-table", DataTable)
-            table.clear()
-            for agent in snapshot.agents:
-                output = str(agent.output_path) if agent.status == "completed" and agent.output_path else "-"
-                table.add_row(
-                    agent.agent_id,
-                    agent.status.upper(),
-                    f"{agent.attempt}/{snapshot.max_attempts}",
-                    output,
-                    key=f"swarm-{agent.agent_id}",
-                )
-            summary = self.query_one("#swarm-summary", Label)
-            summary.update(
-                f"{snapshot.status.upper()} · {snapshot.completed_count}/{len(snapshot.agents)} completed · "
-                f"{snapshot.failed_count} failed · max {snapshot.browser_concurrency} browsers"
-            )
-
     # ── Metrics bar ──────────────────────────────────────────────────────
 
     def _refresh_metrics(self) -> None:
@@ -429,6 +393,17 @@ class _TuiUtilsMixin:
         if system is not None:
             system.write(msg)
         self._stamp_slot_log(active)
+
+    def _log_swarm_msg(self, msg: str | Text) -> None:
+        """Write one line to the Swarm console's own log panel.
+
+        ``_log_msg`` fans unscoped records out to the Overview and the chat
+        console's System log. The swarm worker's progress belongs in the panel
+        the operator is watching, which the mockup gives a single log.
+        """
+        view = getattr(self, "_log_views", {}).get(-1)
+        if view is not None:
+            view.write(msg)
 
     def _stamp_slot_log(self, slot_id: int) -> None:
         """Advance the chat console's trailing log clock (mockup's 09:46:31)."""

@@ -1585,7 +1585,20 @@ HelpScreen {
 
 /* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */
 
-/* Attachment drop-card: file icon, resolved filename, Browse button. */
+/* The console shell, same as the chat console: attachment card, view toggle,
+   log card, action deck. The log card is the only 1fr child, so the deck
+   lands above the nav dock at every terminal height. */
+.swarm-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2 0 2;
+}
+
+/* Attachment card: file icon, resolved filename, Browse chip. The chip is a
+   one-row ghost — the default three-row Button overflowed this three-row card
+   and rendered as an empty box with no label. */
 .swarm-file-card {
     layout: horizontal;
     width: 100%;
@@ -1593,19 +1606,36 @@ HelpScreen {
     background: $bg_raised;
     border: solid $border;
     margin-bottom: 1;
+    padding: 0 1;
     align: left middle;
 }
 
 .swarm-file-icon {
     color: $fg_accent;
     text-style: bold;
-    width: 3;
+    width: auto;
+    margin-right: 1;
 }
 
 .swarm-file-name {
     width: 1fr;
     color: $fg_primary;
     text-style: bold;
+}
+
+.swarm-browse-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_active;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-browse-chip:hover {
+    color: $fg_accent;
 }
 
 .swarm-file-input {
@@ -1616,22 +1646,108 @@ HelpScreen {
     color: $fg_primary;
 }
 
-/* Output Inspection header: caption on the left, view switch on the right. */
+/* View toggle row: caption on the left, segmented switch on the right. The
+   swarm switch is one row (the mockup's pill pair); the chat console keeps
+   its taller switch under .telemetry-header. */
 .output-inspection {
     layout: horizontal;
     width: 100%;
-    /* Three rows: the segmented switch is a 3-row control, and a 1-row header
-       clipped it to a bare fill with no visible label. */
-    height: 3;
-    margin-bottom: 0;
+    height: 1;
+    margin-bottom: 1;
     align: left middle;
 }
 
 .output-inspection .card-caption {
     width: 1fr;
+    color: $status_muted;
+    text-style: bold;
 }
 
-/* Stop / Restart action deck pinned under the swarm log. */
+.swarm-seg {
+    height: 1;
+}
+
+.swarm-seg .seg-btn {
+    height: 1;
+    min-width: 10;
+}
+
+/* Log card: the path header with its hairline, the stream, and the socket
+   footer. Compound selector so .screen-card's padding cannot win over the
+   1fr height the mockup gives the panel. */
+.screen-card.swarm-log-card {
+    height: 1fr;
+    min-height: 8;
+    background: $bg_surface;
+    margin-bottom: 0;
+}
+
+.swarm-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    align: left middle;
+    border-bottom: solid $border;
+}
+
+.swarm-log-path {
+    width: 1fr;
+    height: 1;
+    color: $status_muted;
+    text-style: bold;
+}
+
+.swarm-clear-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_surface;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-clear-chip:hover {
+    color: $status_err;
+}
+
+/* The card carries the frame, so the view only paints stream rows. */
+.swarm-log-view {
+    width: 100%;
+    height: 1fr;
+    max-width: 100%;
+    background: transparent;
+    border: none;
+    color: $fg_primary;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.swarm-log-foot {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    align: left middle;
+}
+
+.swarm-caret {
+    width: auto;
+    color: $accent;
+    text-style: bold;
+    margin-right: 1;
+}
+
+/* Socket listener line under the stream. */
+.listener-line {
+    width: 1fr;
+    height: 1;
+    color: $fg_muted;
+    text-style: italic;
+}
+
+/* Stop / Restart action deck under the log card. */
 .swarm-action-deck {
     layout: horizontal;
     width: 100%;
@@ -1655,14 +1771,6 @@ HelpScreen {
     color: $fg_on_accent;
     border: solid $accent;
     text-style: bold;
-}
-
-/* Terminal-style listener line under the swarm log. */
-.listener-line {
-    width: 100%;
-    height: 1;
-    color: $status_muted;
-    text-style: italic;
 }
 """
 )

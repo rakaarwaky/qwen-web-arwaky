@@ -49,6 +49,7 @@ class _TuiHandlersMixin:
     _run_composer_slot: Any
     query: Any
     query_one: Any
+    _log_swarm_msg: Any
     set_focus: Any
     _log_msg: Any
     copy_to_clipboard: Any
@@ -125,7 +126,7 @@ class _TuiHandlersMixin:
             system_visible = self.query_one("#log-view-swarm-system", QwenTuiRichLog).display
             view = self.query_one("#log-view-swarm-system" if system_visible else "#log-view-swarm", QwenTuiRichLog)
             view.clear()
-            self._log_msg(
+            self._log_swarm_msg(
                 "[{}]Swarm log cleared.[/]".format(THEME["muted"]),
             )
 
