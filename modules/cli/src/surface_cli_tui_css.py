@@ -1836,6 +1836,21 @@ HelpScreen {
     height: 3;
 }
 
+/* Section switch + storage hint share the header row. The hint is pushed to
+   the trailing edge so the two buttons read as one control. */
+.settings-switch {
+    height: 3;
+    margin-bottom: 1;
+}
+
+.settings-switch-hint {
+    width: 1fr;
+    height: 3;
+    content-align: right middle;
+    color: $status_muted;
+    text-style: none;
+}
+
 .settings-toggle Switch {
     width: 4;
     height: 3;
@@ -1863,6 +1878,114 @@ HelpScreen {
     height: 3;
     margin-top: 0;
     margin-left: 1;
+}
+
+/* ═══ SETTINGS (runtime overrides) ═══════════════════════════════════ */
+
+/* The registry is 18 values, which cannot fit one screen. The card scrolls
+   inside its own band rather than growing the pane — the nav dock and the
+   section switch must stay put. */
+.override-scroll {
+    width: 100%;
+    height: 1fr;
+}
+
+/* Compound selector: `.screen-card.settings-card` earlier in this file is also
+   two classes deep and would pin the card to the pane height, which leaves the
+   scroll container nothing to scroll. */
+.screen-card.override-card {
+    height: auto;
+    margin-bottom: 0;
+}
+
+.override-blurb {
+    height: 1;
+    color: $status_muted;
+    margin-bottom: 1;
+}
+
+/* Seven rows: name+badge, purpose, three-row field, the hairline's padding,
+   then the hairline. The row's declared height is its border box, so it has to
+   cover the padding too or the field is clipped and shows no value. */
+.override-row {
+    width: 100%;
+    height: 7;
+    margin-bottom: 1;
+    padding-bottom: 1;
+    border-bottom: solid $border;
+}
+
+.override-head {
+    width: 100%;
+    height: 1;
+}
+
+.override-name {
+    width: auto;
+    height: 1;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+/* Three states: default, in force now, stored but needing a restart. */
+.override-badge {
+    width: 1fr;
+    height: 1;
+    content-align: right middle;
+    color: $status_muted;
+}
+
+.override-badge-active {
+    color: $status_ok;
+    text-style: bold;
+}
+
+.override-badge-restart {
+    color: $status_warn;
+}
+
+.override-purpose {
+    width: 100%;
+    height: 1;
+    color: $status_muted;
+    text-overflow: ellipsis;
+}
+
+.override-field-row {
+    width: 100%;
+    height: 3;
+}
+
+/* Same treatment as the slot form's fields: an explicit frame, because the
+   default Input chrome collapses to a bare rule at this card's padding. */
+.override-input {
+    width: 1fr;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    color: $fg_primary;
+}
+
+.override-input:focus {
+    border: solid $fg_accent;
+}
+
+/* Apply/Reset are the same width as the Browse chip on the form above, so the
+   two halves of the Settings screen line up. */
+.btn-apply {
+    width: 10;
+    min-width: 10;
+    height: 3;
+    margin: 0 0 0 1;
+    background: $bg_hover;
+    color: $fg_accent;
+    border: solid $border;
+}
+
+/* Reset is a quiet affordance: it removes an override, so it must not look
+   like the action that writes one. */
+.btn-reset {
+    color: $status_muted;
 }
 
 /* Stop / Restart action deck under the log card. */

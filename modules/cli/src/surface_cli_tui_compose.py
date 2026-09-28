@@ -56,6 +56,10 @@ class _TuiComposeMixin:
     _refresh_metrics: Any
     _refresh_slot_chips: Any
     _refresh_nav_dock: Any
+    _override_hint: Any
+    _override_rows: Any
+    _override_badge: Any
+    _override_display: Any
 
     # ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -469,7 +473,16 @@ class _TuiComposeMixin:
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
 
-                with Horizontal(classes="slot-carousel"):
+                # Two kinds of setting live here: the per-slot job form, and the
+                # process-wide overrides. A segmented switch picks which, the
+                # same treatment the chat console gives its two logs — one
+                # screen, one thing in view at a time.
+                with Horizontal(classes="seg-switch settings-switch"):
+                    yield Button("Slot Config", id="settings-tab-slot", classes="seg-btn seg-active")
+                    yield Button("Runtime Overrides", id="settings-tab-overrides", classes="seg-btn")
+                    yield Static(self._override_hint(), classes="settings-switch-hint")
+
+                with Horizontal(classes="slot-carousel settings-carousel"):
                     for i in range(1, self._NUM_SLOTS + 1):
                         yield Button(
                             f"● SLOT {i:02d}",
@@ -560,6 +573,45 @@ class _TuiComposeMixin:
                                 id=f"btn-retry-{s}",
                                 classes="btn-slot-retry",
                             )
+
+                # RUNTIME OVERRIDES: one row per registered environment value.
+                # Hidden until the segmented switch selects it, because the
+                # per-slot form above is what an operator usually came for.
+                override_scroll = ScrollableContainer(id="settings-overrides", classes="override-scroll")
+                # Hidden until the section switch selects it: a visible container
+                # would take its share of the pane and squeeze the slot form,
+                # which is what an operator lands on.
+                override_scroll.display = False
+                with override_scroll:
+                    override_card = Vertical(classes="screen-card settings-card override-card", id="override-card")
+                    with override_card:
+                        with Horizontal(classes="card-title-row"):
+                            yield Static("⚙", classes="card-icon")
+                            yield Label("RUNTIME OVERRIDES", classes="card-title")
+
+                        yield Label(
+                            "Every value here already has a working default. Clear a field to fall back to it.",
+                            classes="override-blurb",
+                        )
+                        for name, purpose, default, secret in self._override_rows():
+                            suffix = name.replace("-", "_")
+                            badge_text, badge_class = self._override_badge(name)
+                            detail = purpose if secret else f"{purpose} · default: {default}"
+                            with Vertical(classes="override-row", id=f"override-row-{suffix}"):
+                                with Horizontal(classes="override-head"):
+                                    yield Label(name, classes="override-name")
+                                    yield Static(badge_text, classes=badge_class, id=f"override-badge-{suffix}")
+                                yield Label(detail, classes="override-purpose")
+                                with Horizontal(classes="override-field-row"):
+                                    yield Input(
+                                        value=self._override_display(name),
+                                        placeholder="default",
+                                        password=secret,
+                                        id=f"override-input-{suffix}",
+                                        classes="override-input",
+                                    )
+                                    yield Button("Apply", id=f"override-apply-{name}", classes="btn-apply")
+                                    yield Button("Reset", id=f"override-reset-{name}", classes="btn-apply btn-reset")
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no

@@ -38,6 +38,11 @@ class _TuiEventsMixin:
     _nav_dock_go: Any
     _switch_to_slot: Any
     _show_slot_config: Any
+    _show_settings_section: Any
+    _apply_override_from_field: Any
+    _apply_override: Any
+    _reset_override: Any
+    _override_rows: Any
     _show_slot_log: Any
     _open_picker: Any
     _goto_slot_settings: Any
@@ -94,6 +99,18 @@ class _TuiEventsMixin:
             if slot_raw.isdigit():
                 self._show_slot_config(int(slot_raw))
             return
+        # Settings pane: switch between the per-slot form and the overrides.
+        if button_id in ("settings-tab-slot", "settings-tab-overrides"):
+            self._show_settings_section(button_id == "settings-tab-overrides")
+            return
+        # Settings pane: write or revert one registered environment value.
+        for prefix, handler in (
+            ("override-apply-", self._apply_override_from_field),
+            ("override-reset-", self._reset_override),
+        ):
+            if button_id.startswith(prefix):
+                handler(button_id.removeprefix(prefix))
+                return
         # Chat console: Event/System segmented switch over the slot's logs.
         if button_id.startswith("btn-slot-event-"):
             self._show_slot_log(int(button_id.removeprefix("btn-slot-event-")), False)
@@ -200,6 +217,15 @@ class _TuiEventsMixin:
             slot_raw = input_id.removeprefix("composer-")
             if slot_raw.isdigit():
                 self._send_composer(int(slot_raw))
+            return
+        # Enter inside an override field applies that value, which is the same
+        # gesture as pressing Apply and saves an operator the trip.
+        if input_id.startswith("override-input-"):
+            suffix = input_id.removeprefix("override-input-")
+            for name, _purpose, _default, _secret in self._override_rows():
+                if name.replace("-", "_") == suffix:
+                    self._apply_override(name, event.value)
+                    return
 
 
 __all__ = ["_TuiEventsMixin"]

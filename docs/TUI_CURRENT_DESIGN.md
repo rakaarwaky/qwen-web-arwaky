@@ -213,9 +213,14 @@ Each slot tab is the chat console from `design/slot_chat_automation_console`:
 
 ### 6.2 Settings pane (`tab-settings`)
 
-Per-slot configuration. No mockup ships for this screen, so it follows the
+Two kinds of setting live here, so the pane carries a segmented switch and
+shows one at a time: `Slot Config` (per-slot job form) and
+`Runtime Overrides` (the process-wide values). The slot carousel belongs to the
+form and leaves with it. No mockup ships for this screen, so it follows the
 same card language as the Overview and Swarm consoles; every id the workers
 and tests resolve is preserved.
+
+#### Slot Config
 
 ```text
 ┌ slot carousel (same ten pills, #cfg-slot-N) ─────────────────────┐
@@ -261,6 +266,65 @@ border is suppressed so the `Select` does not paint `▔▔▔` inside our borde
 | `⚡ RUN IN SLOT NN` | `btn-run-N` | accent fill, 2fr | Validates inputs via resolver; starts worker; already-running gives a warning toast + log. Also bound to Enter/Ctrl+R. |
 | `✕ Cancel Slot NN` | `btn-cancel-N` | `danger_bg` fill, 1fr | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"`. Confirms only if the same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
 | `↻ Retry Slot NN` | `btn-retry-N` | `bg_raised` fill, `status_warn` text; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
+
+#### Runtime Overrides
+
+The screen's other half. Every value in the environment registry
+(`REGISTERED_ENV`, the same table `qwa doctor` prints) gets one row: the
+variable name, what it does, the value in force, an `Apply` and a `Reset`
+control. The defaults are the product — this screen only adjusts them — so an
+empty field means "back to the default", never "set to empty".
+
+```text
+┌ ⚙ RUNTIME OVERRIDES ──────────────────────────────────────────────┐
+│ ENVIRONMENT                          DEFAULT · production           │
+│ deployment mode; switches log … · default: production              │
+│ [production                                     ] [Apply] [Reset]  │
+│ ────────────────────────────────────────────────────────────────── │
+│ QWEN_WEB_MAX_WORKERS          RESTART · executor pool built at start│
+│ job-executor worker count … · default: auto                        │
+│ [6                                            ] [Apply] [Reset]  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+17 rows at 7 rows each is 119 rows of content in a 34-row band, so
+`#settings-overrides` is the only thing on the screen that scrolls. The section
+switch above it and the nav dock below it stay put.
+
+| Element | id | Behavior |
+| --- | --- | --- |
+| Section switch | `settings-tab-slot`, `settings-tab-overrides` | `_show_settings_section` — shows one half, hides the other. |
+| Value field | `override-input-NAME` | Shows the effective value; the registry default when nothing overrides it. Secrets render masked (`***`). |
+| `Apply` | `override-apply-NAME` | Validates through the registry's own `validate_env`, writes to `os.environ` **and** the override file, re-renders the row. Enter in the field takes the same path. |
+| `Reset` | `override-reset-NAME` | Drops the override from the file and the environment; the default takes over. |
+| State badge | `override-badge-NAME` | `DEFAULT · <default>`, `ACTIVE NOW`, or `RESTART · <reason>`. |
+
+Six values are read only at start-up and carry a `RESTART` badge:
+`QWEN_WEB_MAX_WORKERS`, `PLAYWRIGHT_BROWSERS_PATH`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_SERVICE_NAME`, `SENTRY_DSN`, `ENVIRONMENT`. Everything else applies to
+the next run or Swarm start in the same session.
+
+Override records go to the Overview event log, not to a slot's event log: a
+change to a process-wide value belongs to no single slot.
+
+#### Where overrides are stored
+
+`~/.config/qwen-web-arwaky/settings.env` (XDG config home), one `NAME=VALUE`
+per line, in the same shape as a shell fragment. The CLI entry calls
+`install_settings()` before the container is built, so a value applied in the
+TUI is in force for the run that reads it.
+
+Precedence, weakest to strongest: registry default → settings file → process
+environment. A shell export therefore always beats the file, and a value the
+registry rejects is dropped on load and on save rather than silently changing
+behaviour on the next start.
+
+Implementation: `modules/shared/src/utility_core_env.py` (`settings_path`,
+`load_settings`, `save_settings`, `install_settings`, `clear_settings`) and
+`modules/cli/src/surface_cli_tui_settings.py` (`_TuiSettingsMixin`). The
+override file lives in the same module as the registry it persists, because a
+second utility importing the first would break the layer's no-utility-imports
+rule.
 
 ---
 

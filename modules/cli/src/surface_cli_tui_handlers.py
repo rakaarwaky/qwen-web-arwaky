@@ -45,6 +45,7 @@ class _TuiHandlersMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
+    _show_settings_section: Any
     _append_chat_message: Any
     _run_composer_slot: Any
     query: Any
@@ -426,6 +427,9 @@ class _TuiHandlersMixin:
 
     def _goto_slot_settings(self, slot_id: int) -> None:
         """Open the Settings pane on *slot_id*'s form — the Templates pill."""
+        # The form is one of two Settings sections; arriving from the chat
+        # console while the overrides card is open must switch back to it.
+        self._show_settings_section(False)
         self._show_slot_config(slot_id)
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-settings"
