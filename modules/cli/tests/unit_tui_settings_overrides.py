@@ -214,6 +214,26 @@ def test_a_secret_is_masked_in_the_field_and_never_echoed_into_the_log(store: Pa
     asyncio.run(_run())
 
 
+def test_the_pane_opens_on_the_overrides_and_has_no_slot_row() -> None:
+    """SETTINGS is a settings menu: it opens on the overrides, with no pills."""
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(150, 44)) as pilot:
+            await pilot.pause()
+            await pilot.click("#nav-settings")
+            for _ in range(3):
+                await pilot.pause(0.02)
+            assert app.query_one("#settings-overrides").display is True
+            assert app.query_one("#slot-config-1").display is False
+            # A second row of slot pills would repeat the chat console's own
+            # carousel, at a width where they do not all fit.
+            assert len(app.query(".settings-carousel")) == 0
+            assert len(app.query("#cfg-slot-1")) == 0
+
+    asyncio.run(_run())
+
+
 def test_the_section_switch_shows_one_half_of_the_screen_at_a_time() -> None:
     app = _make_app()
 
@@ -223,25 +243,44 @@ def test_the_section_switch_shows_one_half_of_the_screen_at_a_time() -> None:
             await pilot.click("#nav-settings")
             for _ in range(3):
                 await pilot.pause(0.02)
-            # Slot Config is what an operator lands on.
-            assert app.query_one(".settings-carousel").display is True
-            assert app.query_one("#slot-config-1").display is True
-            assert app.query_one("#settings-overrides").display is False
-
-            await pilot.click("#settings-tab-overrides")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            assert app.query_one("#settings-overrides").display is True
-            assert app.query_one("#slot-config-1").display is False
-            # The carousel only selects a slot, so it leaves with the form.
-            assert app.query_one(".settings-carousel").display is False
 
             await pilot.click("#settings-tab-slot")
             for _ in range(3):
                 await pilot.pause(0.02)
             assert app.query_one("#settings-overrides").display is False
             assert app.query_one("#slot-config-1").display is True
-            assert app.query_one(".settings-carousel").display is True
+
+            await pilot.click("#settings-tab-overrides")
+            for _ in range(3):
+                await pilot.pause(0.02)
+            assert app.query_one("#settings-overrides").display is True
+            assert app.query_one("#slot-config-1").display is False
+
+    asyncio.run(_run())
+
+
+def test_the_slot_form_edits_the_slot_the_chat_console_is_showing() -> None:
+    """No selector on the screen, so the form has to follow the active slot."""
+    app = _make_app()
+
+    async def _run() -> None:
+        from textual.widgets import Label
+
+        async with app.run_test(size=(150, 44)) as pilot:
+            await pilot.pause()
+            await pilot.click("#nav-chat")
+            for _ in range(3):
+                await pilot.pause(0.02)
+            await pilot.click("#chat-slot-1-3")
+            for _ in range(3):
+                await pilot.pause(0.02)
+
+            app._goto_slot_settings(3)
+            for _ in range(3):
+                await pilot.pause(0.02)
+            assert app.query_one("#slot-config-3").display is True
+            assert app.query_one("#slot-config-1").display is False
+            assert "SLOT 03" in str(app.query_one("#cfg-title-3", Label).render())
 
     asyncio.run(_run())
 
@@ -258,9 +297,6 @@ def test_pressing_apply_writes_what_the_field_holds(store: Path) -> None:
         async with app.run_test(size=(150, 44)) as pilot:
             await pilot.pause()
             await pilot.click("#nav-settings")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            await pilot.click("#settings-tab-overrides")
             for _ in range(3):
                 await pilot.pause(0.02)
             app.query_one("#override-input-ENVIRONMENT", Input).value = "staging"
@@ -285,9 +321,6 @@ def test_the_templates_pill_returns_to_the_slot_form(store: Path) -> None:
             await pilot.click("#nav-settings")
             for _ in range(3):
                 await pilot.pause(0.02)
-            await pilot.click("#settings-tab-overrides")
-            for _ in range(3):
-                await pilot.pause(0.02)
             app._goto_slot_settings(4)
             for _ in range(3):
                 await pilot.pause(0.02)
@@ -298,16 +331,13 @@ def test_the_templates_pill_returns_to_the_slot_form(store: Path) -> None:
 
 
 def test_the_card_scrolls_inside_its_own_band() -> None:
-    """18 rows cannot fit one screen, so the scrollbar belongs to the card."""
+    """17 rows cannot fit one screen, so the scrollbar belongs to the card."""
     app = _make_app()
 
     async def _run() -> None:
         async with app.run_test(size=(150, 44)) as pilot:
             await pilot.pause()
             await pilot.click("#nav-settings")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            await pilot.click("#settings-tab-overrides")
             for _ in range(3):
                 await pilot.pause(0.02)
             scroll = app.query_one("#settings-overrides")

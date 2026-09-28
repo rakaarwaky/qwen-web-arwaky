@@ -468,31 +468,27 @@ class _TuiComposeMixin:
             # captions over fields, a one-row Browse chip beside every input,
             # and the run controls on the card's last row so nothing hides
             # below the fold. Every id the workers and tests resolve is kept.
+            #
+            # The screen carries no slot selector. Settings configures the
+            # application, and the per-slot form edits whichever slot the Chat
+            # console is showing — the slot the operator is already looking at,
+            # so a second row of pills here would only repeat it. The pane
+            # opens on RUNTIME OVERRIDES: that is what an operator who pressed
+            # SETTINGS came for, and the form is one press away.
             with TabPane("Settings", id="tab-settings"), Vertical(classes="settings-screen"):
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
 
-                # Two kinds of setting live here: the per-slot job form, and the
-                # process-wide overrides. A segmented switch picks which, the
-                # same treatment the chat console gives its two logs — one
-                # screen, one thing in view at a time.
                 with Horizontal(classes="seg-switch settings-switch"):
-                    yield Button("Slot Config", id="settings-tab-slot", classes="seg-btn seg-active")
-                    yield Button("Runtime Overrides", id="settings-tab-overrides", classes="seg-btn")
-                    yield Static(self._override_hint(), classes="settings-switch-hint")
-
-                with Horizontal(classes="slot-carousel settings-carousel"):
-                    for i in range(1, self._NUM_SLOTS + 1):
-                        yield Button(
-                            f"● SLOT {i:02d}",
-                            id=f"cfg-slot-{i}",
-                            classes="slot-chip slot-chip-active" if i == 1 else "slot-chip",
-                        )
+                    yield Button("Runtime Overrides", id="settings-tab-overrides", classes="seg-btn seg-active")
+                    yield Button("Slot Config", id="settings-tab-slot", classes="seg-btn")
 
                 for s in range(1, self._NUM_SLOTS + 1):
                     config_block = Vertical(classes="settings-card", id=f"slot-config-{s}")
-                    config_block.display = s == 1
+                    # Hidden until the section switch selects the form: the
+                    # overrides card is what the pane opens on.
+                    config_block.display = False
                     with config_block:
                         with Horizontal(classes="card-title-row"):
                             yield Static("⚙", classes="card-icon")
@@ -578,10 +574,6 @@ class _TuiComposeMixin:
                 # Hidden until the segmented switch selects it, because the
                 # per-slot form above is what an operator usually came for.
                 override_scroll = ScrollableContainer(id="settings-overrides", classes="override-scroll")
-                # Hidden until the section switch selects it: a visible container
-                # would take its share of the pane and squeeze the slot form,
-                # which is what an operator lands on.
-                override_scroll.display = False
                 with override_scroll:
                     override_card = Vertical(classes="screen-card settings-card override-card", id="override-card")
                     with override_card:
@@ -593,6 +585,7 @@ class _TuiComposeMixin:
                             "Every value here already has a working default. Clear a field to fall back to it.",
                             classes="override-blurb",
                         )
+                        yield Label(self._override_hint(), classes="override-hint")
                         for name, purpose, default, secret in self._override_rows():
                             suffix = name.replace("-", "_")
                             badge_text, badge_class = self._override_badge(name)

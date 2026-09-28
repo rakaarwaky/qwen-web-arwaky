@@ -214,16 +214,24 @@ Each slot tab is the chat console from `design/slot_chat_automation_console`:
 ### 6.2 Settings pane (`tab-settings`)
 
 Two kinds of setting live here, so the pane carries a segmented switch and
-shows one at a time: `Slot Config` (per-slot job form) and
-`Runtime Overrides` (the process-wide values). The slot carousel belongs to the
-form and leaves with it. No mockup ships for this screen, so it follows the
-same card language as the Overview and Swarm consoles; every id the workers
-and tests resolve is preserved.
+shows one at a time: `Runtime Overrides` (the process-wide values) and
+`Slot Config` (the per-slot job form). The pane **opens on the overrides** —
+that is what an operator who pressed SETTINGS came for — and the form is one
+press away.
+
+The screen has **no slot selector**. Settings configures the application, and
+a per-slot form editing a slot the operator cannot see would be a guess, so
+`Slot Config` edits the slot the Chat console is showing. The card title names
+it (`SLOT 03 CONFIGURATION`), and the Chat console's Templates pill lands on
+that slot's form.
+
+No mockup ships for this screen, so it follows the same card language as the
+Overview and Swarm consoles; every id the workers and tests resolve is
+preserved.
 
 #### Slot Config
 
 ```text
-┌ slot carousel (same ten pills, #cfg-slot-N) ─────────────────────┐
 │ ⚙ SLOT 01 CONFIGURATION                     ← card title + chip   │
 │ PROMPT TEMPLATE                                                 │
 │ [ Select a template or type a file path below ▼ ]                │
@@ -239,8 +247,9 @@ and tests resolve is preserved.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-One card per slot; only the selected one is displayed (`#slot-config-N`).
-A carousel pill (`#cfg-slot-N`) swaps which card is shown.
+One card per slot; only the active slot's is displayed (`#slot-config-N`).
+`_show_slot_config` swaps which card is shown and `_show_settings_section`
+decides whether the form or the override list is on screen at all.
 
 #### Slot form fields
 
@@ -293,7 +302,7 @@ switch above it and the nav dock below it stay put.
 
 | Element | id | Behavior |
 | --- | --- | --- |
-| Section switch | `settings-tab-slot`, `settings-tab-overrides` | `_show_settings_section` — shows one half, hides the other. |
+| Section switch | `settings-tab-slot`, `settings-tab-overrides` | `_show_settings_section` — shows one half, hides the other. The form follows the active chat slot unless a caller names one (the Templates pill does). |
 | Value field | `override-input-NAME` | Shows the effective value; the registry default when nothing overrides it. Secrets render masked (`***`). |
 | `Apply` | `override-apply-NAME` | Validates through the registry's own `validate_env`, writes to `os.environ` **and** the override file, re-renders the row. Enter in the field takes the same path. |
 | `Reset` | `override-reset-NAME` | Drops the override from the file and the environment; the default takes over. |

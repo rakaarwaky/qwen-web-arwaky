@@ -93,13 +93,7 @@ class _TuiEventsMixin:
             if pane_raw.isdigit() and slot_raw.isdigit():
                 self._switch_to_slot(int(slot_raw))
             return
-        # Settings pane: pick which slot's configuration block is displayed.
-        if button_id.startswith("cfg-slot-"):
-            slot_raw = button_id.removeprefix("cfg-slot-")
-            if slot_raw.isdigit():
-                self._show_slot_config(int(slot_raw))
-            return
-        # Settings pane: switch between the per-slot form and the overrides.
+        # Settings pane: switch between the overrides and the per-slot form.
         if button_id in ("settings-tab-slot", "settings-tab-overrides"):
             self._show_settings_section(button_id == "settings-tab-overrides")
             return

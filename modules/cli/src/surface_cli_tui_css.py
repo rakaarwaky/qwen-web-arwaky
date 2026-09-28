@@ -1836,19 +1836,13 @@ HelpScreen {
     height: 3;
 }
 
-/* Section switch + storage hint share the header row. The hint is pushed to
-   the trailing edge so the two buttons read as one control. */
+/* Section switch alone on its row. An earlier draft put the storage path in a
+   trailing hint here and it truncated mid-word on any terminal under ~130
+   columns; the path belongs with the overrides, which is where it means
+   something, and that card is 140 columns wide. */
 .settings-switch {
     height: 3;
     margin-bottom: 1;
-}
-
-.settings-switch-hint {
-    width: 1fr;
-    height: 3;
-    content-align: right middle;
-    color: $status_muted;
-    text-style: none;
 }
 
 .settings-toggle Switch {
@@ -1902,6 +1896,14 @@ HelpScreen {
     height: 1;
     color: $status_muted;
     margin-bottom: 1;
+}
+
+/* Where an applied value is stored. Its own row inside the card rather than a
+   trailing hint on the section switch, which had no room for it. */
+.override-hint {
+    height: 1;
+    color: $status_muted;
+    text-style: italic;
 }
 
 /* Seven rows: name+badge, purpose, three-row field, the hairline's padding,

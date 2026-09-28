@@ -264,8 +264,8 @@ class _TuiHandlersMixin:
 
         CHAT has no single tab of its own: it stands for every per-slot job
         tab, so it lands on the slot the user is already on (slot 1 when the
-        active tab is not a slot tab). SETTINGS follows the same rule — it
-        opens on whichever slot is currently on screen.
+        active tab is not a slot tab). SETTINGS carries no slot of its own —
+        the per-slot form inside it follows the active slot.
         """
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
@@ -369,17 +369,15 @@ class _TuiHandlersMixin:
         self._refresh_nav_dock()
 
     def action_switch_tab_settings(self) -> None:
-        """Switch to the Settings tab (ctrl+comma), keeping the slot on screen.
+        """Switch to the Settings tab (ctrl+comma), keeping the section on screen.
 
-        Arriving from another tab picks the slot the user was just looking at;
-        pressing the shortcut while already on Settings leaves the configured
-        slot alone instead of snapping back to slot 1.
+        Which half of the Settings screen is showing is owned by
+        :meth:`_show_settings_section`, so this only moves the tab. An earlier
+        version also revealed the slot form, which put a per-slot card behind
+        the override list the pane opens on.
         """
         with contextlib.suppress(Exception):
-            tabs = self.query_one(TabbedContent)
-            if tabs.active != "tab-settings":
-                self._show_slot_config(self._get_active_slot_id())
-                tabs.active = "tab-settings"
+            self.query_one(TabbedContent).active = "tab-settings"
         self._refresh_nav_dock()
 
     def _switch_to_slot(self, slot_id: int) -> None:
@@ -418,21 +416,31 @@ class _TuiHandlersMixin:
             system_btn.set_class(not show_system, "seg-active")
 
     def _show_slot_config(self, slot_id: int) -> None:
-        """Display one slot's configuration block and mark its picker pill."""
+        """Display *slot_id*'s form on the Settings pane and hide the rest.
+
+        The pane has no slot selector, so the card title is the only thing
+        naming the slot being edited — which is why the form follows the slot
+        the Chat console is on.
+        """
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self.query_one(f"#slot-config-{s}", Vertical).display = s == slot_id
-            with contextlib.suppress(NoMatches):
-                self.query_one(f"#cfg-slot-{s}", Button).set_class(s == slot_id, "slot-chip-active")
 
     def _goto_slot_settings(self, slot_id: int) -> None:
-        """Open the Settings pane on *slot_id*'s form — the Templates pill."""
-        # The form is one of two Settings sections; arriving from the chat
-        # console while the overrides card is open must switch back to it.
-        self._show_settings_section(False)
+        """Open the Settings pane on *slot_id*'s form — the Templates pill.
+
+        Same focus rule as :meth:`_switch_to_slot`: the Templates pill holds the
+        focus, and Textual makes the pane holding the focused widget the active
+        tab, so the focus has to travel with the tab or the switch is undone.
+        """
         self._show_slot_config(slot_id)
+        self._show_settings_section(False, slot_id)
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = "tab-settings"
+            tabs = self.query_one(TabbedContent)
+            tabs.active = "tab-settings"
+            pane = tabs.get_pane("tab-settings")
+            focusable = [widget for widget in pane.query("*") if widget.focusable]
+            self.set_focus(focusable[0] if focusable else None, scroll_visible=False)
         self._refresh_nav_dock()
 
     def _send_composer(self, slot_id: int) -> None:
