@@ -558,6 +558,8 @@ Switch.-on {
 
 .slot-loading {
     display: none;
+    width: 1;
+    height: 1;
     height: 1;
     margin-bottom: 1;
 }
@@ -1282,15 +1284,16 @@ HelpScreen {
     background: $bg_surface;
     padding: 0 1;
     margin-bottom: 1;
-    overflow-x: auto;
+    /* Hidden, not auto: the pills below size themselves to the terminal, so
+       the carousel can never overflow and never grows a scrollbar. */
+    overflow-x: hidden;
 }
 
-/* Width follows the label so all ten pills fit one row at a normal terminal
-   width; a fixed min-width pushed SLOT 10 out under the scroll bar. */
+/* The pills split the width instead of sizing to their labels, so all ten
+   slots fit whatever the terminal is. Textual's Button also ships
+   min-width: 16, which alone pushed the last pills off the viewport. */
 .slot-chip {
-    width: auto;
-    /* Textual's Button ships min-width: 16, which is wide enough to push the
-       last pills of the carousel past the viewport; override it. */
+    width: 1fr;
     min-width: 0;
     height: 3;
     margin-right: 1;
@@ -1298,6 +1301,7 @@ HelpScreen {
     color: $fg_muted;
     border: solid $border;
     padding: 0;
+    text-align: center;
 }
 
 .slot-chip.slot-chip-active {
@@ -1355,10 +1359,13 @@ HelpScreen {
     width: 1;
 }
 
-/* Chat transcript: user prompt on the right, agent response on the left. */
+/* Chat transcript: user prompt on the right, agent response on the left.
+   It sizes to its own content up to a cap instead of taking 1fr, so an idle
+   slot hands its rows to the log card below instead of leaving a void. */
 .chat-stream {
     width: 100%;
-    height: 1fr;
+    height: auto;
+    max-height: 12;
     background: $bg_base;
     padding: 1 2;
     overflow-y: auto;
@@ -1521,21 +1528,28 @@ HelpScreen {
 }
 
 /* EVENT LOG [SLOT #N] card: header row, the buffer, and the trailing clock. */
+/* The log card is the pane's 1fr child: it takes every row the carousel,
+   header, transcript and composer leave, so the console always fills the
+   screen exactly, and min-height 10 keeps the buffer readable when the
+   terminal is short. */
 .event-log-card {
     layout: vertical;
     width: 100%;
-    height: 10;
+    height: 1fr;
+    min-height: 4;
     background: $bg_overlay;
     border: solid $border;
     padding: 0 1;
-    margin-top: 1;
     margin-bottom: 1;
 }
 
+/* One row, as the mockup draws it: title, slot tag and the Copy ghost share
+   the header line, so the card's floor is 4 rows (2 border + header + clock)
+   and the console still fits a 30-row terminal. */
 .event-log-head {
     layout: horizontal;
     width: 100%;
-    height: 3;
+    height: 1;
     align: left middle;
 }
 

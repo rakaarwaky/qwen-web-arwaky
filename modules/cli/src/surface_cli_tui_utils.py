@@ -202,7 +202,9 @@ class _TuiUtilsMixin:
     _swarm_started_perf: float | None
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
+    query: Any
     query_one: Any
+    screen: Any
     set_timer: Any
     _get_active_slot_id: Any
 
@@ -360,6 +362,33 @@ class _TuiUtilsMixin:
             tabs = self.query_one(TabbedContent)
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
             tab.label = Content.from_text(title)
+
+    # Columns a slot pill needs: the "● SLOT 07" label, its border, and the
+    # one-column gap the mockup puts between pills.
+    _CHIP_COLUMNS = 12
+
+    def _refresh_slot_chips(self) -> None:
+        """Fit every slot carousel to the terminal width.
+
+        The ten pills share the row instead of scrolling, so the label has to
+        give way when the row is narrow: below the width a full "● SLOT 07"
+        needs, the pill keeps its status dot and number and drops the word, so
+        all ten slots stay readable at any size.
+
+        The width comes from the screen, not the carousel's region: a pane
+        that is not on screen has no region yet, and its pills still need the
+        right label for when the user switches to it.
+        """
+        screen_width = self.screen.size.width
+        # .chat-screen pads 2 a side and .slot-carousel pads 1 a side.
+        compact = screen_width - 6 < self._NUM_SLOTS * self._CHIP_COLUMNS
+        for chip in self.query(".slot-chip"):
+            index = str(chip.id).rsplit("-", 1)[-1]
+            try:
+                number = f"{int(index):02d}"
+            except ValueError:
+                continue
+            chip.label = f"● {number}" if compact else f"● SLOT {number}"
 
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(NoMatches):

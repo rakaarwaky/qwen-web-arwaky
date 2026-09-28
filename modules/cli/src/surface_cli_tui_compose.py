@@ -55,6 +55,7 @@ class _TuiComposeMixin:
     _truncate_name: Any
     _flush_metrics: Any
     _refresh_metrics: Any
+    _refresh_slot_chips: Any
     _refresh_nav_dock: Any
 
     # ── Lifecycle ────────────────────────────────────────────────────────
@@ -581,6 +582,7 @@ class _TuiComposeMixin:
         # Redesign v6.5.2: seed the engine readouts so the Overview shows real
         # numbers on first paint rather than placeholders.
         self._flush_metrics()
+        self._refresh_slot_chips()
         # Seed the bottom nav dock to match the initial tab.
         self._refresh_nav_dock()
 
@@ -613,6 +615,9 @@ class _TuiComposeMixin:
 
         # P5: defer RichLog writes until after first paint to avoid overlay glitch.
         self.set_timer(0.4, self._deferred_startup)
+        # The first Resize lands before layout, so the slot pills get one more
+        # pass once their carousel has a measured width.
+        self.set_timer(0.1, self._refresh_slot_chips)
 
     def on_resize(self, _event: events.Resize) -> None:
         """Re-tint the cluster bars once the layout has measured them.
@@ -621,9 +626,12 @@ class _TuiComposeMixin:
         own column count, and that count only exists after the first layout
         pass — and changes whenever the terminal is resized. The repaint is
         routed through the debounced metrics flush, so a drag-resize repaints
-        once at the end instead of on every column.
+        once at the end instead of on every column. The slot pills are
+        relabelled here too: their full "SLOT 07" captions only fit a wide
+        row, so a narrower terminal gets the compact form.
         """
         self._refresh_metrics()
+        self._refresh_slot_chips()
 
     def _deferred_startup(self) -> None:
         """Attach log handler and write initial messages after first paint."""
