@@ -286,10 +286,17 @@ Underline {
 
 /* The engine cards + THREADS MATRIX live in this scroll band so the log
    strip below the band stays inside the tab pane at every terminal size. */
+/* The Overview never scrolls: the mockup is a single screen, and the only
+   scrollbar on it belongs to the log panel. `hidden` rather than `auto`
+   because a scroll container sizes its 1fr children against the container
+   instead of the rows the auto siblings leave over — which is what lets the
+   log card fill the gap exactly. Below the size where the four blocks fit
+   (about 36 rows) the band clips its last block instead of growing a
+   scrollbar. */
 .overview-scroll {
     width: 100%;
     height: 1fr;
-    overflow-y: auto;
+    overflow-y: hidden;
     margin-bottom: 0;
 }
 
@@ -300,7 +307,10 @@ Underline {
    is the card's own content height (2 border + 2 padding + 2 header + 3 log
    rows), so a short terminal scrolls the band rather than flattening the
    panel. */
-.log-card {
+/* Compound selector: .screen-card is declared later in this file, so at equal
+   specificity its `height: auto` would win and the card would size to its
+   content instead of taking the rows the engine cards leave. */
+.screen-card.log-card {
     height: 1fr;
     min-height: 9;
     background: $bg_surface;
