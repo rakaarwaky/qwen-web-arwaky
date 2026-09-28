@@ -140,7 +140,6 @@ class QwenTuiApp(
         self._template_roles: set[str] = set(manifest)
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
-        self._metric_done: Any = None
         self._metric_model: Any = None
         self._metric_swarm_ring: Any = None
         self._metric_swarm_detail: Any = None

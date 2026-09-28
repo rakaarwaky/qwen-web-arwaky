@@ -73,26 +73,23 @@ Typography conventions:
 
 ## 3. Tab 1 — Overview (`tab-overview`)
 
-Vertical stack inside `.overview-container` (padding 1×2×0×2). Everything
-except the log strip lives in `.overview-scroll` (height 1fr, `overflow-y:
-auto`); the log strip is pinned below the band so it stays inside the pane at
-every terminal size.
+Brand row (`>_ QWEN-CLI` + version chip), then every block in the mockup's
+order inside one scroll band (`.overview-scroll`, `height: 1fr`,
+`overflow-y: auto`). The band is the only element that gives up rows on a
+short terminal, so the log card keeps its height at every size.
 
-1. **Telemetry card** (`.screen-card.metric-card`, `bg_overlay`, bordered, no
-   vertical padding → 4 rows) holding two `bg_raised` tiles split by a
+1. **Telemetry banner** (`.screen-card.metric-card`, `bg_overlay`, bordered,
+   no vertical padding → 4 rows) holding two `bg_raised` tiles split by a
    one-column gap:
    - **Tile 1** — caption `● ACTIVE ACCOUNTS` (`#metric-active-label`) over
      value `#metric-active` (bare RUNNING-slot count) plus the unit label
      `Active`.
    - **Tile 2** — caption `⊕ MODEL` (`#metric-model-label`) over
-     `#metric-model`, with the telemetry cluster (`.metric-cluster`) on the
-     value row: `SLOTS` / `#metric-slots` (10), `DONE` / `#metric-done`
-     (SUCCESS+FAILED count), `SESSION` / `#session-badge`. Badge states:
-     `CHECKING…` → `VALID` (green) / `EXPIRED` (warn class) / `TIMEOUT`
-     (15s timeout) / `LOGGING IN…` / `N/A`.
-2. **Engine card ×2** (`.screen-card.engine-card`, 7 rows each): card title
-   (`⌬ Swarm Status` / `💬 Chat Status`, carrying `#metric-swarm-label` /
-   `#metric-threads-label`) over a 3-row readout row:
+     `#metric-model`, printed in `primary_fixed` (`#c4e7ff`).
+2. **Engine card ×2** (`.screen-card.engine-card`, 7 rows each): icon chip
+   (`.card-icon`) plus the card title (`#metric-swarm-label` /
+   `#metric-threads-label`), the inset bento (`.engine-bento`, 3 rows) and the
+   per-slot cluster bar.
    - **Ring** (`#metric-swarm-ring` / `#metric-threads-ring`) — accent-bordered
      box holding the `n/m` count (swarm agents / slot threads).
    - **Detail** — `Idle` or `N Running` (`#metric-swarm-detail`); the chat card
@@ -101,24 +98,19 @@ every terminal size.
    - **Uptime** (swarm card only, `#metric-swarm-uptime`) — right-aligned;
      `Uptime Elapsed —` while idle, split onto two lines
      (`Uptime Elapsed` / `21m 53s`) once a run is live.
-   - **Cluster bar** (`#metric-swarm-bar` / `#metric-threads-bar`) — one tinted
-     segment per slot stretched across the card, re-tinted on resize from the
-     bar's own width.
-3. **Label**: `≡ THREADS MATRIX` (`.section-label`).
-4. **Threads matrix** (`#threads-matrix`, 2-column grid, `grid-gutter: 1 1`) —
-   one cell per job slot: `#thread-state-N` (`Ready` / `Streaming` / `Done` /
-   `Failed` / `Cancelled` / `Stopping`, tinted per state) and
-   `#thread-duration-N` (elapsed, right-aligned). Cells mount once and update
-   in place.
-5. **Slots table** (`#slots-table`, DataTable) — below the matrix, reachable by
-   scrolling the band.
-   - Columns: `Slot` | `Status` | `Prompt File` | `Duration`
-   - One row per slot; status cell uses table format (section 8); duration
-     ticks every 5s while running (`12s`, `1m 5s`).
-6. **Pane title row**: `System Event Log` + button **`📋 Copy`**
-   (`btn-copy-log`, 1-row height, accent text on `bg_base`).
-7. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
-   lines, bordered, height 4 = 2 content rows).
+   - **Cluster bar** (`#metric-swarm-bar` / `#metric-threads-bar`) — one
+     tinted segment per job slot stretched across the card. This bar is the
+     per-slot indicator: each segment recolours with its slot's state, and it
+     re-tints on resize from the bar's own width.
+3. **System Event Log card** (`.screen-card.log-card`, `bg_surface`): header
+   row (`● [ SYSTEM EVENT LOG ]` … `● LIVE STREAM` + the `Copy` button
+   `#btn-copy-log`) over `#log-view-overview` (RichLog, wrap, auto-scroll,
+   2000 lines, `height: 7` → 6 content rows).
+
+Session state is no longer a badge on the Overview: `_check_session` writes
+the verdict (`VALID` / `EXPIRED` / `N/A` / `TIMEOUT`) to this log and to
+`_last_session_state`, and the Sessions screen carries the per-account health
+state.
 
 Startup message in log: `Qwen Web Automation TUI initialized with multi-slot
 architecture.` / `Each slot runs an independent Chromium process sharing

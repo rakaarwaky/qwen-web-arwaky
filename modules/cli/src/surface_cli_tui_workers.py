@@ -71,7 +71,6 @@ class _TuiWorkersMixin:
     _set_slot_tab_title: Any
     _truncate_name: Any
     _update_slot_status: Any
-    _update_table_row: Any
     _refresh_metrics: Any
     _format_status: Any
     _format_event_status: Any
@@ -141,7 +140,6 @@ class _TuiWorkersMixin:
             "event": "EVENT_WEB_LOADED",
             "_start_perf": time.perf_counter(),
         }
-        self._update_table_row(slot_id, self._format_status("RUNNING", "table"), p_name, "running…")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
@@ -187,7 +185,6 @@ class _TuiWorkersMixin:
             "event": "EVENT_WEB_LOADED",
             "_start_perf": time.perf_counter(),
         }
-        self._update_table_row(slot_id, self._format_status("RUNNING", "table"), filename, "running…")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
@@ -235,12 +232,6 @@ class _TuiWorkersMixin:
         # U1: show CANCELLING intermediate status while browser process stops
         self._update_slot_status(slot_id, self._format_status("CANCELLING", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} {self._format_status('CANCELLING', 'badge')}")
-        self._update_table_row(
-            slot_id,
-            self._format_status("CANCELLING", "table"),
-            self._slot_stats[slot_id].get("file", "-"),
-            "stopping…",
-        )
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
         # AR-2/FE-1: cancel only this slot's run via its own cancel event.
         # Sibling slots' browser contexts are untouched.
@@ -260,8 +251,6 @@ class _TuiWorkersMixin:
         self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ●")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
-        file_name = self._slot_stats[slot_id]["file"]
-        self._update_table_row(slot_id, self._format_status("CANCELLED", "table"), file_name, "stopped")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -288,31 +277,14 @@ class _TuiWorkersMixin:
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
         self._update_slot_status(slot_id, self._format_status(status, "badge"))
-        self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")
         with contextlib.suppress(NoMatches):
             self.query_one(f"#btn-retry-{slot_id}").display = status == "FAILED"
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
-    def _tick_elapsed(self, slot_id: int) -> None:
-        """U4: update the Duration column with live elapsed time."""
-        stats = self._slot_stats.get(slot_id)
-        if stats is None or stats.get("status") != "RUNNING":
-            return
-        elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
-        label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
-        event = stats.get("event")
-        status_text = self._format_event_status(event, "table") if event else self._format_status("RUNNING", "table")
-        self._update_table_row(
-            slot_id,
-            status_text,
-            stats.get("file", "-"),
-            label,
-        )
-
     def _update_slot_event_status(self, slot_id: int, event_name: str) -> None:
-        """Render the current pipeline event on the slot badge and table.
+        """Render the current pipeline event on the slot badge.
 
         Called from the worker thread via ``call_from_thread``; only updates
         the UI while the slot is still RUNNING so a stale event cannot
@@ -321,15 +293,7 @@ class _TuiWorkersMixin:
         stats = self._slot_stats.get(slot_id)
         if stats is None or stats.get("status") != "RUNNING":
             return
-        elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
-        dur_label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
         self._update_slot_status(slot_id, self._format_event_status(event_name, "badge"))
-        self._update_table_row(
-            slot_id,
-            self._format_event_status(event_name, "table"),
-            stats.get("file", "-"),
-            dur_label,
-        )
 
     # ── Adaptive Swarm run / cancel ──────────────────────────────────────
 
@@ -408,31 +372,6 @@ class _TuiWorkersMixin:
             self._swarm_started_perf = None
             self.call_from_thread(self._refresh_metrics)
 
-    def _install_slot_ticker(self, slot_id: int) -> list[Any]:
-        """Start the 5s elapsed-time ticker for a running slot.
-
-        ``set_interval`` belongs to the event loop thread, so the worker
-        thread queues the installation. ``call_from_thread`` blocks until the
-        callback has run, which is what makes returning the holder safe: the
-        caller's ``finally`` can stop the timer immediately after.
-        """
-        holder: list[Any] = []
-
-        def _create_timer() -> None:
-            holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
-
-        self.call_from_thread(_create_timer)
-        return holder
-
-    @staticmethod
-    def _stop_slot_ticker(holder: list[Any]) -> None:
-        """Stop a ticker started by :meth:`_install_slot_ticker`, if any."""
-        if holder:
-            # Stopping a timer is thread-safe, but keep the call off the
-            # worker's failure path: a dead handle must not mask the result.
-            with contextlib.suppress(Exception):
-                holder[0].stop()
-
     def _observe_slot_event(self, slot_id: int) -> Any:
         """Build the lifecycle observer that mirrors pipeline events into the UI."""
 
@@ -464,8 +403,6 @@ class _TuiWorkersMixin:
         start_t = time.perf_counter()
         # U7: capture the generation at worker start for finalize guard
         gen = self._slot_generation.get(slot_id, 0)
-        # U4: start periodic elapsed-time updater via call_from_thread
-        timer_holder = self._install_slot_ticker(slot_id)
         _on_event = self._observe_slot_event(slot_id)
 
         try:
@@ -517,8 +454,6 @@ class _TuiWorkersMixin:
                 slot_id,
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
-        finally:
-            self._stop_slot_ticker(timer_holder)
 
     @work(thread=True)
     def _execute_direct_worker(
@@ -540,7 +475,6 @@ class _TuiWorkersMixin:
         filename = self._truncate_name(prompt, 24)
         start_t = time.perf_counter()
         gen = self._slot_generation.get(slot_id, 0)
-        timer_holder = self._install_slot_ticker(slot_id)
         _on_event = self._observe_slot_event(slot_id)
 
         self.call_from_thread(
@@ -583,8 +517,6 @@ class _TuiWorkersMixin:
                 slot_id,
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
-        finally:
-            self._stop_slot_ticker(timer_holder)
 
 
 __all__ = ["_TuiWorkersMixin"]

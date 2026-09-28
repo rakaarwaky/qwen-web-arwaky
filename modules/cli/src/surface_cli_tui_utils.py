@@ -20,7 +20,6 @@ from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.content import Content
 from textual.css.query import NoMatches
 from textual.widgets import Button, DataTable, Label, Static, TabbedContent
-from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
@@ -184,7 +183,6 @@ class _TuiUtilsMixin:
     _slot_stats: dict[int, dict[str, Any]]
     _metrics_pending: bool
     _metric_active: Any
-    _metric_done: Any
     _metric_model: Any
     _metric_swarm_ring: Any
     _metric_swarm_detail: Any
@@ -207,79 +205,6 @@ class _TuiUtilsMixin:
     query_one: Any
     set_timer: Any
     _get_active_slot_id: Any
-
-    # ── Overview table ───────────────────────────────────────────────────
-
-    # T1: columns are addressed by stable KEYS, never by labels. Textual's
-    # add_columns("Status") auto-generates a ColumnKey, so update_cell(row,
-    # "Status") raises CellDoesNotExist and every write is a silent no-op.
-    COL_SLOT = "slot"
-    COL_STATUS = "status"
-    COL_FILE = "file"
-    COL_DURATION = "duration"
-
-    def _init_table(self) -> None:
-        with contextlib.suppress(NoMatches):
-            table = self.query_one("#slots-table", DataTable)
-            table.add_columns(
-                ("Slot", self.COL_SLOT),
-                ("Status", self.COL_STATUS),
-                ("Prompt File", self.COL_FILE),
-                ("Duration", self.COL_DURATION),
-            )
-            for s in range(1, self._NUM_SLOTS + 1):
-                table.add_row(f"Slot {s}", self._format_status("IDLE", "table"), "-", "0.0s", key=f"row-slot-{s}")
-
-    def _init_threads_matrix(self) -> None:
-        """Seed the Overview THREADS MATRIX with one cell per job slot.
-
-        The mockup draws the matrix as the Overview's main content: a
-        two-column grid of numbered cells, each showing the thread's state
-        and elapsed time. Cells mount once and carry stable ids so
-        _update_threads_matrix rewrites them in place instead of remounting,
-        which would drop the user's scroll position on every metrics tick.
-        """
-        with contextlib.suppress(NoMatches):
-            grid = self.query_one("#threads-matrix", Vertical)
-            grid.mount(
-                *(
-                    Horizontal(
-                        Label(f"{slot:02d}", classes="thread-chip"),
-                        Label(
-                            _thread_state("IDLE")[0],
-                            id=f"thread-state-{slot}",
-                            classes="thread-state",
-                        ),
-                        Static("", classes="thread-spacer"),
-                        Label("0.0s", id=f"thread-duration-{slot}", classes="thread-duration"),
-                        classes="thread-cell",
-                    )
-                    for slot in range(1, self._NUM_SLOTS + 1)
-                )
-            )
-
-    def _update_threads_matrix(self, slot_id: int, status: str, duration: str) -> None:
-        """Write one THREADS MATRIX cell (state label, elapsed time).
-
-        The state label is colourised by wrapping it in the Rich style the
-        mockup pairs with that state (cyan for streaming, green for done, grey
-        for ready), so a glance at the matrix reads the same way the mockup's
-        cells do.
-        """
-        with contextlib.suppress(NoMatches):
-            state_label, state_color = _thread_state(status)
-            self.query_one(f"#thread-state-{slot_id}", Label).update(
-                Text(state_label, style=state_color),
-            )
-            self.query_one(f"#thread-duration-{slot_id}", Label).update(duration)
-
-    def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
-        with contextlib.suppress(NoMatches, CellDoesNotExist):
-            table = self.query_one("#slots-table", DataTable)
-            row_key = f"row-slot-{slot_id}"
-            table.update_cell(row_key, self.COL_STATUS, status)
-            table.update_cell(row_key, self.COL_FILE, filename)
-            table.update_cell(row_key, self.COL_DURATION, duration)
 
     def _init_swarm_table(self) -> None:
         with contextlib.suppress(NoMatches):
@@ -330,14 +255,11 @@ class _TuiUtilsMixin:
         stats = getattr(self, "_slot_stats", {})
         n_slots = getattr(self, "_NUM_SLOTS", 0)
         active = sum(1 for s in stats.values() if s.get("status") == "RUNNING")
-        done = sum(1 for s in stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
         idle = sum(1 for s in stats.values() if s.get("status") == "IDLE")
 
         with contextlib.suppress(NoMatches):
             if self._metric_active is not None:
                 self._metric_active.update(f"{active}")
-            if self._metric_done is not None:
-                self._metric_done.update(f"{done}")
         with contextlib.suppress(NoMatches):
             swarm_ring = getattr(self, "_metric_swarm_ring", None)
             if swarm_ring is not None:
@@ -373,13 +295,6 @@ class _TuiUtilsMixin:
             threads_bar = getattr(self, "_metric_threads_bar", None)
             if threads_bar is not None:
                 threads_bar.update(_cluster_bar_markup(n_slots, stats, threads_bar.region.width))
-        # Per-slot state for the THREADS MATRIX — one cell per job slot.
-        with contextlib.suppress(NoMatches):
-            for s in range(1, n_slots + 1):
-                slot = stats.get(s, {"status": "IDLE", "duration": 0.0})
-                status = str(slot.get("status", "IDLE"))
-                duration = float(slot.get("duration", 0.0))
-                self._update_threads_matrix(s, status, _format_thread_duration(duration))
 
     # ── Swarm engine readout ─────────────────────────────────────────────
 

@@ -24,6 +24,10 @@ from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
 from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
 
+# The dock's active marker: a short accent bar centred over the active
+# section, the way the mockup draws it.
+NAV_ACTIVE_MARKER = "━━━"
+
 
 class _TuiHandlersMixin:
     """Mixin that owns all Textual event handlers and action bindings."""
@@ -43,6 +47,7 @@ class _TuiHandlersMixin:
     _cancel_slot: Any
     _append_chat_message: Any
     _run_composer_slot: Any
+    query: Any
     query_one: Any
     _log_msg: Any
     copy_to_clipboard: Any
@@ -228,6 +233,28 @@ class _TuiHandlersMixin:
             if active_btn is not None:
                 active_btn.set_class(False, "nav-inactive")
                 active_btn.set_class(True, "nav-active")
+            self._refresh_nav_marker(active)
+
+    def _refresh_nav_marker(self, active_tab: str) -> None:
+        """Move the dock's accent bar over the cell that is now active.
+
+        The mockup marks the active section with a short bar centred above
+        its icon rather than a hairline across the whole cell, so the bar
+        lives in its own strip whose 1fr cells line up with the buttons.
+        """
+        with contextlib.suppress(Exception):
+            bars = {
+                "tab-overview": "#nav-bar-overview",
+                "tab-sessions": "#nav-bar-login",
+                "tab-swarm": "#nav-bar-swarm",
+                "tab-settings": "#nav-bar-settings",
+            }
+            slot_tab = active_tab.startswith("tab-slot-")
+            target = bars.get(active_tab, "#nav-bar-chat" if slot_tab else None)
+            for bar in self.query(".nav-bar"):
+                is_target = f"#{bar.id}" == target
+                bar.set_class(is_target, "nav-bar-active")
+                bar.update(NAV_ACTIVE_MARKER if is_target else "")
 
     def _nav_dock_go(self, button_id: str) -> None:
         """Switch the tab bar to whichever section a bottom nav item points at.

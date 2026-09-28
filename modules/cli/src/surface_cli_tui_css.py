@@ -27,6 +27,7 @@ _COLORS: dict[str, str] = {
     "bg_overlay": "#181c24",  # surface-container-low
     "bg_hover": "#262a33",  # surface-container-high
     "bg_active": "#31353e",  # surface-container-highest
+    "primary_fixed": "#c4e7ff",  # primary-fixed
     "border": "#3e484f",  # outline-variant
     # Status colors (mapped from material error/tertiary/primary tokens)
     "status_ok": "#56e5a9",  # tertiary
@@ -93,11 +94,15 @@ Screen {
     width: auto;
 }
 
+/* The mockup's version chip: a surface-container-high block with a hairline
+   border. A one-row cell cannot carry a border, so the chip reads through its
+   background alone. */
 .app-brand-version {
     color: $status_muted;
     background: $bg_hover;
     width: auto;
     height: 1;
+    margin-left: 1;
     padding: 0 1;
 }
 
@@ -142,31 +147,53 @@ Underline {
 /* --- Bottom nav dock (redesign v6.5.2) -------------------------------- */
 /* The mockup's dock replaces the key-hint Footer: five equal cells spread
    across the full width, each stacking its icon above its caption, with the
-   active cell marked by a cyan hairline. dock: bottom takes the dock out of
-   the flow, so it costs no layout rows and the Overview keeps its table/log
-   geometry (tests/unit_tui_log_containment.py). */
+   active cell carrying a short accent bar centred over its icon. dock: bottom
+   takes the dock out of the flow, so it costs no layout rows and the Overview
+   keeps its card/log geometry (tests/unit_tui_log_containment.py). */
 .nav-dock {
-    layout: horizontal;
+    layout: vertical;
     height: 4;
     dock: bottom;
     background: $bg_surface;
     border-top: solid $border;
     padding: 0 1;
-    align: center middle;
 }
 
-/* One icon-over-label cell. The top hairline is the active marker, so every
-   cell keeps a hairline of the dock colour instead of no border at all —
-   otherwise an inactive cell would have a third content row and its icon
-   would sit one row above the active cell's. The two content rows are
-   exactly the icon and the caption, with no room left for padding. */
+/* The marker strip: one 1fr cell per nav item, so a bar sits exactly over
+   the button below it. A terminal cannot centre a bar inside a bordered
+   button, so the strip carries it instead. */
+.nav-bar-strip {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+}
+
+.nav-bar {
+    width: 1fr;
+    height: 1;
+    content-align: center middle;
+    color: $accent;
+}
+
+.nav-bar-active {
+    text-style: bold;
+}
+
+/* The five cells share one row so their 1fr widths line up with the marker
+   strip above. */
+.nav-items {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+}
+
+/* One icon-over-label cell: the icon row sits above the caption. */
 .nav-item {
     width: 1fr;
     min-width: 8;
-    height: 3;
+    height: 2;
     padding: 0;
     border: none;
-    border-top: solid $bg_surface;
     background: $bg_surface;
     color: $fg_muted;
     text-style: bold;
@@ -176,7 +203,6 @@ Underline {
 
 .nav-item.nav-active {
     color: $fg_accent;
-    border-top: solid $accent;
 }
 
 .nav-item.nav-inactive {
@@ -266,15 +292,66 @@ Underline {
     overflow-y: auto;
     margin-bottom: 0;
 }
-/* Border-box height: the two border rows and the horizontal padding come out
-   of `height`, so 4 leaves two content rows — enough to keep the last event
-   visible without stealing the row the THREADS MATRIX needs above the fold. */
+
+/* Realtime System Log card: the mockup's bordered panel with a header row
+   (live pips + LIVE STREAM) above the stream itself. */
+.log-card {
+    background: $bg_surface;
+    margin-bottom: 0;
+}
+
+/* Height 2 because Textual's height is border-box: the hairline takes one
+   row and the header text the other. */
+.log-card-head {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    padding: 0 1;
+    border-bottom: solid $border;
+    align: left middle;
+}
+
+.log-pip {
+    width: auto;
+    margin-right: 1;
+    text-style: bold;
+}
+
+.log-pip-live {
+    color: $status_ok;
+}
+
+.log-pip-stream {
+    color: $accent;
+    margin-left: 2;
+}
+
+.log-card-title {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.log-live-label {
+    width: auto;
+    color: $fg_muted;
+}
+
+.log-head-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+/* The card carries the border, so the view only paints the stream rows.
+   Textual's height is border-box: 7 leaves six content rows, the mockup's
+   log depth, and min-height 3 keeps the panel visible on a 20-row terminal
+   (tests/unit_tui_log_containment.py). */
 #log-view-overview {
-    height: 4;
+    height: 7;
     min-height: 3;
     max-width: 100%;
-    background: $bg_base;
-    border: solid $border;
+    background: transparent;
+    border: none;
     color: $fg_primary;
     padding: 0 1;
     overflow-x: hidden;
@@ -297,20 +374,6 @@ Underline {
     margin-right: 3;
     color: $fg_primary;
     text-style: bold;
-}
-
-/* The Overview's slot table lives below the THREADS MATRIX. It carries the
-   per-slot prompt file and exact pipeline status that the matrix's one-word
-   state does not. Fixed height = 5 (1 header + 4 data rows) so its content
-   actually renders instead of collapsing to a header-only band — see tests
-   for the regression lock that the log panel must remain visible at every
-   terminal size. */
-#slots-table {
-    height: 5;
-    background: $bg_surface;
-    border: solid $border;
-    margin-bottom: 1;
-    overflow-y: scroll;
 }
 
 .template-row {
@@ -486,17 +549,6 @@ Switch.-on {
 .status-badge {
     color: $status_ok;
     text-style: bold;
-}
-
-#session-badge {
-    color: $status_ok;
-    text-style: bold;
-    background: $bg_base;
-    padding: 0 1;
-}
-
-#session-badge.invalid {
-    color: $status_warn;
 }
 
 /* --- Modal File Picker -------------------------------------------------- */
@@ -745,13 +797,31 @@ HelpScreen {
     margin-bottom: 1;
 }
 
-/* Card heading ("Swarm Status", "Chat Status") with the mockup's icon chip
-   prefix. Height 1 keeps the heading on its own row so the ring readout
-   below it starts at a predictable offset. */
-.card-title {
+/* Card heading row: the mockup puts the section icon in a rounded chip on
+   the left, then the heading beside it. The chip is roughly one text row tall
+   in the mockup, so it is a padded accent glyph rather than a 3-row box —
+   that keeps the whole card at the mockup's seven rows. */
+.card-title-row {
+    layout: horizontal;
     width: 100%;
     height: 1;
-    margin-bottom: 0;
+    padding: 0 1;
+    align: left middle;
+}
+
+.card-icon {
+    width: auto;
+    height: 1;
+    margin-right: 1;
+    padding: 0 1;
+    color: $accent;
+    background: $bg_raised;
+    text-style: bold;
+}
+
+.card-title {
+    width: auto;
+    height: 1;
     color: $fg_primary;
     text-style: bold;
 }
@@ -807,13 +877,17 @@ HelpScreen {
     content-align: right middle;
 }
 
-/* Ring gauge row: the ring is a bordered 3-row box, so the row matches it
-   and every readout centres against it. */
-.engine-readout {
+/* The mockup's telemetry bento: an inset surface-container panel holding the
+   ring, its caption and the trailing uptime block. It is one row taller than
+   a bare border would allow, so the panel is drawn with its own background
+   instead of a border — the colour step is what makes it read as inset. */
+.engine-bento {
     layout: horizontal;
     width: 100%;
     height: 3;
-    margin: 0;
+    margin: 0 1;
+    background: $bg_raised;
+    padding: 0 1;
     align: left middle;
 }
 
@@ -896,62 +970,6 @@ HelpScreen {
 
 .cluster-seg-idle {
     color: $status_muted;
-}
-
-/* Threads Matrix: the mockup draws it as a two-column grid of numbered
-   cells (01 Streaming 4m12s | 02 Ready 8m45s) rather than a scrollable
-   table, so the container is a grid whose ten cells mount once and update in
-   place — remounting on a metrics tick would drop the user's scroll. It
-   sizes to its content; the free space stays below it, as in the mockup. */
-#threads-matrix {
-    layout: grid;
-    grid-size: 2;
-    grid-columns: 1fr 1fr;
-    /* Row and column gutters separate the cells the way the mockup spaces
-       them. Cell margins cannot do it: a grid auto-track subtracts a child's
-       margin from its height, which collapses a 1-row cell to nothing. */
-    grid-gutter: 1 1;
-    width: 100%;
-    height: auto;
-    margin-bottom: 1;
-}
-
-.threads-grid {
-    background: $bg_base;
-}
-
-/* One cell: number chip, tinted state, and the elapsed time pushed to the
-   cell's trailing edge. */
-.thread-cell {
-    layout: horizontal;
-    width: 100%;
-    height: 1;
-    padding: 0 1;
-    background: $bg_raised;
-    align: left middle;
-}
-
-.thread-chip {
-    width: auto;
-    margin-right: 1;
-    padding: 0 1;
-    background: $bg_base;
-    color: $fg_primary;
-    text-style: bold;
-}
-
-.thread-state {
-    width: auto;
-}
-
-.thread-spacer {
-    width: 1fr;
-    height: 1;
-}
-
-.thread-duration {
-    width: auto;
-    color: $fg_muted;
 }
 
 .card-caption {
@@ -1080,46 +1098,15 @@ HelpScreen {
     color: $fg_muted;
 }
 
-/* The model tile is the trailing one: it holds the telemetry cluster on its
-   right edge instead of stopping at its own value, so the card reads as two
-   tiles the way the mockup does. */
+/* The model tile is the trailing one, so it carries no gap on its right. */
 .metric-tile-model {
-    layout: horizontal;
     margin-right: 0;
-    align: left middle;
 }
 
-.metric-tile-body {
-    layout: vertical;
-    width: 1fr;
-    height: auto;
-    align: left middle;
-}
-
-/* The trailing telemetry block. A horizontal container aligns its children as
-   one group, so the group's own top margin is what lands the block on the
-   tile's second row: its counts then sit on the same line as the tile values
-   instead of floating between the caption and the value. */
-.metric-cluster {
-    layout: horizontal;
-    width: auto;
-    height: 1;
-    margin-left: 1;
-    margin-top: 1;
-    align: left middle;
-}
-
-.cluster-key {
-    width: auto;
-    color: $fg_muted;
-    margin-right: 1;
-}
-
-.cluster-val {
-    width: auto;
-    color: $fg_primary;
-    text-style: bold;
-    margin-right: 2;
+/* The mockup prints the routed model in primary-fixed, the one tinted
+   monospace value in the banner. */
+.metric-tile-model-value {
+    color: $primary_fixed;
 }
 
 /* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). The overview strip is

@@ -46,13 +46,11 @@ class _TuiComposeMixin:
     _log_handler: logging.Handler
 
     # Stubs for methods provided by other mixins / App at runtime.
-    _init_table: Any
     _init_swarm_table: Any
-    _init_threads_matrix: Any
     query_one: Any
     set_timer: Any
     _log_msg: Any
-    _refresh_session_badge: Any
+    _check_session: Any
     _format_status: Any
     _truncate_name: Any
     _flush_metrics: Any
@@ -83,16 +81,15 @@ class _TuiComposeMixin:
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
-                # The engine cards and the THREADS MATRIX live in their own
-                # scroll band. The System Event Log strip stays outside it so
-                # the panel keeps real estate on short terminals —
-                # tests/unit_tui_log_containment.py and
-                # tests/unit_surface_cli_tui_app.py both gate on the log
-                # staying inside the tab pane at every size.
+                # Every Overview block lives in one scroll band, in the
+                # mockup's order: telemetry banner, swarm card, chat card, log
+                # card. The band is the only element that gives up rows on a
+                # short terminal, so the log panel keeps its height at every
+                # size — tests/unit_tui_log_containment.py and
+                # tests/unit_surface_cli_tui_app.py both gate on that.
                 with Vertical(id="overview-cards", classes="overview-scroll"):
-                    # Telemetry banner: two raised tiles (ACTIVE ACCOUNTS,
-                    # MODEL) with the SLOTS / DONE / SESSION cluster tucked
-                    # into the right tile, mirroring the mockup's card.
+                    # Telemetry banner: two raised tiles, the mockup's
+                    # ACTIVE ACCOUNTS count and the routed model name.
                     with Vertical(classes="screen-card metric-card"), Horizontal(classes="metric-tiles"):
                         with Vertical(classes="metric-tile"):
                             yield Label(
@@ -103,23 +100,21 @@ class _TuiComposeMixin:
                             with Horizontal(classes="metric-tile-value"):
                                 yield Label("0", id="metric-active", classes="metric-tile-number")
                                 yield Label("Active", classes="metric-tile-unit")
-                        with Horizontal(classes="metric-tile metric-tile-model"):
-                            with Vertical(classes="metric-tile-body"):
-                                yield Label("⊕ MODEL", id="metric-model-label", classes="metric-tile-label")
-                                yield Label(DEFAULT_MODEL, id="metric-model", classes="metric-tile-number")
-                            with Horizontal(classes="metric-cluster"):
-                                yield Label("SLOTS", id="metric-slots-label", classes="cluster-key")
-                                yield Label(f"{self._NUM_SLOTS}", id="metric-slots", classes="cluster-val")
-                                yield Label("DONE", id="metric-done-label", classes="cluster-key")
-                                yield Label("0", id="metric-done", classes="cluster-val")
-                                yield Label("SESSION", id="metric-session-label", classes="cluster-key")
-                                yield Label("CHECKING…", id="session-badge", classes="cluster-badge")
+                        with Vertical(classes="metric-tile metric-tile-model"):
+                            yield Label("⊕ MODEL", id="metric-model-label", classes="metric-tile-label")
+                            yield Label(
+                                DEFAULT_MODEL,
+                                id="metric-model",
+                                classes="metric-tile-number metric-tile-model-value",
+                            )
 
-                    # Swarm Status card: title chip, ring gauge, state readout,
-                    # trailing uptime, and the full-width cluster bar.
+                    # Swarm Status card: icon chip + title, the inset bento
+                    # (ring, state, uptime) and the per-slot cluster bar.
                     with Vertical(classes="screen-card engine-card"):
-                        yield Label("⌬ Swarm Status", id="metric-swarm-label", classes="card-title")
-                        with Horizontal(classes="engine-readout"):
+                        with Horizontal(classes="card-title-row"):
+                            yield Static("⌬", classes="card-icon")
+                            yield Label("Swarm Status", id="metric-swarm-label", classes="card-title")
+                        with Horizontal(classes="engine-bento"):
                             yield Label("0/0", id="metric-swarm-ring", classes="engine-ring")
                             yield Label("Idle", id="metric-swarm-detail", classes="engine-detail")
                             yield Static("", classes="engine-spacer")
@@ -135,10 +130,12 @@ class _TuiComposeMixin:
                             markup=True,
                         )
 
-                    # Chat / Threads Status card: title, ring, running split.
+                    # Chat / Threads Status card: same shape, no uptime block.
                     with Vertical(classes="screen-card engine-card"):
-                        yield Label("💬 Chat Status", id="metric-threads-label", classes="card-title")
-                        with Horizontal(classes="engine-readout"):
+                        with Horizontal(classes="card-title-row"):
+                            yield Static("💬", classes="card-icon")
+                            yield Label("Chat Status", id="metric-threads-label", classes="card-title")
+                        with Horizontal(classes="engine-bento"):
                             yield Label("0/0", id="metric-threads-ring", classes="engine-ring")
                             with Vertical(classes="engine-body"):
                                 yield Label("Active Threads", classes="engine-sub")
@@ -154,25 +151,30 @@ class _TuiComposeMixin:
                             markup=True,
                         )
 
-                    # THREADS MATRIX: the mockup's two-column cell grid.
-                    yield Label("≡ THREADS MATRIX", id="threads-matrix-label", classes="section-label")
-                    yield Vertical(id="threads-matrix", classes="threads-grid")
-
-                    # Job slot table: per-slot prompt file and exact status.
-                    yield DataTable(id="slots-table")
-
-                # System Event Log strip (pinned below the scroll band).
-                with Horizontal(classes="pane-title-compact"):
-                    yield Label("System Event Log", classes="field-label")
-                    yield Button("Copy", id="btn-copy-log", classes="btn-copy-log", variant="default")
-                yield QwenTuiRichLog(
-                    id="log-view-overview",
-                    highlight=True,
-                    markup=True,
-                    max_lines=2000,
-                    auto_scroll=True,
-                    wrap=True,
-                )
+                    # System Event Log: the mockup's bordered card with a
+                    # LIVE STREAM marker. The Copy button stays because
+                    # action_copy_active_log is bound to it.
+                    with Vertical(classes="screen-card log-card"):
+                        with Horizontal(classes="log-card-head"):
+                            yield Static("●", classes="log-pip log-pip-live")
+                            yield Label("[ SYSTEM EVENT LOG ]", classes="log-card-title", markup=False)
+                            yield Static("", classes="log-head-spacer")
+                            yield Static("●", classes="log-pip log-pip-stream")
+                            yield Label("LIVE STREAM", classes="log-live-label")
+                            yield Button(
+                                "Copy",
+                                id="btn-copy-log",
+                                classes="btn-copy-log",
+                                variant="default",
+                            )
+                        yield QwenTuiRichLog(
+                            id="log-view-overview",
+                            highlight=True,
+                            markup=True,
+                            max_lines=2000,
+                            auto_scroll=True,
+                            wrap=True,
+                        )
 
             # ─── Screen 2: Login / Session Manager ───────────────
             with TabPane("Sessions", id="tab-sessions"), Vertical(classes="screen-body"):
@@ -543,24 +545,30 @@ class _TuiComposeMixin:
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no
-        # key-hint line: the icon row sits above the caption, and the active
-        # cell is marked by a cyan hairline over its top edge.
+        # key-hint line. The strip above them holds the active marker: a short
+        # accent bar centred over the active cell, the way the mockup draws it
+        # instead of a full-width hairline. Each bar cell is 1fr, so it lines
+        # up with the button below it.
         with Horizontal(id="nav-dock", classes="nav-dock"):
-            yield Button("▦\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
-            yield Button("⚿\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
-            yield Button("▣\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
-            yield Button("⚯\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
-            yield Button("⚙\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
+            with Horizontal(classes="nav-bar-strip"):
+                yield Static("━━━", id="nav-bar-overview", classes="nav-bar nav-bar-active")
+                yield Static("", id="nav-bar-login", classes="nav-bar")
+                yield Static("", id="nav-bar-chat", classes="nav-bar")
+                yield Static("", id="nav-bar-swarm", classes="nav-bar")
+                yield Static("", id="nav-bar-settings", classes="nav-bar")
+            with Horizontal(classes="nav-items"):
+                yield Button("▦\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
+                yield Button("⚿\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
+                yield Button("▣\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
+                yield Button("⚯\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
+                yield Button("⚙\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""
-        self._init_table()
-        self._init_threads_matrix()
         self._init_swarm_table()
 
         # P3: cache metric widget refs once; no per-call DOM lookups.
         self._metric_active = self.query_one("#metric-active", Label)
-        self._metric_done = self.query_one("#metric-done", Label)
         self._metric_model = self.query_one("#metric-model", Label)
         self._metric_swarm_ring = self.query_one("#metric-swarm-ring", Label)
         self._metric_swarm_detail = self.query_one("#metric-swarm-detail", Label)
@@ -645,7 +653,7 @@ class _TuiComposeMixin:
                 log_view = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
                 log_view.auto_scroll = True
 
-        self._refresh_session_badge()
+        self._check_session()
 
     def on_unmount(self) -> None:
         """Detach the TUI log handler and cancel running slot workers."""

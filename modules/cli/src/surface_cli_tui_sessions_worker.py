@@ -1,11 +1,11 @@
-"""Session, badge, and login workers for the Qwen TUI application.
+"""Session and login workers for the Qwen TUI application.
 
 Surface layer (surface_cli): Mixin providing the ``@work(thread=True)``
-workers that validate the stored session, refresh the session badge, load
-the account pool into the Sessions screen, and run health checks. Splitting
-them from :class:`~modules.cli.src.surface_cli_tui_workers._TuiWorkersMixin`
-keeps that file on slot/swarm execution and both files inside the AES
-surface complexity budget.
+workers that validate the stored session, load the account pool into the
+Sessions screen, and run health checks. Splitting them from
+:class:`~modules.cli.src.surface_cli_tui_workers._TuiWorkersMixin` keeps that
+file on slot/swarm execution and both files inside the AES surface complexity
+budget.
 Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 """
 
@@ -16,25 +16,11 @@ from typing import Any
 
 from rich.markup import escape
 from textual import work
-from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.widgets import DataTable, Label
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
-
-# A badge write can land while the app is tearing down: the worker thread's
-# ``call_from_thread`` is queued on the event loop and keeps running after the
-# screen is popped (``ScreenStackError``) or the badge is unmounted
-# (``NoMatches``). Neither is a subclass of ``LookupError``/``AttributeError``,
-# so catching only those let the exception escape as an app crash. There is
-# nothing left to display in that window — return quietly instead.
-_BADGE_UNAVAILABLE: tuple[type[BaseException], ...] = (
-    NoMatches,
-    ScreenStackError,
-    LookupError,
-    AttributeError,
-)
 
 
 class _TuiSessionsWorkerMixin:
@@ -63,10 +49,7 @@ class _TuiSessionsWorkerMixin:
     @work(thread=True)
     def _login_worker(self) -> None:
         self._ensure_log_handler()
-        # U5: update session badge to show login in progress
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            badge.update("LOGGING IN…")
+        self._log_msg("[bold {}]LOGIN…[/] authenticating a new session profile".format(THEME["accent"]))
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
@@ -78,7 +61,7 @@ class _TuiSessionsWorkerMixin:
                     escape(str(res.error or res.message or res.profile_path or "")),
                 ),
             )
-            self.call_from_thread(self._refresh_session_badge)
+            self.call_from_thread(self._check_session)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
@@ -87,15 +70,16 @@ class _TuiSessionsWorkerMixin:
         finally:
             self._login_in_flight = False
 
-    # ── Session badge ────────────────────────────────────────────────────
+    # ── Session validation ───────────────────────────────────────────────
 
-    def _refresh_session_badge(self) -> None:
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            if getattr(self, "_session", None) is None:
-                badge.update("N/A")
-            else:
-                badge.update("CHECKING…")
+    def _check_session(self) -> None:
+        """Validate the stored session and report the verdict to the log.
+
+        The Overview banner carries only the active-account count and the
+        routed model, so the verdict lands in the System Event Log and in
+        ``_last_session_state`` (read by the sessions screen and by doctor)
+        instead of a dedicated badge widget.
+        """
         self._session_check_timed_out = False
         timer = getattr(self, "_session_check_timer", None)
         if timer is not None:
@@ -109,13 +93,6 @@ class _TuiSessionsWorkerMixin:
         self._session_check_timed_out = True
         self._last_session_state = "TIMEOUT"
         msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            # Only show TIMEOUT if the badge is still in CHECKING state.
-            if "CHECKING" not in str(badge.render() or ""):
-                return
-            badge.update("TIMEOUT")
-            badge.set_classes("invalid")
         self._log_msg("[bold {}]WARNING:[/] {}".format(THEME["warn"], msg))
         with contextlib.suppress(Exception):
             self.notify(msg, severity="warning", title="Session")
@@ -123,7 +100,7 @@ class _TuiSessionsWorkerMixin:
     @work(thread=True)
     def _session_check_worker(self) -> None:
         if self._session is None:
-            self.call_from_thread(self._apply_session_badge, False)
+            self.call_from_thread(self._apply_session_state, "N/A")
             return
         try:
             from modules.shared.src.taxonomy_session_vo import SessionRequest
@@ -132,18 +109,14 @@ class _TuiSessionsWorkerMixin:
             valid = response.valid
         except Exception:
             valid = False
-        self.call_from_thread(self._apply_session_badge, valid)
+        self.call_from_thread(self._apply_session_state, "VALID" if valid else "EXPIRED")
 
-    def _apply_session_badge(self, valid: bool) -> None:
-        self._last_session_state = "VALID" if valid else "EXPIRED"
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            badge.update("VALID" if valid else "EXPIRED")
-            badge.set_classes("invalid" if not valid else "")
-        # BUG FIX: cancel the timeout timer when the worker completes.
-        # Without this, a 15s timer can fire AFTER the badge is already
-        # set to VALID, overwriting it with "TIMEOUT".
-        if hasattr(self, "_session_check_timer") and self._session_check_timer is not None:
+    def _apply_session_state(self, state: str) -> None:
+        self._last_session_state = state
+        self._log_msg("[bold {}]SESSION:[/] {}".format(THEME["muted"], state))
+        # Cancel the timeout timer when the worker completes. Without this, a
+        # 15s timer can fire after the verdict lands and overwrite it.
+        if getattr(self, "_session_check_timer", None) is not None:
             self._session_check_timer.stop()
             self._session_check_timer = None
 

@@ -12,8 +12,10 @@ UI (reported as "logs appear above the log area at startup"):
    ``page.on("response")``/``on("requestfailed")`` callbacks emit records
    from *their own threads*, which went straight to the terminal.
 
-2. **Layout squeeze** (PRs #249/#250). ``#slots-table`` (10 rows) claimed
-   every available row on short terminals, leaving the log panel 0 height.
+2. **Layout squeeze** (PRs #249/#250). The Overview's slot table (10 rows)
+   claimed every available row on short terminals, leaving the log panel 0
+   height. The table is gone from the current design, but the Overview cards
+   can still starve the log, so the panel keeps its own lock.
 
 This suite locks both: no log may reach the process stderr while the TUI
 runs, logs must land inside the bordered RichLog panels, and the log panel
@@ -452,8 +454,14 @@ def test_log_panel_stays_inside_tab_pane(cols: int, rows: int) -> None:
     asyncio.run(_run())
 
 
-def test_slots_table_never_squeezes_log_panel_to_zero() -> None:
-    """The regression itself: table rows must not eat the whole pane."""
+def test_log_card_never_squeezes_to_zero_on_a_short_terminal() -> None:
+    """The System Event Log card must keep real estate at 100x20.
+
+    The Overview's cards live in one scroll band, so the band is what gives
+    up rows on a small terminal. The log card is pinned to the end of that
+    band's content: it must still render with height when the cards above it
+    are far taller than the pane.
+    """
     import asyncio
 
     app = _make_app()
@@ -463,12 +471,7 @@ def test_slots_table_never_squeezes_log_panel_to_zero() -> None:
             await pilot.pause()
             for _ in range(15):
                 await pilot.pause()
-            from textual.widgets import DataTable
-
-            table = app.query_one("#slots-table", DataTable)
             log = app.query_one("#log-view-overview", RichLog)
-            # Table is capped and scrolls; the log panel keeps real estate.
-            assert table.region.height < 12
             assert log.region.height >= 1
 
     asyncio.run(_run())
