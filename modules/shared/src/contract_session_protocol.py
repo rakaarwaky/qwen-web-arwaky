@@ -62,6 +62,17 @@ class ISessionManagerProtocol(ABC):
         ...
 
     @abstractmethod
+    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
+        """Remove the saved Chromium profile directory at *profile_path*.
+
+        The target must be an existing directory that clears every rule in
+        ``is_safe_session_target``, and deletion is refused while no backup
+        generation is retained unless *force* is set. Raise ``QwenCliError``
+        when a partial removal leaves residue behind.
+        """
+        ...
+
+    @abstractmethod
     def list_sessions(self) -> SessionList:
         """Return every session in the pool."""
         ...

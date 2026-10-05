@@ -6,7 +6,9 @@ implements, with one concrete return type each, so the capability
 implements its class outright and never carries stubs.
 
 ``ISwarmAggregate`` in ``contract_swarm_aggregate.py`` is the outward
-export surface for outer layers.
+export surface for outer layers. The aggregate's ``execute`` seam routes
+a ``SwarmRequest`` verb to one of the runner's operations, so a
+consumer that needs the individual verbs directly holds this protocol.
 """
 
 from __future__ import annotations

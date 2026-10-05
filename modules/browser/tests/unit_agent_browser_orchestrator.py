@@ -42,7 +42,7 @@ def test_open_session_yields_first_page() -> None:
     stub = MagicMock()
     stub.browser_session.return_value.__enter__.return_value = bctx
 
-    with BrowserOrchestrator(stub).open_session(_cfg()) as got:
+    with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()) as got:
         assert got is page
 
 
@@ -53,7 +53,7 @@ def test_open_session_creates_page_when_context_is_empty() -> None:
     stub = MagicMock()
     stub.browser_session.return_value.__enter__.return_value = bctx
 
-    with BrowserOrchestrator(stub).open_session(_cfg()) as got:
+    with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()) as got:
         assert got is bctx.new_page.return_value
     bctx.new_page.assert_called_once()
 
@@ -67,7 +67,7 @@ def test_open_session_closes_browser_on_exception() -> None:
     stub.browser_session.return_value = manager
 
     with pytest.raises(ValueError, match="boom"):
-        with BrowserOrchestrator(stub).open_session(_cfg()):
+        with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()):
             raise ValueError("boom")
 
     manager.__exit__.assert_called_once()

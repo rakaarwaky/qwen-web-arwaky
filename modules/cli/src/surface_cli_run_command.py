@@ -12,7 +12,7 @@ from modules.shared.src.contract_prompt_protocol import (
     IPromptFileProtocol,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
-from modules.shared.src.utility_core_response import (
+from modules.shared.src.utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,

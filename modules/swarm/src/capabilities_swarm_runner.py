@@ -41,9 +41,12 @@ from modules.shared.src.utility_core_prompt_template import (
     list_prompt_templates,
     materialize_role_template,
 )
-from modules.shared.src.utility_core_response import detect_processing_failure
+from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
 log = logging.getLogger(__name__)
+
+
+# Block 1: Class Definition & Constructor
 
 
 class SwarmRunner(ISwarmProtocol):
@@ -84,6 +87,8 @@ class SwarmRunner(ISwarmProtocol):
         self._cancel_events: dict[SwarmId, dict[str, threading.Event]] = {}
         self._executors: dict[SwarmId, ThreadPoolExecutor] = {}
         self._attachment_paths: dict[SwarmId, Path] = {}
+
+    # Block 2: Protocol Method Implementation
 
     @property
     def browser_concurrency(self) -> BrowserCount:
@@ -181,6 +186,8 @@ class SwarmRunner(ISwarmProtocol):
                 executor.shutdown(wait=False, cancel_futures=True)
             self._cancel_events.pop(swarm_id, None)
             self._attachment_paths.pop(swarm_id, None)
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _run_agent(self, swarm_id: SwarmId, role: str) -> None:
         start = time.perf_counter()

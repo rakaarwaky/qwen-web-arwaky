@@ -16,7 +16,9 @@ from modules.shared.src.utility_logger_factory import get_logger
 log = get_logger("capabilities_folder_to_attachment")
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# Block 1: Class Definition & Constructor
+
+
 class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
     """Adapter that resolves path to attachment-ready file.
 
@@ -32,7 +34,8 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
         """
         self._compiler = folder_compiler
 
-    # ─── Block 2: Public Methods ──
+    # Block 2: Protocol Method Implementation
+
     def resolve_to_attachment(
         self,
         path: Path,
@@ -77,3 +80,5 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
 
 
 __all__ = ["FolderToAttachmentAdapter"]
+
+# Block 3: Dunder Methods, Factories & Helpers

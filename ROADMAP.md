@@ -46,7 +46,9 @@ State / Health: **In Review / At Risk**. Last Updated: **2026-09-24**.
 - New feature directories require both `FRD.md` and `BACKLOG.md`, plus a Feature Roll-up row in this file, in the same PR.
 - Dates are ISO `YYYY-MM-DD`. `Updated` changes only when the row's condition, evidence, owner, state, or health changes.
 
-## Roadmap
+## Release Readiness
+
+### Phase Plan
 
 Dates are target windows, not evidence that work shipped.
 
@@ -58,7 +60,17 @@ Dates are target windows, not evidence that work shipped.
 | Reliability qualification | 2026-10-03–2026-10-09 | Single-attachment and 10-role swarm paths pass authenticated headed QA without aggressive resend or bot-verification loops. | `WS-03`, `CORE-01` | Ready | At Risk |
 | Next release candidate | 2026-10-10–2026-10-16 | P0 rows are clear, automated gates pass on one commit, manual evidence is recorded, and feature roll-ups are Ready for Release. | `WS-03`, feature backlogs | Refinement | At Risk |
 
-## Workspace Backlog
+### Branches in Flight
+
+This table tracks branches with current roadmap relevance; the existence of an old remote branch alone does not make it active.
+
+| Branch | Backlog IDs | State |
+|---|---|---|
+| `arena/01a0d304-qwen-web-arwaky` | `WS-01` | In Review / PR #432 |
+| `refactor/benchmark-structure` | `WS-02` | In Review / PR #428 |
+| `feat/benchmark-suite` | `WS-02` | In Review / PR #426; overlap must be resolved |
+
+## Backlog
 
 Only work spanning multiple features or repository infrastructure belongs here.
 
@@ -78,16 +90,6 @@ Every feature directory is indexed here; implementation detail remains in its ba
 | `modules/core` | Core Automation Engine | P0 | [FRD](modules/core/FRD.md) | [BACKLOG](modules/core/BACKLOG.md) | QA | At Risk | — | `CORE-01` | 2026-09-24 |
 | `modules/cli` | CLI and Textual TUI | P1 | [FRD](modules/cli/FRD.md) | [BACKLOG](modules/cli/BACKLOG.md) | Refinement | At Risk | — | `CLI-01` | 2026-09-24 |
 | `modules/mcp` | MCP Server Surface | P1 | [FRD](modules/mcp/FRD.md) | [BACKLOG](modules/mcp/BACKLOG.md) | Refinement | At Risk | — | `MCP-01` | 2026-09-24 |
-
-## Branches in Flight
-
-This table tracks branches with current roadmap relevance; the existence of an old remote branch alone does not make it active.
-
-| Branch | Backlog IDs | State |
-|---|---|---|
-| `arena/01a0d304-qwen-web-arwaky` | `WS-01` | In Review / PR #432 |
-| `refactor/benchmark-structure` | `WS-02` | In Review / PR #428 |
-| `feat/benchmark-suite` | `WS-02` | In Review / PR #426; overlap must be resolved |
 
 ## Risk Register
 

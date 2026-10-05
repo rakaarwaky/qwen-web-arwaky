@@ -7,27 +7,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from modules.shared.src.contract_core_protocol import IJobStorageProtocol
+from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_vo import (
     JobId,
     JobLimit,
+    JobPath,
+    JobPreview,
     JobRecord,
+    Pid,
+    ResultText,
 )
+from modules.shared.src.taxonomy_jobs_vo import JobCount
 from modules.shared.src.utility_io_writer import ATOMIC_TEMP_SUFFIX, atomic_write_text
 from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_job_storage")
 
 #: Anything outside this set is replaced before a job ID touches the filesystem.
-_UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.\-]")
+_unsafe_filename_chars = re.compile(r"[^A-Za-z0-9_.\-]")
 #: Leaves room for the ``.json`` extension under a 255-byte NAME_MAX.
-_MAX_JOB_FILENAME_LEN = 200
+_max_job_filename_len = 200
+
+
+# Block 1: Class Definition & Constructor
 
 
 class JobStorage(IJobStorageProtocol):
@@ -39,21 +48,7 @@ class JobStorage(IJobStorageProtocol):
         self.cleanup_stale_jobs()
         self.reconcile_zombies()
 
-    def _job_file_path(self, job_id: JobId | str) -> Path:
-        """Map a job ID onto a filesystem-safe path inside the storage dir.
-
-        Job IDs are generated internally, but ``get_job_status`` accepts one
-        straight from an MCP caller, so treat the value as untrusted: collapse
-        every character outside ``[A-Za-z0-9_.-]`` (covers path separators,
-        ``:*?"<>|`` on Windows, and control bytes) and cap the length well below
-        NAME_MAX, appending a digest so truncated IDs stay distinct.
-        """
-        raw = str(job_id)
-        clean_id = _UNSAFE_FILENAME_CHARS.sub("_", raw)
-        if len(clean_id) > _MAX_JOB_FILENAME_LEN:
-            digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
-            clean_id = f"{clean_id[: _MAX_JOB_FILENAME_LEN - len(digest) - 1]}_{digest}"
-        return self.storage_dir / f"{clean_id}.json"
+    # Block 2: Protocol Method Implementation
 
     def save_job(self, record: JobRecord) -> None:
         """Persist a job record to an atomic JSON file."""
@@ -63,6 +58,25 @@ class JobStorage(IJobStorageProtocol):
         content = json.dumps(data, indent=2)
         atomic_write_text(target, content)
         log.debug("job_saved", job_id=record.job_id, latest_event=record.latest_event, completed=record.completed)
+
+    def current_pid(self) -> Pid:
+        """Return the PID that owns the records written from this process."""
+        return Pid(os.getpid())
+
+    def resolve_job_path(self, raw_path: JobPath) -> JobPath:
+        """Return the absolute path a job's *raw_path* argument names."""
+        return JobPath(Path(raw_path.path).expanduser().resolve())
+
+    def preview_job_output(self, output_path: JobPath, result_text: ResultText) -> JobPreview:
+        """Read a short preview of the output file, falling back to the result text."""
+        target = Path(output_path.path)
+        fallback = result_text.text[:500] if result_text.text else None
+        if target.exists():
+            try:
+                return JobPreview(target.read_text(encoding="utf-8")[:500])
+            except OSError:
+                return JobPreview(fallback)
+        return JobPreview(fallback)
 
     def get_job(self, job_id: JobId | str) -> JobRecord | None:
         """Retrieve a job record by ID."""
@@ -91,7 +105,7 @@ class JobStorage(IJobStorageProtocol):
             log.error("job_read_failed", job_id=str(job_id), error=str(exc))
             return None
 
-    def reconcile_zombies(self) -> int:
+    def reconcile_zombies(self) -> JobCount:
         """Mark started-but-incomplete records owned by dead processes as failed."""
         import os
 
@@ -126,21 +140,22 @@ class JobStorage(IJobStorageProtocol):
                 )
                 self.save_job(updated)
                 reconciled += 1
-        return reconciled
+        return JobCount(reconciled)
 
     def cleanup_stale_jobs(
         self,
         *,
-        now: datetime | None = None,
-        terminal_ttl: timedelta = timedelta(hours=24),
-        incomplete_ttl: timedelta = timedelta(days=7),
+        terminal_ttl_hours: float = 24.0,
+        incomplete_ttl_days: float = 7.0,
     ) -> int:
         """Delete terminal jobs after 24h and abandoned jobs after 7 days.
 
         Cleanup is explicit and deterministic so MCP startup/maintenance can
         invoke it without changing the semantics of status reads.
         """
-        reference = now or datetime.now(timezone.utc)
+        reference = datetime.now(timezone.utc)
+        terminal_ttl = timedelta(hours=terminal_ttl_hours)
+        incomplete_ttl = timedelta(days=incomplete_ttl_days)
         removed = 0
         for path in self.storage_dir.glob("*.json"):
             try:
@@ -155,7 +170,7 @@ class JobStorage(IJobStorageProtocol):
                 continue
         return removed
 
-    def list_jobs(self, limit: JobLimit | int = JobLimit(10)) -> list[JobRecord]:
+    def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
         """List recently recorded jobs sorted newest to oldest.
 
         Best-effort under concurrent writes. Records are persisted with
@@ -182,3 +197,21 @@ class JobStorage(IJobStorageProtocol):
             if rec is not None:
                 records.append(rec)
         return records
+
+    # Block 3: Dunder Methods, Factories & Helpers
+
+    def _job_file_path(self, job_id: JobId | str) -> Path:
+        """Map a job ID onto a filesystem-safe path inside the storage dir.
+
+        Job IDs are generated internally, but ``get_job_status`` accepts one
+        straight from an MCP caller, so treat the value as untrusted: collapse
+        every character outside ``[A-Za-z0-9_.-]`` (covers path separators,
+        ``:*?"<>|`` on Windows, and control bytes) and cap the length well below
+        NAME_MAX, appending a digest so truncated IDs stay distinct.
+        """
+        raw = str(job_id)
+        clean_id = _unsafe_filename_chars.sub("_", raw)
+        if len(clean_id) > _max_job_filename_len:
+            digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+            clean_id = f"{clean_id[: _max_job_filename_len - len(digest) - 1]}_{digest}"
+        return self.storage_dir / f"{clean_id}.json"

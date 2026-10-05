@@ -11,7 +11,12 @@ import time
 from playwright.sync_api import Error, Page
 
 from modules.shared.src.contract_core_protocol import ISendProtocol
-from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
+from modules.shared.src.taxonomy_core_constant import (
+    PARSE_FAST_PHASE_SEC,
+    PARSE_POLL_FAST_MS,
+    PARSE_POLL_SLOW_MS,
+    TEXTAREA_SELECTOR,
+)
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import SendDispatchError
 from modules.shared.src.taxonomy_core_event import EVENT_DISPATCH_ACKNOWLEDGED, EVENT_SEND_CLICKED
@@ -28,99 +33,6 @@ from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_send_dispatcher")
 
-#: Window during which parse-waiting stays maximally responsive.
-_PARSE_FAST_PHASE_SEC = 5.0
-#: Poll interval while inside the fast phase.
-_PARSE_POLL_FAST_MS = 500
-#: Backed-off poll interval for long document parses.
-_PARSE_POLL_SLOW_MS = 1000
-
-
-def _is_parse_toast_visible(page: Page) -> bool:
-    """Safely check if Qwen's document parsing warning toast is visible.
-
-    Only real toast/notification containers are consulted. The legacy
-    implementation also scanned ``body`` and broad ``[class*='alert']``
-    / ``[class*='notification']`` nodes, which in Qwen's live chat matched
-    the entire conversation history and the composer chrome, producing
-    persistent false positives that kept the send loop re-clicking.
-    """
-    toast_selectors = (
-        ".ant-message",
-        "[role='alert']",
-        "[class*='toast']",
-        "[class*='message-notice']",
-        "[class*='ant-notification']",
-    )
-    parse_keywords = (
-        "still uploading",
-        "upload to complete",
-        "currently parsing",
-        "parsing file",
-        "wait until",
-        "files still",
-        "uploading",
-    )
-    for selector in toast_selectors:
-        try:
-            locator = page.locator(selector)
-            c = locator.count()
-            if not isinstance(c, int) or c == 0:
-                continue
-            for i in range(min(c, 5)):
-                item = locator.nth(i)
-                if item.is_visible(timeout=100):
-                    text = item.inner_text(timeout=100).casefold()
-                    if any(kw in text for kw in parse_keywords):
-                        return True
-        except Exception:
-            pass
-    return False
-
-
-def _is_file_card_parsing(page: Page) -> bool:
-    """Return True if any file card in the composer input area still shows a Parsing indicator or spinner.
-
-    Only narrow file-card selectors are consulted. The broad ``composer`` and
-    ``input``-area selectors matched container divs that wrap the file card;
-    their text scan produced false positives on unrelated UI chrome, and any
-    spinner inside the whole container kept the send held even after parse
-    completed.
-    """
-    card_selectors = (
-        ".message-input-column-file",
-        ".file-card-list",
-        "[class*='fileitem']",
-        "[class*='file-card']",
-        "[class*='file-item']",
-        "[class*='attachment']",
-    )
-    for sel in card_selectors:
-        try:
-            loc = page.locator(sel)
-            c = loc.count()
-            if not isinstance(c, int) or c == 0:
-                continue
-            for i in range(min(c, 10)):
-                item = loc.nth(i)
-                if not item.is_visible(timeout=100):
-                    continue
-                text = item.inner_text(timeout=100).casefold()
-                if "parsing" in text or "processing" in text or "uploading" in text:
-                    return True
-                spinners = item.locator(
-                    "svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='loading'], [class*='parsing'], [class*='spin']"
-                )
-                # Only a *visible* spinner blocks the send; the loading icon
-                # stays in the DOM after parsing completes (hidden via CSS).
-                for spin_idx in range(spinners.count()):
-                    if spinners.nth(spin_idx).is_visible(timeout=100):
-                        return True
-        except Exception:
-            pass
-    return False
-
-
 # Block 1: Class Definition & Constructor
 
 
@@ -136,6 +48,7 @@ class SendDispatcher(ISendProtocol):
         self.try_enter_key_fallback = try_enter_key_fallback
 
     # ─── Block 2: Public Contract (ISendProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
     def click_send(
         self,
         page: Page,
@@ -222,6 +135,7 @@ class SendDispatcher(ISendProtocol):
 
         raise SendDispatchError("Send control dispatch timed out waiting for document parsing or user turn ACK")
 
+    # Block 3: Dunder Methods, Factories, Helpers
     def _wait_for_dispatch_ack(
         self,
         page: Page,
@@ -283,10 +197,10 @@ class SendDispatcher(ISendProtocol):
         would prevent a valid dispatch.
         """
         deadline = time.monotonic() + (timeout_ms / 1000)
-        fast_phase_deadline = time.monotonic() + _PARSE_FAST_PHASE_SEC
+        fast_phase_deadline = time.monotonic() + PARSE_FAST_PHASE_SEC
         while time.monotonic() < deadline:
             try:
-                parse_wait_ms = _PARSE_POLL_FAST_MS if time.monotonic() < fast_phase_deadline else _PARSE_POLL_SLOW_MS
+                parse_wait_ms = PARSE_POLL_FAST_MS if time.monotonic() < fast_phase_deadline else PARSE_POLL_SLOW_MS
                 # Proactive check: file card still shows "Parsing..." in DOM
                 if hold_on_card_parsing and _is_file_card_parsing(page):
                     log.debug("File card still parsing — holding send.")
@@ -328,3 +242,88 @@ class SendDispatcher(ISendProtocol):
     def __repr__(self) -> str:
         """Return string representation of SendDispatcher."""
         return f"SendDispatcher(timeout={self.click_timeout_ms}, fallback={self.try_enter_key_fallback})"
+
+
+def _is_parse_toast_visible(page: Page) -> bool:
+    """Safely check if Qwen's document parsing warning toast is visible.
+
+    Only real toast/notification containers are consulted. The legacy
+    implementation also scanned ``body`` and broad ``[class*='alert']``
+    / ``[class*='notification']`` nodes, which in Qwen's live chat matched
+    the entire conversation history and the composer chrome, producing
+    persistent false positives that kept the send loop re-clicking.
+    """
+    toast_selectors = (
+        ".ant-message",
+        "[role='alert']",
+        "[class*='toast']",
+        "[class*='message-notice']",
+        "[class*='ant-notification']",
+    )
+    parse_keywords = (
+        "still uploading",
+        "upload to complete",
+        "currently parsing",
+        "parsing file",
+        "wait until",
+        "files still",
+        "uploading",
+    )
+    for selector in toast_selectors:
+        try:
+            locator = page.locator(selector)
+            c = locator.count()
+            if not isinstance(c, int) or c == 0:
+                continue
+            for i in range(min(c, 5)):
+                item = locator.nth(i)
+                if item.is_visible(timeout=100):
+                    text = item.inner_text(timeout=100).casefold()
+                    if any(kw in text for kw in parse_keywords):
+                        return True
+        except Exception:
+            pass
+    return False
+
+
+def _is_file_card_parsing(page: Page) -> bool:
+    """Return True if any file card in the composer input area still shows a Parsing indicator or spinner.
+
+    Only narrow file-card selectors are consulted. The broad ``composer`` and
+    ``input``-area selectors matched container divs that wrap the file card;
+    their text scan produced false positives on unrelated UI chrome, and any
+    spinner inside the whole container kept the send held even after parse
+    completed.
+    """
+    card_selectors = (
+        ".message-input-column-file",
+        ".file-card-list",
+        "[class*='fileitem']",
+        "[class*='file-card']",
+        "[class*='file-item']",
+        "[class*='attachment']",
+    )
+    for sel in card_selectors:
+        try:
+            loc = page.locator(sel)
+            c = loc.count()
+            if not isinstance(c, int) or c == 0:
+                continue
+            for i in range(min(c, 10)):
+                item = loc.nth(i)
+                if not item.is_visible(timeout=100):
+                    continue
+                text = item.inner_text(timeout=100).casefold()
+                if "parsing" in text or "processing" in text or "uploading" in text:
+                    return True
+                spinners = item.locator(
+                    "svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='loading'], [class*='parsing'], [class*='spin']"
+                )
+                # Only a *visible* spinner blocks the send; the loading icon
+                # stays in the DOM after parsing completes (hidden via CSS).
+                for spin_idx in range(spinners.count()):
+                    if spinners.nth(spin_idx).is_visible(timeout=100):
+                        return True
+        except Exception:
+            pass
+    return False

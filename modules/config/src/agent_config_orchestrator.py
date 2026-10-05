@@ -4,13 +4,12 @@ Eight call sites used to import ``build_app_config`` directly, which put
 the sandbox probe and the request-timeout environment override behind a
 module-level import no test could substitute. This orchestrator takes
 the four config capabilities as seams, so the environment-derived policy
-has one owner and a test can substitute any of the four probes without
+has one owner and a test can substitute each of the four probes without
 patching a module global.
 """
 
 from __future__ import annotations
 
-from modules.config.src.utility_config_app_factory import build_app_config
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import (
     IConfigCapacityProtocol,
@@ -21,6 +20,7 @@ from modules.shared.src.contract_config_protocol import (
 )
 from modules.shared.src.taxonomy_config_vo import ConfigRequest, ConfigResponse
 from modules.shared.src.taxonomy_core_vo import AppConfig, SlotRunPlan
+from modules.shared.src.utility_config_app_factory import build_app_config
 
 __all__ = ["ConfigOrchestrator"]
 
@@ -58,7 +58,7 @@ class ConfigOrchestrator(IConfigAggregate):
         self._capacity = capacity
         self._slot_plan = slot_plan
 
-    # ─── Block 2: Aggregate Method Implementation ──────────
+    # Block 2: Protocol Method Implementation
 
     def execute(self, request: ConfigRequest) -> ConfigResponse:
         """Run the requested config verb and return one response shape.
@@ -88,7 +88,7 @@ class ConfigOrchestrator(IConfigAggregate):
             return ConfigResponse(error=resolved.message)
         return ConfigResponse(error=f"Unknown config verb: {request.verb!r}")
 
-    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def _build_config(self, request: ConfigRequest) -> AppConfig:
         """Build the ``AppConfig`` a *request* describes.

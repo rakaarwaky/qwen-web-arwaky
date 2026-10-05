@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 from modules.shared.src.contract_config_protocol import IConfigCapacityProtocol
 from modules.shared.src.taxonomy_config_vo import ByteCount, CapacityReport, WorkerCount
+from modules.shared.src.taxonomy_core_constant import SOURCE_DERIVED, SOURCE_OVERRIDE
 from modules.shared.src.utility_core_capacity import (
     available_memory_bytes,
     format_bytes,
@@ -24,9 +25,7 @@ from modules.shared.src.utility_core_capacity import (
 )
 from modules.shared.src.utility_core_env import QWEN_WEB_MAX_WORKERS
 
-#: Names the effective worker count can come from, for the report's ``source``.
-SOURCE_DERIVED = "derived from measured available memory"
-SOURCE_OVERRIDE = f"{QWEN_WEB_MAX_WORKERS} environment override"
+# Block 1: Class Definition & Constructor
 
 
 class ConfigCapacityAdvisor(IConfigCapacityProtocol):
@@ -39,6 +38,8 @@ class ConfigCapacityAdvisor(IConfigCapacityProtocol):
         so the override path is reachable without mutating the real one.
         """
         self._env: Mapping[str, str] = env if env is not None else os.environ
+
+    # Block 2: Protocol Method Implementation
 
     def report(self) -> CapacityReport:
         """Return measured capacity, the recommended limit, and the effective one.
@@ -71,6 +72,8 @@ class ConfigCapacityAdvisor(IConfigCapacityProtocol):
             f"{measured} available; recommended max workers {report.recommended_max_workers}, "
             f"effective {report.effective_max_workers} ({report.source})"
         )
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _override(self) -> int | None:
         """Return the configured worker count, or None when unset or unusable.

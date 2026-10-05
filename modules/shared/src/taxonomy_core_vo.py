@@ -87,7 +87,58 @@ class ProcessingOutcome:
 
 JobId = NewType("JobId", str)
 JobLimit = NewType("JobLimit", int)
+Pid = NewType("Pid", int)
 AsyncRunFlag = NewType("AsyncRunFlag", bool)
+
+
+@dataclass(frozen=True)
+class JobPath:
+    """Absolute path a job's raw path argument names (expanded + anchored).
+
+    Wraps an ``~``-expanded, ``cwd``-anchored ``Path`` so contract
+    signatures speak in this VO instead of a bare ``str | Path``
+    primitive pair (AES402). ``__fspath__`` keeps the value usable in
+    any path context (``open``, ``Path`` construction, ``f-strings``).
+    """
+
+    path: Path
+
+    @staticmethod
+    def from_raw(raw: str | Path) -> JobPath:
+        """Expand ``~`` and anchor *raw* against the process working directory."""
+        return JobPath(Path(raw).expanduser().resolve())
+
+    def __fspath__(self) -> str:
+        return str(self.path)
+
+    @staticmethod
+    def blank() -> JobPath:
+        """An empty ``JobPath`` for the no-output case in call sites."""
+        return JobPath(Path())
+
+
+@dataclass(frozen=True)
+class JobPreview:
+    """A short preview of a job's output file.
+
+    Carries the first 500 characters of the output file text when the file
+    exists, otherwise a fallback derived from the returned result. Lets the
+    jobs agent hand a preview to persistence without touching the filesystem
+    itself (AES405): the storage capability owns the read.
+    """
+
+    text: str | None
+
+
+@dataclass(frozen=True)
+class ResultText:
+    """The result text returned by a prompt-pipeline execution.
+
+    Wraps the raw string so contract signatures speak in VOs instead of
+    the bare ``str`` primitive (AES402).
+    """
+
+    text: str
 
 
 @dataclass(frozen=True)
@@ -644,6 +695,9 @@ __all__ = [
     "FolderPath",
     "OutputPath",
     "FilePath",
+    "JobPath",
+    "JobPreview",
+    "Pid",
     "RunId",
     "RunIdHex",
     "CompileDepth",

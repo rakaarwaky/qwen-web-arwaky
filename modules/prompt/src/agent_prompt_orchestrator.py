@@ -8,7 +8,16 @@ serves its verb, so no surface has to know which adapter owns which verb.
 
 from __future__ import annotations
 
+from typing import cast
+
+from modules.shared.src.contract_core_protocol import IRunCancelProtocol
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 
@@ -32,20 +41,35 @@ class PromptOrchestrator(IPromptAggregate):
             adapter being wired for it here.
     """
 
-    def __init__(self, direct: IPromptAggregate, file_only: IPromptAggregate, attachment: IPromptAggregate) -> None:
-        """Hold the one adapter that serves each verb.
+    def __init__(
+        self,
+        direct: IDirectPromptProtocol,
+        file_only: IPromptFileProtocol,
+        attachment: IAttachmentPromptProtocol,
+        cancel_registry: IRunCancelProtocol,
+        observability: IObservabilityProtocol,
+    ) -> None:
+        """Hold the one adapter that serves each prompt verb.
 
         Args:
             direct: Serves ``process_direct_prompt``.
             file_only: Serves ``process_prompt_file_only`` and ``request_cancel``.
-            attachment: Serves ``process_prompt_with_attachment`` and ``request_cancel``.
+            attachment: Serves ``process_prompt_with_attachment`` and
+                ``request_cancel``.
+            cancel_registry: The shared targeted-cancel registry the file and
+                attachment adapters register their runs with, so a cancel
+                reaches the run by its stable ID rather than by event identity.
+            observability: Records the routed verb, so a surface that sees a
+                failed response can tell which adapter produced it.
         """
         self._by_verb: dict[str, IPromptAggregate] = {
-            "process_direct_prompt": direct,
-            "process_prompt_file_only": file_only,
-            "process_prompt_with_attachment": attachment,
+            "process_direct_prompt": cast(IPromptAggregate, direct),
+            "process_prompt_file_only": cast(IPromptAggregate, file_only),
+            "process_prompt_with_attachment": cast(IPromptAggregate, attachment),
         }
         self._cancellable = (file_only, attachment)
+        self._cancel_registry = cancel_registry
+        self._observability = observability
 
     def execute(self, request: PromptRequest) -> PromptResponse:
         """Route *request* to the adapter that serves its verb.

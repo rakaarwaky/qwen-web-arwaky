@@ -7,29 +7,18 @@ import re
 from typing import TYPE_CHECKING
 
 from modules.shared.src.contract_session_protocol import ISessionHealthCheckerProtocol, ISessionManagerProtocol
+from modules.shared.src.taxonomy_core_constant import RATE_LIMIT_PATTERNS
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
     pass
 
 
-# Rate limit detection patterns
-RATE_LIMIT_PATTERNS = [
-    r"upper\s+limit",
-    r"rate\s+limit",
-    r"daily\s+limit",
-    r"quota\s+exceeded",
-    r"try\s+again\s+tomorrow",
-    r"too\s+many\s+requests",
-    r"429",
-    r"limit\s+reached",
-    r"usage\s+limit",
-]
-
 # Compiled patterns for performance
-_COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
+_compiled_patterns = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
 
 
+# Block 1: Class Definition & Constructor
 class SessionHealthChecker(ISessionHealthCheckerProtocol):
     """Checks session health via ping test."""
 
@@ -39,6 +28,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
     def __init__(self, timeout_seconds: float = 5.0) -> None:
         self._timeout = timeout_seconds
 
+    # Block 2: Protocol Method Implementation
     async def check_session(self, session: SessionInfo) -> bool:
         """Check if session is healthy.
 
@@ -83,6 +73,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
         return _asyncio.run(_run())
 
+    # Block 3: Dunder Methods, Factories, Helpers
     async def _send_ping(self, _session: SessionInfo) -> str:
         """Send ping message and get response.
 
@@ -105,7 +96,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         response_lower = response.lower()
 
         # Check for rate limit patterns
-        for pattern in _COMPILED_PATTERNS:
+        for pattern in _compiled_patterns:
             if pattern.search(response_lower):
                 return False
 

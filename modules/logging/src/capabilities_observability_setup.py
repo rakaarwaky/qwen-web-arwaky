@@ -61,16 +61,14 @@ from modules.shared.src.utility_telemetry_scrubber import (
     scrub_telemetry_event,
 )
 
-#: Version of the ``status.json`` document contract. Bumped when a field is
-#: added or its meaning changes, so external monitors can branch on it
-#: (issue #296).
-STATUS_SCHEMA_VERSION = 2
-
 # NOTE (issue #359): ``MetricsCounter`` and ``StatusFileWriter`` were extracted
 # into their own capability modules (``capabilities_metrics_counter`` /
 # ``capabilities_status_writer``) and are injected into ``ObservabilitySetup``
 # by the composition root. They are intentionally NOT defined here so this file
 # does not import its peer capabilities (AES201).
+
+
+# Block 1: Class Definition & Constructor
 
 
 class ObservabilitySetup(IObservabilityProtocol):
@@ -95,7 +93,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
-    # ─── Block 2: Public Contract (IObservabilityProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
 
     @property
     def metrics(self) -> IMetricsProtocol:
@@ -150,6 +148,8 @@ class ObservabilitySetup(IObservabilityProtocol):
                 mode,
                 os.getenv("ENVIRONMENT", "production"),
             )
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _configure_sentry(self) -> None:
         """Configure Sentry and log an explicit degraded event when it is off.
@@ -466,8 +466,6 @@ class ObservabilitySetup(IObservabilityProtocol):
         """Install global exception handlers (delegates to module-level function)."""
         install_excepthooks()
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
     def __repr__(self) -> str:
         """Return string representation of ObservabilitySetup."""
         return f"ObservabilitySetup(log_path={self._log_path!r})"
@@ -621,8 +619,8 @@ _security_audit_logger = _get_logger("security.audit")
 
 # A window longer than this makes the counter useless for live incident
 # response; shorter windows would need more state than the process can justify.
-_AUTH_FAILURE_WINDOW_SEC = 60.0
-_ALERT_THRESHOLD = 5
+_auth_failure_window_sec = 60.0
+_alert_threshold = 5
 _auth_failure_events: list[tuple[float, str]] = []
 _auth_failure_lock = threading.Lock()
 
@@ -638,7 +636,7 @@ def _record_auth_failure(event_category: str) -> None:
     now = time.time()
     with _auth_failure_lock:
         # Prune events outside the window so the counter stays bounded.
-        _auth_failure_events[:] = [(ts, cat) for ts, cat in _auth_failure_events if now - ts < _AUTH_FAILURE_WINDOW_SEC]
+        _auth_failure_events[:] = [(ts, cat) for ts, cat in _auth_failure_events if now - ts < _auth_failure_window_sec]
         _auth_failure_events.append((now, event_category))
         recent_count = len(_auth_failure_events)
 
@@ -648,18 +646,18 @@ def _record_auth_failure(event_category: str) -> None:
         event_category=event_category,
         recent_failures=recent_count,
     )
-    if recent_count >= _ALERT_THRESHOLD:
+    if recent_count >= _alert_threshold:
         _security_audit_logger.error(
             "security_alert",
             event_name="security.audit",
             alert="auth_failure_threshold_exceeded",
-            threshold=_ALERT_THRESHOLD,
+            threshold=_alert_threshold,
             recent_failures=recent_count,
-            window_sec=_AUTH_FAILURE_WINDOW_SEC,
+            window_sec=_auth_failure_window_sec,
         )
 
 
-def auth_failure_count(window_sec: float = _AUTH_FAILURE_WINDOW_SEC) -> int:
+def auth_failure_count(window_sec: float = _auth_failure_window_sec) -> int:
     """Return the number of auth/challenge failures recorded in *window_sec*.
 
     Exposed so ``MetricsCounter.snapshot()`` or a custom exporter can surface

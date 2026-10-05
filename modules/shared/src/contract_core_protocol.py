@@ -24,9 +24,6 @@ from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     HeadlessFlag,
     InjectorConfig,
-    JobId,
-    JobLimit,
-    JobRecord,
     MaxFileSizeMb,
     MessageCount,
     MinTextLength,
@@ -326,22 +323,6 @@ class IMetricsProtocol(ABC):
         """Record a completed pipeline run for the rolling-window execution log."""
 
 
-class IJobStorageProtocol(ABC):
-    """Job persistence and state storage contract."""
-
-    @abstractmethod
-    def save_job(self, record: JobRecord) -> None:
-        """Persist a job record to disk."""
-
-    @abstractmethod
-    def get_job(self, job_id: JobId | str) -> JobRecord | None:
-        """Retrieve a job record by ID."""
-
-    @abstractmethod
-    def list_jobs(self, limit: JobLimit = JobLimit(10)) -> list[JobRecord]:
-        """List recently recorded jobs."""
-
-
 class IRunCancelProtocol(ABC):
     """Contract for the shared targeted-cancel registry of in-flight runs.
 
@@ -396,7 +377,6 @@ __all__ = [
     "IWorkspaceProtocol",
     "IStatusProtocol",
     "IMetricsProtocol",
-    "IJobStorageProtocol",
     "IRunCancelProtocol",
     "LifecycleObserver",
 ]

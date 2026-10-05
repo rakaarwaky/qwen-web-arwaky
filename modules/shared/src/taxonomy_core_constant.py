@@ -100,6 +100,11 @@ MEMORY_RESERVED_FRACTION = 0.25
 DEFAULT_SWARM_CONCURRENCY = 10
 SWARM_CONCURRENCY_ENV = "QWEN_SWARM_CONCURRENCY"
 
+#: Resource-governance policy (issue #277). Above this many concurrent browsers
+#: a fan-out is announced with an explicit warning before it starts; below it the
+#: start is silent, matching the interactive cost users expect.
+SWARM_RESOURCE_WARNING_BROWSERS = 4
+
 #: Admission-control bound for the async job queue (issue #362). Submissions
 #: beyond this depth are refused with a retryable over-capacity error instead
 #: of growing the executor's pending queue without limit. One pending slot per
@@ -128,7 +133,7 @@ MODEL_SELECTOR_BUTTON = "Select Model"
 MAX_ATTEMPTS = 3
 
 # ─── Response retry policy ──────────────────────────────────────────────────
-# SharedFlowOrchestrator retries a dispatch when the model returns a
+# PromptFlowDispatcher retries a dispatch when the model returns a
 # rate-limit / throttling page instead of a real answer. Attempts are bounded
 # by MAX_ATTEMPTS (3); the wait before retry N is RETRY_BASE_DELAY_SEC * N.
 RETRY_BASE_DELAY_SEC: int = 30
@@ -481,8 +486,107 @@ EXCLUDED_FILE_EXTENSIONS: frozenset[str] = frozenset(
 DEFAULT_GENERATE_SIDECAR: bool = True
 DEFAULT_ATOMIC_WRITE: bool = True
 
+# ─── Config domain: request timeout ─────────────────────────────────────────
+#: Built-in ceiling on the response-wait when no env override is present.
+#: Matches the default carried by ``AppConfig`` so a bare probe and a built
+#: config never diverge.
+DEFAULT_REQUEST_TIMEOUT_SEC: int = 600
+
+#: Environment override for ``DEFAULT_REQUEST_TIMEOUT_SEC``.
+REQUEST_TIMEOUT_ENV: str = "QWEN_REQUEST_TIMEOUT_SEC"
+
+#: Truthy spellings for boolean env switches.
+TRUE_VALUES: frozenset[str] = frozenset({"1", "true", "yes"})
+
+#: Falsy spellings for boolean env switches.
+FALSE_VALUES: frozenset[str] = frozenset({"0", "false", "no"})
+
+# ─── Update domain ───────────────────────────────────────────────────────────
+#: Package name the self-update pipeline checks and installs.
+DEFAULT_PACKAGE_NAME: str = "qwen-web-arwaky"
+
+#: Upstream GitHub repository for release discovery and git updates.
+DEFAULT_GITHUB_REPO: str = "rakaarwaky/qwen-web-arwaky"
+
+#: Release discovery URL template, ``{repo}`` substituted.
+GITHUB_RELEASE_URL: str = "https://api.github.com/repos/{repo}/releases/latest"
+
+#: Git ref URL template, ``{repo}`` and ``{tag}`` substituted.
+GITHUB_GIT_REF_URL: str = "https://api.github.com/repos/{repo}/git/refs/tags/{tag}"
+
+#: Git tag URL template, ``{repo}`` and ``{sha}`` substituted.
+GITHUB_GIT_TAG_URL: str = "https://api.github.com/repos/{repo}/git/tags/{sha}"
+
+#: Environment override for ``DEFAULT_GITHUB_REPO``.
+GITHUB_REPO_ENV: str = "QWEN_WEB_GITHUB_REPO"
+
+#: Self-update client identity sent to the GitHub API.
+USER_AGENT: str = "qwen-web-arwaky-updater/1.0"
+
+# ─── Prompt domain: stream timeouts ─────────────────────────────────────────
+#: Absolute backstop for a stalled stream run; override per environment with
+#: ``QWEN_STREAM_SAFETY_TIMEOUT_SEC`` (issue #330) since a 4h hardcoded
+#: budget is untestable in staging.
+DEFAULT_SAFETY_TIMEOUT_SEC: int = 4 * 60 * 60
+
+#: Event-driven stall threshold: no forward event within this window classifies
+#: the run stuck; slow-but-alive generations keep emitting events and are
+#: never misclassified.
+DEFAULT_STALL_TIMEOUT_SEC: int = 300
+
+#: Environment override for ``DEFAULT_SAFETY_TIMEOUT_SEC``.
+SAFETY_TIMEOUT_ENV: str = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
+
+# ─── Job domain: status document contract ──────────────────────────────────
+#: Version of the ``status.json`` document contract; bump when a field is
+#: added or its meaning changes so external monitors can branch on it
+#: (issue #296).
+STATUS_SCHEMA_VERSION: int = 2
+
+# ─── Session domain ──────────────────────────────────────────────────────────
+#: Root directory for persistent session pools and profiles.
+SESSIONS_DIR: Path = Path.home() / ".qwen-web" / "sessions"
+
+#: Pool file recording active session pool under ``SESSIONS_DIR``.
+POOL_FILE: Path = SESSIONS_DIR / "sessions.json"
+
+#: Chromium profile directory name reused across runs.
+PROFILE_DIR_NAME: str = "Default"
+
+# ─── Config domain: capacity report source labels ────────────────────────────
+# Names the effective worker count can come from, for the report's ``source``.
+
+#: Source label when the worker count is derived from measured memory.
+SOURCE_DERIVED: str = "derived from measured available memory"
+
+#: Source label when the worker count comes from the env override.
+SOURCE_OVERRIDE: str = "QWEN_WEB_MAX_WORKERS environment override"
+
+# ─── Session domain: rate-limit detection ───────────────────────────────────
+#: Regex patterns matching rate-limit or capacity-exceeded text in the UI,
+#: used by the session health checker to flag a rate-limited session.
+RATE_LIMIT_PATTERNS: list[str] = [
+    r"upper\s+limit",
+    r"rate\s+limit",
+    r"daily\s+limit",
+    r"quota\s+exceeded",
+    r"try\s+again\s+tomorrow",
+    r"too\s+many\s+requests",
+    r"429",
+    r"limit\s+reached",
+    r"usage\s+limit",
+]
+
+
 # ─── Prompt templates (role-based built-in templates) ─────────────────────
 # Role templates now live as Markdown files under ``modules/templates/{role}.md``
 # and are discovered dynamically at runtime by
 # ``modules/shared/src/utility_core_prompt_template.py``. No hardcoded manifest
 # remains in this module.
+
+# Parse-wait loop tuning for the send dispatcher's document-parse gate:
+# window during which parse-waiting stays maximally responsive (fast phase),
+# poll interval inside the fast phase, and backed-off interval for long parses.
+PARSE_FAST_PHASE_SEC: float = 5.0
+PARSE_POLL_FAST_MS: int = 500
+PARSE_POLL_SLOW_MS: int = 1000

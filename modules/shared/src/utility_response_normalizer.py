@@ -1,6 +1,6 @@
 """Response envelope utilities for surface commands.
 
-Utility layer (utility_core_response): stateless functions for building
+Utility layer (utility_response_normalizer): stateless functions for building
 standardized success/error response dicts used by CLI/MCP surfaces.
 """
 

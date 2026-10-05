@@ -14,7 +14,6 @@ from .contract_config_aggregate import IConfigAggregate
 from .contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
-    IJobStorageProtocol,
     IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
@@ -22,8 +21,9 @@ from .contract_core_protocol import (
     IUploadProtocol,
 )
 from .contract_jobs_aggregate import IJobManagerAggregate
+from .contract_jobs_protocol import IJobStorageProtocol
 from .contract_logging_aggregate import IObservabilityAggregate
-from .contract_prompt_aggregate import IPromptAggregate, IPromptFlowAggregate
+from .contract_prompt_aggregate import IPromptAggregate
 from .contract_session_aggregate import ISessionAggregate
 from .contract_session_protocol import ISessionRotatorProtocol
 from .contract_setup_aggregate import ISetupAggregate
@@ -220,19 +220,22 @@ from .utility_core_prompt import (
     strip_input_from_output,
 )
 
+# ─── Utility: text ────────────────────────────────────────────
+from .utility_core_text import strip_ui_noise, utc_now_iso
+
+# ─── Utility: validation ──────────────────────────────────────
+from .utility_core_validation import validate_file, validate_response_content
+
 # ─── Utility: response ────────────────────────────────────────
-from .utility_core_response import (
+from .utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,
     success_response,
 )
 
-# ─── Utility: text ────────────────────────────────────────────
-from .utility_core_text import strip_ui_noise, utc_now_iso
-
-# ─── Utility: validation ──────────────────────────────────────
-from .utility_core_validation import validate_file, validate_response_content
+# ─── Utility: session guard ───────────────────────────────────
+from .utility_session_guard import is_filesystem_root, is_safe_session_target
 
 __all__ = [
     # VOs
@@ -370,6 +373,8 @@ __all__ = [
     "SEND_SELECTORS",
     "MESSAGE_SELECTORS",
     "AUTH_KEYWORDS",
+    "FALSE_VALUES",
+    "TRUE_VALUES",
     "LOGIN_FORM_SELECTORS",
     "CHALLENGE_KEYWORDS",
     "STOP_BUTTON_SELECTORS",
@@ -436,4 +441,6 @@ __all__ = [
     "exit_code_for",
     "should_treat_as_new_response",
     "is_stability_satisfied",
+    "is_filesystem_root",
+    "is_safe_session_target",
 ]

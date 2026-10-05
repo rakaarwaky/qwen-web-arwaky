@@ -1,430 +1,198 @@
 # ═══════════════════════════════════════════════════════════════════════
-# lint_arwaky.config.yaml — Unified configuration for qwen-web-arwaky
-# AES architecture rules for the modules/ layered structure.
+# lint_arwaky.config.yaml — Unified configuration for all languages
+# Replaces: lint_arwaky.config.rust.yaml, lint_arwaky.config.python.yaml,
+#           lint_arwaky.config.typescript.yaml, lint_arwaky.config.javascript.yaml
 # ═══════════════════════════════════════════════════════════════════════
 
 thresholds:
   score: 100.0
   complexity: 15
 
+# ─── Adapters ─────────────────────────────────────────────────────────
+# All adapters listed. The system auto-filters by detected language.
+# This list is also authoritative: `scan`/`check`/`external` only run the
+# adapters named here, so an adapter that is not listed is never invoked —
+# CI and TEST.md §1 install exactly this set.
 adapters:
+  # Rust
+  - name: "clippy"
+    weight: 1.0
+  - name: "rustfmt"
+    weight: 1.0
+  - name: "cargo-audit"
+    weight: 1.0
+  # Python
   - name: "ruff"
     weight: 1.0
   - name: "mypy"
     weight: 1.0
   - name: "bandit"
     weight: 1.0
+  # TypeScript/JavaScript
+  - name: "eslint"
+    weight: 1.0
+  - name: "tsc"
+    weight: 1.0
+  - name: "prettier"
+    weight: 1.0
+  # Markdown
+  - name: "markdownlint"
+    weight: 1.0
+  # Internal
   - name: "architecture"
     weight: 3.0
 
-ignored_rules: []
+ignored_rules:
+  # Rule-level suppressions, applied to every linter's findings. Matched as a
+  # case-insensitive substring of the violation code, so `MD013` silences every
+  # adapter's MD013 and `AES2` silences a whole AES range.
+  #
+  # The markdownlint policy lives here rather than in a separate
+  # `.markdownlint-cli2.jsonc`: `markdownlint-cli2` reads policy only from the
+  # directory it runs in and never walks up, so a tool-specific file would have
+  # to be duplicated into every scan root in the repo. Keeping it beside
+  # `adapters:` makes this file the single source of truth for what runs and
+  # what is reported.
+  #
+  # The structural rules (MD012, MD022, MD031, MD032, MD040, MD047, MD056,
+  # MD058) deliberately stay enabled — they are what catches a malformed table
+  # or an unlabelled code fence. Enabling markdownlint surfaced real defects
+  # through them, including ten BACKLOG.md tables whose header declared 5
+  # columns against 6-cell rows.
+  #
+  # These four are off because this repository's documentation style collides
+  # with them:
+  #   MD013 line-length — spec tables carry a full rule code, a path and a
+  #     command on one row so each table stays scannable as a single unit.
+  #   MD060 table-column-style — tables are written compact (pipes tight
+  #     against the cell text), not column-aligned.
+  #   MD033 inline HTML — `<Type>` is Rust/TS generic notation in prose and
+  #     code spans, not markup.
+  #   MD024 duplicate heading — ARCHITECTURE.md repeats Purpose/Components/
+  #     Dependencies/Special Rules once per AES layer, by design, and CHANGELOG.md
+  #     repeats Added/Changed/Fixed per version entry. This silences the rule
+  #     outright, so a genuine duplicate heading under one parent is
+  #     no longer reported; nothing in this repo currently relies on that.
+  - "markdownlint::MD013"
+  - "markdownlint::MD060"
+  - "markdownlint::MD033"
+  - "markdownlint::MD024"
 
-ignored_paths:
-  # Test-infrastructure utility: consumed only by conftest.py and its own
-  # test module to decide whether the parallel browser tier can run.
-  # It is deliberately unreachable from any _entry file.
-  - "modules/shared/src/utility_host_gate.py"
+ignored_paths: []
 
+# ─── Architecture rules ─────────────────────────────────────────────────
+#
+# The AES business rules — layer scopes, the import dependency matrix, suffix
+# policies, code-quality limits — are fixed in the tool, not configurable. They
+# live in `crates/shared/src/config_system/utility_architecture_constants.rs` and
+# are compiled into the binary, so every project enforces the same architecture.
+#
+# This section carries only what a project may change: whether a rule runs and
+# which files it skips. (The embedded default in
+# `crates/shared/config/lint_arwaky.config.yaml` has the same shape.)
 architecture:
   enabled: true
   rules:
+    # ─── AES100 ───
     AES101:
       enabled: true
-      scope:
-        [
-          "taxonomy",
-          "utility",
-          "contract",
-          "capabilities",
-          "agent",
-          "surface",
-          "root",
-        ]
       exceptions: []
-
     AES102:
       enabled: true
-      scope:
-        [
-          "taxonomy",
-          "utility",
-          "contract",
-          "capabilities",
-          "agent",
-          "surface",
-          "root",
-        ]
       exceptions: []
-      layers:
-        taxonomy:
-          suffix:
-            - strict: ["vo", "entity", "error", "event", "constant"]
-        contract:
-          suffix:
-            - strict: ["protocol", "aggregate"]
-        utility:
-          suffix:
-            - flexible: []
-            - forbidden:
-                [
-                  "vo",
-                  "entity",
-                  "error",
-                  "event",
-                  "constant",
-                  "protocol",
-                  "aggregate",
-                ]
-        capabilities:
-          suffix:
-            - flexible: []
-            - forbidden:
-                [
-                  "vo",
-                  "entity",
-                  "error",
-                  "event",
-                  "constant",
-                  "constants",
-                  "protocol",
-                  "aggregate",
-                  "utility",
-                ]
-        agent:
-          suffix:
-            - strict: ["orchestrator"]
-        surface:
-          suffix:
-            - strict:
-                [
-                  "command",
-                  "controller",
-                  "page",
-                  "view",
-                  "component",
-                  "router",
-                  "layout",
-                  "hook",
-                  "store",
-                  "action",
-                  "screen",
-                ]
-        root:
-          suffix:
-            - strict: ["entry", "container"]
-
+    # ─── AES200 ───
     AES201:
       enabled: true
-      scope:
-        [
-          "taxonomy",
-          "utility",
-          "contract",
-          "capabilities",
-          "agent",
-          "surface",
-          "root",
-        ]
       exceptions: []
-      conditions:
-        - scope: "taxonomy(vo)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "taxonomy(entity,error,event)"
-          allowed: ["taxonomy"]
-          mandatory: ["taxonomy(vo|constant)"]
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "taxonomy(constant)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "utility"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden: ["agent", "surface", "contract", "capabilities", "root", "utility"]
-
-        - scope: "contract(protocol)"
-          allowed: ["taxonomy", "contract"]
-          mandatory: ["taxonomy"]
-          forbidden:
-            ["agent", "surface", "capabilities", "contract(aggregate)", "root"]
-
-        - scope: "contract(aggregate)"
-          allowed: ["taxonomy", "contract"]
-          mandatory: ["taxonomy"]
-          forbidden: ["agent", "surface", "capabilities", "root"]
-          forbidden_inheritance: ["contract(protocol)"]
-
-        - scope: "capabilities"
-          allowed: ["taxonomy", "contract", "utility"]
-          mandatory: ["taxonomy", "contract(protocol)"]
-          forbidden: ["surface", "agent", "capabilities", "root"]
-
-        - scope: "agent(orchestrator)"
-          allowed:
-            ["taxonomy", "contract(aggregate)", "contract(protocol)", "utility"]
-          mandatory: ["taxonomy", "contract(aggregate)"]
-          forbidden: ["surface", "capabilities", "root", "agent"]
-
-        - scope: "root"
-          allowed: ["taxonomy", "contract", "capabilities", "agent", "surface"]
-          mandatory: []
-          forbidden: []
-
-        - scope: "surface(command|controller|page)"
-          allowed: ["taxonomy", "contract(aggregate)", "utility"]
-          mandatory: null
-          forbidden: ["agent", "capabilities", "contract(protocol)", "root"]
-
-        - scope: "surface(hook|store|action|screen|router)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            [
-              "agent",
-              "capabilities",
-              "contract(protocol)",
-              "surface(command|controller|page|entry)",
-              "root",
-            ]
-
-        - scope: "surface(component|view|layout)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            [
-              "agent",
-              "contract",
-              "capabilities",
-              "surface(command|controller|page|entry|hook|store|action|screen|router)",
-              "root",
-            ]
-
     AES202:
       enabled: true
-      scope:
-        [
-          "taxonomy",
-          "utility",
-          "contract",
-          "capabilities",
-          "agent",
-          "surface",
-          "root",
-        ]
       exceptions: []
-      conditions:
-        - scope: "taxonomy(vo)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "taxonomy(entity,error,event)"
-          allowed: ["taxonomy"]
-          mandatory: ["taxonomy(vo|constant)"]
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "taxonomy(constant)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            ["agent", "surface", "contract", "utility", "capabilities", "root"]
-
-        - scope: "utility"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden: ["agent", "surface", "contract", "capabilities", "root", "utility"]
-
-        - scope: "contract(protocol)"
-          allowed: ["taxonomy", "contract"]
-          mandatory: ["taxonomy"]
-          forbidden:
-            ["agent", "surface", "capabilities", "contract(aggregate)", "root"]
-
-        - scope: "contract(aggregate)"
-          allowed: ["taxonomy", "contract"]
-          mandatory: ["taxonomy"]
-          forbidden: ["agent", "surface", "capabilities", "root"]
-
-        - scope: "capabilities"
-          allowed: ["taxonomy", "contract", "utility"]
-          mandatory: ["taxonomy", "contract(protocol)"]
-          forbidden: ["surface", "agent", "capabilities", "root"]
-
-        - scope: "agent(orchestrator)"
-          allowed:
-            ["taxonomy", "contract(aggregate)", "contract(protocol)", "utility"]
-          mandatory: ["taxonomy", "contract(aggregate)"]
-          forbidden: ["surface", "capabilities", "root"]
-
-        - scope: "root"
-          allowed: ["taxonomy", "contract", "capabilities", "agent", "surface"]
-          mandatory: []
-          forbidden: []
-
-        - scope: "surface(command|controller|page)"
-          allowed: ["taxonomy", "contract(aggregate)", "utility"]
-          mandatory: null
-          forbidden: ["agent", "capabilities", "contract(protocol)", "root"]
-
-        - scope: "surface(hook|store|action|screen|router)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            [
-              "agent",
-              "capabilities",
-              "contract(protocol)",
-              "surface(command|controller|page|entry)",
-              "root",
-            ]
-
-        - scope: "surface(component|view|layout)"
-          allowed: ["taxonomy"]
-          mandatory: null
-          forbidden:
-            [
-              "agent",
-              "contract",
-              "capabilities",
-              "surface(command|controller|page|entry|hook|store|action|screen|router)",
-              "root",
-            ]
-
     AES203:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
       exceptions: []
-
     AES204:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
       exceptions: []
-
+    AES205:
+      enabled: true
+      exceptions: []
+    # ─── AES300 ───
     AES301:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
-      max_lines: 1000
       exceptions: []
-
     AES302:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
-      min_lines: 5
       exceptions: []
-
     AES303:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
       exceptions: []
-
     AES304:
       enabled: true
-      scope:
-        [
-          "taxonomy",
-          "utility",
-          "contract",
-          "capabilities",
-          "agent",
-          "surface",
-          "root",
-        ]
-      forbidden_bypass:
-        [
-          "#[allow(",
-          "unwrap",
-          "expect",
-          "panic",
-          "todo",
-          "unimplemented",
-          "unreachable",
-          "noqa",
-          "type: ignore",
-          "eslint-disable",
-          "// @ts-ignore",
-          "// @ts-expect-error",
-          "// @ts-nocheck",
-        ]
       exceptions: []
-
     AES305:
       enabled: true
-      scope:
-        ["taxonomy", "contract", "utility", "capabilities", "agent", "surface"]
       exceptions: []
-
+    # ─── AES400 ───
     AES401:
       enabled: true
-      scope: ["taxonomy(constant)", "taxonomy(entity,error,event)", "taxonomy(vo)"]
-
+      exceptions: []
     AES402:
       enabled: true
-      scope: ["contract(aggregate)", "contract(protocol)"]
       exceptions: []
-
     AES403:
       enabled: true
-      scope: ["capabilities"]
-      max_functions: 30
-      max_impl: 5
       exceptions: []
-
     AES404:
       enabled: true
-      scope: ["utility"]
       exceptions: []
-
     AES405:
       enabled: true
-      scope: ["agent(orchestrator)"]
-      max_lines: 1000
       exceptions: []
-
     AES406:
       enabled: true
-      scope:
-        [
-          "surface(command|controller|page|router|entry)",
-          "surface(hook|store|action|screen)",
-          "surface(component|view|layout)",
-        ]
       exceptions: []
-
+    # ─── AES500 ───
     AES501:
       enabled: true
-      scope: ["taxonomy"]
-
+      exceptions: []
     AES502:
       enabled: true
-      scope: ["contract"]
-
+      exceptions: []
     AES503:
       enabled: true
-      scope: ["capabilities"]
-
+      exceptions: []
     AES504:
       enabled: true
-      scope: ["utility"]
-
+      exceptions: []
     AES505:
       enabled: true
-      scope: ["agent"]
-
+      exceptions: []
     AES506:
       enabled: true
-      scope: ["surface"]
+      exceptions: []
+    # ─── AES600 ───
+    AES601:
+      enabled: true
+      exceptions: []
+    AES602:
+      enabled: true
+      exceptions: []
+    AES603:
+      enabled: true
+      exceptions: []
+    AES604:
+      enabled: true
+      exceptions: []
+    AES605:
+      enabled: true
+      exceptions: []
+    # ─── AES700 ───
+    AES701:
+      enabled: true
+      exceptions: []
+    AES702:
+      enabled: true
+      exceptions: []
+    AES703:
+      enabled: true
+      exceptions: []

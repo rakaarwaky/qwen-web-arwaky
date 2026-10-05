@@ -100,7 +100,7 @@ Capabilities -----> Playwright / filesystem / telemetry
 Shared contracts, taxonomy, and utilities
 ```
 
-## Available Scripts
+## Available Scripts/Commands
 
 Run application commands inside the activated virtual environment.
 
@@ -116,7 +116,7 @@ Run application commands inside the activated virtual environment.
 | `qwen-web-arwaky prompt-with-attachment -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
 | `qwen-web-mcp` | Start the MCP server over standard input/output. | An MCP client can initialize the server; silence while waiting for input is normal. |
 | `python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v` | Run the same test selection as CI. | Pytest ends with a passed summary and status 0. |
-| `bash scripts/gates.sh` | Run local lint, type, security, architecture, and test gates. | The script ends with `All gates passed`. |
+| `bash scripts/ci.sh` | Run local lint, type, security, architecture, and test gates. | The script ends with `All 7 gates passed`. |
 | `python -m build` | Build a source archive and wheel. | Package files appear under `dist/`. |
 
 Use `qwa` as the short alias for `qwen-web-arwaky`. Use `--no-headless` on prompt commands to watch browser automation, and `--json` where supported for machine-readable output.

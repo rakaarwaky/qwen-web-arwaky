@@ -13,7 +13,6 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from modules.config.src.utility_config_app_factory import build_app_config
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
 )
@@ -23,6 +22,7 @@ from modules.shared.src.taxonomy_core_constant import CHAT_URL, DEFAULT_OUTPUT
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_setup_vo import SetupRequest, SetupResponse
+from modules.shared.src.utility_config_app_factory import build_app_config
 from modules.shared.src.utility_core_session_backup import take_snapshot
 
 
@@ -44,7 +44,7 @@ class SetupOrchestrator(ISetupAggregate):
             mode="login",
             input_path=DEFAULT_OUTPUT,
             output_path=DEFAULT_OUTPUT,
-            session_path=Path(profile_path) if profile_path is not None else None,
+            session_path=profile_path,
             headless=request.browser_headless,
         )
 
@@ -134,7 +134,8 @@ class SetupOrchestrator(ISetupAggregate):
                 self._browser.navigate_to_chat(page, emitter)
                 return self._browser.check_session(page)
         except Exception as exc:
-            self._observability.get_logger().debug("saved_session_validation_failed", error=str(exc))
+            log_debug = self._observability.get_logger().debug
+            log_debug("saved_session_validation_failed", error=str(exc))
             return False
 
 

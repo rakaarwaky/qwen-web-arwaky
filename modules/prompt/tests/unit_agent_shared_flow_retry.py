@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
+from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS
 from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE, STANDARD_PROMPT_EVENTS
@@ -67,7 +67,7 @@ def _make_streamer(waits: list[object]) -> MagicMock:
 
 
 def _run_once(
-    flow: SharedFlowOrchestrator,
+    flow: PromptFlowDispatcher,
     emitter,
     state,
     streamer: MagicMock,
@@ -96,7 +96,7 @@ def _run_once(
 def test_dispatch_retry_survives_first_attempt_timeout() -> None:
     """Standard pipeline: attempt 1 times out mid-wait; attempt 2 must pass
     the gate after the prefix-preserving reset and complete the run."""
-    flow = SharedFlowOrchestrator()
+    flow = PromptFlowDispatcher()
     observability = MagicMock()
     logger = MagicMock()
 
@@ -111,7 +111,7 @@ def test_dispatch_retry_survives_first_attempt_timeout() -> None:
         ]
     )
 
-    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.capabilities_prompt_flow_dispatcher.time.sleep"):
         response = _run_once(flow, emitter, state, streamer, observability)
 
     assert response == "final response"
@@ -120,7 +120,7 @@ def test_dispatch_retry_survives_first_attempt_timeout() -> None:
 
 
 def test_dispatch_retry_reraises_on_max_attempts() -> None:
-    flow = SharedFlowOrchestrator()
+    flow = PromptFlowDispatcher()
     observability = MagicMock()
     logger = MagicMock()
 
@@ -130,7 +130,7 @@ def test_dispatch_retry_reraises_on_max_attempts() -> None:
 
     streamer = _make_streamer([ResponseDetectionTimeoutError("always times out")])
 
-    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.capabilities_prompt_flow_dispatcher.time.sleep"):
         with pytest.raises(ResponseDetectionTimeoutError):
             _run_once(flow, emitter, state, streamer, observability)
 
@@ -164,7 +164,7 @@ def test_attachment_pipeline_retry_preserves_document_parsed() -> None:
     """Attachment pipeline: DOCUMENT_PARSED is emitted once before the dispatch loop.
     After a timeout retry, the gate must still accept PROMPT_INJECTED because
     DOCUMENT_PARSED remains in the completed prefix (boundary = index+1 = 5)."""
-    flow = SharedFlowOrchestrator()
+    flow = PromptFlowDispatcher()
     observability = MagicMock()
     logger = MagicMock()
 
@@ -180,7 +180,7 @@ def test_attachment_pipeline_retry_preserves_document_parsed() -> None:
         ]
     )
 
-    with patch("modules.prompt.src.agent_shared_flow_orchestrator.time.sleep"):
+    with patch("modules.prompt.src.capabilities_prompt_flow_dispatcher.time.sleep"):
         response = _run_once(flow, emitter, state, streamer, observability, PIPELINE_EVENT_SEQUENCE)
 
     assert response == "final response"
