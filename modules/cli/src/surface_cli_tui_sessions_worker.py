@@ -112,13 +112,19 @@ class _TuiSessionsWorkerMixin:
         self.call_from_thread(self._apply_session_state, "VALID" if valid else "EXPIRED")
 
     def _apply_session_state(self, state: str) -> None:
-        self._last_session_state = state
-        self._log_msg("[bold {}]SESSION:[/] {}".format(THEME["muted"], state))
-        # Cancel the timeout timer when the worker completes. Without this, a
-        # 15s timer can fire after the verdict lands and overwrite it.
+        # Record the verdict and cancel the watchdog BEFORE the timer can fire.
+        # The 15s timer is armed by _check_session; if the verdict callback
+        # ever fails to reach us (e.g. a cross-thread dispatch dropped on a
+        # busy app loop) the timer would fire 15s later and print a spurious
+        # "Session check timed out" even though the check already succeeded —
+        # which is exactly the log the user saw: EVENT_LOGIN_VERIFIED, then
+        # the timeout warning. Stopping it here keeps the two in step.
         if getattr(self, "_session_check_timer", None) is not None:
             self._session_check_timer.stop()
             self._session_check_timer = None
+        self._session_check_timed_out = state == "TIMEOUT"
+        self._last_session_state = state
+        self._log_msg("[bold {}]SESSION:[/] {}".format(THEME["muted"], state))
 
     # ── Session Pool Management ────────────────────────────────────────
 
