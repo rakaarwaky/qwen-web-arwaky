@@ -9,6 +9,7 @@ routes the request verb and wraps the outcome into the shared VO.
 from __future__ import annotations
 
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
 from modules.shared.src.taxonomy_core_vo import VersionString
 from modules.shared.src.taxonomy_update_vo import (
@@ -22,16 +23,19 @@ __all__ = ["UpdateOrchestrator"]
 class UpdateOrchestrator(IUpdateAggregate):
     """Run the self-update pipeline on behalf of the CLI update command."""
 
-    def __init__(self, updater: IUpdateProtocol) -> None:
-        """Wrap the update capability.
+    def __init__(self, updater: IUpdateProtocol, observability: IObservabilityProtocol) -> None:
+        """Wrap the update capability and the observability seam.
 
         ``updater`` arrives as ``IUpdateProtocol`` so a test can hand in a
-        stub without this agent reaching for the concrete update capability.
-        The concrete updater is constructed by the container and injected here.
+        stub without this agent reaching for the concrete update capability;
+        the concrete updater is constructed by the container and injected here.
+        ``observability`` records the update run, so a long download and a
+        rolled-back version land in the run log rather than only on stdout.
         """
         self._updater = updater
+        self._observability = observability
 
-    # ─── Block 2: Aggregate Method Implementation ──────────
+    # Block 2: Protocol Method Implementation
 
     def execute(self, request: UpdateRequest) -> UpdateResponse:
         """Run the requested update verb and return its outcome as a shared VO.
@@ -51,7 +55,7 @@ class UpdateOrchestrator(IUpdateAggregate):
             return UpdateResponse(steps=self._updater.rollback_to(VersionString(previous)))
         return UpdateResponse(error=f"unknown update verb: {request.verb!r}")
 
-    # ─── Block 3: Dunder Methods, Factories & Helpers ──────
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def __repr__(self) -> str:
         return "UpdateOrchestrator()"

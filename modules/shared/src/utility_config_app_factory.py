@@ -13,16 +13,10 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
+    REQUEST_TIMEOUT_ENV,
+    TRUE_VALUES,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig
-
-_TRUE_VALUES = frozenset({"1", "true", "yes"})
-
-#: Operator override for the response-wait ceiling. The stream monitor treats
-#: ``request_timeout`` as wall-clock, so a host with slower reasoning models can
-#: raise it without a code change; unparseable or non-positive values fall back
-#: to the built-in default instead of failing the pipeline boot.
-REQUEST_TIMEOUT_ENV = "QWEN_REQUEST_TIMEOUT_SEC"
 
 
 def _resolve_request_timeout(override: int) -> int:
@@ -79,7 +73,7 @@ def build_app_config(
     output_path: Path | None = None,
     headless: bool = True,
     interval: int = 3,
-    session_path: Path | None = None,
+    session_path: Path | str | None = None,
     log_path: Path | None = None,
     timeout: int = 300,
     prompt_file: Path | None = None,
@@ -106,17 +100,20 @@ def build_app_config(
     ``QWEN_DISABLE_SANDBOX`` forces it off.
     """
     dummy_path = Path(os.devnull)
-    if os.environ.get("QWEN_DISABLE_SANDBOX", "").lower() in _TRUE_VALUES:
+    if os.environ.get("QWEN_DISABLE_SANDBOX", "").lower() in TRUE_VALUES:
         disable_sandbox = True
-    elif os.environ.get("QWEN_ENABLE_SANDBOX", "").lower() in _TRUE_VALUES:
+    elif os.environ.get("QWEN_ENABLE_SANDBOX", "").lower() in TRUE_VALUES:
         disable_sandbox = False
     elif not disable_sandbox and sandbox_unavailable():
         disable_sandbox = True
+    # Normalise a raw string profile argument to a Path; fall back to the
+    # shared default when the caller supplied nothing.
+    session_path = Path(session_path) if isinstance(session_path, str) else (session_path or DEFAULT_SESSION)
     return AppConfig(
         mode=mode,
         input_path=input_path or dummy_path,
         output_path=output_path or DEFAULT_OUTPUT,
-        session_path=session_path or DEFAULT_SESSION,
+        session_path=session_path,
         log_path=log_path or DEFAULT_LOG,
         interval=interval,
         timeout=timeout,

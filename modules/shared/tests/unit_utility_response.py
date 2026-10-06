@@ -1,8 +1,8 @@
-"""Unit tests for utility_core_response functions."""
+"""Unit tests for utility_response_normalizer functions."""
 
 from __future__ import annotations
 
-from modules.shared.src.utility_core_response import (
+from modules.shared.src.utility_response_normalizer import (
     detect_processing_failure,
     safe_handle,
     success_response,

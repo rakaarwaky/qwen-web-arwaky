@@ -19,6 +19,7 @@ from modules.shared.src.contract_core_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_vo import RunId, RunState
 
 
+# Block 1: Class Definition & Constructor
 class RunCancelRegistry:
     """Thread-safe registry of active runs keyed by their run_id.
 
@@ -34,6 +35,7 @@ class RunCancelRegistry:
         self._event_index: dict[threading.Event, RunId] = {}
         self._lock = threading.Lock()
 
+    # Block 2: Protocol Method Implementation
     def register(self, run_state: RunState) -> None:
         """Track a newly started in-flight run."""
         with self._lock:
@@ -100,6 +102,7 @@ class RunCancelRegistry:
             return
         self.cancel_run(run_id)
 
+    # Block 3: Dunder Methods, Factories, Helpers
     def __repr__(self) -> str:
         return f"RunCancelRegistry(active={len(self._states)})"
 

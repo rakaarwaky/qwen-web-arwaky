@@ -16,6 +16,7 @@ from playwright.sync_api import BrowserContext, Page
 
 from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_core_protocol import IBrowserProtocol
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_vo import AppConfig
 
 __all__ = ["BrowserOrchestrator"]
@@ -24,14 +25,17 @@ __all__ = ["BrowserOrchestrator"]
 class BrowserOrchestrator(IBrowserAggregate):
     """Open authenticated chat sessions on behalf of the other orchestrators."""
 
-    def __init__(self, browser: IBrowserProtocol) -> None:
+    def __init__(self, browser: IBrowserProtocol, observability: IObservabilityProtocol) -> None:
         """Wrap the browser capability that does the Playwright work.
 
-        The dependency arrives as ``IBrowserProtocol`` so this agent depends on
-        the contract, not on the concrete ``BrowserAdapter``: a test can inject
-        a stub that never launches a real Chromium process.
+        Both dependencies arrive as contracts, so this agent depends on
+        ``IBrowserProtocol`` rather than the concrete ``BrowserAdapter`` and a
+        test can inject a stub that never launches a real Chromium process.
+        ``observability`` owns the run-scoped log the session's browser
+        callbacks report into.
         """
         self._browser = browser
+        self._observability = observability
 
     @contextmanager
     def open_session(self, cfg: AppConfig) -> Iterator[Page]:

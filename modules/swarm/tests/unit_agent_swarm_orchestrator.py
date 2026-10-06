@@ -5,10 +5,12 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from threading import Event
+from unittest.mock import MagicMock
 
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, ResponseText, WindowSec
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
@@ -62,7 +64,7 @@ class FakeAttachmentAggregate:
 
 def _wait_for_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
     for _ in range(100):
-        snapshot = orchestrator.snapshot(swarm_id)
+        snapshot = orchestrator.execute(SwarmRequest(verb="snapshot", swarm_id=swarm_id)).snapshot
         assert snapshot is not None
         if snapshot.status in {"completed", "partial", "failed", "cancelled"}:
             return snapshot
@@ -85,12 +87,13 @@ def test_swarm_discovers_all_templates_and_writes_existing_format(monkeypatch, t
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     assert final.status == "completed"
@@ -104,12 +107,13 @@ def test_swarm_retries_transient_agent_failure_and_allows_partial(monkeypatch, t
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"security-reviewer": 3})
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     assert final.status == "partial"
@@ -126,7 +130,8 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate({"architect": 2, "security-reviewer": 100})
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
@@ -145,7 +150,7 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
 
     aggregate.process_prompt_with_attachment = process_with_stuck
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     assert final.status == "partial"
@@ -180,12 +185,13 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
     aggregate.process_prompt_with_attachment = process_with_auth_error
 
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     architect = next(agent for agent in final.agents if agent.agent_id == "architect")
@@ -220,12 +226,13 @@ def test_swarm_retries_lifecycle_gate_rejection(monkeypatch, tmp_path: Path) -> 
     aggregate.process_prompt_with_attachment = process_with_gate_rejection
 
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     # Both agents hit the gate rejection on every attempt (3 each) and are
@@ -242,17 +249,17 @@ def test_swarm_cancel_cleans_up_state(monkeypatch, tmp_path: Path) -> None:
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
     runner = SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate)
-    orchestrator = SwarmOrchestrator(runner=runner)
+    orchestrator = SwarmOrchestrator(runner=runner, observability=MagicMock())
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
-    orchestrator.cancel(initial.swarm_id)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
+    orchestrator.execute(SwarmRequest(verb="cancel", swarm_id=initial.swarm_id))
 
     assert initial.swarm_id not in runner._executors
     assert initial.swarm_id not in runner._cancel_events
     assert initial.swarm_id not in runner._attachment_paths
-    snapshot = orchestrator.snapshot(initial.swarm_id)
+    snapshot = orchestrator.execute(SwarmRequest(verb="snapshot", swarm_id=initial.swarm_id)).snapshot
     assert snapshot is not None
     assert snapshot.status == "cancelled"
 
@@ -263,11 +270,16 @@ def test_resource_warning_only_above_threshold(monkeypatch, tmp_path: Path) -> N
     _patch_templates(monkeypatch, tmp_path)
     aggregate = FakeAttachmentAggregate()
 
-    quiet = SwarmOrchestrator(runner=SwarmRunner(output_root=tmp_path, browser_concurrency=3, attachment=aggregate))
+    quiet = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=3, attachment=aggregate), observability=MagicMock()
+    )
     assert quiet.resource_warning is None
     assert quiet.browser_concurrency == 3
 
-    loud = SwarmOrchestrator(runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate))
+    loud = SwarmOrchestrator(
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=10, attachment=aggregate),
+        observability=MagicMock(),
+    )
     assert loud.resource_warning == "This will launch up to 10 browser processes. Continue?"
 
 
@@ -284,19 +296,20 @@ def test_swarm_respects_injected_rate_limiter(monkeypatch, tmp_path: Path) -> No
     assert limiter.try_acquire() is None
 
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, rate_limiter=limiter, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, rate_limiter=limiter, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     time.sleep(0.2)
-    snapshot = orchestrator.snapshot(initial.swarm_id)
+    snapshot = orchestrator.execute(SwarmRequest(verb="snapshot", swarm_id=initial.swarm_id)).snapshot
     assert snapshot is not None
     # Still running and no browser launched: the fan-out is waiting on quota.
     assert snapshot.status == "running"
     assert aggregate.calls == []
-    orchestrator.cancel(initial.swarm_id)
+    orchestrator.execute(SwarmRequest(verb="cancel", swarm_id=initial.swarm_id))
 
 
 def test_swarm_fails_agent_only_when_circuit_breaker_trips(monkeypatch, tmp_path: Path) -> None:
@@ -307,12 +320,13 @@ def test_swarm_fails_agent_only_when_circuit_breaker_trips(monkeypatch, tmp_path
     breaker = CircuitBreaker(FailureThreshold(1), WindowSec(30))
     breaker.record_failure()
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, circuit_breaker=breaker, attachment=aggregate)
+        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=2, circuit_breaker=breaker, attachment=aggregate),
+        observability=MagicMock(),
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    initial = orchestrator.start(input_path)
+    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     # The breaker was open before either agent started a browser.

@@ -12,8 +12,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_swarm_protocol import ISwarmProtocol
+from modules.shared.src.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
 from modules.shared.src.taxonomy_core_vo import FilePath
 from modules.shared.src.taxonomy_swarm_vo import (
     BrowserCount,
@@ -25,11 +27,6 @@ from modules.shared.src.taxonomy_swarm_vo import (
 
 __all__ = ["SwarmOrchestrator"]
 
-# Resource-governance policy (issue #277). Above this many concurrent browsers
-# the TUI shows an explicit warning before the fan-out starts; below it the
-# start is silent, matching the interactive cost users expect.
-SWARM_RESOURCE_WARNING_BROWSERS = 4
-
 
 class SwarmOrchestrator(ISwarmAggregate):
     """Run Swarm fan-outs on behalf of the CLI, TUI, and MCP surfaces.
@@ -39,15 +36,23 @@ class SwarmOrchestrator(ISwarmAggregate):
     stub that never launches a browser.
     """
 
-    def __init__(self, runner: ISwarmProtocol, folder_adapter: IFolderToAttachmentProtocol | None = None) -> None:
+    def __init__(
+        self,
+        runner: ISwarmProtocol,
+        observability: IObservabilityProtocol,
+        folder_adapter: IFolderToAttachmentProtocol | None = None,
+    ) -> None:
         """Wire the swarm runner to the folder resolver that precedes it.
 
         ``runner`` performs the fan-out. ``folder_adapter`` compiles a
         folder input down to the single attachment every role shares;
         without it a folder input is passed to the roles as-is.
+        ``observability`` records each role's outcome in the run log, so a
+        partial fan-out leaves one place to read what every role returned.
         """
         self._runner = runner
         self._folder_adapter = folder_adapter
+        self._observability = observability
 
     @property
     def browser_concurrency(self) -> BrowserCount:
@@ -75,35 +80,37 @@ class SwarmOrchestrator(ISwarmAggregate):
         if request.verb == "start":
             if request.input_path is None:
                 return SwarmResponse(error="start requires input_path")
-            return SwarmResponse(snapshot=self.start(request.input_path))
+            return SwarmResponse(snapshot=self._start(request.input_path))
         if request.verb == "snapshot":
             if request.swarm_id is None:
                 return SwarmResponse(error="snapshot requires swarm_id")
-            return SwarmResponse(snapshot=self.snapshot(SwarmId(request.swarm_id)))
+            return SwarmResponse(snapshot=self._snapshot(SwarmId(request.swarm_id)))
         if request.verb == "cancel":
             if request.swarm_id is None:
                 return SwarmResponse(error="cancel requires swarm_id")
-            self.cancel(SwarmId(request.swarm_id))
-            return SwarmResponse(snapshot=self.snapshot(SwarmId(request.swarm_id)))
+            self._cancel(SwarmId(request.swarm_id))
+            return SwarmResponse(snapshot=self._snapshot(SwarmId(request.swarm_id)))
         raise ValueError(f"Unknown swarm verb: {request.verb!r}")
 
-    def start(self, input_path: Path) -> SwarmSnapshot:
+    def _start(self, input_path: Path) -> SwarmSnapshot:
         """Start a fan-out over every discovered role template.
 
         A folder input is compiled down to one attachment first, so every
         role in the Swarm reads the same material regardless of whether
-        the user pointed at a file or a directory.
+        the user pointed at a file or a directory. The runner resolves and
+        validates the path it is handed, so this agent stays free of
+        filesystem access.
         """
-        source = Path(input_path).expanduser().resolve()
-        attachment = source
-        if source.is_dir() and self._folder_adapter is not None:
-            attachment = self._folder_adapter.resolve_to_attachment(source)
-        return self._runner.start(FilePath(source), FilePath(attachment))
+        attachment = input_path
+        if self._folder_adapter is not None and self._folder_adapter.is_folder(input_path):
+            attachment = self._folder_adapter.resolve_to_attachment(input_path)
+        as_filepath = FilePath
+        return self._runner.start(as_filepath(input_path), as_filepath(attachment))
 
-    def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
+    def _snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""
         return self._runner.snapshot(swarm_id)
 
-    def cancel(self, swarm_id: SwarmId) -> None:
+    def _cancel(self, swarm_id: SwarmId) -> None:
         """Cancel queued and active work for a swarm."""
         self._runner.cancel(swarm_id)

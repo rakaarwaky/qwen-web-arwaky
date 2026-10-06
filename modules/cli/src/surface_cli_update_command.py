@@ -15,7 +15,7 @@ from modules.shared.src.taxonomy_core_vo import (
     UpdateReport,
     UpdateStepResult,
 )
-from modules.shared.src.utility_core_response import error_response, safe_handle, success_response
+from modules.shared.src.utility_response_normalizer import error_response, safe_handle, success_response
 
 _DIVIDER = "─" * 58
 

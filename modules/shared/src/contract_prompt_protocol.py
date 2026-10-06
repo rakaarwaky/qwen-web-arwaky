@@ -10,6 +10,7 @@ Seams:
 - ``IDirectPromptProtocol``     → ``DirectPromptAdapter``
 - ``IPromptFileProtocol``       → ``PromptFileAdapter``
 - ``IAttachmentPromptProtocol`` → ``AttachmentPromptAdapter``
+- ``IPromptFlowProtocol``       → ``PromptFlowDispatcher``
 
 The outward entry point, ``IPromptAggregate``, is in
 ``contract_prompt_aggregate.py``.
@@ -17,18 +18,31 @@ The outward entry point, ``IPromptAggregate``, is in
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import Event
 
-from modules.shared.src.contract_core_protocol import LifecycleObserver
+from playwright.sync_api import Page
+
+from modules.shared.src.contract_core_protocol import (
+    IInjectionProtocol,
+    ISendProtocol,
+    IStreamProtocol,
+    LifecycleObserver,
+)
+from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_vo import (
+    AppConfig,
     AttachmentPath,
     HeadlessFlag,
+    MessageCount,
     OutputPath,
     PromptPath,
     PromptText,
     ResponseText,
+    SenderConfig,
     TimeoutSec,
 )
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
@@ -137,10 +151,46 @@ class IAttachmentPromptProtocol(ABC):
         ...
 
 
+class IPromptFlowProtocol(ABC):
+    """Shared prompt dispatch/response-wait flow capability.
+
+    One method: the inject → send → wait flow with retry and rollback.
+    Implemented by ``PromptFlowDispatcher`` and consumed by the direct,
+    file, and attachment prompt adapters via dependency injection.
+    """
+
+    @abstractmethod
+    def dispatch_and_wait_for_response(
+        self,
+        page: Page,
+        injector: IInjectionProtocol,
+        sender: ISendProtocol,
+        streamer: IStreamProtocol,
+        emitter: LifecycleEmitter,
+        state: LifecycleState,
+        observability: IObservabilityProtocol,
+        filepath: Path,
+        prompt: str,
+        msg_count_before: MessageCount,
+        timeout_sec: int,
+        active_cfg: AppConfig,
+        sender_config: SenderConfig | None = None,
+        document_parsed: bool = True,
+        cancel_event: threading.Event | None = None,
+    ) -> str:
+        """Inject the prompt, send it, and wait for the AI response.
+
+        Retries on rate-limit and response-timeout errors; raises
+        ``RunCancelledError`` when ``cancel_event`` is set.
+        """
+        ...
+
+
 __all__ = [
     "IAttachmentPromptProtocol",
     "IDirectPromptProtocol",
     "IPromptFileProtocol",
+    "IPromptFlowProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -148,4 +198,5 @@ _layer_symbols = {
     "IAttachmentPromptProtocol": IAttachmentPromptProtocol,
     "IDirectPromptProtocol": IDirectPromptProtocol,
     "IPromptFileProtocol": IPromptFileProtocol,
+    "IPromptFlowProtocol": IPromptFlowProtocol,
 }

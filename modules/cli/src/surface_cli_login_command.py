@@ -6,7 +6,7 @@ from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
-from modules.shared.src.utility_core_response import safe_handle, success_response
+from modules.shared.src.utility_response_normalizer import safe_handle, success_response
 
 
 @safe_handle

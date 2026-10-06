@@ -32,7 +32,7 @@ from modules.shared.src.taxonomy_core_vo import (
 from modules.shared.src.taxonomy_jobs_vo import JobRequest
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
-from modules.shared.src.utility_core_response import detect_processing_failure
+from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
 # ─── FR-002 success envelope status values ──────────────────────────────────
 # Every successful MCP payload carries a `status` discriminator so agent

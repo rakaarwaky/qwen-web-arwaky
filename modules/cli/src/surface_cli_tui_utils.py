@@ -20,6 +20,7 @@ from textual.widgets import DataTable, Label, TabbedContent
 from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
+from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 
 if TYPE_CHECKING:
     pass
@@ -350,7 +351,7 @@ class _TuiUtilsMixin:
         if swarm is None:
             return 0, 0, 0.0
         try:
-            snapshot = swarm.snapshot(snapshot_id)
+            snapshot = swarm.execute(SwarmRequest(verb="snapshot", swarm_id=snapshot_id)).snapshot
         except Exception:
             return 0, 0, 0.0
         if snapshot is None:

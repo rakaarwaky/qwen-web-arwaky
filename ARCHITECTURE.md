@@ -34,7 +34,7 @@ The parts are joined by underscores, followed by the normal file extension for t
 
 ---
 
-## 4. Vertical Slicing Folder Structure
+## 4. Vertical Slicing Layout
 
 AI agents frequently make this mistake. Do NOT create `surface/`, `taxonomy/`,
 `contract/`, `capabilities/`, `utility/`, `agent/` folders. The correct structure

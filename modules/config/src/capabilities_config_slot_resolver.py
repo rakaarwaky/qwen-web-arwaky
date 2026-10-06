@@ -12,10 +12,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from modules.config.src.utility_config_app_factory import (
-    build_app_config,
-    resolve_pipeline_output_path,
-)
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
 from modules.shared.src.taxonomy_core_vo import (
     BatchPromptOutcome,
@@ -26,6 +22,10 @@ from modules.shared.src.taxonomy_core_vo import (
     SlotInputValue,
     SlotRunPlan,
 )
+from modules.shared.src.utility_config_app_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 # Backward-compatible aliases — the concrete types now live in the taxonomy
@@ -33,26 +33,13 @@ from modules.shared.src.utility_core_prompt_template import is_prompt_role, mate
 SlotInputError: type[SlotInputValue] = SlotInputValue
 
 
-def _output_dir_write_error(out_path: Path) -> str | None:
-    """Return an actionable message when *out_path* cannot be written to.
-
-    Checks the target itself and its nearest existing ancestor, so a directory
-    that has not been created yet is validated by the directory that would
-    have to be created (issue #280 AC-2).
-    """
-    probe_dir = out_path if out_path.is_dir() else out_path.parent
-    ancestor = probe_dir
-    while not ancestor.exists() and ancestor != ancestor.parent:
-        ancestor = ancestor.parent
-    if not ancestor.is_dir():
-        return f"Output directory not writable: {out_path}. Check permissions."
-    if not os.access(ancestor, os.W_OK | os.X_OK):
-        return f"Output directory not writable: {out_path}. Check permissions."
-    return None
+# Block 1: Class Definition & Constructor
 
 
 class SlotRunPlanResolver(IConfigSlotPlanProtocol):
     """Resolve raw slot widget values into an executable run plan."""
+
+    # Block 2: Protocol Method Implementation
 
     def resolve_slot_run_plan(
         self,
@@ -136,6 +123,27 @@ class SlotRunPlanResolver(IConfigSlotPlanProtocol):
         if not files:
             return BatchPromptOutcome(error=SlotInputValue(f"No .md files found in {batch_path}"))
         return BatchPromptOutcome(files=files)
+
+
+# Block 3: Dunder Methods, Factories & Helpers
+
+
+def _output_dir_write_error(out_path: Path) -> str | None:
+    """Return an actionable message when *out_path* cannot be written to.
+
+    Checks the target itself and its nearest existing ancestor, so a directory
+    that has not been created yet is validated by the directory that would
+    have to be created (issue #280 AC-2).
+    """
+    probe_dir = out_path if out_path.is_dir() else out_path.parent
+    ancestor = probe_dir
+    while not ancestor.exists() and ancestor != ancestor.parent:
+        ancestor = ancestor.parent
+    if not ancestor.is_dir():
+        return f"Output directory not writable: {out_path}. Check permissions."
+    if not os.access(ancestor, os.W_OK | os.X_OK):
+        return f"Output directory not writable: {out_path}. Check permissions."
+    return None
 
 
 __all__ = ["SlotInputError", "SlotRunPlan", "SlotRunPlanResolver"]

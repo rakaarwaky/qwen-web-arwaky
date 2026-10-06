@@ -20,13 +20,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_session_vo import SessionRequest
 from modules.shared.src.utility_session_guard import is_filesystem_root, is_safe_session_target
 
 
 def _orchestrator() -> SessionOrchestrator:
-    return SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
+    return SessionOrchestrator(
+        browser=MagicMock(),
+        observability=MagicMock(),
+        sessions=SessionManager(),
+    )
 
 
 # ── Refusals: filesystem roots and near-root paths ───────────────────────────
@@ -175,7 +180,7 @@ def test_orchestrator_refuses_target_when_guard_rejects(tmp_path: Path) -> None:
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
         patch(
-            "modules.session.src.agent_session_orchestrator.is_safe_session_target",
+            "modules.session.src.capabilities_session_manager.utility_session_guard.is_safe_session_target",
             return_value=False,
         ) as guard,
     ):
@@ -185,12 +190,13 @@ def test_orchestrator_refuses_target_when_guard_rejects(tmp_path: Path) -> None:
         guard.assert_called_once_with(target.resolve())
 
 
-def test_delete_session_missing_target_reports_not_found(tmp_path: Path) -> None:
-    """A non-existent target is a no-op, not a refusal."""
+def test_delete_session_missing_target_reports_no_error(tmp_path: Path) -> None:
+    """A non-existent target is a no-op, not a refusal or an error."""
     orch = _orchestrator()
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = tmp_path / "absent"
-        assert "No session found" in str(orch.execute(SessionRequest(verb="delete")))
+        response = orch.execute(SessionRequest(verb="delete"))
+    assert response.error is None
 
 
 def test_delete_session_removes_default_session(tmp_path: Path) -> None:
@@ -223,7 +229,7 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     with (
         patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
-        patch("modules.session.src.agent_session_orchestrator.shutil.rmtree", side_effect=OSError("device busy")),
+        patch("modules.session.src.capabilities_session_manager.shutil.rmtree", side_effect=OSError("device busy")),
     ):
         build.return_value.session_path = fake_default
         with pytest.raises(QwenCliError) as excinfo:

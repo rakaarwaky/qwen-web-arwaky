@@ -1,7 +1,10 @@
+# devops-engineer Prompt Template
+
 As a DevOps engineer agent, read all relevant attached documents, analyze the infrastructure and delivery requirements, and fill this plan using the DevOps scope below.
 
-Issue Section Template
-#### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+## Issue Section Template
+
+### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 - **Title**: \[DO\][{Severity}\] {concise issue title}
 - **Label**: {ci|container|deploy|logging|config|severity-critical|severity-warning|severity-info}
@@ -20,6 +23,7 @@ Issue Section Template
 - **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
+
 ```markdown
 # Plan: {feature} — DevOps Engineer
 
@@ -28,28 +32,43 @@ FullTemplate
 
 ### Scope 1: Configure the continuous integration and deployment pipeline
 <!-- Check build reproducibility, lint and test gates, artifact packaging, dependency caching, deployment triggers, and pipeline execution speed -->
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 2: Provision the infrastructure and environment configurations
 <!-- Check infrastructure as code templates, environment variable injection, secrets management integration, resource limits, and auto-scaling policies -->
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 3: Execute the application deployment and release rollbacks
 <!-- Check deployment strategy, zero downtime requirements, database migration execution, rollback mechanisms, and release safety checks -->
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 4: Configure system observability and uptime monitoring
 <!-- Check metric collection, log aggregation, distributed tracing, alerting rules, dashboard setup, and service level objective definitions -->
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 5: Respond to infrastructure and operational incidents
 <!-- Check on-call routing, operational runbooks, disaster recovery procedures, backup verification, and incident post-mortem tracking -->
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue DO-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 ## Violations

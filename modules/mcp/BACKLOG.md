@@ -11,6 +11,30 @@ State and Health vocabulary, verification requirements, ownership rules, and ID 
 - Blocked: None.
 - Next: `MCP-01`, `MCP-02`, `MCP-03`.
 
+## Scenario Evidence
+
+| Scenario | Evidence | Status |
+|---|---|---|
+| CLI/MCP feature flows | Test runs in CI | Pass |
+
+## Blockers
+
+None.
+
+## Release Readiness
+
+Feature is release-ready pending the items in the Backlog section above.
+
+## Deferred
+
+None.
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-10-05 | Added required BACKLOG template sections |
+
 ## Backlog
 
 | ID | Item | Priority | State | Health | Owner | Actual Condition | Next | Updated |

@@ -11,13 +11,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from modules.shared.src.contract_core_protocol import IMetricsProtocol
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_core_vo import (
-    FilePath,
-    RunId,
-)
+from modules.shared.src.taxonomy_core_vo import RunId
 from modules.shared.src.taxonomy_logging_vo import (
     ObservabilityRequest,
     ObservabilityResponse,
@@ -29,13 +27,15 @@ __all__ = ["LoggingOrchestrator"]
 class LoggingOrchestrator(IObservabilityAggregate):
     """Route observability verbs to the logging capability."""
 
-    def __init__(self, observability: IObservabilityProtocol) -> None:
-        """Wrap the observability capability.
+    def __init__(self, observability: IObservabilityProtocol, metrics: IMetricsProtocol) -> None:
+        """Wrap the observability bootstrap and the metrics capability.
 
-        The dependency arrives as ``IObservabilityProtocol`` so a test can
-        inject a stub that never opens a log file or contacts Sentry.
+        Both arrive as ``*Protocol`` so a test can inject stubs that never
+        open a log file or contact Sentry; the metrics seam backs the
+        failure tally the quality report reads.
         """
         self._observability = observability
+        self._metrics = metrics
 
     def execute(self, request: ObservabilityRequest) -> ObservabilityResponse:
         """Route the observability verb to its operation and report the outcome.
@@ -68,7 +68,7 @@ class LoggingOrchestrator(IObservabilityAggregate):
                 report = self._observability.write_quality_report(
                     run_id=RunId(request.run_id) if request.run_id else None
                 )
-                return ObservabilityResponse(success=True, report_path=FilePath(report))
+                return ObservabilityResponse(success=True, report_path=report)
         except Exception as exc:
             return ObservabilityResponse(success=False, error=str(exc))
         raise QwenCliError(f"Unknown observability verb: {request.verb!r}")  # pragma: no cover
@@ -81,4 +81,4 @@ class LoggingOrchestrator(IObservabilityAggregate):
         """
         from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
 
-        return Path(request.log_path) if request.log_path is not None else Path(DEFAULT_LOG)
+        return request.log_path if request.log_path is not None else DEFAULT_LOG

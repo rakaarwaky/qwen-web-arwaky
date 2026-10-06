@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.taxonomy_core_constant import POOL_FILE, SESSIONS_DIR
+from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
     pass
 
 
-SESSIONS_DIR = Path.home() / ".qwen-web" / "sessions"
-POOL_FILE = SESSIONS_DIR / "sessions.json"
-PROFILE_DIR_NAME = "Default"
+# Block 1: Class Definition & Constructor
 
 
 class SessionManager(ISessionManagerProtocol):
@@ -26,9 +28,7 @@ class SessionManager(ISessionManagerProtocol):
         self._base_dir = base_dir or SESSIONS_DIR
         self._ensure_dirs()
 
-    def _ensure_dirs(self) -> None:
-        """Create session storage directories."""
-        self._base_dir.mkdir(parents=True, exist_ok=True)
+    # Block 2: Protocol Method Implementation
 
     def load_pool(self) -> SessionPool:
         """Load session pool from disk."""
@@ -94,6 +94,32 @@ class SessionManager(ISessionManagerProtocol):
             return True
         return False
 
+    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
+        """Remove the saved Chromium profile directory at *profile_path*.
+
+        Safety checks run before anything is removed: the target must exist,
+        must clear ``is_safe_session_target`` (never a filesystem root, a
+        near-root path, or a path outside the allow-list), and must have a
+        retained backup generation unless *force* is set. A partial removal
+        raises rather than silently leaving an inconsistent profile.
+        """
+        target = profile_path.resolve()
+        if not target.exists():
+            return
+        if not utility_session_guard.is_safe_session_target(target):
+            raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
+        try:
+            utility_core_session_backup.refuse_delete_without_backup(target, force=force)
+        except PermissionError as exc:
+            raise QwenCliError(str(exc)) from exc
+        try:
+            shutil.rmtree(target)
+        except Exception as exc:
+            raise QwenCliError(
+                f"Failed to delete session {target}: {exc}. "
+                "Deletion may be partial — remove the remaining directory manually."
+            ) from exc
+
     def list_sessions(self) -> SessionList:
         """List all sessions."""
         return SessionList(self.load_pool().sessions)
@@ -117,6 +143,12 @@ class SessionManager(ISessionManagerProtocol):
         pool = self.load_pool()
         pool.mark_healthy(session_id)
         self.save_pool(pool)
+
+    # Block 3: Dunder Methods, Factories & Helpers
+
+    def _ensure_dirs(self) -> None:
+        """Create session storage directories."""
+        self._base_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def _parse_datetime(iso_str: str | None) -> datetime | None:

@@ -59,7 +59,7 @@ class FileUploader(IUploadProtocol):
         self.card_selectors = self.config.card_selectors
         self.last_error: Exception | None = None
 
-    # ─── Block 2: Public Contract (IUploadProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
     def upload_attachment(
         self,
         page: Page,
@@ -165,7 +165,7 @@ class FileUploader(IUploadProtocol):
             self.max_file_size_mb = MaxFileSizeMb(max_size_mb)
         return FileSizeBytes(validate_file(filepath, float(self.max_file_size_mb)))
 
-    # ─── Block 3: Private Helpers (In Chronological Execution Order) ──
+    # Block 3: Dunder Methods, Factories, Helpers
 
     # ── Helper for Step 2: Execute single upload attempt ──
     def _try_upload_attempt(self, page: Page, filepath: Path) -> bool:

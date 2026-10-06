@@ -31,8 +31,13 @@ _PATH_ROLES: tuple[tuple[str, bool], ...] = (
 )
 
 
+# Block 1: Class Definition & Constructor
+
+
 class ConfigPathResolver(IConfigPathResolverProtocol):
     """Resolve a config's paths and verify the host can use each one."""
+
+    # Block 2: Protocol Method Implementation
 
     def resolve_paths(self, app_config: AppConfig) -> ResolvedConfigPaths:
         """Return every path *app_config* names, with existence and writability verified.
@@ -71,6 +76,8 @@ class ConfigPathResolver(IConfigPathResolverProtocol):
                 )
             resolved.append(ResolvedConfigPath(role=field, path=path, exists=exists, writable=writable))
         return ResolvedConfigPaths(paths=tuple(resolved), issues=tuple(issues))
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     @staticmethod
     def _writable(path: Path) -> bool:

@@ -12,7 +12,6 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.config.src.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
@@ -22,8 +21,10 @@ from modules.shared.src.contract_core_protocol import (
     LifecycleObserver,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_prompt_aggregate import IPromptFlowAggregate
-from modules.shared.src.contract_prompt_protocol import IDirectPromptProtocol
+from modules.shared.src.contract_prompt_protocol import (
+    IDirectPromptProtocol,
+    IPromptFlowProtocol,
+)
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
 from modules.shared.src.taxonomy_core_vo import (
@@ -38,9 +39,12 @@ from modules.shared.src.taxonomy_core_vo import (
     TimeoutSec,
 )
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
+
+# Block 1: Class Definition & Constructor
 
 
 class DirectPromptAdapter(IDirectPromptProtocol):
@@ -54,7 +58,7 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         streamer: IStreamProtocol,
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
-        flow: IPromptFlowAggregate,
+        flow: IPromptFlowProtocol,
     ) -> None:
         self._browser = browser
         self._injector = injector
@@ -63,6 +67,8 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         self._saver = saver
         self._observability = observability
         self._flow = flow
+
+    # Block 2: Protocol Method Implementation
 
     def process_direct_prompt(
         self,
@@ -113,6 +119,8 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         finally:
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _execute_direct_on_page(
         self,
