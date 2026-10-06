@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [6.6.0] - 2026-10-06
+
+### Added
+
+- feat(tui): match chat tab design to slot_chat_automation_console mockup (#484)
+- feat(tui): lazy load and refresh template roles dynamically
+- feat(tui): Settings pane is configuration only, drop the slot form
+- feat(tui): mockup design parity across all consoles
+- feat(tui): port mobile-web mockup designs onto the tab layout
+- feat: 1:1 mockup parity TUI layout (4 screens + bottom dock)
+- feat(contract): add browser, config, and update aggregate contracts
+
+### Fixed
+
+- fix(tui): stop spurious session-check timeout warning
+- fix(tui): stop spurious SESSION LOAD ERROR on app-thread scheduling
+- fix(tests): untrack the modules/prompt .last_run_ts fixture
+
+### Changed
+
+- chore: gitignore entire .agents/ and untrack its files (supersedes #481)
+- chore: gitignore whole .agents/ except the tracked skill files
+- refactor(aes): migrate to zero-violation AES architecture (324 → 0)
+- chore(deps): bump the python group with 4 updates
+- refactor(tui): port mockup engine status design to Textual Overview
+- chore: add ci.sh, slim container, fix AES lint violations
+- docs: add TUI_CURRENT_DESIGN reference for redesign workflow
+- refactor(tui): apply Obsidian Terminal design tokens and card layout
+- docs: replace design assets with Obsidian Terminal system + screen mockups
+- refactor: consolidate feature modules, remove legacy core module, fix container session mounts
+- refactor(feature-modules): relocate utilities + add browser/config/update orchestrators
+
 ## [6.5.2] - 2026-09-26
 
 Rollback-safe patch release: cuts a tagged point after the stream-monitor
