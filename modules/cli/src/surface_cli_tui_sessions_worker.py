@@ -122,15 +122,25 @@ class _TuiSessionsWorkerMixin:
 
     # ── Session Pool Management ────────────────────────────────────────
 
-    @work(thread=True)
+    @work(thread=True, group="session-table", exclusive=True)
     def _refresh_sessions_table(self) -> None:
-        """Load and display all sessions in the Sessions tab table."""
+        """Load and display all sessions in the Sessions tab table.
+
+        ``exclusive=True`` guards against a double-fire when this worker is
+        scheduled from two paths in quick succession (e.g. ``_check_session``
+        on mount plus a nav-dock click on the same event-loop tick). Without
+        it the second invocation's callback would race the first into the DOM
+        and ``query_one`` would see an inconsistent widget tree.
+        """
         if not hasattr(self, "_session_manager") or self._session_manager is None:
             self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
             return
         try:
             pool = self._session_manager.load_pool()
             sessions = pool.sessions
+            total = pool.total_count
+            healthy = sum(1 for s in sessions if s.is_healthy)
+            limited = sum(1 for s in sessions if s.is_limited)
 
             def _update() -> None:
                 table = self.query_one("#sessions-table", DataTable)
@@ -146,23 +156,40 @@ class _TuiSessionsWorkerMixin:
                     )
                     for s in sessions
                 )
-                total = pool.total_count
-                healthy = sum(1 for s in sessions if s.is_healthy)
-                limited = sum(1 for s in sessions if s.is_limited)
                 self._render_account_cards(list(sessions))
                 with contextlib.suppress(NoMatches):
                     self.query_one("#session-total", Label).update(f"{total}")
                     self.query_one("#session-healthy", Label).update(f"{healthy}")
                     self.query_one("#session-limited", Label).update(f"{limited}")
-                self.call_from_thread(
-                    self._log_msg,
+                # _update runs on the app thread only when _refresh_sessions_table
+                # was called from the main thread; call_from_thread is the no-op
+                # fast path in that case. It must NOT appear inside the callback
+                # itself — calling it from the app thread raises ValueError and
+                # surfaces as a spurious "SESSION LOAD ERROR" even though the
+                # table rendered fine.
+                self._log_msg(
                     "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
                         THEME["ok"], total, healthy, limited
                     ),
                 )
 
-            self.call_from_thread(_update)
+            # _refresh_sessions_table is @work(thread=True), so this worker runs
+            # on a background thread and the dispatch below is a real
+            # cross-thread hop. The outer try/except catches data-load errors
+            # (load_pool, query_one on a table that is not yet mounted, etc.)
+            # — NOT the app-thread call_from_thread ValueError, which is a
+            # scheduling no-op, not a data error, and should not masquerade
+            # as a session load failure.
+            with contextlib.suppress(ValueError):
+                # call_from_thread raises ValueError when the calling thread is
+                # already the app thread (a scheduling no-op, not a data error).
+                # Swallowing it here keeps "SESSION LOAD ERROR" reserved for
+                # genuine load failures.
+                self.call_from_thread(_update)
         except Exception as exc:
+            # Only real data-load errors reach here. App-thread call_from_thread
+            # scheduling errors are swallowed above so they do not print a
+            # misleading "SESSION LOAD ERROR".
             self.call_from_thread(
                 self._log_msg,
                 "[bold {}]SESSION LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
