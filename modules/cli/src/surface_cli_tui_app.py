@@ -13,11 +13,14 @@ All logic is split across focused mixin modules:
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
 from textual.app import App
 from textual.binding import Binding
+from textual.css.query import NoMatches
+from textual.widgets import Select
 
 from modules.cli.src.surface_cli_tui_components import ConfirmModal
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
@@ -140,6 +143,8 @@ class QwenTuiApp(
         manifest = prompt_template_manifest()
         self._template_options: list[tuple[str, str]] = [(meta["title"], role) for role, meta in manifest.items()]
         self._template_roles: set[str] = set(manifest)
+        # P7: lazy reload guard - refresh on first UI request when new templates appear.
+        self._template_roles_dirty: bool = True
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
         self._metric_model: Any = None
@@ -199,6 +204,26 @@ class QwenTuiApp(
         if not confirmed or pending is None:
             return
         self._swarm_worker(pending)
+
+    # ── Prompt template lazy reload ─────────────────────────────────────────
+    def _check_template_roles(self) -> None:
+        """Ensure the in-memory template_roles set matches disk, lazy-loaded."""
+        if self._template_roles_dirty:
+            manifest = prompt_template_manifest()
+            self._template_roles = set(manifest)
+            self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
+            self._template_roles_dirty = False
+            # P7: populate the select dropdown with fresh options so the UI
+            # reflects any newly-added templates without a restart.
+            self._refresh_template_selects()
+
+    def _refresh_template_selects(self) -> None:
+        """Rebuild each slot's template Select widget with the current roles."""
+        for s in range(1, self._NUM_SLOTS + 1):
+            with contextlib.suppress(NoMatches):
+                select = self.query_one(f"#select-template-{s}", Select)
+                options = [("No template", "")] + [(role, role) for role in sorted(self._template_roles)]
+                select.set_options(options)
 
 
 __all__ = [
