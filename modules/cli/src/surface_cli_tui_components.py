@@ -224,11 +224,15 @@ class TemplatePickerModal(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         """Render one button per discovered template role, newest first."""
+        seen_roles = set()
         with Vertical(id="template-picker-container"):
             yield Label(f"[ {self._title} ]", id="template-picker-title")
             if not self._options:
                 yield Label("[dim]No templates discovered under modules/templates/.[/]\n")
             for role, display in self._options:
+                if role in seen_roles:
+                    continue
+                seen_roles.add(role)
                 safe_role = role.replace(" ", "_")
                 yield Button(display, id=f"tpl-{safe_role}", variant="default")
             yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
