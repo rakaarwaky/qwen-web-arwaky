@@ -25,7 +25,7 @@ class _ValidSession:
     already use.
     """
 
-    def execute(self, request):  # type: ignore[no-untyped-def]
+    def execute(self, request):
         response = MagicMock()
         response.valid = True
         return response
