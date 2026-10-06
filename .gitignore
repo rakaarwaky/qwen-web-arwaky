@@ -68,6 +68,7 @@ qwen_session/
 tests/artifacts/
 tests/fixtures/qwen_session
 tests/fixtures/.last_run_ts
+**/tests/fixtures/.last_run_ts
 
 # ==========================================
 # 7. AI, Agents & Code Analysis Tools
@@ -113,7 +114,7 @@ worktrees/
 **/.repowise/*
 !**/.repowise/bot.yaml
 !**/.repowise/health-rules.json
-tests/fixtures/.last_run_ts
+**/tests/fixtures/.last_run_ts
 .podman-data/
 build/
 
