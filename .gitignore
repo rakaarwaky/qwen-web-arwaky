@@ -84,13 +84,9 @@ tests/fixtures/.last_run_ts
 .mimocode
 mimocode.jsonc
 
-# AI Agents & Rules — ignore every local-only artefact under .agents/,
-# but keep the checked-in skill files: git does not re-evaluate already
-# tracked files, so .agents/skills/** stays in the repo while finding,
-# plans, reports, state and any new sibling directory are ignored.
-.agents/*
-!.agents/skills/
-!.agents/skills/**
+# AI Agents & Rules — every artefact under .agents/ is local-only;
+# nothing here is intended for the repo.
+.agents/
 .github/instructions/codacy.instructions.md
 
 # ==========================================
