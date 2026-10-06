@@ -205,6 +205,47 @@ class ConfirmModal(ModalScreen[bool]):
         self.dismiss(True)
 
 
+class TemplatePickerModal(ModalScreen[str | None]):
+    """Modal screen listing prompt-template roles for the operator to pick one.
+
+    The Templates pill on the chat console opens this modal; choosing a
+    role dismisses with the role string, choosing nothing dismisses with
+    ``None``. The caller writes the role into the slot's composer input.
+    """
+
+    BINDINGS = [
+        Binding("escape", "dismiss_none", "Cancel"),
+    ]
+
+    def __init__(self, options: list[tuple[str, str]], title: str = "PROMPT TEMPLATES") -> None:
+        super().__init__()
+        self._options = options
+        self._title = title
+
+    def compose(self) -> ComposeResult:
+        """Render one button per discovered template role, newest first."""
+        with Vertical(id="template-picker-container"):
+            yield Label(f"[ {self._title} ]", id="template-picker-title")
+            if not self._options:
+                yield Label("[dim]No templates discovered under modules/templates/.[/]")
+            for role, display in self._options:
+                yield Button(display, id=f"tpl-{role}", variant="default")
+            yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dismiss with the chosen role, or None on cancel."""
+        button_id = event.button.id
+        if button_id is None or button_id == "tpl-cancel":
+            self.dismiss(None)
+            return
+        if button_id.startswith("tpl-"):
+            self.dismiss(button_id.removeprefix("tpl-"))
+
+    def action_dismiss_none(self) -> None:
+        """Cancel the picker without a selection."""
+        self.dismiss(None)
+
+
 class QwenTuiRichLog(RichLog):
     """RichLog with a copy helper used by the ctrl+c log-copy action."""
 

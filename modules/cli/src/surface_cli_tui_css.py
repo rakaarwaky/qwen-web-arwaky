@@ -585,6 +585,27 @@ FilePickerModal {
     padding: 1 2;
 }
 
+/* Template picker modal: one button per discovered role, Cancel at the foot. */
+#template-picker-container {
+    width: 60%;
+    height: auto;
+    min-height: 8;
+    background: $bg_surface;
+    border: double $fg_accent;
+    padding: 1 2;
+}
+
+#template-picker-title {
+    background: $bg_base;
+    color: $fg_accent;
+    text-style: bold;
+    padding: 0 1;
+    border-bottom: solid $border;
+    height: 1;
+    width: 100%;
+    margin-bottom: 1;
+}
+
 #modal-title {
     background: $bg_base;
     color: $fg_accent;
