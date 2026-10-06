@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "qwen-web-mcp": {
-      "command": "qwen-web-mcp",
-      "args": []
-    }
-  }
-}

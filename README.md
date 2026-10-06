@@ -121,7 +121,7 @@ Run application commands inside the activated virtual environment.
 
 Use `qwa` as the short alias for `qwen-web-arwaky`. Use `--no-headless` on prompt commands to watch browser automation, and `--json` where supported for machine-readable output.
 
-For MCP client configuration, use the checked-in [`mcp.local.json`](mcp.local.json) as the minimal example.
+For MCP client configuration, use `.mcp.json` as the minimal example.
 
 ## Configuration
 
@@ -166,7 +166,7 @@ Operator runbooks for each `ErrorCategory` live in [`docs/runbooks/`](docs/runbo
 A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker count is in
 [`deploy/qwen-web-arwaky.service`](deploy/qwen-web-arwaky.service).
 
-MCP client configuration examples are in `mcp.local.json` and `.mcp.json`. Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
+MCP client configuration examples are in `.mcp.json`. Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
 
 ## Testing
 
