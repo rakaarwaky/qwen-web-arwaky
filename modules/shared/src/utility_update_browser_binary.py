@@ -44,9 +44,27 @@ EXTRA_PATHS = [
 
 # Playwright build names, most specific first. ``*_headless_shell`` is only
 # usable for headless runs, so the full browser name is probed first.
+#
+# The tuple order matters: ``chromium`` must come before
+# ``chromium_headless_shell`` because the headless-shell glob
+# (``chromium_headless_shell-*``) can match a build whose only binary is the
+# headless shell (no GUI). Returning that as ``executable_path`` for a
+# ``headless=False`` run produces no visible window — the exact "login opens
+# no browser" bug. The full ``chromium`` entry is tried first so the GUI
+# binary wins whenever it exists.
 _PLAYWRIGHT_BROWSER_DIRS = (
-    ("chromium_headless_shell", ("chrome-linux/headless_shell",)),
-    ("chromium", ("chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium")),
+    (
+        "chromium",
+        ("chrome-linux/chrome", "chrome-linux64/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"),
+    ),
+    (
+        "chromium_headless_shell",
+        (
+            "chrome-linux/headless_shell",
+            "chrome-linux64/headless_shell",
+            "chrome-headless-shell-linux64/chrome-headless-shell",
+        ),
+    ),
 )
 
 # Group- and world-writable bits: a file or directory carrying either can be
