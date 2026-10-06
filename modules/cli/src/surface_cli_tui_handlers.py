@@ -14,6 +14,7 @@ from typing import Any
 
 from rich.markup import escape
 from textual import work
+from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input, Select, TabbedContent
 
@@ -56,14 +57,14 @@ class _TuiHandlersMixin:
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dispatch button presses to slot, swarm, picker, and log-copy handlers."""
         button_id = event.button.id or ""
-        if button_id == "btn-swarm-start":
-            self._run_swarm()
+        if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
+            self._swarm_button_pressed(button_id)
             return
-        if button_id == "btn-swarm-cancel":
-            self._cancel_swarm()
+        if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
+            self._auth_panel_pressed(button_id)
             return
-        if button_id == "btn-browse-swarm-file":
-            self._open_picker("input-swarm-file", select_directories=True)
+        if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm"):
+            self._nav_dock_go(button_id)
             return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
@@ -75,6 +76,9 @@ class _TuiHandlersMixin:
                 if suffix.isdigit():
                     handler(int(suffix))
                     return
+        if button_id.startswith("chip-"):
+            self._apply_template_chip(button_id)
+            return
         for field, picker in (("prompt", False), ("file", True), ("output", False)):
             prefix = f"btn-browse-{field}-"
             if button_id.startswith(prefix):
@@ -88,8 +92,7 @@ class _TuiHandlersMixin:
             slot_id = int(button_id.removeprefix("btn-copy-log-"))
             self._copy_slot_log(slot_id)
             return
-        # Session management buttons
-        if button_id in ("btn-sessions-refresh", "btn-sessions-refresh-row"):
+        if button_id in ("btn-sessions-refresh", "btn-sessions-rerefresh"):
             self._refresh_sessions_table()
             return
         if button_id == "btn-sessions-login":
@@ -98,15 +101,86 @@ class _TuiHandlersMixin:
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
             return
-        if button_id in ("btn-stream-view", "btn-log-view"):
-            self._switch_swarm_view(visible_log=button_id == "btn-log-view")
+
+    def _swarm_button_pressed(self, button_id: str) -> None:
+        """Route Swarm-screen button presses to the right handler."""
+        if button_id == "btn-swarm-start":
+            self._run_swarm()
+        elif button_id == "btn-swarm-cancel":
+            self._cancel_swarm()
+        elif button_id == "btn-browse-swarm-file":
+            self._open_picker("input-swarm-file", select_directories=True)
+        elif button_id in ("btn-swarm-event", "btn-swarm-system"):
+            self._show_swarm_log(button_id == "btn-swarm-system")
+        elif button_id == "btn-clear-swarm-log":
+            self._clear_swarm_log()
+
+    def _apply_template_chip(self, button_id: str) -> None:
+        """Route a template-chip press into the slot's Select widget.
+
+        The chip id encodes both the slot and the role (``chip-<slot>-<role>``).
+        Selecting the same role twice is a no-op so the chip does not emit a
+        redundant log line on a repeated press.
+        """
+        _, _, remainder = button_id.partition("chip-")
+        slot_raw, _, role = remainder.partition("-")
+        if not slot_raw.isdigit() or not role:
             return
-        if button_id == "btn-clear-swarm-log":
-            self._clear_swarm_system_log()
-            return
-        if button_id.startswith("btn-templates-"):
-            self._open_template_sheet(int(button_id.removeprefix("btn-templates-")))
-            return
+        slot_id = int(slot_raw)
+        with contextlib.suppress(NoMatches):
+            select = self.query_one(f"#select-template-{slot_id}", Select)
+            if select.value == role:
+                return
+            select.value = role
+
+    def _show_swarm_log(self, show_system: bool) -> None:
+        """Switch the Swarm tab between the Event log and the System log.
+
+        The mockup presents these as a segmented toggle over one panel, so
+        exactly one of the two RichLog views stays visible and the toggle
+        buttons carry matching active/inactive styling.
+        """
+        with contextlib.suppress(NoMatches):
+            event_log = self.query_one("#log-view-swarm", QwenTuiRichLog)
+            system_log = self.query_one("#log-view-swarm-system", QwenTuiRichLog)
+            event_log.display = not show_system
+            system_log.display = show_system
+        with contextlib.suppress(NoMatches):
+            event_btn = self.query_one("#btn-swarm-event", Button)
+            system_btn = self.query_one("#btn-swarm-system", Button)
+            # Add/remove one class at a time. set_classes() would also drop
+            # the -style-default class that Textual's own Button CSS hangs
+            # its default rendering off, leaving the button unstyled.
+            event_btn.set_class(not show_system, "toggle-active")
+            event_btn.set_class(show_system, "toggle-inactive")
+            system_btn.set_class(show_system, "toggle-active")
+            system_btn.set_class(not show_system, "toggle-inactive")
+
+    def _clear_swarm_log(self) -> None:
+        """Empty whichever Swarm log view is currently on screen."""
+        with contextlib.suppress(NoMatches):
+            system_visible = self.query_one("#log-view-swarm-system", QwenTuiRichLog).display
+            view = self.query_one("#log-view-swarm-system" if system_visible else "#log-view-swarm", QwenTuiRichLog)
+            view.clear()
+            self._log_msg(
+                "[{}]Swarm log cleared.[/]".format(THEME["muted"]),
+            )
+
+    def _auth_panel_pressed(self, button_id: str) -> None:
+        """Handle the Login screen's auth-panel buttons.
+
+        ``btn-session-add`` toggles the expandable panel;
+        ``btn-auth-connect`` / ``btn-auth-cancel`` close it (and
+        ``btn-auth-connect`` also fires the login flow).
+        """
+        with contextlib.suppress(NoMatches):
+            panel = self.query_one("#auth-panel", Vertical)
+            if button_id == "btn-session-add":
+                panel.display = not panel.display
+            else:
+                panel.display = False
+                if button_id == "btn-auth-connect":
+                    self.action_login_action()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """Fill a slot's prompt input from the chosen role template."""
@@ -179,6 +253,50 @@ class _TuiHandlersMixin:
                 return int(active_id.split("-")[-1])
         return 1
 
+    def _refresh_nav_dock(self) -> None:
+        """Update the bottom nav dock's active indicator to match the tab bar."""
+        with contextlib.suppress(Exception):
+            from textual.widgets import Button
+
+            tabs = self.query_one(TabbedContent)
+            active = tabs.active or ""
+            overview_btn = self.query_one("#nav-overview", Button)
+            login_btn = self.query_one("#nav-login", Button)
+            chat_btn = self.query_one("#nav-chat", Button)
+            swarm_btn = self.query_one("#nav-swarm", Button)
+            # Reset all to inactive; then activate the one that matches.
+            for btn in (overview_btn, login_btn, chat_btn, swarm_btn):
+                btn.set_class(True, "nav-inactive")
+                btn.set_class(False, "nav-active")
+            if active == "tab-overview":
+                overview_btn.set_class(True, "nav-active")
+            elif active == "tab-sessions":
+                login_btn.set_class(True, "nav-active")
+            elif active.startswith("tab-slot-"):
+                chat_btn.set_class(True, "nav-active")
+            elif active == "tab-swarm":
+                swarm_btn.set_class(True, "nav-active")
+
+    def _nav_dock_go(self, button_id: str) -> None:
+        """Switch the tab bar to whichever section a bottom nav item points at.
+
+        CHAT has no single tab of its own: it stands for every per-slot job
+        tab, so it lands on the slot the user is already on (slot 1 when the
+        active tab is not a slot tab).
+        """
+        with contextlib.suppress(Exception):
+            tabs = self.query_one(TabbedContent)
+            if button_id == "nav-overview":
+                tabs.active = "tab-overview"
+            elif button_id == "nav-login":
+                tabs.active = "tab-sessions"
+            elif button_id == "nav-chat":
+                active_id = tabs.active or ""
+                tabs.active = active_id if active_id.startswith("tab-slot-") else "tab-slot-1"
+            elif button_id == "nav-swarm":
+                tabs.active = "tab-swarm"
+        self._refresh_nav_dock()
+
     # ── Keyboard actions ─────────────────────────────────────────────────
 
     def action_run_active_slot(self) -> None:
@@ -227,39 +345,6 @@ class _TuiHandlersMixin:
             return
         self._copy_rich_log(view)
 
-    def _switch_swarm_view(self, visible_log: bool) -> None:
-        """Toggle between the event stream and the raw system log (Swarm redesign)."""
-        with contextlib.suppress(NoMatches):
-            self.query_one("#unified-stream-container").display = not visible_log
-            self.query_one("#full-log-container").display = visible_log
-            self.query_one("#btn-stream-view").set_classes(
-                "segswitch-btn" if visible_log else "segswitch-btn segswitch-active"
-            )
-            self.query_one("#btn-log-view").set_classes(
-                "segswitch-btn segswitch-active" if visible_log else "segswitch-btn"
-            )
-
-    def _clear_swarm_system_log(self) -> None:
-        """Flush the raw system-log pane of the Swarm screen."""
-        with contextlib.suppress(NoMatches):
-            view = self.query_one("#log-view-swarm-system", QwenTuiRichLog)
-            view.clear()
-            view.write("[dim][Logs flushed by user][/dim]")
-
-    def _open_template_sheet(self, slot_id: int) -> None:
-        """List the role templates for a slot and log the chosen one.
-
-        Textual has no bottom-sheet primitive, so the template sheet is a
-        compact modal; picking a template routes through the same handler
-        as the Select dropdown so both entry points stay in sync.
-        """
-        options = getattr(self, "_template_options", [])
-        self._log_msg(
-            f"[bold {THEME['bright']}]TEMPLATES:[/] Slot {slot_id} — {len(options)} roles available "
-            f"(use the Quick Select dropdown to apply one).",
-            slot_id,
-        )
-
     def _copy_slot_log(self, slot_id: int) -> None:
         """Copy the per-slot log buffer identified by its slot number."""
         log_views: dict[Any, Any] = getattr(self, "_log_views", {})
@@ -281,15 +366,18 @@ class _TuiHandlersMixin:
         """Switch to the Overview tab (alt+0)."""
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-overview"
+        self._refresh_nav_dock()
 
     def action_switch_tab_swarm(self) -> None:
         """Switch to the Swarm tab (ctrl+alt+s)."""
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-swarm"
+        self._refresh_nav_dock()
 
     def _switch_to_slot(self, slot_id: int) -> None:
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
+        self._refresh_nav_dock()
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""

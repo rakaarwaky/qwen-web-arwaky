@@ -31,6 +31,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
     _format_success_payload,
 )
 from modules.shared.src.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.taxonomy_session_vo import SessionRequest
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files,
     compile_files_to_markdown,
@@ -90,7 +91,9 @@ def test_async_envelope_paths_are_trust_marked() -> None:
         workspace=tools,
         jobs=tools,
     )
-    tools.get_job_status.return_value = JobRecord(
+    from modules.shared.src.taxonomy_jobs_vo import JobResponse
+
+    status_record = JobRecord(
         job_id="job_1",
         latest_event="DONE",
         completed=True,
@@ -104,7 +107,10 @@ def test_async_envelope_paths_are_trust_marked() -> None:
         error=None,
         result_preview="answer",
     )
-    tools.list_jobs.return_value = []
+    tools.execute.side_effect = [
+        JobResponse(record=status_record),
+        JobResponse(records=[]),
+    ]
 
     status_payload = json.loads(command.get_job_status("job_1"))
     list_payload = json.loads(command.list_jobs(5))
@@ -135,8 +141,9 @@ def test_mcp_tool_descriptions_state_result_is_untrusted() -> None:
 
 def _orchestrator() -> object:
     from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+    from modules.session.src.capabilities_session_manager import SessionManager
 
-    return SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
+    return SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=SessionManager())
 
 
 def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> None:
@@ -150,7 +157,7 @@ def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> 
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.delete_session()
+            orchestrator.execute(SessionRequest(verb="delete"))
 
     assert (target / "keepme.txt").exists()
 
@@ -165,7 +172,7 @@ def test_delete_session_refuses_qwen_session_named_dir_under_home(tmp_path: Path
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.delete_session()
+            orchestrator.execute(SessionRequest(verb="delete"))
 
     assert target.exists()
 
@@ -183,7 +190,7 @@ def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
-        result = orchestrator.delete_session()
+        result = orchestrator.execute(SessionRequest(verb="delete"))
 
     assert "deleted successfully" in str(result)
     assert not fake_default.exists()
@@ -296,55 +303,55 @@ def _fake_browser(dir_path: Path, name: str = "chromium", mode: int = 0o755) -> 
 
 def test_world_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) -> None:
     """A world-writable fake chromium must be skipped, not launched."""
-    from modules.update.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "evil-bin"
     _fake_browser(bindir, mode=0o777)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.update.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
         lambda: "",
     )
-    monkeypatch.setattr("modules.update.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == ""
 
 
 def test_group_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) -> None:
     """A group-writable binary is equally substitutable."""
-    from modules.update.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "group-bin"
     _fake_browser(bindir, mode=0o775)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.update.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
         lambda: "",
     )
-    monkeypatch.setattr("modules.update.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == ""
 
 
 def test_owned_non_shared_binary_is_accepted(tmp_path: Path, monkeypatch) -> None:
     """A correctly permissioned binary on PATH is still discovered."""
-    from modules.update.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "ok-bin"
     binary = _fake_browser(bindir, mode=0o755)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.update.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
         lambda: "",
     )
-    monkeypatch.setattr("modules.update.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == str(binary)
 
 
 def test_playwright_managed_binary_is_preferred(tmp_path: Path, monkeypatch) -> None:
     """The Playwright-managed build wins over any PATH candidate."""
-    from modules.update.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
 
     root = tmp_path / "ms-playwright"
     managed = root / "chromium-1" / "chrome-linux" / "chrome"
@@ -357,7 +364,7 @@ def test_playwright_managed_binary_is_preferred(tmp_path: Path, monkeypatch) -> 
     _fake_browser(bindir, mode=0o755)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(root))
-    monkeypatch.setattr("modules.update.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == str(managed)
 
@@ -635,14 +642,14 @@ def test_repeated_auth_failures_raise_a_security_alert(caplog) -> None:
     original = obs._security_audit_logger
     obs._security_audit_logger = logger
     try:
-        for _ in range(obs._ALERT_THRESHOLD):
+        for _ in range(obs._alert_threshold):
             obs._record_auth_failure("auth")
     finally:
         obs._security_audit_logger = original
 
-    assert auth_failure_count() >= obs._ALERT_THRESHOLD
+    assert auth_failure_count() >= obs._alert_threshold
     assert ("security_alert", "error") in logger.calls
-    assert logger.calls.count(("auth_or_challenge_failure", "warning")) == obs._ALERT_THRESHOLD
+    assert logger.calls.count(("auth_or_challenge_failure", "warning")) == obs._alert_threshold
 
 
 def test_single_auth_failure_does_not_alert() -> None:

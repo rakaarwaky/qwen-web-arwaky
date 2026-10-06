@@ -11,19 +11,19 @@ from __future__ import annotations
 import sys
 
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-)
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.utility_core_response import error_response, safe_handle, success_response
+from modules.shared.src.utility_response_normalizer import error_response, safe_handle, success_response
 
 
 class InteractiveController:
@@ -32,9 +32,9 @@ class InteractiveController:
     def __init__(
         self,
         workspace: IWorkspaceProtocol,
-        direct: IDirectPromptAggregate,
-        file_only: IPromptFileAggregate,
-        attachment: IAttachmentPromptAggregate,
+        direct: IDirectPromptProtocol,
+        file_only: IPromptFileProtocol,
+        attachment: IAttachmentPromptProtocol,
         slot_config: IConfigSlotPlanProtocol,
         setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,

@@ -673,25 +673,25 @@ class TestRequestTimeoutBudget:
         assert cfg.request_timeout >= 600, "a 120s ceiling aborts healthy thinking runs"
 
     def test_env_override_is_honored(self, monkeypatch):
-        from modules.config.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "1800")
         assert build_app_config().request_timeout == 1800
 
     def test_invalid_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.config.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "not-a-number")
         assert build_app_config().request_timeout == 600
 
     def test_non_positive_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.config.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "0")
         assert build_app_config().request_timeout == 600
 
     def test_absent_env_keeps_the_default(self, monkeypatch):
-        from modules.config.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.utility_config_app_factory import build_app_config
 
         monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
         assert build_app_config().request_timeout == 600
@@ -715,6 +715,6 @@ class TestRequestTimeoutBudget:
     def test_measured_thinking_phase_is_not_a_duplicate_of_the_marker_default(self):
         """Guard the 600 literal so a silent default change is visible in the
         diff of the two tests above rather than hidden inside a range check."""
-        from modules.config.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.utility_config_app_factory import build_app_config
 
         assert build_app_config().request_timeout == 600

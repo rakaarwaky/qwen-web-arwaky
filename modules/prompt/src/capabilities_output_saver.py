@@ -43,7 +43,7 @@ class Saver(ISaverProtocol):
         self.generate_sidecar = generate_sidecar
         self.atomic_write = atomic_write
 
-    # ─── Block 2: Public Contract (ISaverProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
     def write_output(
         self,
         path: Path,
@@ -110,7 +110,7 @@ class Saver(ISaverProtocol):
 
         log.info("output_file_written: %s", path.name)
 
-    # ─── Block 3: Dunder Methods, Factories & Helpers ─────
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def _write_text_file(self, path: Path, content: str, atomic: bool) -> None:
         """Write *content* to *path*, atomically or directly.

@@ -18,6 +18,8 @@ from modules.shared.src.taxonomy_core_vo import MessageCount
 from modules.shared.src.utility_io_writer import atomic_write_json
 from modules.shared.src.utility_telemetry_scrubber import harden_private_file
 
+# Block 1: Class Definition & Constructor
+
 
 class MetricsCounter(IMetricsProtocol):
     """Thread-safe metrics collector persisted in a rolling-window JSON file."""
@@ -30,51 +32,7 @@ class MetricsCounter(IMetricsProtocol):
         self._start_time = datetime.now(tz=timezone.utc)
         self._load()
 
-    def _load(self) -> None:
-        try:
-            raw = json.loads(self._metrics_path.read_text(encoding="utf-8"))
-            counters = raw.get("counters", {}) if isinstance(raw, dict) else {}
-            if isinstance(counters, dict):
-                self._counters = {str(k): int(v) for k, v in counters.items()}
-            events = raw.get("execution_events", []) if isinstance(raw, dict) else []
-            if isinstance(events, list):
-                self._execution_events = [event for event in events if isinstance(event, dict)]
-            self._prune_events()
-        except (OSError, ValueError, TypeError):
-            self._counters = {}
-            self._execution_events = []
-
-    def _prune_events(self) -> None:
-        cutoff = datetime.now(tz=timezone.utc).timestamp() - 24 * 60 * 60
-        kept: list[dict[str, Any]] = []
-        for event in self._execution_events:
-            try:
-                if datetime.fromisoformat(str(event["at"]).replace("Z", "+00:00")).timestamp() >= cutoff:
-                    kept.append(event)
-            except (KeyError, TypeError, ValueError):
-                continue
-        self._execution_events = kept
-
-    def _persist(self) -> None:
-        self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
-        self._prune_events()
-        total = len(self._execution_events)
-        successful = sum(1 for event in self._execution_events if event.get("success") is True)
-        atomic_write_json(
-            self._metrics_path,
-            {
-                "window": "rolling_24h",
-                "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-                "counters": self._counters,
-                "execution_events": self._execution_events,
-                "total_executions": total,
-                "successful_executions": successful,
-            },
-        )
-        # Counters describe failure rates, which is telemetry an operator may
-        # not want world-readable, so the file is owner-only regardless of the
-        # process umask (issue #352).
-        harden_private_file(self._metrics_path)
+    # Block 2: Protocol Method Implementation
 
     def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
         """Add *amount* to the counter *key* and persist the metrics file."""
@@ -133,8 +91,56 @@ class MetricsCounter(IMetricsProtocol):
             result["success_rate"] = round(successful / total, 6) if total else None
             return result
 
+    # Block 3: Dunder Methods, Factories & Helpers
+
     def __repr__(self) -> str:
         return f"MetricsCounter(path={self._metrics_path!s})"
+
+    def _load(self) -> None:
+        try:
+            raw = json.loads(self._metrics_path.read_text(encoding="utf-8"))
+            counters = raw.get("counters", {}) if isinstance(raw, dict) else {}
+            if isinstance(counters, dict):
+                self._counters = {str(k): int(v) for k, v in counters.items()}
+            events = raw.get("execution_events", []) if isinstance(raw, dict) else []
+            if isinstance(events, list):
+                self._execution_events = [event for event in events if isinstance(event, dict)]
+            self._prune_events()
+        except (OSError, ValueError, TypeError):
+            self._counters = {}
+            self._execution_events = []
+
+    def _prune_events(self) -> None:
+        cutoff = datetime.now(tz=timezone.utc).timestamp() - 24 * 60 * 60
+        kept: list[dict[str, Any]] = []
+        for event in self._execution_events:
+            try:
+                if datetime.fromisoformat(str(event["at"]).replace("Z", "+00:00")).timestamp() >= cutoff:
+                    kept.append(event)
+            except (KeyError, TypeError, ValueError):
+                continue
+        self._execution_events = kept
+
+    def _persist(self) -> None:
+        self._metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        self._prune_events()
+        total = len(self._execution_events)
+        successful = sum(1 for event in self._execution_events if event.get("success") is True)
+        atomic_write_json(
+            self._metrics_path,
+            {
+                "window": "rolling_24h",
+                "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+                "counters": self._counters,
+                "execution_events": self._execution_events,
+                "total_executions": total,
+                "successful_executions": successful,
+            },
+        )
+        # Counters describe failure rates, which is telemetry an operator may
+        # not want world-readable, so the file is owner-only regardless of the
+        # process umask (issue #352).
+        harden_private_file(self._metrics_path)
 
 
 __all__ = ["MetricsCounter"]

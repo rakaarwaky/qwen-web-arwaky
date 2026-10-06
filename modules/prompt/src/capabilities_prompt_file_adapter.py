@@ -11,11 +11,6 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.config.src.utility_config_app_factory import (
-    build_app_config,
-    resolve_pipeline_output_path,
-)
-from modules.shared.src.contract_core_aggregate import IPromptFileAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IInjectionProtocol,
@@ -26,6 +21,10 @@ from modules.shared.src.contract_core_protocol import (
     LifecycleObserver,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_protocol import (
+    IPromptFileProtocol,
+    IPromptFlowProtocol,
+)
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError
 from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
@@ -41,6 +40,10 @@ from modules.shared.src.taxonomy_core_vo import (
     RunState,
 )
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.utility_config_app_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
@@ -53,7 +56,10 @@ def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
     return RunState()
 
 
-class PromptFileAdapter(IPromptFileAggregate):
+# Block 1: Class Definition & Constructor
+
+
+class PromptFileAdapter(IPromptFileProtocol):
     """Orchestrates prompt file execution (without document attachment)."""
 
     def __init__(
@@ -64,7 +70,7 @@ class PromptFileAdapter(IPromptFileAggregate):
         streamer: IStreamProtocol,
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
-        flow: IPromptFlowAggregate,
+        flow: IPromptFlowProtocol,
         cancel: IRunCancelProtocol,
     ) -> None:
         self._browser = browser
@@ -75,6 +81,8 @@ class PromptFileAdapter(IPromptFileAggregate):
         self._observability = observability
         self._flow = flow
         self._cancel = cancel
+
+    # Block 2: Protocol Method Implementation
 
     def request_cancel(self, cancel_event: threading.Event) -> None:
         """Cancel a specific in-flight run identified by its cancel event.
@@ -149,6 +157,8 @@ class PromptFileAdapter(IPromptFileAggregate):
             self._cancel.release(run_state)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _execute_file_on_page(
         self,

@@ -21,7 +21,9 @@ from textual.widgets import DataTable, Input, Label, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
-from modules.shared.src.utility_core_response import detect_processing_failure
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
+from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
 # A badge write can land while the app is tearing down: the worker thread's
 # ``call_from_thread`` is queued on the event loop and keeps running after the
@@ -52,6 +54,7 @@ class _TuiWorkersMixin:
     _swarm_id: str | None
     _swarm_pending_input: Path | None
     _confirm_or_start_swarm: Any
+    _swarm_started_perf: float | None
     _session_check_timed_out: bool
     _last_session_state: str | None
     _login_in_flight: bool
@@ -303,8 +306,8 @@ class _TuiWorkersMixin:
         if self._swarm_id is None or self._swarm is None:
             self.notify("No Swarm is currently running.", severity="warning")
             return
-        self._swarm.cancel(self._swarm_id)
-        snapshot = self._swarm.snapshot(self._swarm_id)
+        self._swarm.execute(SwarmRequest(verb="cancel", swarm_id=self._swarm_id))
+        snapshot = self._swarm.execute(SwarmRequest(verb="snapshot", swarm_id=self._swarm_id)).snapshot
         if snapshot is not None:
             self._render_swarm_snapshot(snapshot)
         self._log_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
@@ -312,8 +315,11 @@ class _TuiWorkersMixin:
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
         try:
-            snapshot = self._swarm.start(input_path)
+            snapshot = self._swarm.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
+            assert snapshot is not None
             self._swarm_id = snapshot.swarm_id
+            # Overview Swarm Status card shows Uptime Elapsed from this stamp.
+            self._swarm_started_perf = time.perf_counter()
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
                 self._log_msg,
@@ -323,10 +329,11 @@ class _TuiWorkersMixin:
             )
             while True:
                 time.sleep(1.0)
-                latest = self._swarm.snapshot(snapshot.swarm_id)
+                latest = self._swarm.execute(SwarmRequest(verb="snapshot", swarm_id=snapshot.swarm_id)).snapshot
                 if latest is None:
                     break
                 self.call_from_thread(self._render_swarm_snapshot, latest)
+                self.call_from_thread(self._refresh_metrics)
                 if latest.status in {"completed", "partial", "failed", "cancelled"}:
                     self.call_from_thread(
                         self._log_msg,
@@ -345,6 +352,8 @@ class _TuiWorkersMixin:
             )
         finally:
             self._swarm_id = None
+            self._swarm_started_perf = None
+            self.call_from_thread(self._refresh_metrics)
 
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
@@ -445,10 +454,13 @@ class _TuiWorkersMixin:
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
-            res = self._setup.setup_session()
+            res = self._setup.execute(SetupRequest())
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]LOGIN RESULT:[/] {}".format(THEME["ok"], escape(str(res))),
+                "[bold {}]LOGIN RESULT:[/] {}".format(
+                    THEME["ok"],
+                    escape(str(res.error or res.message or res.profile_path or "")),
+                ),
             )
             self.call_from_thread(self._refresh_session_badge)
         except Exception as exc:
@@ -498,7 +510,10 @@ class _TuiWorkersMixin:
             self.call_from_thread(self._apply_session_badge, False)
             return
         try:
-            valid, _msg = self._session.validate_session()
+            from modules.shared.src.taxonomy_session_vo import SessionRequest
+
+            response = self._session.execute(SessionRequest(verb="validate"))
+            valid = response.valid
         except Exception:
             valid = False
         self.call_from_thread(self._apply_session_badge, valid)

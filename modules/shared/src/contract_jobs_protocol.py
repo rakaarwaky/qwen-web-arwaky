@@ -7,7 +7,7 @@ and never carries stubs.
 
 Seams:
 
-- ``IJobStorageProtocol``         → ``JobStorage``             (persist / read jobs)
+- ``IJobStorageProtocol``         → ``JobStorage``             (persist / read jobs / preview)
 - ``IFolderCompileProtocol``      → ``FolderCompiler``         (compile folder → markdown)
 - ``IFolderToAttachmentProtocol`` → ``FolderToAttachmentAdapter`` (resolve path → attachment file)
 - ``IStatusProtocol``            → ``StatusFileWriter``        (write / read status JSON)
@@ -27,7 +27,11 @@ from modules.shared.src.taxonomy_core_vo import (
     CompileDepth,
     JobId,
     JobLimit,
+    JobPath,
+    JobPreview,
     JobRecord,
+    Pid,
+    ResultText,
     StatusRecordVO,
 )
 from modules.shared.src.taxonomy_jobs_vo import JobCount, StatusRecordMap
@@ -42,8 +46,38 @@ class IJobStorageProtocol(ABC):
         ...
 
     @abstractmethod
-    def get_job(self, job_id: JobId) -> JobRecord | None:
+    def get_job(self, job_id: JobId | str) -> JobRecord | None:
         """Retrieve a job record by ID."""
+        ...
+
+    @abstractmethod
+    def current_pid(self) -> Pid:
+        """Return the PID that owns the records written from this process.
+
+        The submit path stamps this onto ``owner_pid`` so a later
+        :meth:`reconcile_zombies` can tell a crashed run from a live one.
+        """
+        ...
+
+    @abstractmethod
+    def preview_job_output(self, output_path: JobPath, result_text: ResultText) -> JobPreview:
+        """Return a short preview of the file at *output_path*.
+
+        Reads the first 500 characters of the output file when it exists;
+        otherwise falls back to the supplied *result_text* (or None when
+        that is empty too). The filesystem read lives here, not in the
+        orchestrator.
+        """
+        ...
+
+    @abstractmethod
+    def resolve_job_path(self, raw_path: JobPath) -> JobPath:
+        """Return the absolute path a job's *raw_path* argument names.
+
+        A job's prompt, attachment, and output arguments arrive as plain
+        strings from the CLI and MCP layers, so this expands ``~`` and
+        anchors the result against the process working directory.
+        """
         ...
 
     @abstractmethod

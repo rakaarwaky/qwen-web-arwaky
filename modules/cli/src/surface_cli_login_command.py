@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from modules.shared.src.contract_core_aggregate import ISessionAggregate, ISetupAggregate
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.utility_core_response import safe_handle, success_response
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
+from modules.shared.src.utility_response_normalizer import safe_handle, success_response
 
 
 @safe_handle
@@ -19,8 +21,5 @@ def handle(
     The user logs in manually in the headed browser, then closes it — that
     triggers the session check. No ENTER press needed.
     """
-    result = setup.setup_session(
-        wait_for_confirmation=None,
-        session_path=cfg.session_path,
-    )
-    return success_response(result)
+    response = setup.execute(SetupRequest(profile_path=cfg.session_path))
+    return success_response(response.error or response.message or response.profile_path or "")

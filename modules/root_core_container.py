@@ -37,7 +37,6 @@ from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.prompt.src.agent_shared_flow_orchestrator import SharedFlowOrchestrator
 
 # capabilities_attachment_prompt_adapter
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
@@ -49,37 +48,38 @@ from modules.prompt.src.capabilities_output_saver import Saver
 
 # capabilities_prompt_file_adapter
 from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
+from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 
 # agent_session_orchestrator
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+
+# agent_setup_orchestrator
+from modules.session.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
-
-# capabilities_setup_adapter
-from modules.session.src.capabilities_setup_adapter import SetupAdapter
 from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IBrowserAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    IPromptFlowAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-    IUpdateAggregate,
-)
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
-from modules.shared.src.contract_session_aggregate import ISessionManagerProtocol, ISessionRotatorAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+    IPromptFlowProtocol,
+)
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, ISessionRotatorProtocol
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.contract_update_aggregate import IUpdateAggregate
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -124,19 +124,20 @@ class SharedContainer:
         self.streamer = StreamMonitor()
         self.uploader = FileUploader()
         self.saver = Saver()
+        self.metrics = MetricsCounter(metrics_path=log / "metrics.json")
         self.observability = ObservabilitySetup(
             log,
             status_writer=StatusFileWriter(status_path_for(log)),
-            metrics=MetricsCounter(metrics_path=log / "metrics.json"),
+            metrics=self.metrics,
         )
         self.workspace = WorkspaceProvisioner()
         self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
         # The three feature agents sit between their capability and the
         # Surfaces so no caller repeats the sequence each one owns: browser
         # auth, observability verb routing, and the update rollback gate.
-        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser)
-        self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability)
-        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(self.updater)
+        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser, self.observability)
+        self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
+        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(self.updater, self.observability)
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
@@ -157,33 +158,33 @@ class SharedContainer:
             slot_plan=self.slot_plan,
         )
 
-        # Shared prompt-flow agent (injected into the three prompt orchestrators)
-        self.agent_shared_flow_orchestrator: IPromptFlowAggregate = SharedFlowOrchestrator()
+        # Shared prompt-flow capability (injected into the three prompt adapters)
+        self.prompt_flow_dispatcher: IPromptFlowProtocol = PromptFlowDispatcher()
 
         # Shared targeted-cancel registry (injected into the prompt file / attachment orchestrators)
         self.run_cancel_registry: CapabilitiesRunCancelRegistry = CapabilitiesRunCancelRegistry()
 
         # The 5 specialized agent orchestrators
-        self.agent_direct_prompt_orchestrator: IDirectPromptAggregate = DirectPromptAdapter(
+        self.agent_direct_prompt_orchestrator: IDirectPromptProtocol = DirectPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
             saver=self.saver,
             observability=self.observability,
-            flow=self.agent_shared_flow_orchestrator,
+            flow=self.prompt_flow_dispatcher,
         )
-        self.agent_prompt_file_orchestrator: IPromptFileAggregate = PromptFileAdapter(
+        self.agent_prompt_file_orchestrator: IPromptFileProtocol = PromptFileAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
             saver=self.saver,
             observability=self.observability,
-            flow=self.agent_shared_flow_orchestrator,
+            flow=self.prompt_flow_dispatcher,
             cancel=self.run_cancel_registry,
         )
-        self.agent_attachment_prompt_orchestrator: IAttachmentPromptAggregate = AttachmentPromptAdapter(
+        self.agent_attachment_prompt_orchestrator: IAttachmentPromptProtocol = AttachmentPromptAdapter(
             browser=self.browser,
             injector=self.injector,
             sender=self.sender,
@@ -191,25 +192,26 @@ class SharedContainer:
             uploader=self.uploader,
             saver=self.saver,
             observability=self.observability,
-            flow=self.agent_shared_flow_orchestrator,
+            flow=self.prompt_flow_dispatcher,
             folder_adapter=self.folder_adapter,
             cancel=self.run_cancel_registry,
         )
-        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
-            browser=self.browser,
-            observability=self.observability,
-        )
-
         # Session rotation infrastructure
         self.session_manager: ISessionManagerProtocol = SessionManager()
         self.session_health_checker = SessionHealthChecker()
+        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
+            browser=self.browser,
+            observability=self.observability,
+            sessions=self.session_manager,
+        )
+
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 
-        self.session_rotator: ISessionRotatorAggregate = SessionRotationAdapter(
+        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = SetupAdapter(
+        self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
             browser=self.browser,
             observability=self.observability,
         )
@@ -240,6 +242,7 @@ class SharedContainer:
                 rate_limiter=self.rl,
             ),
             folder_adapter=self.folder_adapter,
+            observability=self.observability,
         )
 
     def wire(self) -> None:

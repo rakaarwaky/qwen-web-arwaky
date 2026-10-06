@@ -22,6 +22,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
 )
 from modules.shared.src.taxonomy_core_error import RateLimitError
 from modules.shared.src.taxonomy_core_vo import ErrorReason, JobRecord
+from modules.shared.src.taxonomy_jobs_vo import JobResponse
 
 
 def _job_record(**overrides) -> JobRecord:
@@ -64,7 +65,7 @@ def _prompt(tmp_path: Path) -> Path:
 def test_async_submission_carries_accepted_status(tools_and_mocks, tmp_path) -> None:
     """The default async path must expose the FR-002 status discriminator."""
     tools, _, jobs = tools_and_mocks
-    jobs.submit_file_job.return_value = _job_record()
+    jobs.execute.return_value = JobResponse(record=_job_record())
 
     payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
 
@@ -87,7 +88,7 @@ def test_sync_execution_carries_success_status(tools_and_mocks, tmp_path) -> Non
 def test_sync_and_async_envelopes_share_a_discriminator(tools_and_mocks, tmp_path) -> None:
     """A consumer reading `status` must never encounter a missing key."""
     tools, mocks, jobs = tools_and_mocks
-    jobs.submit_file_job.return_value = _job_record()
+    jobs.execute.return_value = JobResponse(record=_job_record())
     mocks["file_only"].process_prompt_file_only.return_value = "answer text"
     prompt = str(_prompt(tmp_path))
 
@@ -102,7 +103,7 @@ def test_sync_and_async_envelopes_share_a_discriminator(tools_and_mocks, tmp_pat
 def test_attachment_async_submission_carries_accepted_status(tools_and_mocks, tmp_path) -> None:
     """Attachment submissions follow the same envelope as file-only ones."""
     tools, _, jobs = tools_and_mocks
-    jobs.submit_attachment_job.return_value = _job_record(attachment_file="/ws/doc.pdf")
+    jobs.execute.return_value = JobResponse(record=_job_record(attachment_file="/ws/doc.pdf"))
     attachment = tmp_path / "doc.pdf"
     attachment.write_text("data", encoding="utf-8")
 
@@ -122,7 +123,7 @@ def test_attachment_async_submission_carries_accepted_status(tools_and_mocks, tm
 def test_get_job_status_reports_lifecycle_status(tools_and_mocks, completed, error, expected) -> None:
     """Polling a job must describe its lifecycle through the same field."""
     tools, _, jobs = tools_and_mocks
-    jobs.get_job_status.return_value = _job_record(completed=completed, error=error)
+    jobs.execute.return_value = JobResponse(record=_job_record(completed=completed, error=error))
 
     payload = json.loads(tools.get_job_status("file_20260922_000000_abc123"))
 
@@ -132,10 +133,12 @@ def test_get_job_status_reports_lifecycle_status(tools_and_mocks, completed, err
 def test_list_jobs_annotates_every_entry(tools_and_mocks) -> None:
     """Listed jobs each carry a status so the UI need not infer one."""
     tools, _, jobs = tools_and_mocks
-    jobs.list_jobs.return_value = [
-        _job_record(job_id="a", completed=True),
-        _job_record(job_id="b", completed=True, error="boom"),
-    ]
+    jobs.execute.return_value = JobResponse(
+        records=[
+            _job_record(job_id="a", completed=True),
+            _job_record(job_id="b", completed=True, error="boom"),
+        ]
+    )
 
     payload = json.loads(tools.list_jobs(10))
 
@@ -146,7 +149,7 @@ def test_list_jobs_annotates_every_entry(tools_and_mocks) -> None:
 def test_rate_limited_submission_returns_retry_hint(tools_and_mocks, tmp_path) -> None:
     """Throttling must surface as a retryable error, not a hung tool call."""
     tools, _, jobs = tools_and_mocks
-    jobs.submit_file_job.side_effect = RateLimitError(ErrorReason("rate limit reached"), retry_after_sec=12.34)
+    jobs.execute.side_effect = RateLimitError(ErrorReason("rate limit reached"), retry_after_sec=12.34)
 
     payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
 

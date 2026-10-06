@@ -19,10 +19,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.config.src.utility_config_app_factory import build_app_config, sandbox_unavailable
 from modules.logging.src.capabilities_observability_setup import effective_telemetry_mode
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.taxonomy_session_vo import SessionRequest
+from modules.shared.src.utility_config_app_factory import build_app_config, sandbox_unavailable
 from modules.update.src.capabilities_update_manager import UpdateManager
 
 # ─── #290: sandbox is on by default ─────────────────────────────────────────
@@ -32,7 +33,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
     """No opt-in and a sandbox-capable host means the sandbox stays on."""
     with (
         patch.dict("os.environ", {}, clear=False),
-        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
+        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -41,7 +42,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
 def test_sandbox_dropped_on_explicit_opt_in() -> None:
     """QWEN_DISABLE_SANDBOX is the documented way to drop the sandbox."""
     with (
-        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
+        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -50,7 +51,7 @@ def test_sandbox_dropped_on_explicit_opt_in() -> None:
 def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
     """A container with no seccomp filter and no user namespaces falls back."""
     with (
-        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
+        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -59,7 +60,7 @@ def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
 def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
     """QWEN_ENABLE_SANDBOX overrides the container detection."""
     with (
-        patch("modules.config.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
+        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_ENABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -321,28 +322,30 @@ def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:
 def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
     """delete_session refuses when no backup exists unless forced (#300)."""
     from modules.session.src import agent_session_orchestrator as session_module
+    from modules.session.src.capabilities_session_manager import SessionManager
 
-    orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
+    orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=SessionManager())
     session = tmp_path / "qwen_session"
     session.mkdir()
     (session / "Cookies").write_text("x", encoding="utf-8")
     monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
 
     with pytest.raises(Exception, match="no session backup is retained"):
-        orch.delete_session(session)
+        orch.execute(SessionRequest(verb="delete", session_path=session))
 
 
 def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
     """force=True skips the backup guard so an operator can still delete."""
     from modules.session.src import agent_session_orchestrator as session_module
+    from modules.session.src.capabilities_session_manager import SessionManager
 
-    orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock())
+    orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=SessionManager())
     session = tmp_path / "qwen_session"
     session.mkdir()
     (session / "Cookies").write_text("x", encoding="utf-8")
     monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
 
-    result = orch.delete_session(session, force=True)
+    result = orch.execute(SessionRequest(verb="delete", session_path=session, force=True))
 
     assert "deleted successfully" in str(result)
     assert not session.exists()

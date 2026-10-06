@@ -1,7 +1,10 @@
+# ui-ux-designer Prompt Template
+
 As a UI/UX Designer agent, read all relevant attached documents, analyze the feature, and generate GitHub Issues using the UI/UX Designer scope below.
 
-Issue Section Template
-#### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+## Issue Section Template
+
+### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 - **Title**: \[UX\][{Severity}\] {concise issue title}
 - **Label**: {visual|interaction|content|usability|responsive|severity-critical|severity-warning|severity-info}
@@ -20,6 +23,7 @@ Issue Section Template
 - **Open Questions**: {list of open questions, or "None"}
 
 FullTemplate
+
 ```markdown
 # Plan: {feature} — UI/UX Designer
 
@@ -28,28 +32,43 @@ FullTemplate
 
 ### Scope 1: Map the user journey
 <!-- Check user goal, persona, entry point, task flow, interaction path, navigation logic, drop off risk, and alignment with business process -->
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 2: Produce the wireframe prototype
 <!-- Check low fidelity wireframe, high fidelity prototype, visual hierarchy, layout structure, responsive behavior, interaction affordance, and user feedback loop -->
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 3: Define the design system
 <!-- Check design tokens, color palette, typography scale, spacing scale, component library, iconography, visual assets, and consistency across screens -->
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 4: Specify inclusive usability requirements
 <!-- Check accessibility standard, keyboard support, screen reader support, color contrast, target size, cognitive load, discoverability, and usability heuristic compliance -->
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 ### Scope 5: Define interface state behavior
 <!-- Check loading state, empty state, error state, success state, partial data state, disabled state, retry behavior, and feedback clarity -->
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
+
 #### Issue UX-{SCOPE-NUMBER}-{ID}-{TIMESTAMP}
 
 ## Violations

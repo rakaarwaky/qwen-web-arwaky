@@ -34,7 +34,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         """Initialize WorkspaceProvisioner."""
         pass
 
-    # ─── Block 2: Public Contract (IWorkspaceProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
     def init_workspace(self, target_dir: FilePath) -> None:
         """Initialize workspace in 4 sequential steps:
 
@@ -99,7 +99,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         else:
             git_ignore.write_text(f"{entry}\n", encoding="utf-8")
 
-    # ─── Block 3: Dunder Methods, Factories & Helpers ─────
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def __repr__(self) -> str:
         """Return string representation of WorkspaceProvisioner."""

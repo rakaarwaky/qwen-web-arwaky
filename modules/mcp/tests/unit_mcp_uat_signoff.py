@@ -22,6 +22,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
     McpToolCommand,
 )
 from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.taxonomy_jobs_vo import JobResponse
 
 pytestmark = pytest.mark.uat
 
@@ -72,7 +73,7 @@ def test_uat_mcp_004_delete_session_without_confirm_is_refused(tools_and_mocks) 
     assert payload["success"] is False
     assert payload["error"]["code"] == "CONFIRMATION_REQUIRED"
     assert payload["error"]["hint"]
-    mocks["session"].delete_session.assert_not_called()
+    mocks["session"].execute.assert_not_called()
 
 
 def test_uat_mcp_005_delete_session_with_confirm_succeeds(tools_and_mocks) -> None:
@@ -83,26 +84,28 @@ def test_uat_mcp_005_delete_session_with_confirm_succeeds(tools_and_mocks) -> No
 
     assert payload["success"] is True
     assert payload["next_action"] == "setup_session"
-    mocks["session"].delete_session.assert_called_once()
+    mocks["session"].execute.assert_called_once()
 
 
 def test_uat_mcp_006_async_job_full_lifecycle(tools_and_mocks, tmp_path) -> None:
     """UAT-MCP-006: submit → poll (ACCEPTED, RUNNING) → COMPLETED with output file."""
     tools, _, jobs = tools_and_mocks
-    jobs.submit_file_job.return_value = _job_record()
+    jobs.execute.return_value = JobResponse(record=_job_record())
     output_file = tmp_path / "out.md"
 
     accepted = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
     assert accepted["status"] == STATUS_ACCEPTED
     job_id = accepted["job_id"]
 
-    jobs.get_job_status.side_effect = [
-        _job_record(job_id=job_id),
-        _job_record(
-            job_id=job_id,
-            completed=True,
-            latest_event="EVENT_OUTPUT_COPIED",
-            output_file=str(output_file),
+    jobs.execute.side_effect = [
+        JobResponse(record=_job_record(job_id=job_id)),
+        JobResponse(
+            record=_job_record(
+                job_id=job_id,
+                completed=True,
+                latest_event="EVENT_OUTPUT_COPIED",
+                output_file=str(output_file),
+            )
         ),
     ]
     first = json.loads(tools.get_job_status(job_id))
@@ -129,7 +132,7 @@ def test_uat_mcp_007_empty_prompt_is_rejected(tools_and_mocks) -> None:
 def test_uat_mcp_008_setup_session_error_carries_actionable_hint(tools_and_mocks) -> None:
     """UAT-MCP-008: a failed setup_session surfaces a hint, not a bare traceback."""
     tools, mocks, _ = tools_and_mocks
-    mocks["setup"].setup_session.side_effect = RuntimeError("Browser launch requires a display")
+    mocks["setup"].execute.side_effect = RuntimeError("Browser launch requires a display")
 
     payload = json.loads(tools.setup_session())
 

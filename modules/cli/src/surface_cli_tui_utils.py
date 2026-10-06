@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from rich.text import Text
@@ -19,6 +20,7 @@ from textual.widgets import DataTable, Label, TabbedContent
 from textual.widgets._data_table import CellDoesNotExist
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
+from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 
 if TYPE_CHECKING:
     pass
@@ -78,6 +80,55 @@ def format_event_label(event_name: str) -> str:
     return _STATUS_BADGE["RUNNING"]
 
 
+# Redesign v6.5.2: thread-state labels used by the Overview Threads Matrix.
+# The mockup names each cell's state in one short word (Streaming / Ready /
+# Done / Active / Idle) rather than the pipeline event name, so the table
+# stays scannable at a glance.
+_THREAD_STATE: dict[str, tuple[str, str]] = {
+    "IDLE": ("Idle", "grey61"),
+    "RUNNING": ("Active", "cyan"),
+    "SUCCESS": ("Done", "green"),
+    "FAILED": ("Failed", "red"),
+    "CANCELLED": ("Cancelled", "grey61"),
+    "CANCELLING": ("Stopping", "yellow"),
+}
+
+
+def _thread_state(status: str) -> tuple[str, str]:
+    """Return the (label, rich-style) pair an engine readout shows for *status*."""
+    return _THREAD_STATE.get(status, _THREAD_STATE["IDLE"])
+
+
+def _format_thread_duration(seconds: float) -> str:
+    """Format a thread duration the way the mockup does (4m12s, 0.0s, 1h 2m)."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    if seconds < 3600:
+        return f"{int(seconds // 60)}m{int(seconds % 60):02d}s"
+    return f"{int(seconds // 3600)}h {int((seconds % 3600) // 60):02d}m"
+
+
+def _cluster_bar_markup(n_slots: int, stats: dict[int, dict[str, Any]]) -> str:
+    """Render the Overview cluster segment bar as Rich markup.
+
+    The mockups draw a 10-cell bar under the Swarm and Chat cards, each cell
+    tinted by that slot's state. A terminal cannot tint individual cells from a
+    single Label, so each cell is emitted as its own block glyph wrapped in the
+    status colour. The compose tree is built before any slot state exists, so
+    ``stats`` may be empty, which renders every cell as idle.
+    """
+    parts: list[str] = []
+    for slot in range(1, n_slots + 1):
+        status = str(stats.get(slot, {}).get("status", "IDLE"))
+        parts.append(f"[{_THREAD_STATE.get(status, _THREAD_STATE['IDLE'])[1]}]█[/]")
+    return "".join(parts)
+
+
+def _empty_cluster_bar_markup(n_slots: int) -> str:
+    """Render the all-idle cluster bar used as the compose-time placeholder."""
+    return _cluster_bar_markup(n_slots, {})
+
+
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
 
@@ -87,8 +138,19 @@ class _TuiUtilsMixin:
     _metrics_pending: bool
     _metric_active: Any
     _metric_done: Any
+    _metric_model: Any
+    _metric_swarm_ring: Any
+    _metric_swarm_detail: Any
+    _metric_swarm_uptime: Any
+    _metric_threads_ring: Any
+    _metric_threads_detail: Any
+    _metric_swarm_bar: Any
+    _metric_threads_bar: Any
     _log_handler: logging.Handler
-    _log_views: dict[Any, QwenTuiRichLog]
+    _log_views: dict[int, QwenTuiRichLog]
+    _swarm_id: str | None
+    _swarm: Any
+    _swarm_started_perf: float | None
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     query_one: Any
@@ -105,6 +167,13 @@ class _TuiUtilsMixin:
     COL_FILE = "file"
     COL_DURATION = "duration"
 
+    # THREADS MATRIX columns. The mockup's grid shows a zero-padded index, the
+    # thread's one-word state, and its elapsed time, so those are the three
+    # cells each matrix row carries.
+    COL_MTX_INDEX = "mtx-index"
+    COL_MTX_STATE = "mtx-state"
+    COL_MTX_DURATION = "mtx-duration"
+
     def _init_table(self) -> None:
         with contextlib.suppress(NoMatches):
             table = self.query_one("#slots-table", DataTable)
@@ -116,6 +185,48 @@ class _TuiUtilsMixin:
             )
             for s in range(1, self._NUM_SLOTS + 1):
                 table.add_row(f"Slot {s}", self._format_status("IDLE", "table"), "-", "0.0s", key=f"row-slot-{s}")
+
+    def _init_threads_matrix(self) -> None:
+        """Seed the Overview THREADS MATRIX with one idle cell per job slot.
+
+        The mockup draws the matrix as the Overview's main content: a
+        two-column grid of numbered cells, each showing the thread's state
+        and elapsed time. Rows are keyed by slot id so _update_threads_matrix
+        writes cells in place instead of rebuilding the table, which would
+        drop the user's scroll position on every metrics tick.
+        """
+        with contextlib.suppress(NoMatches):
+            table = self.query_one("#threads-matrix", DataTable)
+            table.add_columns(
+                ("#", self.COL_MTX_INDEX),
+                ("Thread", self.COL_MTX_STATE),
+                ("Elapsed", self.COL_MTX_DURATION),
+            )
+            for s in range(1, self._NUM_SLOTS + 1):
+                table.add_row(
+                    f"{s:02d}",
+                    _thread_state("IDLE")[0],
+                    "0.0s",
+                    key=f"mtx-slot-{s}",
+                )
+
+    def _update_threads_matrix(self, slot_id: int, status: str, duration: str) -> None:
+        """Write one THREADS MATRIX cell pair (state label, elapsed time).
+
+        The state label is colourised by wrapping it in the Rich style the
+        mockup pairs with that state (cyan for running, green for done, grey
+        for idle), so a glance at the matrix reads the same way the mockup's
+        cells do.
+        """
+        with contextlib.suppress(NoMatches, CellDoesNotExist):
+            table = self.query_one("#threads-matrix", DataTable)
+            state_label, state_color = _thread_state(status)
+            table.update_cell(
+                f"mtx-slot-{slot_id}",
+                self.COL_MTX_STATE,
+                Text(f"{state_label}", style=state_color),
+            )
+            table.update_cell(f"mtx-slot-{slot_id}", self.COL_MTX_DURATION, duration)
 
     def _update_table_row(self, slot_id: int, status: str, filename: str, duration: str) -> None:
         with contextlib.suppress(NoMatches, CellDoesNotExist):
@@ -171,13 +282,85 @@ class _TuiUtilsMixin:
 
     def _flush_metrics(self) -> None:
         self._metrics_pending = False
+        stats = getattr(self, "_slot_stats", {})
+        n_slots = getattr(self, "_NUM_SLOTS", 0)
+        active = sum(1 for s in stats.values() if s.get("status") == "RUNNING")
+        done = sum(1 for s in stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
+        idle = sum(1 for s in stats.values() if s.get("status") == "IDLE")
+
         with contextlib.suppress(NoMatches):
-            active = sum(1 for s in self._slot_stats.values() if s.get("status") == "RUNNING")
-            done = sum(1 for s in self._slot_stats.values() if s.get("status") in {"SUCCESS", "FAILED"})
             if self._metric_active is not None:
                 self._metric_active.update(f"{active}")
             if self._metric_done is not None:
                 self._metric_done.update(f"{done}")
+        with contextlib.suppress(NoMatches):
+            swarm_ring = getattr(self, "_metric_swarm_ring", None)
+            if swarm_ring is not None:
+                swarm_active, swarm_total, _ = self._swarm_engine_state()
+                swarm_ring.update(f"{swarm_active}/{swarm_total}")
+        with contextlib.suppress(NoMatches):
+            threads_ring = getattr(self, "_metric_threads_ring", None)
+            if threads_ring is not None:
+                threads_ring.update(f"{active}/{n_slots}")
+        with contextlib.suppress(NoMatches):
+            swarm_detail = getattr(self, "_metric_swarm_detail", None)
+            if swarm_detail is not None:
+                swarm_active, _swarm_total, _uptime = self._swarm_engine_state()
+                swarm_detail.update(f"{swarm_active} Running" if swarm_active else "Idle")
+        with contextlib.suppress(NoMatches):
+            swarm_uptime = getattr(self, "_metric_swarm_uptime", None)
+            if swarm_uptime is not None:
+                _swarm_active, _swarm_total, uptime = self._swarm_engine_state()
+                swarm_uptime.update(
+                    f"Uptime Elapsed {_format_thread_duration(uptime)}" if uptime > 0 else "Uptime Elapsed —"
+                )
+        with contextlib.suppress(NoMatches):
+            threads_detail = getattr(self, "_metric_threads_detail", None)
+            if threads_detail is not None:
+                threads_detail.update(f"{active} Running · {idle} Idle")
+        with contextlib.suppress(NoMatches):
+            swarm_bar = getattr(self, "_metric_swarm_bar", None)
+            if swarm_bar is not None:
+                swarm_bar.update(_cluster_bar_markup(n_slots, stats))
+        with contextlib.suppress(NoMatches):
+            threads_bar = getattr(self, "_metric_threads_bar", None)
+            if threads_bar is not None:
+                threads_bar.update(_cluster_bar_markup(n_slots, stats))
+        # Per-slot state for the THREADS MATRIX — one cell per job slot.
+        with contextlib.suppress(NoMatches):
+            for s in range(1, n_slots + 1):
+                slot = stats.get(s, {"status": "IDLE", "duration": 0.0})
+                status = str(slot.get("status", "IDLE"))
+                duration = float(slot.get("duration", 0.0))
+                self._update_threads_matrix(s, status, _format_thread_duration(duration))
+
+    # ── Swarm engine readout ─────────────────────────────────────────────
+
+    def _swarm_engine_state(self) -> tuple[int, int, float]:
+        """Return (active_agents, total_agents, uptime_seconds) for the Swarm card.
+
+        The Overview's Swarm Status card tracks the adaptive swarm, which is a
+        different resource from the per-slot job threads tracked by the Chat
+        Status card. Before a swarm starts there are no agents, so the card
+        reads 0/0 and Idle rather than borrowing the slot counters.
+        """
+        snapshot_id = getattr(self, "_swarm_id", None)
+        if snapshot_id is None:
+            return 0, 0, 0.0
+        swarm = getattr(self, "_swarm", None)
+        if swarm is None:
+            return 0, 0, 0.0
+        try:
+            snapshot = swarm.execute(SwarmRequest(verb="snapshot", swarm_id=snapshot_id)).snapshot
+        except Exception:
+            return 0, 0, 0.0
+        if snapshot is None:
+            return 0, 0, 0.0
+        agents = list(snapshot.agents)
+        running = sum(1 for a in agents if str(a.status) == "running")
+        started = getattr(self, "_swarm_started_perf", None)
+        uptime = (time.perf_counter() - started) if started else 0.0
+        return running, len(agents), uptime
 
     # ── Slot status / tab title ──────────────────────────────────────────
 

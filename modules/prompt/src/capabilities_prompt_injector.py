@@ -29,7 +29,7 @@ class PromptInjector(IInjectionProtocol):
         """Initialize with an InjectorConfig VO."""
         self.config = config
 
-    # ─── Block 2: Public Contract (IInjectionProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
     def find_input(self, page: Page, config: InjectorConfig | None = None) -> Any:
         """Find input element using selector fallbacks."""
         cfg = config or self.config

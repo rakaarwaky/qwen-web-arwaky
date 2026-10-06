@@ -9,13 +9,14 @@ Seams:
 
 - ``ISessionManagerProtocol``       → ``SessionManager``        (pool CRUD, status marking)
 - ``ISessionHealthCheckerProtocol`` → ``SessionHealthChecker``  (async ping, bulk health)
+- ``ISessionRotatorProtocol``       → ``SessionRotationAdapter`` (round-robin selection)
 - ``IRunCancelProtocol``            → ``RunCancelRegistry``      (targeted browser-context cancel)
 - ``IWorkspaceProtocol``            → ``WorkspaceProvisioner`` (XDG dirs, symlinks, SKILL.md)
 
 The outward export surface for outer layers is ``ISessionAggregate``
 (validate/delete) in ``contract_session_aggregate.py``. Rotation has no
 aggregate: the consumer that picks the next session calls
-the aggregate on the capability directly.
+``ISessionRotatorProtocol`` on the capability directly.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ from typing import Any
 
 from modules.shared.src.taxonomy_core_vo import FilePath, RunId, RunState
 from modules.shared.src.taxonomy_session_vo import (
+    RotatorRequest,
+    RotatorResponse,
     SessionId,
     SessionInfo,
     SessionList,
@@ -56,6 +59,17 @@ class ISessionManagerProtocol(ABC):
     @abstractmethod
     def remove_session(self, session_id: SessionId) -> bool:
         """Remove the session by *session_id*; True when one was removed."""
+        ...
+
+    @abstractmethod
+    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
+        """Remove the saved Chromium profile directory at *profile_path*.
+
+        The target must be an existing directory that clears every rule in
+        ``is_safe_session_target``, and deletion is refused while no backup
+        generation is retained unless *force* is set. Raise ``QwenCliError``
+        when a partial removal leaves residue behind.
+        """
         ...
 
     @abstractmethod
@@ -95,6 +109,27 @@ class ISessionHealthCheckerProtocol(ABC):
     @abstractmethod
     async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
         """Health-check every session and return the updated pool."""
+        ...
+
+
+class ISessionRotatorProtocol(ABC):
+    """Session rotation contract: select the next healthy session to use."""
+
+    @abstractmethod
+    async def rotate(self, request: RotatorRequest) -> RotatorResponse:
+        """Select the next healthy session from the pool and return it.
+
+        A coroutine because selecting a session awaits the health ping that
+        proves the pooled session is still usable.
+        """
+        ...
+
+    @abstractmethod
+    async def get_next_session(self) -> SessionInfo | None:
+        """Pick the next healthy session by round-robin order.
+
+        Returns None once every pooled session is rate-limited.
+        """
         ...
 
 
@@ -157,6 +192,7 @@ class IWorkspaceProtocol(ABC):
 __all__ = [
     "ISessionManagerProtocol",
     "ISessionHealthCheckerProtocol",
+    "ISessionRotatorProtocol",
     "IRunCancelProtocol",
     "IWorkspaceProtocol",
 ]
@@ -165,6 +201,7 @@ __all__ = [
 _layer_symbols = {
     "ISessionManagerProtocol": ISessionManagerProtocol,
     "ISessionHealthCheckerProtocol": ISessionHealthCheckerProtocol,
+    "ISessionRotatorProtocol": ISessionRotatorProtocol,
     "IRunCancelProtocol": IRunCancelProtocol,
     "IWorkspaceProtocol": IWorkspaceProtocol,
 }

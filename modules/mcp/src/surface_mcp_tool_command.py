@@ -12,26 +12,27 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IJobManagerAggregate,
-    IPromptFileAggregate,
-    ISessionAggregate,
-    ISetupAggregate,
-)
 from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_error import RateLimitError
+from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
+from modules.shared.src.taxonomy_core_error import QwenCliError, RateLimitError
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
     JobId,
-    JobLimit,
     PromptText,
     TimeoutSec,
 )
+from modules.shared.src.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
-from modules.shared.src.utility_core_response import detect_processing_failure
+from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
 # ─── FR-002 success envelope status values ──────────────────────────────────
 # Every successful MCP payload carries a `status` discriminator so agent
@@ -226,9 +227,9 @@ class McpToolCommand:
 
     def __init__(
         self,
-        direct: IDirectPromptAggregate,
-        file_only: IPromptFileAggregate,
-        attachment: IAttachmentPromptAggregate,
+        direct: IDirectPromptProtocol,
+        file_only: IPromptFileProtocol,
+        attachment: IAttachmentPromptProtocol,
         session: ISessionAggregate,
         setup: ISetupAggregate,
         workspace: IWorkspaceProtocol,
@@ -314,11 +315,17 @@ class McpToolCommand:
 
         if async_run and self._jobs is not None:
             try:
-                record = self._jobs.submit_file_job(
-                    prompt_file=FilePath(p_path),
-                    output_file=FilePath(out_path) if out_path else None,
-                    headless=HeadlessFlag(headless),
+                submitted = self._jobs.execute(
+                    JobRequest(
+                        verb="submit_file_job",
+                        prompt_file=FilePath(p_path),
+                        output_file=FilePath(out_path) if out_path else None,
+                        headless=headless,
+                    )
                 )
+                record = submitted.record
+                if record is None:
+                    raise QwenCliError("Job submission returned no record.")
                 return json.dumps(
                     {
                         "success": True,
@@ -399,12 +406,18 @@ class McpToolCommand:
 
         if async_run and self._jobs is not None:
             try:
-                record = self._jobs.submit_attachment_job(
-                    prompt_file=FilePath(p_path),
-                    attachment_file=FilePath(a_path),
-                    output_file=FilePath(out_path) if out_path else None,
-                    headless=HeadlessFlag(headless),
+                submitted = self._jobs.execute(
+                    JobRequest(
+                        verb="submit_attachment_job",
+                        prompt_file=FilePath(p_path),
+                        attachment_file=FilePath(a_path),
+                        output_file=FilePath(out_path) if out_path else None,
+                        headless=headless,
+                    )
                 )
+                record = submitted.record
+                if record is None:
+                    raise QwenCliError("Job submission returned no record.")
                 return json.dumps(
                     {
                         "success": True,
@@ -473,7 +486,7 @@ class McpToolCommand:
                 hint="Check MCP server setup.",
             )
 
-        record = self._jobs.get_job_status(JobId(job_id))
+        record = self._jobs.execute(JobRequest(verb="get_job_status", job_id=JobId(job_id))).record
         if record is None:
             return _format_error_payload(
                 code="JOB_NOT_FOUND",
@@ -527,7 +540,7 @@ class McpToolCommand:
                 hint="Check MCP server setup.",
             )
 
-        records = self._jobs.list_jobs(limit=JobLimit(limit))
+        records = self._jobs.execute(JobRequest(verb="list_jobs", limit=limit)).records or []
         items = [
             {
                 "job_id": rec.job_id,
@@ -563,13 +576,15 @@ class McpToolCommand:
             JSON string with session_valid flag and recommended next action.
         """
         try:
-            valid, msg = self._session.validate_session()
+            from modules.shared.src.taxonomy_session_vo import SessionRequest
+
+            response = self._session.execute(SessionRequest(verb="validate"))
             return json.dumps(
                 {
                     "success": True,
-                    "session_valid": bool(valid),
-                    "message": str(msg),
-                    "next_action": None if valid else "setup_session",
+                    "session_valid": bool(response.valid),
+                    "message": str(response.message),
+                    "next_action": None if response.valid else "setup_session",
                 },
                 indent=2,
             )
@@ -599,7 +614,9 @@ class McpToolCommand:
             )
 
         try:
-            self._session.delete_session(force=bool(force))
+            from modules.shared.src.taxonomy_session_vo import SessionRequest
+
+            self._session.execute(SessionRequest(verb="delete", force=bool(force)))
             return json.dumps(
                 {
                     "success": True,
@@ -618,7 +635,7 @@ class McpToolCommand:
     def shutdown(self) -> None:
         """Release background job resources when the MCP server exits."""
         if self._jobs is not None:
-            self._jobs.shutdown()
+            self._jobs.execute(JobRequest(verb="shutdown"))
 
     def setup_session(self) -> str:
         """Launch visible browser on chat.qwen.ai for manual login / session setup.
@@ -627,8 +644,8 @@ class McpToolCommand:
             JSON string with setup result message.
         """
         try:
-            res = self._setup.setup_session()
-            return _format_success_payload(str(res))
+            response = self._setup.execute(SetupRequest())
+            return _format_success_payload(str(response.error or response.message or response.profile_path or ""))
         except Exception as exc:
             return _format_error_payload(
                 code="SETUP_SESSION_FAILED",

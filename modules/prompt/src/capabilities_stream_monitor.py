@@ -14,6 +14,9 @@ from playwright.sync_api import Error, Page
 
 from modules.shared.src.contract_core_protocol import IStreamProtocol
 from modules.shared.src.taxonomy_core_constant import (
+    DEFAULT_SAFETY_TIMEOUT_SEC,
+    DEFAULT_STALL_TIMEOUT_SEC,
+    SAFETY_TIMEOUT_ENV,
     STOP_BUTTON_SELECTORS,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
@@ -45,38 +48,6 @@ from modules.shared.src.utility_logger_factory import get_logger
 log = get_logger("capabilities_stream_monitor")
 # Test seam: patched by unit_capability_stream_monitor to script DOM responses.
 _dom_latest = latest_message_text
-DEFAULT_SAFETY_TIMEOUT_SEC = 4 * 60 * 60
-# Event-driven stall threshold: if no forward event (thinking, streaming text
-# change, or terminal completion) arrives within this window, the run is
-# classified stuck. Slow-but-alive generations keep emitting events and are
-# never misclassified. This is not a wall-clock cutoff for generation.
-DEFAULT_STALL_TIMEOUT_SEC = 300
-# Issue #330: the absolute backstop is operator-tunable without a code change
-# (a 4h hardcoded budget is untestable in staging and unusable where hosts
-# have tighter wall-clock limits).
-SAFETY_TIMEOUT_ENV = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
-
-
-def _resolve_safety_timeout(override: int | None) -> int:
-    """Resolve the safety circuit-breaker budget.
-
-    Precedence: explicit ``safety_timeout_sec`` constructor argument →
-    ``QWEN_STREAM_SAFETY_TIMEOUT_SEC`` env var → the 4-hour default.
-    Unparseable or non-positive env values fall back to the default with a
-    warning instead of crashing the pipeline boot.
-    """
-    if override is not None:
-        return int(override)
-    raw = os.environ.get(SAFETY_TIMEOUT_ENV, "").strip()
-    if raw:
-        try:
-            parsed = int(raw)
-        except ValueError:
-            parsed = 0
-        if parsed > 0:
-            return parsed
-        log.warning("Ignoring invalid %s=%r; using default %ds", SAFETY_TIMEOUT_ENV, raw, DEFAULT_SAFETY_TIMEOUT_SEC)
-    return DEFAULT_SAFETY_TIMEOUT_SEC
 
 
 # Block 1: Class Definition & Constructor
@@ -108,7 +79,8 @@ class StreamMonitor(IStreamProtocol):
             self.stability_checks = StabilityChecks(4)
             self.min_text_length = MinTextLength(1)
 
-    # ─── Block 2: Public Contract (IStreamProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
+
     def is_generation_complete(self, page: Page, *, thinking: bool | None = None) -> bool:
         """Check if Qwen AI is done generating.
 
@@ -349,9 +321,33 @@ class StreamMonitor(IStreamProtocol):
                 log.error("Unexpected error during polling: %s", e)
                 raise
 
+    # Block 3: Dunder Methods, Factories & Helpers
+
     def __repr__(self) -> str:
         """Return string representation of StreamMonitor."""
         return (
             f"StreamMonitor(poll={self.polling_interval_sec}, checks={self.stability_checks}, "
             f"min_len={self.min_text_length})"
         )
+
+
+def _resolve_safety_timeout(override: int | None) -> int:
+    """Resolve the safety circuit-breaker budget.
+
+    Precedence: explicit ``safety_timeout_sec`` constructor argument →
+    ``QWEN_STREAM_SAFETY_TIMEOUT_SEC`` env var → the 4-hour default.
+    Unparseable or non-positive env values fall back to the default with a
+    warning instead of crashing the pipeline boot.
+    """
+    if override is not None:
+        return int(override)
+    raw = os.environ.get(SAFETY_TIMEOUT_ENV, "").strip()
+    if raw:
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = 0
+        if parsed > 0:
+            return parsed
+        log.warning("Ignoring invalid %s=%r; using default %ds", SAFETY_TIMEOUT_ENV, raw, DEFAULT_SAFETY_TIMEOUT_SEC)
+    return DEFAULT_SAFETY_TIMEOUT_SEC

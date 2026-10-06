@@ -28,7 +28,16 @@ from urllib import request
 from urllib.parse import unquote, urlparse
 
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
-from modules.shared.src.taxonomy_core_constant import XDG_STATE_HOME
+from modules.shared.src.taxonomy_core_constant import (
+    DEFAULT_GITHUB_REPO,
+    DEFAULT_PACKAGE_NAME,
+    GITHUB_GIT_REF_URL,
+    GITHUB_GIT_TAG_URL,
+    GITHUB_RELEASE_URL,
+    GITHUB_REPO_ENV,
+    USER_AGENT,
+    XDG_STATE_HOME,
+)
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
@@ -41,18 +50,20 @@ from modules.shared.src.utility_logger_factory import get_logger
 
 log = get_logger("capabilities_update_manager")
 
-DEFAULT_PACKAGE_NAME = "qwen-web-arwaky"
-DEFAULT_GITHUB_REPO = "rakaarwaky/qwen-web-arwaky"
-GITHUB_RELEASE_URL = "https://api.github.com/repos/{repo}/releases/latest"
-GITHUB_GIT_REF_URL = "https://api.github.com/repos/{repo}/git/refs/tags/{tag}"
-GITHUB_GIT_TAG_URL = "https://api.github.com/repos/{repo}/git/tags/{sha}"
-GITHUB_REPO_ENV = "QWEN_WEB_GITHUB_REPO"
-USER_AGENT = "qwen-web-arwaky-updater/1.0"
-_GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-_GITHUB_API_HOST = "api.github.com"
+_github_repo_pattern = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_github_api_host = "api.github.com"
 
 
 # ─── Module-level pure helpers ──────────────────────────────────────────────
+
+
+def compare_versions(left: str, right: str) -> int:
+    """Return >0 when *left* is newer than *right*, <0 when older, 0 when equal."""
+    left_parts = _parse_version_tuple(left)
+    right_parts = _parse_version_tuple(right)
+    return (left_parts > right_parts) - (left_parts < right_parts)
+
+
 def _parse_version_tuple(version: str) -> tuple[tuple[int, int, str], ...]:
     """Parse a semver-ish string into a comparable tuple (zero external deps)."""
     cleaned = str(version).strip().lstrip("vV")
@@ -66,13 +77,6 @@ def _parse_version_tuple(version: str) -> tuple[tuple[int, int, str], ...]:
         else:
             parts.append((1, 0, chunk))
     return tuple(parts)
-
-
-def compare_versions(left: str, right: str) -> int:
-    """Return >0 when *left* is newer than *right*, <0 when older, 0 when equal."""
-    left_parts = _parse_version_tuple(left)
-    right_parts = _parse_version_tuple(right)
-    return (left_parts > right_parts) - (left_parts < right_parts)
 
 
 def _tail(text: str | None, max_chars: int = 400) -> str:
@@ -111,6 +115,8 @@ def _smoke_gate_unavailable(reason: str) -> tuple[UpdateStepResult, ...]:
 
 
 # Block 1: Class Definition & Constructor
+
+
 class UpdateManager(IUpdateProtocol):
     """Self-update pipeline: discovery → pip upgrade → browser sync → health checks."""
 
@@ -137,7 +143,8 @@ class UpdateManager(IUpdateProtocol):
         self.browser_timeout_sec = browser_timeout_sec
         self._smoke_gate = smoke_gate or (lambda: ())
 
-    # ─── Block 2: Public Contract (IUpdateProtocol ONLY) ──
+    # Block 2: Protocol Method Implementation
+
     def current_version(self) -> VersionString:
         """Return the installed package version ('unknown' when unresolvable)."""
         return self._resolve_installed_version()
@@ -474,7 +481,8 @@ class UpdateManager(IUpdateProtocol):
             rollback_status=rollback_status,
         )
 
-    # ─── Block 3: Private Helpers ──
+    # Block 3: Dunder Methods, Factories & Helpers
+
     def _snapshot_dir(self) -> Path:
         """Return the directory holding pre-upgrade environment snapshots."""
         return XDG_STATE_HOME / "update-snapshots"
@@ -617,7 +625,7 @@ class UpdateManager(IUpdateProtocol):
     def _github_repo_url(self, target_version: str | None = None) -> str:
         """Build a GitHub source URL, pinning to the discovered release when known."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
-        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+        if _github_repo_pattern.fullmatch(repo) is None:
             raise ValueError(f"Invalid GitHub repository name: {repo!r}")
         suffix = f"@v{target_version.lstrip('vV')}" if target_version else ""
         return f"git+https://github.com/{repo}.git{suffix}"
@@ -635,7 +643,7 @@ class UpdateManager(IUpdateProtocol):
         dereference. Both tag spellings (``vX.Y.Z`` and ``X.Y.Z``) are tried.
         """
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
-        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+        if _github_repo_pattern.fullmatch(repo) is None:
             return None
         cleaned = target_version.strip().lstrip("vV")
         sha_pattern = re.compile(r"[0-9a-f]{40}")
@@ -686,7 +694,7 @@ class UpdateManager(IUpdateProtocol):
             parsed = urlparse(url)
             if (
                 parsed.scheme != "https"
-                or parsed.hostname != _GITHUB_API_HOST
+                or parsed.hostname != _github_api_host
                 or parsed.username is not None
                 or parsed.password is not None
                 or parsed.port not in (None, 443)
@@ -706,7 +714,7 @@ class UpdateManager(IUpdateProtocol):
     def _fetch_latest_github(self) -> tuple[str | None, str | None]:
         """Return (version, error) from GitHub releases."""
         repo = os.getenv(GITHUB_REPO_ENV, "").strip() or DEFAULT_GITHUB_REPO
-        if _GITHUB_REPO_PATTERN.fullmatch(repo) is None:
+        if _github_repo_pattern.fullmatch(repo) is None:
             return None, f"invalid GitHub repository configured (set {GITHUB_REPO_ENV}=owner/repo)"
         payload = self._fetch_json(GITHUB_RELEASE_URL.format(repo=repo))
         if payload is None:

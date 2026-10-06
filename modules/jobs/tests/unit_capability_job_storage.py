@@ -18,12 +18,31 @@ from modules.shared.src.taxonomy_core_event import (
 )
 from modules.shared.src.taxonomy_core_vo import (
     FailureThreshold,
-    HeadlessFlag,
     JobId,
     JobRecord,
     ResponseText,
     WindowSec,
 )
+from modules.shared.src.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.taxonomy_prompt_vo import PromptResponse
+
+
+def _submit_file(
+    orchestrator: AgentJobOrchestrator,
+    prompt_file: Path,
+    output_file: Path | None = None,
+) -> JobRecord:
+    """Submit a prompt-file job through the aggregate and return its record."""
+    record = orchestrator.execute(
+        JobRequest(verb="submit_file_job", prompt_file=prompt_file, output_file=output_file)
+    ).record
+    assert record is not None
+    return record
+
+
+def _job_status(orchestrator: AgentJobOrchestrator, job_id: str) -> JobRecord | None:
+    """Read a job back through the aggregate."""
+    return orchestrator.execute(JobRequest(verb="get_job_status", job_id=JobId(job_id))).record
 
 
 class TestJobStorage(unittest.TestCase):
@@ -107,15 +126,12 @@ class TestAgentJobOrchestrator(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_submit_file_job(self) -> None:
-        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("Test response output")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("Test response output"))
 
         prompt_file = Path(self.temp_dir.name) / "prompt.md"
         prompt_file.write_text("Hello", encoding="utf-8")
 
-        rec = self.orchestrator.submit_file_job(
-            prompt_file=prompt_file,
-            headless=HeadlessFlag(True),
-        )
+        rec = _submit_file(self.orchestrator, prompt_file)
         self.assertEqual(rec.latest_event, EVENT_DISPATCH_ACKNOWLEDGED.value)
         self.assertFalse(rec.completed)
         self.assertTrue(rec.job_id.startswith("file_"))
@@ -123,7 +139,7 @@ class TestAgentJobOrchestrator(unittest.TestCase):
         # Wait for thread execution
         self.orchestrator._executor.shutdown(wait=True)
 
-        final_rec = self.orchestrator.get_job_status(JobId(rec.job_id))
+        final_rec = _job_status(self.orchestrator, rec.job_id)
         self.assertIsNotNone(final_rec)
         assert final_rec is not None
         self.assertEqual(final_rec.latest_event, EVENT_GENERATION_FINISHED.value)
@@ -132,12 +148,12 @@ class TestAgentJobOrchestrator(unittest.TestCase):
 
     def test_submit_record_carries_owner_pid(self) -> None:
         """Issue #376: submit must set ``owner_pid`` so zombies are identifiable."""
-        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("Test")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("Test"))
 
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
 
-        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        rec = _submit_file(self.orchestrator, prompt_file)
         self.assertEqual(rec.owner_pid, os.getpid())
         self.orchestrator._executor.shutdown(wait=True)
 
@@ -165,16 +181,16 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         """``_save_started`` must preserve the submitted record's ownership."""
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
 
-        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        rec = _submit_file(self.orchestrator, prompt_file)
         pid = rec.owner_pid
         self.assertIsNotNone(pid)
 
         # The worker thread is already running; let it save a terminal state.
         self.orchestrator._executor.shutdown(wait=True)
 
-        saved = self.orchestrator.get_job_status(JobId(rec.job_id))
+        saved = _job_status(self.orchestrator, rec.job_id)
         self.assertIsNotNone(saved)
         assert saved is not None
         self.assertEqual(saved.owner_pid, pid)
@@ -184,14 +200,14 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         correctly skips it (alive owner = not a zombie)."""
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
 
-        rec = self.orchestrator.submit_file_job(prompt_file=prompt_file)
+        rec = _submit_file(self.orchestrator, prompt_file)
         pid = rec.owner_pid
 
         self.orchestrator._executor.shutdown(wait=True)
 
-        loaded = self.orchestrator.get_job_status(JobId(rec.job_id))
+        loaded = _job_status(self.orchestrator, rec.job_id)
         self.assertIsNotNone(loaded)
         assert loaded is not None
         self.assertTrue(loaded.completed)
@@ -209,7 +225,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
 
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.process_prompt_file_only.return_value = ResponseText("ok")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
 
         # Open the breaker up front — the submit-time guard must refuse immediately.
         throttled = AgentJobOrchestrator(
@@ -223,7 +239,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
 
         start = time.perf_counter()
         with pytest.raises(CircuitBreakerOpenError):
-            throttled.submit_file_job(prompt_file=prompt_file)
+            _submit_file(throttled, prompt_file)
         elapsed = time.perf_counter() - start
 
         self.assertLess(elapsed, 0.5, f"submit took {elapsed:.2f}s — must be sub-500ms when rejected")

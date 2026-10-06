@@ -1,14 +1,17 @@
-"""Prompt-domain aggregate contract (AES101 `_aggregate`).
+"""Prompt-domain aggregate contracts (AES101 `_aggregate`).
 
-``IPromptAggregate`` is the single entry point over the prompt feature.
-The CLI/MCP/surface callers pass a ``PromptRequest``; the agent behind
-the aggregate routes internally to the rich protocol methods:
+One file for the prompt feature. Each class below is one aggregate: the
+single entry point the surface/root/CLI/MCP layer calls for that concern.
+An aggregate carries exactly one method — the door consumers knock on — so
+adding a consumer verb means adding a variant to the request VO, never a
+second aggregate method.
 
-- ``inject_text``     → prompt injection / find_input
-- ``click_send``       → send / count_messages / latest_message
-- ``wait_for_response`` → stream wait / completion / thinking checks
-- ``write_output``      → output persistence
-- ``upload_attachment`` → attachment upload / validation
+Aggregates:
+
+- ``IPromptAggregate``   → ``PromptOrchestrator``  (direct / file / attachment)
+
+The shared inject → send → wait flow is a capability seam in
+``contract_prompt_protocol.py`` (``IPromptFlowProtocol`` → ``PromptFlowDispatcher``).
 """
 
 from __future__ import annotations
@@ -34,7 +37,6 @@ class IPromptAggregate(ABC):
 
 __all__ = ["IPromptAggregate"]
 
-# Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
     "IPromptAggregate": IPromptAggregate,
 }

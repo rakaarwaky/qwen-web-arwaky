@@ -12,11 +12,6 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.config.src.utility_config_app_factory import (
-    build_app_config,
-    resolve_pipeline_output_path,
-)
-from modules.shared.src.contract_core_aggregate import IAttachmentPromptAggregate, IPromptFlowAggregate
 from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
     IFolderToAttachmentProtocol,
@@ -29,6 +24,10 @@ from modules.shared.src.contract_core_protocol import (
     LifecycleObserver,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IPromptFlowProtocol,
+)
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE
@@ -46,6 +45,10 @@ from modules.shared.src.taxonomy_core_vo import (
     SenderConfig,
 )
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.utility_config_app_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 from modules.shared.src.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.utility_error_mapping import to_error_response
 from modules.shared.src.utility_io_writer import save_orchestrator_output
@@ -58,7 +61,10 @@ def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
     return RunState()
 
 
-class AttachmentPromptAdapter(IAttachmentPromptAggregate):
+# Block 1: Class Definition & Constructor
+
+
+class AttachmentPromptAdapter(IAttachmentPromptProtocol):
     """Orchestrates prompt execution with document file attachment."""
 
     def __init__(
@@ -70,7 +76,7 @@ class AttachmentPromptAdapter(IAttachmentPromptAggregate):
         uploader: IUploadProtocol,
         saver: ISaverProtocol,
         observability: IObservabilityProtocol,
-        flow: IPromptFlowAggregate,
+        flow: IPromptFlowProtocol,
         folder_adapter: IFolderToAttachmentProtocol,
         cancel: IRunCancelProtocol,
     ) -> None:
@@ -84,6 +90,8 @@ class AttachmentPromptAdapter(IAttachmentPromptAggregate):
         self._flow = flow
         self._folder_adapter = folder_adapter
         self._cancel = cancel
+
+    # Block 2: Protocol Method Implementation
 
     def request_cancel(self, cancel_event: threading.Event) -> None:
         """Cancel a specific in-flight run identified by its cancel event.
@@ -169,6 +177,8 @@ class AttachmentPromptAdapter(IAttachmentPromptAggregate):
             self._cancel.release(run_state)
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _execute_attachment_on_page(
         self,

@@ -13,14 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from modules.shared.src.contract_core_protocol import IStatusProtocol
+from modules.shared.src.taxonomy_core_constant import STATUS_SCHEMA_VERSION
 from modules.shared.src.taxonomy_core_vo import StatusRecordVO
 from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_io_writer import atomic_write_json, ensure_dir
 
-#: Version of the ``status.json`` document contract. Bumped when a field is
-#: added or its meaning changes, so external monitors can branch on it
-#: (issue #296).
-STATUS_SCHEMA_VERSION = 2
+# Block 1: Class Definition & Constructor
 
 
 class StatusFileWriter(IStatusProtocol):
@@ -29,6 +27,8 @@ class StatusFileWriter(IStatusProtocol):
     def __init__(self, status_path: Path) -> None:
         self._status_path = status_path
         ensure_dir(self._status_path)
+
+    # Block 2: Protocol Method Implementation
 
     def write(self, **kwargs: Any) -> None:
         """Atomically write the status JSON from keyword fields.
@@ -102,6 +102,8 @@ class StatusFileWriter(IStatusProtocol):
             return None
         except (OSError, ValueError):
             return None
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         return "StatusFileWriter()"

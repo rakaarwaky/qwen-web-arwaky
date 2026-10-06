@@ -38,7 +38,7 @@ from modules.shared.src.utility_core_session_backup import has_session_backup, s
 from modules.shared.src.utility_session_cloner import session_age_warning
 
 if TYPE_CHECKING:
-    from modules.shared.src.contract_core_aggregate import ISessionAggregate
+    from modules.shared.src.contract_session_aggregate import ISessionAggregate
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -126,7 +126,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     expensive ``sync_playwright`` cold-start probe runs only when
     ``QWEN_DOCTOR_DEEP=1`` so the default report stays fast.
     """
-    from modules.update.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
 
     trusted_binary = find_chrome_binary()
     browsers_dir = get_playwright_browsers_path()
@@ -317,15 +317,17 @@ def _check_observability() -> dict[str, Any]:
 def _smoke_check(session: ISessionAggregate | None) -> tuple[bool, str]:
     """Run a headless browser round-trip against the saved session.
 
-    Delegates to ``ISessionAggregate.validate_session()`` so the surface reuses
+    Delegates to ``ISessionAggregate.execute()`` so the surface reuses
     the Core launch → navigate → textarea-check → close pipeline with no new
     capability code. The aggregate is injected by the Root container.
     """
     if session is None:
         return False, "Smoke test requires a session aggregate; run it through `qwen-web-arwaky doctor --smoke`."
     try:
-        valid, message = session.validate_session()
-        return bool(valid), message or "Session validation returned no detail."
+        from modules.shared.src.taxonomy_session_vo import SessionRequest
+
+        response = session.execute(SessionRequest(verb="validate"))
+        return response.valid, response.message or "Session validation returned no detail."
     except Exception as exc:
         return False, f"Smoke test failed: {exc}"
 

@@ -6,13 +6,13 @@ orchestrator based on AppConfig.mode, then delegates with zero business logic.
 
 from __future__ import annotations
 
-from modules.shared.src.contract_core_aggregate import (
-    IAttachmentPromptAggregate,
-    IDirectPromptAggregate,
-    IPromptFileAggregate,
+from modules.shared.src.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
-from modules.shared.src.utility_core_response import (
+from modules.shared.src.utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,
@@ -27,9 +27,9 @@ def _processing_failure_message(result: object) -> str | None:
 
 def dispatch_run(
     cfg: AppConfig,
-    direct: IDirectPromptAggregate,
-    file_only: IPromptFileAggregate,
-    attachment: IAttachmentPromptAggregate,
+    direct: IDirectPromptProtocol,
+    file_only: IPromptFileProtocol,
+    attachment: IAttachmentPromptProtocol,
 ) -> dict[str, object]:
     """C4: single shared dispatcher for direct/single modes.
 
@@ -77,9 +77,9 @@ def dispatch_run(
 def handle(
     args: object,
     cfg: AppConfig,
-    direct: IDirectPromptAggregate,
-    file_only: IPromptFileAggregate,
-    attachment: IAttachmentPromptAggregate,
+    direct: IDirectPromptProtocol,
+    file_only: IPromptFileProtocol,
+    attachment: IAttachmentPromptProtocol,
 ) -> dict[str, object]:
     """Dispatch single prompt processing to the matching pipeline orchestrator."""
     _ = args

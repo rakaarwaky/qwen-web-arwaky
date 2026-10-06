@@ -33,6 +33,7 @@ from modules.cli.src.surface_cli_update_command import handle as handle_update_c
 from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 _ERROR_PREFIX = "[ERROR]"
@@ -171,8 +172,8 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
         return
 
     async def _pick() -> Path | None:
-        session = await container.session_rotator.get_next_session()
-        return session.path if session else None
+        response = await container.session_rotator.rotate(RotatorRequest())
+        return response.session.path if response.session else None
 
     try:
         session_path = asyncio.run(_pick())

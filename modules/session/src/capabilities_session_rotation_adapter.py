@@ -5,12 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from modules.shared.src.contract_session_aggregate import (
+from modules.shared.src.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
-    ISessionRotatorAggregate,
+    ISessionRotatorProtocol,
 )
-from modules.shared.src.taxonomy_session_vo import SessionId, SessionInfo, SessionPool
+from modules.shared.src.taxonomy_session_vo import (
+    RotatorRequest,
+    RotatorResponse,
+    SessionId,
+    SessionInfo,
+    SessionPool,
+)
 
 if TYPE_CHECKING:
     pass
@@ -36,7 +42,10 @@ class AllSessionsLimitedError(Exception):
         )
 
 
-class SessionRotationAdapter(ISessionRotatorAggregate):
+# Block 1: Class Definition & Constructor
+
+
+class SessionRotationAdapter(ISessionRotatorProtocol):
     """Transparent session rotation with health checking."""
 
     def __init__(
@@ -48,11 +57,7 @@ class SessionRotationAdapter(ISessionRotatorAggregate):
         self._checker: ISessionHealthCheckerProtocol | None = health_checker
         self._metrics = RotationMetrics()
 
-    def _ensure_checker(self) -> ISessionHealthCheckerProtocol:
-        """Return the health checker, raising if not configured."""
-        if self._checker is None:
-            raise RuntimeError("Health checker not configured — pass one to SessionRotationAdapter()")
-        return self._checker
+    # Block 2: Protocol Method Implementation
 
     async def get_next_session(self) -> SessionInfo | None:
         """Get next healthy session with fallback."""
@@ -85,6 +90,32 @@ class SessionRotationAdapter(ISessionRotatorAggregate):
         # All exhausted
         self._metrics.sessions_exhausted += 1
         return None
+
+    async def rotate(self, request: RotatorRequest) -> RotatorResponse:
+        """Return the next healthy session, skipping ones already tried.
+
+        ``request.exclude_ids`` lists sessions a caller has already attempted
+        in this turn, so a rotation that hits a rate-limited session moves on
+        rather than re-picking the one that just failed. When the entire pool
+        is exhausted the response carries ``session=None`` with no error —
+        "every session is limited" is a state to report, not a fault.
+        """
+        self._metrics.total_attempts += 1
+        pool = self._manager.load_pool()
+        excluded = set(request.exclude_ids)
+        checker = self._ensure_checker()
+
+        for candidate in pool.sessions:
+            if candidate.session_id in excluded:
+                continue
+            if await checker.check_session(candidate):
+                self._manager.mark_healthy(candidate.session_id)
+                self._metrics.successful_rotations += 1
+                return RotatorResponse(session=candidate)
+            self._manager.mark_limited(candidate.session_id)
+
+        self._metrics.sessions_exhausted += 1
+        return RotatorResponse()
 
     async def mark_limited(self, session_id: SessionId) -> None:
         """Mark session as rate-limited."""
@@ -121,6 +152,19 @@ class SessionRotationAdapter(ISessionRotatorAggregate):
 
         return response, session
 
+    @property
+    def metrics(self) -> RotationMetrics:
+        """Get rotation metrics."""
+        return self._metrics
+
+    # Block 3: Dunder Methods, Factories & Helpers
+
+    def _ensure_checker(self) -> ISessionHealthCheckerProtocol:
+        """Return the health checker, raising if not configured."""
+        if self._checker is None:
+            raise RuntimeError("Health checker not configured — pass one to SessionRotationAdapter()")
+        return self._checker
+
     async def _execute_request(
         self,
         prompt: str,
@@ -138,11 +182,6 @@ class SessionRotationAdapter(ISessionRotatorAggregate):
         """
         # Simulated response for now
         return f"Response using session {session.session_id}: {prompt}"
-
-    @property
-    def metrics(self) -> RotationMetrics:
-        """Get rotation metrics."""
-        return self._metrics
 
 
 __all__ = [

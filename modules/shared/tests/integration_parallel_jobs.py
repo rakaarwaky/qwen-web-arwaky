@@ -14,10 +14,8 @@ from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.root_core_container import SharedContainer
-from modules.shared.src.taxonomy_core_vo import (
-    HeadlessFlag,
-    ResponseText,
-)
+from modules.shared.src.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.taxonomy_prompt_vo import PromptResponse
 
 
 def test_shared_container_wires_max_workers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -41,11 +39,11 @@ def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
         file_only = MagicMock()
         attachment = MagicMock()
 
-        def fake_execute(*_a: Any, **_kw: Any) -> ResponseText:
+        def fake_execute(*_a: Any, **_kw: Any) -> PromptResponse:
             time.sleep(0.5)
-            return ResponseText("ok")
+            return PromptResponse(response_text="ok")
 
-        file_only.process_prompt_file_only.side_effect = fake_execute
+        file_only.execute.side_effect = fake_execute
 
         orch = AgentJobOrchestrator(
             storage=storage,
@@ -57,19 +55,21 @@ def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
         for i in range(3):
             prompt = Path(tmp) / f"p_{i}.md"
             prompt.write_text("hi", encoding="utf-8")
-            orch.submit_file_job(prompt_file=prompt, headless=HeadlessFlag(True))
+            orch.execute(JobRequest(verb="submit_file_job", prompt_file=prompt, headless=True))
 
         # Three parallel jobs at 0.5s each should finish in well under 1.5s serial.
         deadline = time.monotonic() + 3.0
         done = 0
         while time.monotonic() < deadline:
-            done = sum(1 for j in orch.list_jobs(limit=10) if j.completed)
+            done = sum(1 for j in (orch.execute(JobRequest(verb="list_jobs", limit=10)).records or []) if j.completed)
             if done == 3:
                 break
             time.sleep(0.05)
         orch._executor.shutdown(wait=True)
         assert done == 3
-        assert any((j.duration_sec or 0) >= 0.4 for j in orch.list_jobs(limit=10))
+        assert any(
+            (j.duration_sec or 0) >= 0.4 for j in (orch.execute(JobRequest(verb="list_jobs", limit=10)).records or [])
+        )
 
 
 def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None:
