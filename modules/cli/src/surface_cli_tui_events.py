@@ -15,8 +15,6 @@ from typing import Any
 
 from textual.widgets import Button, Input
 
-from modules.cli.src.surface_cli_tui_css import THEME
-
 
 class _TuiEventsMixin:
     """Mixin that owns widget event callbacks (button, input)."""
@@ -50,6 +48,7 @@ class _TuiEventsMixin:
     _session_login_action: Any
     _run_session_health_check: Any
     _check_template_roles: Any
+    _open_template_picker: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -116,11 +115,7 @@ class _TuiEventsMixin:
             return
         if button_id.startswith("btn-pill-templates-"):
             slot_id = int(button_id.removeprefix("btn-pill-templates-"))
-            self._check_template_roles()
-            self._log_msg(
-                "[{}]Template roles checked for slot {}.[/]".format(THEME["muted"], slot_id),
-                slot_id,
-            )
+            self._open_template_picker(slot_id)
             return
         # Clipped job-config chips and Browse buttons (revealed by the pills).
         if button_id.startswith("chip-"):

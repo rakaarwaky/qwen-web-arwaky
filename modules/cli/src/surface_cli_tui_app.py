@@ -13,15 +13,22 @@ All logic is split across focused mixin modules:
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
+from rich.markup import escape
 from textual.app import App
 from textual.binding import Binding
+from textual.css.query import NoMatches
+from textual.widgets import Input
 
-from modules.cli.src.surface_cli_tui_components import ConfirmModal
+from modules.cli.src.surface_cli_tui_components import (
+    ConfirmModal,
+    TemplatePickerModal,
+)
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
-from modules.cli.src.surface_cli_tui_css import TUI_CSS
+from modules.cli.src.surface_cli_tui_css import THEME, TUI_CSS
 from modules.cli.src.surface_cli_tui_events import _TuiEventsMixin
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_sessions_worker import _TuiSessionsWorkerMixin
@@ -210,6 +217,26 @@ class QwenTuiApp(
             self._template_roles = set(manifest)
             self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
             self._template_roles_dirty = False
+
+    def _open_template_picker(self, slot_id: int) -> None:
+        """Open the template picker modal for the given slot.
+
+        Choosing a role fills that slot's composer input with the role so
+        the operator can append a task before hitting Send.
+        """
+        self._check_template_roles()
+
+        def _on_picked(role: str | None) -> None:
+            if role:
+                with contextlib.suppress(NoMatches):
+                    composer = self.query_one(f"#composer-{slot_id}", Input)
+                    composer.value = role
+                    self._log_msg(
+                        "[bold {}]TEMPLATE:[/] Slot {} ← '{}'".format(THEME["bright"], slot_id, escape(role)),
+                        slot_id,
+                    )
+
+        self.push_screen(TemplatePickerModal(self._template_options), _on_picked)
 
 
 __all__ = [
