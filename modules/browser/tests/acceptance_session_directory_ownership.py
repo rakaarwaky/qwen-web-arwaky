@@ -34,6 +34,7 @@ def test_acceptance_seed_session_owns_live_cookies_under_owner_only_mode(tmp_pat
     session = _seed_session(tmp_path)
 
     assert (session / "Default" / "Cookies").exists()
-    os.chmod(session, 0o700)
+    owner_only = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+    os.chmod(session, owner_only)
     mode = stat.S_IMODE(session.stat().st_mode)
-    assert mode == 0o700, "a session directory holding cookies must be owner-only"
+    assert mode == owner_only, "a session directory holding cookies must be owner-only"

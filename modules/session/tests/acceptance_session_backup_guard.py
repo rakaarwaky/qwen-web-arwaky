@@ -38,9 +38,10 @@ def test_acceptance_a_session_directory_holding_cookies_is_owner_only(tmp_path: 
     be readable by another account."""
     session = _session(tmp_path)
 
-    os.chmod(session, 0o700)
+    owner_only = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+    os.chmod(session, owner_only)
 
-    assert stat.S_IMODE(session.stat().st_mode) == 0o700
+    assert stat.S_IMODE(session.stat().st_mode) == owner_only
 
 
 def test_acceptance_deleting_without_a_backup_is_refused(tmp_path: Path) -> None:
