@@ -18,7 +18,7 @@ from rich.markup import escape
 from textual import work
 from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Button, Input, Select, TabbedContent
+from textual.widgets import Button, Input, TabbedContent
 
 from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
 from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
@@ -34,7 +34,6 @@ class _TuiHandlersMixin:
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
     _target_field_for_picker: str | None
-    _template_roles: set[str]
     _slot_workers: dict[int, Any]
     _NUM_SLOTS: int
     _run_swarm: Any
@@ -78,24 +77,6 @@ class _TuiHandlersMixin:
             self._show_swarm_log(button_id == "btn-swarm-system")
         elif button_id == "btn-clear-swarm-log":
             self._clear_swarm_log()
-
-    def _apply_template_chip(self, button_id: str) -> None:
-        """Route a template-chip press into the slot's Select widget.
-
-        The chip id encodes both the slot and the role (``chip-<slot>-<role>``).
-        Selecting the same role twice is a no-op so the chip does not emit a
-        redundant log line on a repeated press.
-        """
-        _, _, remainder = button_id.partition("chip-")
-        slot_raw, _, role = remainder.partition("-")
-        if not slot_raw.isdigit() or not role:
-            return
-        slot_id = int(slot_raw)
-        with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)
-            if select.value == role:
-                return
-            select.value = role
 
     def _show_swarm_log(self, show_system: bool) -> None:
         """Switch the Swarm tab between the Event log and the System log.
@@ -263,8 +244,8 @@ class _TuiHandlersMixin:
 
         CHAT has no single tab of its own: it stands for every per-slot job
         tab, so it lands on the slot the user is already on (slot 1 when the
-        active tab is not a slot tab). SETTINGS follows the same rule — it
-        opens on whichever slot is currently on screen.
+        active tab is not a slot tab). SETTINGS carries no slot of its own —
+        the per-slot form inside it follows the active slot.
         """
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
@@ -368,17 +349,13 @@ class _TuiHandlersMixin:
         self._refresh_nav_dock()
 
     def action_switch_tab_settings(self) -> None:
-        """Switch to the Settings tab (ctrl+comma), keeping the slot on screen.
+        """Switch to the Settings tab (ctrl+comma).
 
-        Arriving from another tab picks the slot the user was just looking at;
-        pressing the shortcut while already on Settings leaves the configured
-        slot alone instead of snapping back to slot 1.
+        The pane carries the runtime-override card and nothing else, so
+        moving the tab is the whole switch.
         """
         with contextlib.suppress(Exception):
-            tabs = self.query_one(TabbedContent)
-            if tabs.active != "tab-settings":
-                self._show_slot_config(self._get_active_slot_id())
-                tabs.active = "tab-settings"
+            self.query_one(TabbedContent).active = "tab-settings"
         self._refresh_nav_dock()
 
     def _switch_to_slot(self, slot_id: int) -> None:
@@ -415,21 +392,6 @@ class _TuiHandlersMixin:
             system_btn = self.query_one(f"#btn-slot-system-{slot_id}", Button)
             event_btn.set_class(show_system, "seg-active")
             system_btn.set_class(not show_system, "seg-active")
-
-    def _show_slot_config(self, slot_id: int) -> None:
-        """Display one slot's configuration block and mark its picker pill."""
-        for s in range(1, self._NUM_SLOTS + 1):
-            with contextlib.suppress(NoMatches):
-                self.query_one(f"#slot-config-{s}", Vertical).display = s == slot_id
-            with contextlib.suppress(NoMatches):
-                self.query_one(f"#cfg-slot-{s}", Button).set_class(s == slot_id, "slot-chip-active")
-
-    def _goto_slot_settings(self, slot_id: int) -> None:
-        """Open the Settings pane on *slot_id*'s form — the Templates pill."""
-        self._show_slot_config(slot_id)
-        with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = "tab-settings"
-        self._refresh_nav_dock()
 
     def _send_composer(self, slot_id: int) -> None:
         """Echo the typed task into the transcript and dispatch it."""

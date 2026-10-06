@@ -26,8 +26,8 @@ class _TuiEventsMixin:
     """Mixin that owns widget event callbacks (button, select, input)."""
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
-    _template_roles: set[str]
     _NUM_SLOTS: int
+    _template_roles: set[str]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -37,14 +37,17 @@ class _TuiEventsMixin:
     _auth_panel_pressed: Any
     _nav_dock_go: Any
     _switch_to_slot: Any
-    _show_slot_config: Any
+    _apply_override_from_field: Any
+    _apply_override: Any
+    _reset_override: Any
+    _override_rows: Any
     _show_slot_log: Any
     _open_picker: Any
-    _goto_slot_settings: Any
-    _send_composer: Any
+    _toggle_slot_config: Any
+    _apply_template_chip: Any
     _run_slot: Any
     _cancel_slot: Any
-    _apply_template_chip: Any
+    _send_composer: Any
     _copy_log_by_id: Any
     _copy_slot_log: Any
     _refresh_sessions_table: Any
@@ -88,12 +91,14 @@ class _TuiEventsMixin:
             if pane_raw.isdigit() and slot_raw.isdigit():
                 self._switch_to_slot(int(slot_raw))
             return
-        # Settings pane: pick which slot's configuration block is displayed.
-        if button_id.startswith("cfg-slot-"):
-            slot_raw = button_id.removeprefix("cfg-slot-")
-            if slot_raw.isdigit():
-                self._show_slot_config(int(slot_raw))
-            return
+        # Settings pane: write or revert one registered environment value.
+        for prefix, handler in (
+            ("override-apply-", self._apply_override_from_field),
+            ("override-reset-", self._reset_override),
+        ):
+            if button_id.startswith(prefix):
+                handler(button_id.removeprefix(prefix))
+                return
         # Chat console: Event/System segmented switch over the slot's logs.
         if button_id.startswith("btn-slot-event-"):
             self._show_slot_log(int(button_id.removeprefix("btn-slot-event-")), False)
@@ -102,22 +107,25 @@ class _TuiEventsMixin:
             self._show_slot_log(int(button_id.removeprefix("btn-slot-system-")), True)
             return
         # Chat console action pills: prompt picker, attachment picker, and the
-        # template selector — which lives on the Settings pane.
+        # template selector. The job-config card the fields live in stays
+        # hidden until a pill asks for it, so each pill reveals it first.
         if button_id.startswith("btn-pill-prompt-"):
             slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
+            self._toggle_slot_config(slot_id)
             self._open_picker(f"input-prompt-{slot_id}")
             return
         if button_id.startswith("btn-pill-attach-"):
             slot_id = int(button_id.removeprefix("btn-pill-attach-"))
+            self._toggle_slot_config(slot_id)
             self._open_picker(f"input-file-{slot_id}", select_directories=True)
             return
         if button_id.startswith("btn-pill-templates-"):
             slot_id = int(button_id.removeprefix("btn-pill-templates-"))
-            self._goto_slot_settings(slot_id)
+            self._toggle_slot_config(slot_id)
             return
-        # Chat console composer: dispatch the typed task as a direct prompt.
-        if button_id.startswith("btn-send-"):
-            self._send_composer(int(button_id.removeprefix("btn-send-")))
+        # Clipped job-config chips and Browse buttons (revealed by the pills).
+        if button_id.startswith("chip-"):
+            self._apply_template_chip(button_id)
             return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
@@ -129,15 +137,16 @@ class _TuiEventsMixin:
                 if suffix.isdigit():
                     handler(int(suffix))
                     return
-        if button_id.startswith("chip-"):
-            self._apply_template_chip(button_id)
-            return
         for field, picker in (("prompt", False), ("file", True), ("output", False)):
             prefix = f"btn-browse-{field}-"
             if button_id.startswith(prefix):
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
+        # Chat console composer: dispatch the typed task as a direct prompt.
+        if button_id.startswith("btn-send-"):
+            self._send_composer(int(button_id.removeprefix("btn-send-")))
+            return
         if button_id == "btn-copy-log":
             self._copy_log_by_id(button_id)
             return
@@ -200,6 +209,15 @@ class _TuiEventsMixin:
             slot_raw = input_id.removeprefix("composer-")
             if slot_raw.isdigit():
                 self._send_composer(int(slot_raw))
+            return
+        # Enter inside an override field applies that value, which is the same
+        # gesture as pressing Apply and saves an operator the trip.
+        if input_id.startswith("override-input-"):
+            suffix = input_id.removeprefix("override-input-")
+            for name, _purpose, _default, _secret in self._override_rows():
+                if name.replace("-", "_") == suffix:
+                    self._apply_override(name, event.value)
+                    return
 
 
 __all__ = ["_TuiEventsMixin"]

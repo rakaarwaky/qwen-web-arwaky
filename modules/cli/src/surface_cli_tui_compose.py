@@ -21,26 +21,23 @@ from textual.widgets import (
     Input,
     Label,
     LoadingIndicator,
-    Select,
     Static,
-    Switch,
     TabbedContent,
     TabPane,
 )
 
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
-from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup, _template_label
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL, DEFAULT_OUTPUT
+from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
+from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.utility_core_version import get_package_version
 
 
 class _TuiComposeMixin:
     """Mixin that owns the Textual compose tree and app lifecycle hooks."""
 
-    # QwenTuiApp sets this at class level; the mixin reads it.
+    # QwenTuiApp sets these at class level / __init__; the mixin reads them.
     _NUM_SLOTS: int
-    _template_options: list[tuple[str, str]]
     _slot_workers: dict[int, Any]
     # Declared here to match _TuiUtilsMixin and avoid incompatible-definition error.
     _log_handler: logging.Handler
@@ -56,6 +53,10 @@ class _TuiComposeMixin:
     _refresh_metrics: Any
     _refresh_slot_chips: Any
     _refresh_nav_dock: Any
+    _override_hint: Any
+    _override_rows: Any
+    _override_badge: Any
+    _override_display: Any
 
     # ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -329,25 +330,11 @@ class _TuiComposeMixin:
                         yield system_log
                         yield Label("--:--:--", id=f"slot-log-time-{s}", classes="slot-log-time")
 
-                    # Action pills: the mockup's Upload / Attach / Templates row.
-                    with Horizontal(classes="action-pill-row"):
-                        yield Button(
-                            "⬆ Upload Prompt (.md)",
-                            id=f"btn-pill-prompt-{s}",
-                            classes="action-pill",
-                        )
-                        yield Button(
-                            "📎 Attach File / Folder",
-                            id=f"btn-pill-attach-{s}",
-                            classes="action-pill",
-                        )
-                        yield Button(
-                            "✨ Templates",
-                            id=f"btn-pill-templates-{s}",
-                            classes="action-pill action-pill-templates",
-                        )
-
                     # Composer: prompt glyph, free-text task, send button.
+                    # The per-slot job-config card and its Upload / Attach /
+                    # Templates pills are gone: Settings is the override
+                    # surface only, and a typed task in the composer is the
+                    # execution surface.
                     with Horizontal(classes="composer"):
                         yield Label(">", classes="composer-glyph")
                         yield Input(
@@ -459,107 +446,51 @@ class _TuiComposeMixin:
                 yield swarm_input
 
             # ─── Screen 5: Settings ──────────────────────────────
-            # No mockup ships for this screen, so it follows the same card
-            # language as the Overview and Swarm consoles: one card per slot,
-            # captions over fields, a one-row Browse chip beside every input,
-            # and the run controls on the card's last row so nothing hides
-            # below the fold. Every id the workers and tests resolve is kept.
+            # The Settings pane is the runtime-override surface: one row per
+            # registered environment value, Apply/Reset per row. No mockup
+            # ships for this screen, so it follows the same card language as
+            # the Overview and Swarm consoles. An earlier draft carried a
+            # per-slot job form here; it read inputs that only lived on this
+            # screen and shadowed the Chat console's composer, so the form is
+            # gone and overrides are the whole pane.
             with TabPane("Settings", id="tab-settings"), Vertical(classes="settings-screen"):
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
 
-                with Horizontal(classes="slot-carousel"):
-                    for i in range(1, self._NUM_SLOTS + 1):
-                        yield Button(
-                            f"● SLOT {i:02d}",
-                            id=f"cfg-slot-{i}",
-                            classes="slot-chip slot-chip-active" if i == 1 else "slot-chip",
-                        )
-
-                for s in range(1, self._NUM_SLOTS + 1):
-                    config_block = Vertical(classes="settings-card", id=f"slot-config-{s}")
-                    config_block.display = s == 1
-                    with config_block:
+                # RUNTIME OVERRIDES: one row per registered environment value.
+                override_scroll = ScrollableContainer(id="settings-overrides", classes="override-scroll")
+                with override_scroll:
+                    override_card = Vertical(classes="screen-card settings-card override-card", id="override-card")
+                    with override_card:
                         with Horizontal(classes="card-title-row"):
                             yield Static("⚙", classes="card-icon")
-                            yield Label(
-                                f"SLOT {s:02d} CONFIGURATION",
-                                id=f"cfg-title-{s}",
-                                classes="card-title",
-                            )
+                            yield Label("RUNTIME OVERRIDES", classes="card-title")
 
-                        yield Label("PROMPT TEMPLATE", classes="settings-caption")
-                        yield Select(
-                            self._template_options,
-                            prompt="Select a template or type a file path below",
-                            allow_blank=True,
-                            id=f"select-template-{s}",
+                        yield Label(
+                            "Every value here already has a working default. Clear a field to fall back to it.",
+                            classes="override-blurb",
                         )
-
-                        # Quick-select chips: one row, one line of overflow
-                        # hidden, so a long template list never grows the card.
-                        with Horizontal(classes="settings-chips", id=f"chip-row-{s}"):
-                            for _title, role in self._template_options[:4]:
-                                yield Button(
-                                    self._truncate_name(_template_label(role), 18),
-                                    id=f"chip-{s}-{role}",
-                                    classes="template-chip",
-                                )
-
-                        yield Label("PROMPT FILE / ROLE (REQUIRED) *", classes="settings-caption")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value="",
-                                placeholder="path/to/prompt.md or role",
-                                id=f"input-prompt-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-prompt-{s}", classes="btn-browse")
-
-                        yield Label("ATTACHMENT (OPTIONAL)", classes="settings-caption")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value="",
-                                placeholder="path/to/file or folder",
-                                id=f"input-file-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-file-{s}", classes="btn-browse")
-
-                        yield Label("OUTPUT DESTINATION", classes="settings-caption")
-                        with Horizontal(classes="field-row"):
-                            yield Input(
-                                value=str(DEFAULT_OUTPUT),
-                                placeholder="path/to/output.md",
-                                id=f"input-output-{s}",
-                                classes="field-input",
-                            )
-                            yield Button("Browse", id=f"btn-browse-output-{s}", classes="btn-browse")
-
-                        with Horizontal(classes="settings-toggle"):
-                            yield Label("HEADLESS BROWSER", classes="settings-caption")
-                            yield Static("1 independent browser in background", classes="toggle-subtext")
-                            yield Static("", classes="settings-toggle-spacer")
-                            yield Switch(value=True, id=f"switch-headless-{s}")
-
-                        with Horizontal(classes="settings-actions"):
-                            yield Button(
-                                f"⚡ RUN IN SLOT {s:02d}",
-                                variant="primary",
-                                id=f"btn-run-{s}",
-                                classes="btn-slot-run",
-                            )
-                            yield Button(
-                                f"✕ Cancel Slot {s:02d}",
-                                id=f"btn-cancel-{s}",
-                                classes="btn-slot-cancel",
-                            )
-                            yield Button(
-                                f"↻ Retry Slot {s:02d}",
-                                id=f"btn-retry-{s}",
-                                classes="btn-slot-retry",
-                            )
+                        yield Label(self._override_hint(), classes="override-hint")
+                        for name, purpose, default, secret in self._override_rows():
+                            suffix = name.replace("-", "_")
+                            badge_text, badge_class = self._override_badge(name)
+                            detail = purpose if secret else f"{purpose} · default: {default}"
+                            with Vertical(classes="override-row", id=f"override-row-{suffix}"):
+                                with Horizontal(classes="override-head"):
+                                    yield Label(name, classes="override-name")
+                                    yield Static(badge_text, classes=badge_class, id=f"override-badge-{suffix}")
+                                yield Label(detail, classes="override-purpose")
+                                with Horizontal(classes="override-field-row"):
+                                    yield Input(
+                                        value=self._override_display(name),
+                                        placeholder="default",
+                                        password=secret,
+                                        id=f"override-input-{suffix}",
+                                        classes="override-input",
+                                    )
+                                    yield Button("Apply", id=f"override-apply-{name}", classes="btn-apply")
+                                    yield Button("Reset", id=f"override-reset-{name}", classes="btn-apply btn-reset")
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no

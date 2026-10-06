@@ -25,6 +25,7 @@ from modules.cli.src.surface_cli_tui_css import TUI_CSS
 from modules.cli.src.surface_cli_tui_events import _TuiEventsMixin
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
 from modules.cli.src.surface_cli_tui_sessions_worker import _TuiSessionsWorkerMixin
+from modules.cli.src.surface_cli_tui_settings import _TuiSettingsMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
@@ -59,6 +60,7 @@ class QwenTuiApp(
     _TuiEventsMixin,
     _TuiWorkersMixin,
     _TuiSessionsWorkerMixin,
+    _TuiSettingsMixin,
     _TuiUtilsMixin,
     App[None],
 ):

@@ -131,6 +131,15 @@ review each value. `qwen-web-arwaky doctor --json` echoes the effective configur
 secret values masked, and reports any `QWEN_*` / `QWA_*` variable set but not in the
 registry — a typo otherwise changes runtime behaviour silently.
 
+Zero configuration is the supported default: with no `.env`, no exports, and no
+settings file, every value below falls back to the registry default. The TUI
+Settings screen's **Runtime Overrides** tab is the place to change one — it
+lists the same registry `doctor` prints, shows the value actually in force, and
+writes the change to `~/.config/qwen-web-arwaky/settings.env`. That file is
+loaded before the container is built, so an override survives a restart. A
+shell export still outranks it, and clearing a field returns the value to its
+default rather than blanking it.
+
 Behaviour switches worth knowing:
 
 - `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` — target model (default `Qwen3.8-Max`); the `--model`
@@ -142,6 +151,8 @@ Behaviour switches worth knowing:
 - `QWEN_WEB_MAX_WORKERS` / `QWEN_SWARM_CONCURRENCY` — browser fan-out. Unset derives the
   worker count from available host memory (~700 MiB per Chromium); set explicitly to
   override, clamped to the derived capacity.
+- `QWEN_REQUEST_TIMEOUT_SEC` — ceiling on how long a single response may take (default
+  `600`). A non-numeric value is refused by the registry and never stored.
 - `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` — error tracking and tracing. With
   `ENVIRONMENT=production` and neither set, `doctor` reports a warning.
 - `QWEN_WORKSPACE_ROOT` — override the workspace root directory.

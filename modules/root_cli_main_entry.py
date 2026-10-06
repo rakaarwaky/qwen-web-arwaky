@@ -34,6 +34,7 @@ from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
+from modules.shared.src.utility_core_env import install_settings
 from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 _ERROR_PREFIX = "[ERROR]"
@@ -410,6 +411,12 @@ def main(argv: list[str] | None = None) -> int:
 
         run_mcp_server()
         return 0
+
+    # The TUI Settings screen persists operator overrides to an XDG file. They
+    # must be in the environment before the container is built, because the
+    # capabilities that read them (capacity, sandbox, model) are constructed
+    # once and never re-read the registry.
+    install_settings()
 
     cfg: AppConfig | None = None
     if args is not None:

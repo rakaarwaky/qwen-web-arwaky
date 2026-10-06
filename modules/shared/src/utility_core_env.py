@@ -10,17 +10,38 @@ share one mechanism: the registry labels which is which, and
 Registry entries are plain tuples — ``(name, purpose, default, secret)`` —
 because the Utility layer holds no type definitions; the field positions are
 named by the ``_`` constants below.
+
+The same module owns the operator's *persisted* overrides: a second utility
+importing this one would break the layer's no-utility-imports rule.
+:func:`install_settings` is called by the CLI entry before the container is
+built, so a value chosen in the TUI Settings screen is in force for the run
+that reads it. The file holds overrides only — the defaults above keep working
+with zero configuration, and an empty field on the screen means "back to the
+default", never "set to empty".
 """
 
 from __future__ import annotations
 
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+
+from modules.shared.src.taxonomy_core_constant import XDG_CONFIG_HOME
 
 _MASK = "***"
 _GITHUB_REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+#: File name under the XDG config home holding the operator's overrides.
+SETTINGS_FILE_NAME = "settings.env"
+
+#: Header written above the values so the file explains itself to the next
+#: reader, including whoever opens it in an editor a year from now.
+_SETTINGS_HEADER = (
+    "# qwen-web-arwaky runtime overrides.\n"
+    "# Edited by the TUI Settings screen; loaded before the container is built.\n"
+    "# Only registered values are honoured. The process environment wins.\n"
+)
 
 # Names registered in :data:`REGISTERED_ENV` — one constant per variable so
 # call sites never drift from the registry.
@@ -34,6 +55,7 @@ QWEN_DISABLE_SANDBOX = "QWEN_DISABLE_SANDBOX"
 QWEN_DOCTOR_DEEP = "QWEN_DOCTOR_DEEP"
 QWEN_DOCTOR_SHOW_PATH = "QWEN_DOCTOR_SHOW_PATH"
 QWEN_ENABLE_SANDBOX = "QWEN_ENABLE_SANDBOX"
+QWEN_REQUEST_TIMEOUT_SEC = "QWEN_REQUEST_TIMEOUT_SEC"
 QWEN_STREAM_SAFETY_TIMEOUT_SEC = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 QWEN_SWARM_CONCURRENCY = "QWEN_SWARM_CONCURRENCY"
 QWEN_WEB_GITHUB_REPO = "QWEN_WEB_GITHUB_REPO"
@@ -55,6 +77,7 @@ REGISTERED_ENV: tuple[tuple[str, str, str, bool], ...] = (
     (QWEN_DOCTOR_DEEP, "enable the slow Playwright cold-start probe in doctor", "0", False),
     (QWEN_DOCTOR_SHOW_PATH, "print the effective Chromium binary path in doctor", "0", False),
     (QWEN_ENABLE_SANDBOX, "force Chromium's OS sandbox back on even in containers", "unset", False),
+    (QWEN_REQUEST_TIMEOUT_SEC, "ceiling on how long a single response may take", "600s", False),
     (QWEN_STREAM_SAFETY_TIMEOUT_SEC, "safety timeout for a streaming response; 0 disables", "4h", False),
     (QWEN_SWARM_CONCURRENCY, "browser fan-out cap for one Swarm; clamped by host memory (issue #291)", "auto", False),
     (
@@ -170,6 +193,9 @@ def validate_env(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
         raw = source.get(name, "").strip()
         if raw and not raw.isdigit():
             problems.append(f"{name}: {raw!r} is not a positive integer")
+    response_ceiling = source.get(QWEN_REQUEST_TIMEOUT_SEC, "").strip()
+    if response_ceiling and not response_ceiling.isdigit():
+        problems.append(f"{QWEN_REQUEST_TIMEOUT_SEC}: {response_ceiling!r} is not a positive integer")
     timeout = source.get(QWEN_STREAM_SAFETY_TIMEOUT_SEC, "").strip()
     if timeout and (not timeout.isdigit() or int(timeout) < 0):
         problems.append(f"{QWEN_STREAM_SAFETY_TIMEOUT_SEC}: {timeout!r} is not a non-negative integer")
@@ -180,6 +206,110 @@ def validate_env(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     if workspace and not Path(workspace).is_absolute():
         problems.append(f"{QWEN_WORKSPACE_ROOT}: {workspace!r} is not an absolute path")
     return tuple(problems)
+
+
+# ── Persisted overrides ───────────────────────────────────────────────
+# The Settings screen writes what the operator changes here. The file is the
+# same shape as a shell fragment, so it can be read with ``cat``, edited by
+# hand, or pointed at by a test.
+
+
+def settings_path() -> Path:
+    """Return the XDG path the override file lives at."""
+    return XDG_CONFIG_HOME / SETTINGS_FILE_NAME
+
+
+def _rejected(name: str, value: str) -> bool:
+    """Return True when the registry would refuse *value* for *name*.
+
+    A value that fails validation is dropped rather than stored, so a restart
+    can never behave differently from the session that typed it.
+    """
+    if is_secret(name) and not value:
+        return True
+    return bool(validate_env({name: value}))
+
+
+def parse_settings(text: str) -> dict[str, str]:
+    """Return the overrides in *text*, dropping blanks, comments, and bad values.
+
+    A line is ``NAME=VALUE`` for a registered variable. Unknown names are
+    ignored: the registry is the contract, and an unregistered key is read by
+    no capability.
+    """
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        entry = line.strip()
+        if not entry or entry.startswith("#") or "=" not in entry:
+            continue
+        name, _, value = entry.partition("=")
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name in _REGISTERED_NAMES:
+            out[name] = value
+    return {name: value for name, value in out.items() if not _rejected(name, value)}
+
+
+def load_settings(path: Path | None = None) -> dict[str, str]:
+    """Return the stored overrides, or an empty mapping when there is no file.
+
+    A missing file is the zero-config case and is not an error; an unreadable
+    one is swallowed too, because refusing to start over a config typo would be
+    worse than running on the defaults.
+    """
+    try:
+        text = (path or settings_path()).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    return parse_settings(text)
+
+
+def save_settings(values: Mapping[str, str], path: Path | None = None) -> Path:
+    """Write *values* as the complete override set and return the file path.
+
+    The file is rewritten whole, so an override the operator removes on the
+    Settings screen disappears instead of lingering. Invalid entries are
+    dropped, leaving the written file equal to what a later load returns.
+    """
+    target = path or settings_path()
+    kept = {name: value for name, value in values.items() if not _rejected(name, value)}
+    lines = [_SETTINGS_HEADER]
+    lines.extend(f"{name}={kept[name]}" for name in sorted(kept))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
+
+
+def install_settings(path: Path | None = None, *, env: dict[str, str] | None = None) -> dict[str, str]:
+    """Load the override file into *env* without overwriting a real export.
+
+    Returns the values actually installed, so the caller can report which
+    source is in force. Only names absent from *env* are set: a shell export is
+    the operator's most explicit statement of intent and outranks the file.
+    """
+    target = env if env is not None else os.environ
+    installed: dict[str, str] = {}
+    for name, value in load_settings(path).items():
+        if not value or target.get(name, "").strip():
+            continue
+        target[name] = value
+        installed[name] = value
+    return installed
+
+
+def clear_settings(names: Iterable[str], path: Path | None = None) -> dict[str, str]:
+    """Remove *names* from the override file and from the process environment.
+
+    The defaults take over again, which is what Reset means: a value is not
+    blanked, it reverts to whatever the registry default is.
+    """
+    target = path or settings_path()
+    drop = set(names)
+    remaining = {name: value for name, value in load_settings(target).items() if name not in drop}
+    for name in drop:
+        os.environ.pop(name, None)
+    save_settings(remaining, target)
+    return remaining
 
 
 __all__ = [
@@ -193,6 +323,7 @@ __all__ = [
     "QWEN_DOCTOR_DEEP",
     "QWEN_DOCTOR_SHOW_PATH",
     "QWEN_ENABLE_SANDBOX",
+    "QWEN_REQUEST_TIMEOUT_SEC",
     "QWEN_STREAM_SAFETY_TIMEOUT_SEC",
     "QWEN_SWARM_CONCURRENCY",
     "QWEN_WEB_GITHUB_REPO",
@@ -200,12 +331,19 @@ __all__ = [
     "QWEN_WORKSPACE_ROOT",
     "REGISTERED_ENV",
     "SENTRY_DSN",
+    "SETTINGS_FILE_NAME",
+    "clear_settings",
     "effective_config",
     "get_env",
     "get_secret_env",
+    "install_settings",
     "is_secret",
+    "load_settings",
+    "parse_settings",
     "registered_env",
     "runbook_index",
+    "save_settings",
+    "settings_path",
     "unknown_env_vars",
     "validate_env",
 ]
