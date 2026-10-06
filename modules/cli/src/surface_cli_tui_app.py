@@ -13,14 +13,11 @@ All logic is split across focused mixin modules:
 
 from __future__ import annotations
 
-import contextlib
 from pathlib import Path
 from typing import Any
 
 from textual.app import App
 from textual.binding import Binding
-from textual.css.query import NoMatches
-from textual.widgets import Select
 
 from modules.cli.src.surface_cli_tui_components import ConfirmModal
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
@@ -213,17 +210,6 @@ class QwenTuiApp(
             self._template_roles = set(manifest)
             self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
             self._template_roles_dirty = False
-            # P7: populate the select dropdown with fresh options so the UI
-            # reflects any newly-added templates without a restart.
-            self._refresh_template_selects()
-
-    def _refresh_template_selects(self) -> None:
-        """Rebuild each slot's template Select widget with the current roles."""
-        for s in range(1, self._NUM_SLOTS + 1):
-            with contextlib.suppress(NoMatches):
-                select = self.query_one(f"#select-template-{s}", Select)
-                options = [("No template", "")] + [(role, role) for role in sorted(self._template_roles)]
-                select.set_options(options)
 
 
 __all__ = [

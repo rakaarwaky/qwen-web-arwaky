@@ -1477,6 +1477,15 @@ HelpScreen {
     color: $fg_accent;
 }
 
+/* File indicator row: shows the attached file/folder, hidden by default. */
+.file-indicator {
+    width: 100%;
+    height: 1;
+    color: $fg_muted;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
 /* Composer row: prompt glyph, free-text input, send button. */
 .composer {
     layout: horizontal;

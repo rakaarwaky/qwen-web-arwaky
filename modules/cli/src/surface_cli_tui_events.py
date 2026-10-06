@@ -11,19 +11,15 @@ Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 
 from __future__ import annotations
 
-import contextlib
-from pathlib import Path
 from typing import Any
 
-from rich.markup import escape
-from textual.css.query import NoMatches
-from textual.widgets import Button, Input, Select
+from textual.widgets import Button, Input
 
 from modules.cli.src.surface_cli_tui_css import THEME
 
 
 class _TuiEventsMixin:
-    """Mixin that owns widget event callbacks (button, select, input)."""
+    """Mixin that owns widget event callbacks (button, input)."""
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
     _NUM_SLOTS: int
@@ -54,7 +50,6 @@ class _TuiEventsMixin:
     _session_login_action: Any
     _run_session_health_check: Any
     _check_template_roles: Any
-    _refresh_template_selects: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -113,17 +108,19 @@ class _TuiEventsMixin:
         # hidden until a pill asks for it, so each pill reveals it first.
         if button_id.startswith("btn-pill-prompt-"):
             slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
-            self._toggle_slot_config(slot_id)
-            self._open_picker(f"input-prompt-{slot_id}")
+            self._open_picker(f"composer-{slot_id}")
             return
         if button_id.startswith("btn-pill-attach-"):
             slot_id = int(button_id.removeprefix("btn-pill-attach-"))
-            self._toggle_slot_config(slot_id)
-            self._open_picker(f"input-file-{slot_id}", select_directories=True)
+            self._open_picker(f"composer-{slot_id}", select_directories=True)
             return
         if button_id.startswith("btn-pill-templates-"):
             slot_id = int(button_id.removeprefix("btn-pill-templates-"))
-            self._toggle_slot_config(slot_id)
+            self._check_template_roles()
+            self._log_msg(
+                "[{}]Template roles checked for slot {}.[/]".format(THEME["muted"], slot_id),
+                slot_id,
+            )
             return
         # Clipped job-config chips and Browse buttons (revealed by the pills).
         if button_id.startswith("chip-"):
@@ -145,14 +142,6 @@ class _TuiEventsMixin:
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
-        if button_id.startswith("btn-refresh-template-"):
-            slot_id = int(button_id.removeprefix("btn-refresh-template-"))
-            self._check_template_roles()
-            self._log_msg(
-                "[{}]Template roles refreshed for slot {}.[/]".format(THEME["muted"], slot_id),
-                slot_id,
-            )
-            return
         # Chat console composer: dispatch the typed task as a direct prompt.
         if button_id.startswith("btn-send-"):
             self._send_composer(int(button_id.removeprefix("btn-send-")))
@@ -172,48 +161,6 @@ class _TuiEventsMixin:
             return
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Fill the slot's composer from the chosen role template."""
-        select_id = event.select.id or ""
-        if not select_id.startswith("select-template-"):
-            return
-        slot_id = int(select_id.split("-")[-1])
-        role = event.value
-        if not role:
-            return
-        # P7: lazy-reload template roles so newly added templates are visible
-        # without a restart.
-        self._check_template_roles()
-        with contextlib.suppress(NoMatches):
-            composer = self.query_one(f"#composer-{slot_id}", Input)
-            composer.value = str(role)
-            self._log_msg(
-                "[bold {}]TEMPLATE:[/] Slot {} ← role '{}'".format(THEME["bright"], slot_id, escape(str(role))),
-                slot_id,
-            )
-            # U8: optimistic existence hint when the picked value is a file path.
-            if str(role) not in self._template_roles and not Path(str(role)).exists():
-                self._log_msg(
-                    "[{}]WARNING:[/] '{}' is not a known role and the file does not exist.".format(
-                        THEME["warn"], escape(str(role))
-                    ),
-                    slot_id,
-                )
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """U6: keep the template Select in sync with manual path/role entry."""
-        input_id = event.input.id or ""
-        if not input_id.startswith("input-prompt-"):
-            return
-        slot_id = int(input_id.split("-")[-1])
-        value = event.value.strip()
-        with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)
-            if value in self._template_roles:
-                select.value = value
-            elif select.value not in (None, Select.BLANK) and select.value != value:
-                select.value = Select.BLANK
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Enter inside a composer input sends that slot's typed task."""
