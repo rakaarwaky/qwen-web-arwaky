@@ -4,6 +4,10 @@ Reference document for a redesign. Describes the TUI exactly as it exists
 today: structure, every button, every label, colors, interactions, and
 keyboard behavior. Source of truth: `modules/cli/src/surface_cli_tui_*.py`.
 
+Sections 3, 4, 5, 6, 9, and 13 reflect the mobile-web mockup port from
+`design/overview_engine_status`, `design/login_session_manager`,
+`design/slot_chat_automation_console`, and `design/swarm_multi_agent_stream`.
+
 App title bar: `QWEN-CLI <version>` · subtitle: `chat.qwen.ai parallel
 automation engine`.
 
@@ -80,16 +84,23 @@ Vertical stack inside `.overview-container` (padding 1×2, scroll-y auto):
      `CHECKING…` → `VALID` (green) / `EXPIRED` (warn class) / `TIMEOUT`
      (15s timeout) / `LOGGING IN…` / `N/A`.
 2. **Label**: `Active Job Slots (1 Browser per Job)`
-3. **Slots table** (`#slots-table`, DataTable, `bg_surface`, max-height 9
+3. **Cluster health bar** (`#segment-bar`, `.segment-bar`) — one
+   `Static("█", classes="segment-fill segment-idle")` per slot, rendered as a
+   single row of block glyphs. State classes per segment: `segment-idle`
+   (dim `fg_muted`), `segment-running` (accent cyan, pulses), `segment-done`
+   (`status_ok`), `segment-failed` (`status_err`), `segment-cancelled`
+   (`status_warn`). Compact cluster-health read taken from
+   `design/overview_engine_status`.
+4. **Slots table** (`#slots-table`, DataTable, `bg_surface`, max-height 9
    rows so the log panel below stays visible on short terminals)
    - Columns: `Slot` | `Status` | `Prompt File` | `Duration`
    - One row per slot; status cell uses table format (section 8); duration
      ticks every 5s while running (`12s`, `1m 5s`).
-4. **Pane title row**: `System Event Log` + button **`📋 Copy`**
+5. **Pane title row**: `System Event Log` + button **`📋 Copy`**
    (`btn-copy-log`, 1-row height, accent text on `bg_base`).
-5. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
+6. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
    lines, bordered).
-6. **Help hint** (dim): `Press ? for keyboard shortcuts. Configure a slot
+7. **Help hint** (dim): `Press ? for keyboard shortcuts. Configure a slot
    tab, then press Enter to run.`
 
 Startup message in log: `Qwen Web Automation TUI initialized with multi-slot
@@ -100,44 +111,82 @@ login state.`
 
 ## 4. Tab 2 — Sessions (`tab-sessions`)
 
+Layout follows `design/login_session_manager` — the primary account action
+sits full-width above the pool, and the pool title row carries the utility
+action.
+
 1. **Metric tile strip** (`.card-inner`):
    - `REGISTERED` + value `0`
    - `HEALTHY` + value `0` (metric-ok, green)
    - `LIMITED` + value `0`
-2. **Label**: `Registered Sessions`
-3. **Sessions table** (`#sessions-table`): `ID` | `Name` | `Status` |
+2. **Primary account button** — **`＋ ADD ACCOUNT`** (`#btn-sessions-login`,
+   `.btn-primary-full`, `variant="primary"`, full width, height 3) — opens
+   SessionSetupScreen (currently falls back to a notify telling the user the
+   CLI command).
+3. **Pool title row** (`.pane-title`): `ACCOUNT POOL` label +
+   **`🔄 Re-check Tokens`** (`#btn-sessions-refresh`, `.btn-copy-log`) —
+   reloads the session pool into the table.
+4. **Sessions table** (`#sessions-table`): `ID` | `Name` | `Status` |
    `Last Used` | `Path`
-4. **Button row** (`.toggle-row`, bordered, height 3):
-   - **`🔄 Refresh`** — reloads the session pool into the table.
-   - **`🔐 Add Session`** — primary accent button; opens SessionSetupScreen
-     (currently falls back to a notify telling the user the CLI command).
-   - **`🏥 Health Check`** — runs `SessionHealthChecker` on the pool,
-     logs `HEALTH CHECK: n/m sessions healthy.`, refreshes table.
-5. **Log view** (`#log-view-sessions`, 500 lines).
+5. **Button row** (`.toggle-row`, bordered, height 3):
+   - **`🏥 Health Check`** (`#btn-sessions-health`) — runs
+     `SessionHealthChecker` on the pool, logs `HEALTH CHECK: n/m sessions
+     healthy.`, refreshes table.
+6. **Log view** (`#log-view-sessions`, 500 lines).
 
 ---
 
 ## 5. Tab 3 — Swarm (`tab-swarm`)
 
-1. **Label**: `Attachment File or Folder` (section-label)
+Layout follows `design/swarm_multi_agent_stream`: attachment input at the
+top, a segmented log inspector in the middle, the agent table below it, and
+a stop/start action deck at the bottom.
+
+1. **Section label**: `ATTACHMENT` (`.section-label` in a `.card-inner` row)
 2. **Field row** (`.card-inner`): Input `#input-swarm-file` (placeholder
-   `path/to/file or folder`) + button **`Browse`** (width 8) → opens
-   FilePickerModal in directory-select mode.
-3. **Action row** (`.card-inner`):
-   - **`START`** — primary; validates input; if resource warning threshold
-     reached (≥4 browsers) shows `ConfirmModal "Swarm Resource Usage"`
-     first, then starts `swarm.start()`.
-   - **`CANCEL`** — cancels the running swarm.
-   - Label `Adaptive templates · max 10 browsers` (`#swarm-summary`;
-     live updates to e.g. `COMPLETED · 8/10 completed · 1 failed · max 10
-     browsers`).
-4. **Swarm table** (`#swarm-table`): `Agent` | `Status` | `Attempt` |
+   `path/to/file or folder`) + button **`Browse`** (`#btn-browse-swarm-file`,
+   width 8) → opens FilePickerModal in directory-select mode.
+3. **Section label**: `OUTPUT INSPECTION` (`.section-label` in a `.card-inner`
+   row)
+4. **Segmented log toggle** (`.card-inner` row) — two `.segswitch-btn`
+   buttons; the active one also carries `.segswitch-active`:
+   - **`EVENT LOG`** (`#btn-stream-view`, active by default) — shows
+     `#unified-stream-container`.
+   - **`SYSTEM LOG`** (`#btn-log-view`) — shows `#full-log-container`.
+   Toggling swaps which container has `display: true` and moves the
+   `.segswitch-active` class between the two buttons.
+5. **Event log pane** (`#unified-stream-container`, visible by default):
+   - Pane title row: `Event Log — Parallel Stream` + **`📋 Copy`**
+     (`#btn-copy-swarm-log`).
+   - RichLog `#log-view-swarm`, 2000 lines, wrap, auto-scroll. This is the
+     pane the swarm workers stream into.
+6. **System log pane** (`#full-log-container`, `.hidden` — `display: none`
+   until the toggle switches to SYSTEM LOG):
+   - Pane title row: `/var/log/qwen-swarm.pool.log` + **`Clear`**
+     (`#btn-clear-swarm-log`).
+   - RichLog `#log-view-swarm-system`, 1000 lines, wrap, auto-scroll, rendered
+     in a raw terminal treatment (`#log-view-swarm-system` CSS: raised
+     background, borderless rows). Registered in the app's `_log_views` map
+     under the reserved key `"swarm-system"` so stdlib log lines land in it
+     alongside the event log. `Clear` flushes the buffer and writes
+     `[Logs flushed by user]`.
+7. **Swarm table** (`#swarm-table`): `Agent` | `Status` | `Attempt` |
    `Output`. Empty state row: `—` | `IDLE` | `—` | `No active swarm —
    select an attachment above and click START SWARM`.
-5. **Pane title row**: `Swarm Log` + **`📋 Copy`** (`btn-copy-swarm-log`).
-6. **Log view** (`#log-view-swarm`, 2000 lines).
+8. **Action deck** (`.card-inner.swarm-actions`) — the mockup's sticky
+   bottom bar, rendered inline as the last row of the pane:
+   - **`■ STOP`** (`#btn-swarm-cancel`, `.btn-stop`) — cancels the running
+     swarm.
+   - **`▶ START`** (`#btn-swarm-start`, `.btn-start`, `variant="primary"`) —
+     validates input; if the resource warning threshold is reached (≥4
+     browsers) shows `ConfirmModal "Swarm Resource Usage"` first, then starts
+     `swarm.start()`.
+   - Label `#swarm-summary` — `Adaptive templates · max N browsers`; live
+     updates to e.g. `COMPLETED · 8/10 completed · 1 failed · max 10
+     browsers`.
 
-Concurrency from env `QWEN_SWARM_CONCURRENCY` (default 10, clamped 1–10).
+Concurrency from env `QWEN_SWARM_CONCURRENCY` (default 10, clamped 1–10); the
+clamped value is what `#swarm-summary` reports at compose time.
 
 ---
 
@@ -163,6 +212,9 @@ Each slot tab is a horizontal split:
 │  [ RUN IN SLOT N ]              ← primary, full width, height 3   │
 │  [ Cancel Slot N ]              ← danger red, full width          │
 │  [ ↻ Retry Slot N ]             ← indigo, hidden unless FAILED    │
+│  ┌─ card-inner (template sheet) ──────────────────────────────┐   │
+│  │ PROMPT TEMPLATES          [ OPEN ]   ← design mockup row    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
 ├─ right-pane (52%, min 30 cols, bg_overlay, pad 1×2) ───────────────┤
 │  [ LIVE LOG: BROWSER #N ]   [● READY]   [📋]   ← title + badge    │
 │  (LoadingIndicator, hidden unless running)                         │
@@ -189,6 +241,7 @@ Each slot tab is a horizontal split:
 | `RUN IN SLOT N` | `btn-run-N` | accent fill `fg_accent`/`fg_on_accent`, bold; hover inverts to outline | Validates inputs via resolver; starts worker; disabled state = already-running warning toast + log. Also bound to Enter/Ctrl+R. |
 | `Cancel Slot N` | `btn-cancel-N` | `danger_bg` fill, `status_err` border, bold; hover inverts | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"` ("Slot N has been running for Xs. Cancelling will lose the current progress."). Confirms only if same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
 | `↻ Retry Slot N` | `btn-retry-N` | `bg_raised` fill, `status_warn` text+border; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
+| `OPEN` | `btn-templates-N` | `.btn-copy-log`, inside a `.card-inner` row labeled `PROMPT TEMPLATES` | Surfaces the template sheet from `design/slot_chat_automation_console`: counts the configured role templates and logs `TEMPLATES: Slot N — K roles available (use the Quick Select dropdown to apply one).` into that slot's own log pane. |
 
 ### Slot right pane
 
@@ -294,22 +347,26 @@ to keep column widths stable.
 | # | Label | Location | id | Variant / style |
 | --- | --- | --- | --- | --- |
 | 1 | `📋 Copy` | Overview log title | `btn-copy-log` | default, accent text |
-| 2 | `🔄 Refresh` | Sessions | `btn-sessions-refresh` | default |
-| 3 | `🔐 Add Session` | Sessions | `btn-sessions-login` | primary (accent) |
-| 4 | `🏥 Health Check` | Sessions | `btn-sessions-health` | default |
+| 2 | `＋ ADD ACCOUNT` | Sessions primary row | `btn-sessions-login` | primary (`.btn-primary-full`) |
+| 3 | `🔄 Re-check Tokens` | Sessions pool title row | `btn-sessions-refresh` | default |
+| 4 | `🏥 Health Check` | Sessions toggle row | `btn-sessions-health` | default |
 | 5 | `Browse` | Swarm file field | `btn-browse-swarm-file` | width 8, accent text |
-| 6 | `START` | Swarm | `btn-swarm-start` | primary |
-| 7 | `CANCEL` | Swarm | `btn-swarm-cancel` | default |
-| 8 | `📋 Copy` | Swarm log title | `btn-copy-swarm-log` | default |
-| 9 | `Browse` ×3 | Slot prompt/file/output fields | `btn-browse-{prompt,file,output}-N` | width 8 |
-| 10 | `RUN IN SLOT N` | Slot left pane | `btn-run-N` | primary full-width |
-| 11 | `Cancel Slot N` | Slot left pane | `btn-cancel-N` | danger full-width |
-| 12 | `↻ Retry Slot N` | Slot left pane | `btn-retry-N` | warn, hidden until FAILED |
-| 13 | `📋` | Slot log title | `btn-copy-log-N` | icon-only, tooltip |
-| 14 | `Select This Folder` / `Cancel (Esc)` | File picker modal | `btn-select-folder` / `btn-cancel-modal` | primary / default |
-| 15 | `Close` | Help modal | `help-close` | default |
-| 16 | `Cancel` / confirm label | Confirm modal | `btn-cancel` / `btn-confirm` | default / error |
-| 17 | `Delete Session & Login Again` / `Back to Main Menu` | Session setup | `login` / `back` | error / default |
+| 6 | `EVENT LOG` | Swarm log toggle | `btn-stream-view` | `.segswitch-btn` (active by default) |
+| 7 | `SYSTEM LOG` | Swarm log toggle | `btn-log-view` | `.segswitch-btn` |
+| 8 | `📋 Copy` | Swarm event log title | `btn-copy-swarm-log` | default |
+| 9 | `Clear` | Swarm system log title | `btn-clear-swarm-log` | default |
+| 10 | `■ STOP` | Swarm action deck | `btn-swarm-cancel` | `.btn-stop` |
+| 11 | `▶ START` | Swarm action deck | `btn-swarm-start` | `.btn-start`, primary |
+| 12 | `Browse` ×3 | Slot prompt/file/output fields | `btn-browse-{prompt,file,output}-N` | width 8 |
+| 13 | `RUN IN SLOT N` | Slot left pane | `btn-run-N` | primary full-width |
+| 14 | `Cancel Slot N` | Slot left pane | `btn-cancel-N` | danger full-width |
+| 15 | `↻ Retry Slot N` | Slot left pane | `btn-retry-N` | warn, hidden until FAILED |
+| 16 | `OPEN` | Slot template sheet row | `btn-templates-N` | `.btn-copy-log` |
+| 17 | `📋` | Slot log title | `btn-copy-log-N` | icon-only, tooltip |
+| 18 | `Select This Folder` / `Cancel (Esc)` | File picker modal | `btn-select-folder` / `btn-cancel-modal` | primary / default |
+| 19 | `Close` | Help modal | `help-close` | default |
+| 20 | `Cancel` / confirm label | Confirm modal | `btn-cancel` / `btn-confirm` | default / error |
+| 21 | `Delete Session & Login Again` / `Back to Main Menu` | Session setup | `login` / `back` | error / default |
 
 Interactive non-button controls: slot `Select` dropdown, 4 inputs per slot
 (template, prompt, attachment, output), swarm file input, headless `Switch`
@@ -342,9 +399,13 @@ Footer shows the same hints (Textual auto-renders bindings).
 
 ## 11. Log System
 
-- Log scopes: Overview (system), Sessions, Swarm, and one per slot.
-  `_log_msg(msg, slot_id=None)` writes to Overview + the active slot view;
-  with `slot_id` it writes to that slot's view only.
+- Log scopes: Overview (system), Sessions, Swarm event log, Swarm system log,
+  and one per slot. `_log_msg(msg, slot_id=None)` writes to Overview + the
+  active slot view; with `slot_id` it writes to that slot's view only.
+- `_log_views` is keyed by `0` (overview), `-1` (swarm event log), the string
+  `"swarm-system"` (swarm system log), and the int slot ids. `QwenTuiLogHandler`
+  broadcasts each stdlib line into every registered view, so both Swarm panes
+  receive the same stream and differ only in presentation.
 - `QwenTuiLogHandler` streams stdlib logging into the RichLogs, filtered to
   app namespaces (`qwen`, `browser`, `modules`, `capabilities`, `agent`,
   `lifecycle`, `utility`, `shared`, `core`, `cli`, `surface`, root).
@@ -383,6 +444,8 @@ Footer shows the same hints (Textual auto-renders bindings).
 | Session check hangs 15s | Badge `TIMEOUT` + warning toast advising `qwen-web-arwaky doctor`. |
 | Swarm with no input | Toast `Select a file or folder before starting Swarm.` |
 | Swarm ≥4 browsers | Resource-usage ConfirmModal before start. |
+| Swarm system log empty, `Clear` pressed | `[Logs flushed by user]` written to `#log-view-swarm-system`. |
+| Template sheet on a slot with no templates | `TEMPLATES: Slot N — 0 roles available (use the Quick Select dropdown to apply one).` |
 | Log copy on empty buffer | `Log buffer is empty — nothing to copy.` |
 | Template select of missing path | `WARNING: 'x' is not a known role and the file does not exist.` |
 
