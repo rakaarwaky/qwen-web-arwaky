@@ -21,7 +21,6 @@ from textual.widgets import (
     Input,
     Label,
     LoadingIndicator,
-    Select,
     Static,
     TabbedContent,
     TabPane,
@@ -332,11 +331,28 @@ class _TuiComposeMixin:
                         yield system_log
                         yield Label("--:--:--", id=f"slot-log-time-{s}", classes="slot-log-time")
 
+                    # Action pill row: design/slot_chat_automation_console bottom dock.
+                    with Horizontal(classes="action-pill-row"):
+                        yield Button(
+                            "⬆ Prompt",
+                            id=f"btn-pill-prompt-{s}",
+                            classes="action-pill",
+                        )
+                        yield Button(
+                            "📎 Attach",
+                            id=f"btn-pill-attach-{s}",
+                            classes="action-pill",
+                        )
+                        yield Button(
+                            "✨ Templates",
+                            id=f"btn-pill-templates-{s}",
+                            classes="action-pill action-pill-templates",
+                        )
+                    # File indicator: shows the attached file/folder, hidden by default.
+                    file_indicator = Label("", id=f"file-indicator-{s}", classes="file-indicator")
+                    file_indicator.display = False
+                    yield file_indicator
                     # Composer: prompt glyph, free-text task, send button.
-                    # The per-slot job-config card and its Upload / Attach /
-                    # Templates pills are gone: Settings is the override
-                    # surface only, and a typed task in the composer is the
-                    # execution surface.
                     with Horizontal(classes="composer"):
                         yield Label(">", classes="composer-glyph")
                         yield Input(
@@ -346,22 +362,6 @@ class _TuiComposeMixin:
                             classes="composer-input",
                         )
                         yield Button("Send", id=f"btn-send-{s}", classes="btn-send")
-
-                    # Template picker: inline select next to the composer so
-                    # a role can be chosen without leaving the chat page.
-                    with Horizontal(classes="template-picker"):
-                        yield Label("Template:", id=f"template-label-{s}", classes="template-label")
-                        yield Select(
-                            options=[("No template", "")] + self._template_options,
-                            value="",
-                            id=f"select-template-{s}",
-                            classes="template-select",
-                        )
-                        yield Button(
-                            "↻ Refresh",
-                            id=f"btn-refresh-template-{s}",
-                            classes="template-refresh",
-                        )
 
             # ─── Screen 4: Swarm ─────────────────────────────────
             # design/swarm_multi_agent_stream: attachment card, view toggle,
