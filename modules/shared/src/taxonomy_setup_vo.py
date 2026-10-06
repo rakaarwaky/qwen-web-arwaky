@@ -32,7 +32,7 @@ class SetupRequest:
     """
 
     verb: str = ""
-    browser_headless: bool = True
+    browser_headless: bool = False
     profile_path: Path | str | None = None
     wait_for_confirmation: Callable[[], bool] | None = None
 
