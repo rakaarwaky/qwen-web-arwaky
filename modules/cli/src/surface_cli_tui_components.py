@@ -209,8 +209,8 @@ class TemplatePickerModal(ModalScreen[str | None]):
     """Modal screen listing prompt-template roles for the operator to pick one.
 
     The Templates pill on the chat console opens this modal; choosing a
-    role dismisses with the role string, choosing nothing dismisses with
-    ``None``. The caller writes the role into the slot's composer input.
+    role fills that slot's composer input with the role so the operator can
+    append a task before hitting Send.
     """
 
     BINDINGS = [
@@ -227,9 +227,10 @@ class TemplatePickerModal(ModalScreen[str | None]):
         with Vertical(id="template-picker-container"):
             yield Label(f"[ {self._title} ]", id="template-picker-title")
             if not self._options:
-                yield Label("[dim]No templates discovered under modules/templates/.[/]")
+                yield Label("[dim]No templates discovered under modules/templates/.[/]\n")
             for role, display in self._options:
-                yield Button(display, id=f"tpl-{role}", variant="default")
+                safe_role = role.replace(" ", "_")
+                yield Button(display, id=f"tpl-{safe_role}", variant="default")
             yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
