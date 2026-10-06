@@ -53,6 +53,8 @@ class _TuiEventsMixin:
     _refresh_sessions_table: Any
     _session_login_action: Any
     _run_session_health_check: Any
+    _check_template_roles: Any
+    _refresh_template_selects: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -143,6 +145,14 @@ class _TuiEventsMixin:
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
+        if button_id.startswith("btn-refresh-template-"):
+            slot_id = int(button_id.removeprefix("btn-refresh-template-"))
+            self._check_template_roles()
+            self._log_msg(
+                "[{}]Template roles refreshed for slot {}.[/]".format(THEME["muted"], slot_id),
+                slot_id,
+            )
+            return
         # Chat console composer: dispatch the typed task as a direct prompt.
         if button_id.startswith("btn-send-"):
             self._send_composer(int(button_id.removeprefix("btn-send-")))
@@ -164,17 +174,20 @@ class _TuiEventsMixin:
             self._run_session_health_check()
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Fill a slot's prompt input from the chosen role template."""
+        """Fill the slot's composer from the chosen role template."""
         select_id = event.select.id or ""
         if not select_id.startswith("select-template-"):
             return
         slot_id = int(select_id.split("-")[-1])
         role = event.value
-        if role is None:
+        if not role:
             return
+        # P7: lazy-reload template roles so newly added templates are visible
+        # without a restart.
+        self._check_template_roles()
         with contextlib.suppress(NoMatches):
-            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
-            prompt_input.value = str(role)
+            composer = self.query_one(f"#composer-{slot_id}", Input)
+            composer.value = str(role)
             self._log_msg(
                 "[bold {}]TEMPLATE:[/] Slot {} ← role '{}'".format(THEME["bright"], slot_id, escape(str(role))),
                 slot_id,

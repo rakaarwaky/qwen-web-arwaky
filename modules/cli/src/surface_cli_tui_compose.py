@@ -21,6 +21,7 @@ from textual.widgets import (
     Input,
     Label,
     LoadingIndicator,
+    Select,
     Static,
     TabbedContent,
     TabPane,
@@ -39,6 +40,7 @@ class _TuiComposeMixin:
     # QwenTuiApp sets these at class level / __init__; the mixin reads them.
     _NUM_SLOTS: int
     _slot_workers: dict[int, Any]
+    _template_options: list[tuple[str, str]]
     # Declared here to match _TuiUtilsMixin and avoid incompatible-definition error.
     _log_handler: logging.Handler
 
@@ -344,6 +346,22 @@ class _TuiComposeMixin:
                             classes="composer-input",
                         )
                         yield Button("Send", id=f"btn-send-{s}", classes="btn-send")
+
+                    # Template picker: inline select next to the composer so
+                    # a role can be chosen without leaving the chat page.
+                    with Horizontal(classes="template-picker"):
+                        yield Label("Template:", id=f"template-label-{s}", classes="template-label")
+                        yield Select(
+                            options=[("No template", "")] + self._template_options,
+                            value="",
+                            id=f"select-template-{s}",
+                            classes="template-select",
+                        )
+                        yield Button(
+                            "↻ Refresh",
+                            id=f"btn-refresh-template-{s}",
+                            classes="template-refresh",
+                        )
 
             # ─── Screen 4: Swarm ─────────────────────────────────
             # design/swarm_multi_agent_stream: attachment card, view toggle,
