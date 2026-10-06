@@ -21,7 +21,6 @@ from textual.widgets import Input, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
