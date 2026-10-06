@@ -17,7 +17,7 @@ from rich.markup import escape
 from textual import work
 from textual.app import ScreenStackError
 from textual.css.query import NoMatches
-from textual.widgets import Input, LoadingIndicator, Switch
+from textual.widgets import Input, LoadingIndicator
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
@@ -90,18 +90,17 @@ class _TuiWorkersMixin:
                 self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
 
-        try:
-            prompt_val = self.query_one(f"#input-prompt-{slot_id}", Input).value
-            file_val = self.query_one(f"#input-file-{slot_id}", Input).value
-            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
-            headless_val = self.query_one(f"#switch-headless-{slot_id}", Switch).value
-        except Exception as exc:
-            # U1: a user-initiated action must never fail silently.
-            msg = f"Could not read Slot {slot_id} inputs: {exc}"
-            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
-            with contextlib.suppress(Exception):
-                self.notify(msg, severity="error", title=f"Slot {slot_id}")
-            return
+        # The per-slot Settings form that used to carry prompt, file, and
+        # output fields is gone. The keyboard run (Enter / Ctrl+R) hands the
+        # slot's typed composer text to the resolver as the prompt source, so
+        # an empty composer degrades to a "Prompt file is required." notice
+        # instead of a blind default run.
+        prompt_val = ""
+        with contextlib.suppress(NoMatches):
+            prompt_val = self.query_one(f"#composer-{slot_id}", Input).value.strip()
+        file_val = ""
+        out_val = ""
+        headless_val = True
 
         plan = self._slot_config.resolve_slot_run_plan(
             PromptText(prompt_val),
@@ -121,8 +120,8 @@ class _TuiWorkersMixin:
         p_name = plan.prompt_path.name
 
         # The chat console's transcript mirrors what this slot was asked to
-        # do, so a run started from Settings still shows up in the Chat view.
-        self._append_chat_message(slot_id, "user", p_name, attachment=file_val)
+        # do, so a run started from the composer shows up in the Chat view.
+        self._append_chat_message(slot_id, "user", prompt_val or p_name)
 
         # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
         # never touches another slot's in-flight browser context.
@@ -165,11 +164,10 @@ class _TuiWorkersMixin:
                 self.notify(msg, severity="error", title=f"Slot {slot_id}")
             return
 
+        # The Settings form's headless switch and output field are gone; the
+        # composer inherits the session defaults for both.
         headless = True
         out_val = ""
-        with contextlib.suppress(Exception):
-            headless = self.query_one(f"#switch-headless-{slot_id}", Switch).value
-            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
 
         filename = self._truncate_name(text, 24)
         self._slot_cancel_events[slot_id] = threading.Event()

@@ -1,10 +1,10 @@
-"""Unit tests for the Settings screen's runtime-override card.
+"""Unit tests for the Settings screen's runtime-override surface.
 
-The Settings screen exists to adjust values that already have working
-defaults, so these tests pin the three promises the screen makes: every
-registered value is listed with the value actually in force, a write reaches
-both the running process and the file that survives a restart, and clearing a
-field returns the value to its default instead of blanking it.
+The Settings pane is the override card and nothing else, so these tests pin
+the promises that card makes: every registered value is listed with the value
+actually in force, a write reaches both the running process and the file that
+survives a restart, and clearing a field returns the value to its default
+instead of blanking it.
 """
 
 from __future__ import annotations
@@ -71,15 +71,13 @@ def test_every_registered_value_gets_a_row() -> None:
     app = _make_app()
 
     async def _run() -> None:
-        async with app.run_test(size=(150, 44)) as pilot:
-            await pilot.pause()
+        async with app.run_test(size=(150, 44)):
             for name, _purpose, _default, _secret in REGISTERED_ENV:
                 suffix = name.replace("-", "_")
                 assert app.query_one(f"#override-input-{suffix}") is not None, name
                 assert app.query_one(f"#override-badge-{suffix}") is not None, name
                 assert app.query_one(f"#override-apply-{name}") is not None, name
                 assert app.query_one(f"#override-reset-{name}") is not None, name
-            await pilot.pause()
 
     asyncio.run(_run())
 
@@ -214,73 +212,27 @@ def test_a_secret_is_masked_in_the_field_and_never_echoed_into_the_log(store: Pa
     asyncio.run(_run())
 
 
-def test_the_pane_opens_on_the_overrides_and_has_no_slot_row() -> None:
-    """SETTINGS is a settings menu: it opens on the overrides, with no pills."""
+def test_the_settings_pane_is_the_overrides_card_and_nothing_else() -> None:
+    """SETTINGS opens on the override card, with no slot form behind it."""
     app = _make_app()
 
     async def _run() -> None:
+        from textual.css.query import NoMatches
+
         async with app.run_test(size=(150, 44)) as pilot:
             await pilot.pause()
             await pilot.click("#nav-settings")
             for _ in range(3):
                 await pilot.pause(0.02)
             assert app.query_one("#settings-overrides").display is True
-            assert app.query_one("#slot-config-1").display is False
-            # A second row of slot pills would repeat the chat console's own
-            # carousel, at a width where they do not all fit.
+            # The per-slot form is gone from the pane entirely.
+            with pytest.raises(NoMatches):
+                app.query_one("#slot-config-1")
             assert len(app.query(".settings-carousel")) == 0
             assert len(app.query("#cfg-slot-1")) == 0
-
-    asyncio.run(_run())
-
-
-def test_the_section_switch_shows_one_half_of_the_screen_at_a_time() -> None:
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test(size=(150, 44)) as pilot:
-            await pilot.pause()
-            await pilot.click("#nav-settings")
-            for _ in range(3):
-                await pilot.pause(0.02)
-
-            await pilot.click("#settings-tab-slot")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            assert app.query_one("#settings-overrides").display is False
-            assert app.query_one("#slot-config-1").display is True
-
-            await pilot.click("#settings-tab-overrides")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            assert app.query_one("#settings-overrides").display is True
-            assert app.query_one("#slot-config-1").display is False
-
-    asyncio.run(_run())
-
-
-def test_the_slot_form_edits_the_slot_the_chat_console_is_showing() -> None:
-    """No selector on the screen, so the form has to follow the active slot."""
-    app = _make_app()
-
-    async def _run() -> None:
-        from textual.widgets import Label
-
-        async with app.run_test(size=(150, 44)) as pilot:
-            await pilot.pause()
-            await pilot.click("#nav-chat")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            await pilot.click("#chat-slot-1-3")
-            for _ in range(3):
-                await pilot.pause(0.02)
-
-            app._goto_slot_settings(3)
-            for _ in range(3):
-                await pilot.pause(0.02)
-            assert app.query_one("#slot-config-3").display is True
-            assert app.query_one("#slot-config-1").display is False
-            assert "SLOT 03" in str(app.query_one("#cfg-title-3", Label).render())
+            # No section switch either: the card is the whole screen.
+            assert len(app.query("#settings-tab-slot")) == 0
+            assert len(app.query("#settings-tab-overrides")) == 0
 
     asyncio.run(_run())
 
@@ -311,27 +263,8 @@ def test_pressing_apply_writes_what_the_field_holds(store: Path) -> None:
     asyncio.run(_run())
 
 
-def test_the_templates_pill_returns_to_the_slot_form(store: Path) -> None:
-    """Arriving from the chat console must not land on the override list."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test(size=(150, 44)) as pilot:
-            await pilot.pause()
-            await pilot.click("#nav-settings")
-            for _ in range(3):
-                await pilot.pause(0.02)
-            app._goto_slot_settings(4)
-            for _ in range(3):
-                await pilot.pause(0.02)
-            assert app.query_one("#settings-overrides").display is False
-            assert app.query_one("#slot-config-4").display is True
-
-    asyncio.run(_run())
-
-
 def test_the_card_scrolls_inside_its_own_band() -> None:
-    """17 rows cannot fit one screen, so the scrollbar belongs to the card."""
+    """The registry outgrows one screen, so the scrollbar belongs to the card."""
     app = _make_app()
 
     async def _run() -> None:
@@ -342,8 +275,7 @@ def test_the_card_scrolls_inside_its_own_band() -> None:
                 await pilot.pause(0.02)
             scroll = app.query_one("#settings-overrides")
             assert scroll.region.height > 0
-            # The section switch and the nav dock stay put above and below it.
-            assert app.query_one(".settings-switch").region.y < scroll.region.y
+            # The nav dock stays put below the card.
             assert app.query_one("#nav-dock").region.y > scroll.region.y
 
     asyncio.run(_run())

@@ -196,89 +196,44 @@ Each slot tab is the chat console from `design/slot_chat_automation_console`:
 │ Pick a prompt file, or type a task below to get started.          │  ← transcript
 │ ┌ EVENT LOG [SLOT #1]  Copy ────────────────────────────────────┐ │  ← event log card (1fr)
 │ └────────────────────────────── 12:04:30 ───────────────────────┘ │
-│ [⬆ Upload Prompt (.md)] [📎 Attach File / Folder] [✨ Templates]  │
 │ [ > Type automated task or command...                    ]      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- The pills split the row (`width: 1fr`, carousel `overflow-x: hidden`) and
-  relabel themselves: `● SLOT 07` while the row has the twelve columns a
+A task is typed into the composer below the event log card and sent. The
+execution surface is the composer: a prompt role typed there materializes the
+template through the same resolver a run takes, and a free-text task goes
+through the direct-prompt path. The registry overrides on the Settings pane
+shape every run. The Upload / Attach / Templates pill row that used to sit
+between the log card and the composer is gone with the per-slot form it drove;
+typed text in the composer covers both paths.
+
+- The slot carousel pills split the row (`width: 1fr`, `overflow-x: hidden`)
+  and relabel themselves: `● SLOT 07` while the row has the twelve columns a
   pill needs, `● 07` below that (`_refresh_slot_chips`).
 - The transcript sizes to its content up to 12 rows; the log card takes
   every leftover row, so the console fills the screen and the composer stays
   put. The whole console needs about 29 rows; below that the pane clips.
-- A pill press switches the slot in one click and carries the focus with it
-  (`_switch_to_slot`), because Textual makes the pane holding the focused
-  widget the active tab.
+- A carousel pill press switches the slot in one click and carries the focus
+  with it (`_switch_to_slot`), because Textual makes the pane holding the
+  focused widget the active tab.
 
 ### 6.2 Settings pane (`tab-settings`)
 
-Two kinds of setting live here, so the pane carries a segmented switch and
-shows one at a time: `Runtime Overrides` (the process-wide values) and
-`Slot Config` (the per-slot job form). The pane **opens on the overrides** —
-that is what an operator who pressed SETTINGS came for — and the form is one
-press away.
-
-The screen has **no slot selector**. Settings configures the application, and
-a per-slot form editing a slot the operator cannot see would be a guess, so
-`Slot Config` edits the slot the Chat console is showing. The card title names
-it (`SLOT 03 CONFIGURATION`), and the Chat console's Templates pill lands on
-that slot's form.
+**Configuration only.** The pane is the runtime-override surface and nothing
+else: one row per registered environment value, `Apply`/`Reset` per row. It
+carries **no slot selector, no prompt file, no attachment path, and no run
+controls** — those belong to a job, not to the application. The per-slot
+form they lived in (and its second copy on the slot console) is gone; the
+composer on the slot console is the execution surface, and the override card
+is the whole of Settings.
 
 No mockup ships for this screen, so it follows the same card language as the
-Overview and Swarm consoles; every id the workers and tests resolve is
-preserved.
-
-#### Slot Config
-
-```text
-│ ⚙ SLOT 01 CONFIGURATION                     ← card title + chip   │
-│ PROMPT TEMPLATE                                                 │
-│ [ Select a template or type a file path below ▼ ]                │
-│ [Backend Engineer] [Business Analyst] [Devops…] [Frontend…]      │
-│ PROMPT FILE / ROLE (REQUIRED) *                                  │
-│ [path/to/prompt.md or role]                          [Browse]    │
-│ ATTACHMENT (OPTIONAL)                                            │
-│ [path/to/file or folder]                           [Browse]    │
-│ OUTPUT DESTINATION                                               │
-│ [.local/share/qwen-web-arwaky/output]               [Browse]    │
-│ HEADLESS BROWSER  1 independent browser in background   [Switch]  │
-│ [⚡ RUN IN SLOT 01] [✕ Cancel Slot 01] [↻ Retry Slot 01]          │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-One card per slot; only the active slot's is displayed (`#slot-config-N`).
-`_show_slot_config` swaps which card is shown and `_show_settings_section`
-decides whether the form or the override list is on screen at all.
-
-#### Slot form fields
-
-| Field | Widget | Default / placeholder | Notes |
-| --- | --- | --- | --- |
-| Prompt Template | `Select` | blank; prompt `Select a template or type a file path below` | Options = role templates from `modules/templates/*.md` (backend-engineer, business-analyst, devops-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, software-architect, system-analyst, ui-ux-designer). Selecting one fills the Prompt File input and logs `TEMPLATE: Slot N ← role 'x'`. Unknown path logs a WARNING. |
-| Prompt Template quick select | chips `chip-N-role` (one row, frameless) | first four roles | Labelled from the role (`backend-engineer` → `Backend Engineer`): every shipped template opens with `## Summary`, so the manifest titles are all identical. Selecting a chip sets the `Select`. |
-| Prompt File / Role (Required) `*` | `Input` + Browse | placeholder `path/to/prompt.md or role` | Manual edits desync the Select back to blank. |
-| Attachment File or Folder (Optional) | `Input` + Browse | placeholder `path/to/file or folder` | Browse opens picker in directory mode. |
-| Output Destination | `Input` + Browse | default `.local/share/qwen-web-arwaky/output` (DEFAULT_OUTPUT) | Browse opens picker in file mode. |
-| Headless Browser | `Switch` (default ON) | subtext `1 independent browser in background` | |
-
-Two Textual geometry traps are handled here: the Browse buttons are ten
-columns wide (at eight, minus the border and the default padding, "Browse"
-wrapped onto two rows) and the chips are frameless (a one-row box with a
-border has no content row left for the label). `SelectCurrent`'s own `tall`
-border is suppressed so the `Select` does not paint `▔▔▔` inside our border.
-
-#### Slot action buttons (one row, height 3)
-
-| Button | id | Style | Behavior |
-| --- | --- | --- | --- |
-| `⚡ RUN IN SLOT NN` | `btn-run-N` | accent fill, 2fr | Validates inputs via resolver; starts worker; already-running gives a warning toast + log. Also bound to Enter/Ctrl+R. |
-| `✕ Cancel Slot NN` | `btn-cancel-N` | `danger_bg` fill, 1fr | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"`. Confirms only if the same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
-| `↻ Retry Slot NN` | `btn-retry-N` | `bg_raised` fill, `status_warn` text; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
+Overview and Swarm consoles.
 
 #### Runtime Overrides
 
-The screen's other half. Every value in the environment registry
+The whole pane. Every value in the environment registry
 (`REGISTERED_ENV`, the same table `qwa doctor` prints) gets one row: the
 variable name, what it does, the value in force, an `Apply` and a `Reset`
 control. The defaults are the product — this screen only adjusts them — so an
@@ -297,12 +252,11 @@ empty field means "back to the default", never "set to empty".
 ```
 
 17 rows at 7 rows each is 119 rows of content in a 34-row band, so
-`#settings-overrides` is the only thing on the screen that scrolls. The section
-switch above it and the nav dock below it stay put.
+`#settings-overrides` is the only thing on the screen that scrolls; the nav
+dock below it stays put.
 
 | Element | id | Behavior |
 | --- | --- | --- |
-| Section switch | `settings-tab-slot`, `settings-tab-overrides` | `_show_settings_section` — shows one half, hides the other. The form follows the active chat slot unless a caller names one (the Templates pill does). |
 | Value field | `override-input-NAME` | Shows the effective value; the registry default when nothing overrides it. Secrets render masked (`***`). |
 | `Apply` | `override-apply-NAME` | Validates through the registry's own `validate_env`, writes to `os.environ` **and** the override file, re-renders the row. Enter in the field takes the same path. |
 | `Reset` | `override-reset-NAME` | Drops the override from the file and the environment; the default takes over. |
@@ -440,20 +394,18 @@ to keep column widths stable.
 | 9 | `Clear` | Swarm system log title | `btn-clear-swarm-log` | default |
 | 10 | `■ STOP` | Swarm action deck | `btn-swarm-cancel` | `.btn-stop` |
 | 11 | `▶ START` | Swarm action deck | `btn-swarm-start` | `.btn-start`, primary |
-| 12 | `Browse` ×3 | Slot prompt/file/output fields | `btn-browse-{prompt,file,output}-N` | width 8 |
-| 13 | `RUN IN SLOT N` | Slot left pane | `btn-run-N` | primary full-width |
-| 14 | `Cancel Slot N` | Slot left pane | `btn-cancel-N` | danger full-width |
-| 15 | `↻ Retry Slot N` | Slot left pane | `btn-retry-N` | warn, hidden until FAILED |
-| 16 | `OPEN` | Slot template sheet row | `btn-templates-N` | `.btn-copy-log` |
-| 17 | `📋` | Slot log title | `btn-copy-log-N` | icon-only, tooltip |
-| 18 | `Select This Folder` / `Cancel (Esc)` | File picker modal | `btn-select-folder` / `btn-cancel-modal` | primary / default |
-| 19 | `Close` | Help modal | `help-close` | default |
-| 20 | `Cancel` / confirm label | Confirm modal | `btn-cancel` / `btn-confirm` | default / error |
-| 21 | `Delete Session & Login Again` / `Back to Main Menu` | Session setup | `login` / `back` | error / default |
+| 12 | `Send` | Slot composer | `btn-send-N` | `.btn-send` |
+| 13 | `📋` | Slot log title | `btn-copy-log-N` | icon-only, tooltip |
+| 14 | `Select This Folder` / `Cancel (Esc)` | File picker modal | `btn-select-folder` / `btn-cancel-modal` | primary / default |
+| 15 | `Close` | Help modal | `help-close` | default |
+| 16 | `Cancel` / confirm label | Confirm modal | `btn-cancel` / `btn-confirm` | default / error |
+| 17 | `Delete Session & Login Again` / `Back to Main Menu` | Session setup | `login` / `back` | error / default |
+| 18 | `Apply` / `Reset` | Settings override row | `override-apply-NAME` / `override-reset-NAME` | `.btn-apply` |
 
-Interactive non-button controls: slot `Select` dropdown, 4 inputs per slot
-(template, prompt, attachment, output), swarm file input, headless `Switch`
-per slot.
+Interactive non-button controls: one `Input` per slot (`composer-N`, the
+free-text task), the swarm file input, one `Input` per Settings override row
+(`override-input-NAME`).
+
 
 ---
 
@@ -466,7 +418,7 @@ per slot.
 | `Ctrl+Alt+0…9` | Slot 10…19 |
 | `Ctrl+Alt+S` | Swarm tab |
 | `Alt+Left` / `Alt+Right` | Prev / next slot tab |
-| `Enter` / `Ctrl+R` | Run active slot |
+| `Enter` / `Ctrl+R` | Run the active slot's typed composer text through the resolver; empty composer gives a "Prompt file is required." notice |
 | `Ctrl+X` | Cancel active slot |
 | `Ctrl+C` | Copy active tab's log to clipboard (toast: `Copied N log lines to clipboard`) |
 | `Ctrl+L` | Login / session setup |

@@ -19,7 +19,6 @@ import os
 from typing import Any
 
 from rich.markup import escape
-from textual.css.query import NoMatches
 from textual.widgets import Input, Static
 
 from modules.cli.src.surface_cli_tui_css import THEME
@@ -55,9 +54,6 @@ class _TuiSettingsMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
     query_one: Any
-    _NUM_SLOTS: int
-    _show_slot_config: Any
-    _get_active_slot_id: Any
 
     # ── Reading the registry ───────────────────────────────────────────
 
@@ -163,33 +159,6 @@ class _TuiSettingsMixin:
     def _load_stored(self) -> dict[str, str]:
         """Return the override file's current contents."""
         return load_settings()
-
-    def _show_settings_section(self, overrides: bool, slot_id: int | None = None) -> None:
-        """Show the runtime-override card or the per-slot form, not both.
-
-        The form carries no slot selector of its own: this screen configures the
-        application, and a per-slot form editing a slot the operator cannot see
-        would be a guess. It edits *slot_id* when a caller names one — the
-        Templates pill knows which slot it belongs to — and otherwise the slot
-        the Chat console is showing, which is the one they are already looking
-        at.
-        """
-        with contextlib.suppress(NoMatches):
-            self.query_one("#settings-overrides").display = overrides
-        if overrides:
-            for slot in range(1, self._NUM_SLOTS + 1):
-                with contextlib.suppress(NoMatches):
-                    self.query_one(f"#slot-config-{slot}").display = False
-        else:
-            self._show_slot_config(self._get_active_slot_id() if slot_id is None else slot_id)
-        for tab_id, active in (
-            ("settings-tab-slot", not overrides),
-            ("settings-tab-overrides", overrides),
-        ):
-            with contextlib.suppress(NoMatches):
-                self.query_one(f"#{tab_id}").set_class(active, "seg-active")
-        if overrides:
-            self._refresh_all_overrides()
 
     def _reset_override(self, name: str) -> None:
         """Drop the override for *name* so its registry default applies again."""

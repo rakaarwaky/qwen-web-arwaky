@@ -26,8 +26,8 @@ class _TuiEventsMixin:
     """Mixin that owns widget event callbacks (button, select, input)."""
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
-    _template_roles: set[str]
     _NUM_SLOTS: int
+    _template_roles: set[str]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -37,19 +37,17 @@ class _TuiEventsMixin:
     _auth_panel_pressed: Any
     _nav_dock_go: Any
     _switch_to_slot: Any
-    _show_slot_config: Any
-    _show_settings_section: Any
     _apply_override_from_field: Any
     _apply_override: Any
     _reset_override: Any
     _override_rows: Any
     _show_slot_log: Any
     _open_picker: Any
-    _goto_slot_settings: Any
-    _send_composer: Any
+    _toggle_slot_config: Any
+    _apply_template_chip: Any
     _run_slot: Any
     _cancel_slot: Any
-    _apply_template_chip: Any
+    _send_composer: Any
     _copy_log_by_id: Any
     _copy_slot_log: Any
     _refresh_sessions_table: Any
@@ -93,10 +91,6 @@ class _TuiEventsMixin:
             if pane_raw.isdigit() and slot_raw.isdigit():
                 self._switch_to_slot(int(slot_raw))
             return
-        # Settings pane: switch between the overrides and the per-slot form.
-        if button_id in ("settings-tab-slot", "settings-tab-overrides"):
-            self._show_settings_section(button_id == "settings-tab-overrides")
-            return
         # Settings pane: write or revert one registered environment value.
         for prefix, handler in (
             ("override-apply-", self._apply_override_from_field),
@@ -113,22 +107,25 @@ class _TuiEventsMixin:
             self._show_slot_log(int(button_id.removeprefix("btn-slot-system-")), True)
             return
         # Chat console action pills: prompt picker, attachment picker, and the
-        # template selector — which lives on the Settings pane.
+        # template selector. The job-config card the fields live in stays
+        # hidden until a pill asks for it, so each pill reveals it first.
         if button_id.startswith("btn-pill-prompt-"):
             slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
+            self._toggle_slot_config(slot_id)
             self._open_picker(f"input-prompt-{slot_id}")
             return
         if button_id.startswith("btn-pill-attach-"):
             slot_id = int(button_id.removeprefix("btn-pill-attach-"))
+            self._toggle_slot_config(slot_id)
             self._open_picker(f"input-file-{slot_id}", select_directories=True)
             return
         if button_id.startswith("btn-pill-templates-"):
             slot_id = int(button_id.removeprefix("btn-pill-templates-"))
-            self._goto_slot_settings(slot_id)
+            self._toggle_slot_config(slot_id)
             return
-        # Chat console composer: dispatch the typed task as a direct prompt.
-        if button_id.startswith("btn-send-"):
-            self._send_composer(int(button_id.removeprefix("btn-send-")))
+        # Clipped job-config chips and Browse buttons (revealed by the pills).
+        if button_id.startswith("chip-"):
+            self._apply_template_chip(button_id)
             return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
@@ -140,15 +137,16 @@ class _TuiEventsMixin:
                 if suffix.isdigit():
                     handler(int(suffix))
                     return
-        if button_id.startswith("chip-"):
-            self._apply_template_chip(button_id)
-            return
         for field, picker in (("prompt", False), ("file", True), ("output", False)):
             prefix = f"btn-browse-{field}-"
             if button_id.startswith(prefix):
                 slot_id = int(button_id.removeprefix(prefix))
                 self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
                 return
+        # Chat console composer: dispatch the typed task as a direct prompt.
+        if button_id.startswith("btn-send-"):
+            self._send_composer(int(button_id.removeprefix("btn-send-")))
+            return
         if button_id == "btn-copy-log":
             self._copy_log_by_id(button_id)
             return

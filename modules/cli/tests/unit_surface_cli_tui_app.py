@@ -454,32 +454,6 @@ def test_slot_pill_click_switches_the_pane_in_one_click() -> None:
     asyncio.run(_run())
 
 
-def test_template_chip_drives_select_and_prompt_input() -> None:
-    """Pressing a template chip updates the slot's Select and prompt input."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test(size=(100, 40)) as pilot:
-            from textual.widgets import Button, Input, Select
-
-            select = app.query_one("#select-template-1", Select)
-            prompt = app.query_one("#input-prompt-1", Input)
-            # The Select starts in its NULL state, not Python None.
-            assert select.value is Select.NULL
-            assert prompt.value == ""
-
-            # Pressing a chip routes the role through the slot's Select, which
-            # fires Select.Changed and fills the prompt input.
-            app.query_one("#chip-1-backend-engineer", Button).press()
-            await pilot.pause()
-            for _ in range(4):
-                await pilot.pause()
-            assert str(select.value) == "backend-engineer"
-            assert prompt.value == "backend-engineer"
-
-    asyncio.run(_run())
-
-
 def test_overview_at_regression_size_keeps_log_visible() -> None:
     """The log panel must still be visible at the regression-lock size 100x20."""
     import asyncio

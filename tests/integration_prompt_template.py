@@ -111,21 +111,15 @@ class TestTuiPromptTemplateIntegration:
             SlotRunPlanResolver(),  # slot_config
         )
 
-        mock_input_prompt = MagicMock(value="software-architect")
-        mock_input_file = MagicMock(value="")
-        mock_input_output = MagicMock(value="")
-        mock_switch = MagicMock(value=True)
+        # The per-slot Settings form is gone; the keyboard run reads the
+        # slot's typed composer text as the prompt source, so a role typed
+        # in the composer materializes exactly as it did in the old form.
+        mock_composer = MagicMock(value="software-architect")
 
         def fake_query_one(selector: str, *args: object, **kwargs: object) -> MagicMock:
             sel = str(selector)
-            if sel.startswith("#input-prompt"):
-                return mock_input_prompt
-            if sel.startswith("#input-file"):
-                return mock_input_file
-            if sel.startswith("#input-output"):
-                return mock_input_output
-            if sel.startswith("#switch-headless"):
-                return mock_switch
+            if sel.startswith("#composer-"):
+                return mock_composer
             return MagicMock()
 
         app.query_one = fake_query_one  # type: ignore[assignment]

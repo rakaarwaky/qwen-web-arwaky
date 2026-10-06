@@ -18,7 +18,7 @@ from rich.markup import escape
 from textual import work
 from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Button, Input, Select, TabbedContent
+from textual.widgets import Button, Input, TabbedContent
 
 from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
 from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
@@ -34,7 +34,6 @@ class _TuiHandlersMixin:
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
     _target_field_for_picker: str | None
-    _template_roles: set[str]
     _slot_workers: dict[int, Any]
     _NUM_SLOTS: int
     _run_swarm: Any
@@ -45,7 +44,6 @@ class _TuiHandlersMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
-    _show_settings_section: Any
     _append_chat_message: Any
     _run_composer_slot: Any
     query: Any
@@ -79,24 +77,6 @@ class _TuiHandlersMixin:
             self._show_swarm_log(button_id == "btn-swarm-system")
         elif button_id == "btn-clear-swarm-log":
             self._clear_swarm_log()
-
-    def _apply_template_chip(self, button_id: str) -> None:
-        """Route a template-chip press into the slot's Select widget.
-
-        The chip id encodes both the slot and the role (``chip-<slot>-<role>``).
-        Selecting the same role twice is a no-op so the chip does not emit a
-        redundant log line on a repeated press.
-        """
-        _, _, remainder = button_id.partition("chip-")
-        slot_raw, _, role = remainder.partition("-")
-        if not slot_raw.isdigit() or not role:
-            return
-        slot_id = int(slot_raw)
-        with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)
-            if select.value == role:
-                return
-            select.value = role
 
     def _show_swarm_log(self, show_system: bool) -> None:
         """Switch the Swarm tab between the Event log and the System log.
@@ -369,12 +349,10 @@ class _TuiHandlersMixin:
         self._refresh_nav_dock()
 
     def action_switch_tab_settings(self) -> None:
-        """Switch to the Settings tab (ctrl+comma), keeping the section on screen.
+        """Switch to the Settings tab (ctrl+comma).
 
-        Which half of the Settings screen is showing is owned by
-        :meth:`_show_settings_section`, so this only moves the tab. An earlier
-        version also revealed the slot form, which put a per-slot card behind
-        the override list the pane opens on.
+        The pane carries the runtime-override card and nothing else, so
+        moving the tab is the whole switch.
         """
         with contextlib.suppress(Exception):
             self.query_one(TabbedContent).active = "tab-settings"
@@ -414,34 +392,6 @@ class _TuiHandlersMixin:
             system_btn = self.query_one(f"#btn-slot-system-{slot_id}", Button)
             event_btn.set_class(show_system, "seg-active")
             system_btn.set_class(not show_system, "seg-active")
-
-    def _show_slot_config(self, slot_id: int) -> None:
-        """Display *slot_id*'s form on the Settings pane and hide the rest.
-
-        The pane has no slot selector, so the card title is the only thing
-        naming the slot being edited — which is why the form follows the slot
-        the Chat console is on.
-        """
-        for s in range(1, self._NUM_SLOTS + 1):
-            with contextlib.suppress(NoMatches):
-                self.query_one(f"#slot-config-{s}", Vertical).display = s == slot_id
-
-    def _goto_slot_settings(self, slot_id: int) -> None:
-        """Open the Settings pane on *slot_id*'s form — the Templates pill.
-
-        Same focus rule as :meth:`_switch_to_slot`: the Templates pill holds the
-        focus, and Textual makes the pane holding the focused widget the active
-        tab, so the focus has to travel with the tab or the switch is undone.
-        """
-        self._show_slot_config(slot_id)
-        self._show_settings_section(False, slot_id)
-        with contextlib.suppress(Exception):
-            tabs = self.query_one(TabbedContent)
-            tabs.active = "tab-settings"
-            pane = tabs.get_pane("tab-settings")
-            focusable = [widget for widget in pane.query("*") if widget.focusable]
-            self.set_focus(focusable[0] if focusable else None, scroll_visible=False)
-        self._refresh_nav_dock()
 
     def _send_composer(self, slot_id: int) -> None:
         """Echo the typed task into the transcript and dispatch it."""
