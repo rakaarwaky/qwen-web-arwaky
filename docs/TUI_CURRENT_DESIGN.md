@@ -73,35 +73,44 @@ Typography conventions:
 
 ## 3. Tab 1 — Overview (`tab-overview`)
 
-Vertical stack inside `.overview-container` (padding 1×2, scroll-y auto):
+Brand row (`>_ QWEN-CLI` + version chip), then every block in the mockup's
+order inside one scroll band (`.overview-scroll`, `height: 1fr`,
+`overflow-y: auto`). The band is the only element that gives up rows on a
+short terminal, so the log card keeps its height at every size.
 
-1. **Metric tile strip** (`.card-inner`, `bg_raised`, bordered, height 3)
-   - `SLOTS` section-label + value `10` (metric-value).
-   - `ACTIVE` section-label + value `0` (metric-accent, cyan — live count of
-     RUNNING slots, debounced 4 refresh/sec).
-   - `DONE` section-label + value `0` (metric-value — SUCCESS+FAILED count).
-   - `SESSION` section-label + value badge (`#session-badge`), states:
-     `CHECKING…` → `VALID` (green) / `EXPIRED` (warn class) / `TIMEOUT`
-     (15s timeout) / `LOGGING IN…` / `N/A`.
-2. **Label**: `Active Job Slots (1 Browser per Job)`
-3. **Cluster health bar** (`#segment-bar`, `.segment-bar`) — one
-   `Static("█", classes="segment-fill segment-idle")` per slot, rendered as a
-   single row of block glyphs. State classes per segment: `segment-idle`
-   (dim `fg_muted`), `segment-running` (accent cyan, pulses), `segment-done`
-   (`status_ok`), `segment-failed` (`status_err`), `segment-cancelled`
-   (`status_warn`). Compact cluster-health read taken from
-   `design/overview_engine_status`.
-4. **Slots table** (`#slots-table`, DataTable, `bg_surface`, max-height 9
-   rows so the log panel below stays visible on short terminals)
-   - Columns: `Slot` | `Status` | `Prompt File` | `Duration`
-   - One row per slot; status cell uses table format (section 8); duration
-     ticks every 5s while running (`12s`, `1m 5s`).
-5. **Pane title row**: `System Event Log` + button **`📋 Copy`**
-   (`btn-copy-log`, 1-row height, accent text on `bg_base`).
-6. **Log view** (`#log-view-overview`, RichLog, wrap, auto-scroll, 2000
-   lines, bordered).
-7. **Help hint** (dim): `Press ? for keyboard shortcuts. Configure a slot
-   tab, then press Enter to run.`
+1. **Telemetry banner** (`.screen-card.metric-card`, `bg_overlay`, bordered,
+   no vertical padding → 4 rows) holding two `bg_raised` tiles split by a
+   one-column gap:
+   - **Tile 1** — caption `● ACTIVE ACCOUNTS` (`#metric-active-label`) over
+     value `#metric-active` (bare RUNNING-slot count) plus the unit label
+     `Active`.
+   - **Tile 2** — caption `⊕ MODEL` (`#metric-model-label`) over
+     `#metric-model`, printed in `primary_fixed` (`#c4e7ff`).
+2. **Engine card ×2** (`.screen-card.engine-card`, 7 rows each): icon chip
+   (`.card-icon`) plus the card title (`#metric-swarm-label` /
+   `#metric-threads-label`), the inset bento (`.engine-bento`, 3 rows) and the
+   per-slot cluster bar.
+   - **Ring** (`#metric-swarm-ring` / `#metric-threads-ring`) — accent-bordered
+     box holding the `n/m` count (swarm agents / slot threads).
+   - **Detail** — `Idle` or `N Running` (`#metric-swarm-detail`); the chat card
+     adds the `Active Threads` sub-caption over `N Running · N Idle`
+     (`#metric-threads-detail`).
+   - **Uptime** (swarm card only, `#metric-swarm-uptime`) — right-aligned;
+     `Uptime Elapsed —` while idle, split onto two lines
+     (`Uptime Elapsed` / `21m 53s`) once a run is live.
+   - **Cluster bar** (`#metric-swarm-bar` / `#metric-threads-bar`) — one
+     tinted segment per job slot stretched across the card. This bar is the
+     per-slot indicator: each segment recolours with its slot's state, and it
+     re-tints on resize from the bar's own width.
+3. **System Event Log card** (`.screen-card.log-card`, `bg_surface`): header
+   row (`● [ SYSTEM EVENT LOG ]` … `● LIVE STREAM` + the `Copy` button
+   `#btn-copy-log`) over `#log-view-overview` (RichLog, wrap, auto-scroll,
+   2000 lines, `height: 7` → 6 content rows).
+
+Session state is no longer a badge on the Overview: `_check_session` writes
+the verdict (`VALID` / `EXPIRED` / `N/A` / `TIMEOUT`) to this log and to
+`_last_session_state`, and the Sessions screen carries the per-account health
+state.
 
 Startup message in log: `Qwen Web Automation TUI initialized with multi-slot
 architecture.` / `Each slot runs an independent Chromium process sharing
@@ -138,119 +147,120 @@ action.
 
 ## 5. Tab 3 — Swarm (`tab-swarm`)
 
-Layout follows `design/swarm_multi_agent_stream`: attachment input at the
-top, a segmented log inspector in the middle, the agent table below it, and
-a stop/start action deck at the bottom.
+Vertical stack inside `.swarm-screen`, in the mockup's order.
 
-1. **Section label**: `ATTACHMENT` (`.section-label` in a `.card-inner` row)
-2. **Field row** (`.card-inner`): Input `#input-swarm-file` (placeholder
-   `path/to/file or folder`) + button **`Browse`** (`#btn-browse-swarm-file`,
-   width 8) → opens FilePickerModal in directory-select mode.
-3. **Section label**: `OUTPUT INSPECTION` (`.section-label` in a `.card-inner`
-   row)
-4. **Segmented log toggle** (`.card-inner` row) — two `.segswitch-btn`
-   buttons; the active one also carries `.segswitch-active`:
-   - **`EVENT LOG`** (`#btn-stream-view`, active by default) — shows
-     `#unified-stream-container`.
-   - **`SYSTEM LOG`** (`#btn-log-view`) — shows `#full-log-container`.
-   Toggling swaps which container has `display: true` and moves the
-   `.segswitch-active` class between the two buttons.
-5. **Event log pane** (`#unified-stream-container`, visible by default):
-   - Pane title row: `Event Log — Parallel Stream` + **`📋 Copy`**
-     (`#btn-copy-swarm-log`).
-   - RichLog `#log-view-swarm`, 2000 lines, wrap, auto-scroll. This is the
-     pane the swarm workers stream into.
-6. **System log pane** (`#full-log-container`, `.hidden` — `display: none`
-   until the toggle switches to SYSTEM LOG):
-   - Pane title row: `/var/log/qwen-swarm.pool.log` + **`Clear`**
-     (`#btn-clear-swarm-log`).
-   - RichLog `#log-view-swarm-system`, 1000 lines, wrap, auto-scroll, rendered
-     in a raw terminal treatment (`#log-view-swarm-system` CSS: raised
-     background, borderless rows). Registered in the app's `_log_views` map
-     under the reserved key `"swarm-system"` so stdlib log lines land in it
-     alongside the event log. `Clear` flushes the buffer and writes
-     `[Logs flushed by user]`.
-7. **Swarm table** (`#swarm-table`): `Agent` | `Status` | `Attempt` |
-   `Output`. Empty state row: `—` | `IDLE` | `—` | `No active swarm —
-   select an attachment above and click START SWARM`.
-8. **Action deck** (`.card-inner.swarm-actions`) — the mockup's sticky
-   bottom bar, rendered inline as the last row of the pane:
-   - **`■ STOP`** (`#btn-swarm-cancel`, `.btn-stop`) — cancels the running
-     swarm.
-   - **`▶ START`** (`#btn-swarm-start`, `.btn-start`, `variant="primary"`) —
-     validates input; if the resource warning threshold is reached (≥4
-     browsers) shows `ConfirmModal "Swarm Resource Usage"` first, then starts
-     `swarm.start()`.
-   - Label `#swarm-summary` — `Adaptive templates · max N browsers`; live
-     updates to e.g. `COMPLETED · 8/10 completed · 1 failed · max 10
-     browsers`.
+1. **Attachment card** (`.screen-card.swarm-file-card`, 3 rows): file icon
+   (`#swarm-file-icon`) + resolved name (`#swarm-file-name`, starts as
+   `No file attached`) + **`⇪ Browse`** chip (`#btn-browse-swarm-file`) →
+   FilePickerModal in directory-select mode. The chip is a one-row ghost
+   because the default three-row Button overflowed the card and rendered as
+   an empty box.
+2. **View toggle row** (`.output-inspection`, 1 row): caption
+   `OUTPUT INSPECTION` + segmented switch `#btn-swarm-event` (Event Log) /
+   `#btn-swarm-system` (`log system`). Exactly one of the two log views in
+   the card below stays visible.
+3. **Log card** (`.screen-card.swarm-log-card`, `1fr`, min-height 8):
+   - header row `.swarm-log-head` — path `/var/log/qwen-swarm.pool.log` +
+     **`🗑 Clear`** (`#btn-clear-swarm-log`), hairline under it;
+   - `#log-view-swarm` (event, visible by default) and
+     `#log-view-swarm-system`, both `.swarm-log-view` (wrap, auto-scroll,
+     2000 lines);
+   - footer row — `>` caret + `Listening on unix socket
+     /run/qwen-swarm.sock...` (`#listener-line`).
+4. **Action deck** (`.swarm-action-deck`, 3 rows): **`■ Stop`**
+   (`#btn-swarm-cancel`, raised surface, error text) + **`↻ RESTART`**
+   (`#btn-swarm-start`, accent fill, twice the width). RESTART validates the
+   attachment; at ≥4 browsers it confirms through `ConfirmModal "Swarm
+   Resource Usage"` first.
+5. Hidden `#input-swarm-file` — the Browse chip drives its value.
 
-Concurrency from env `QWEN_SWARM_CONCURRENCY` (default 10, clamped 1–10); the
-clamped value is what `#swarm-summary` reports at compose time.
+The mockup has no agent table, so per-agent progress is reported to the log
+instead: `_render_swarm_snapshot` writes a line per agent whose status or
+attempt changed, plus an aggregate line, and skips an unchanged snapshot
+because the worker polls once a second. The swarm worker's own status lines go
+to this panel through `_log_swarm_msg`, not to the Overview log.
 
 ---
 
-## 6. Tabs 4…N — Job Slots (`tab-slot-1` … `tab-slot-N`)
+## 6. Tabs 4…N — Job Slot Consoles, and the Settings pane
 
-Each slot tab is a horizontal split:
+### 6.1 Slot console (`tab-slot-N`)
+
+Each slot tab is the chat console from `design/slot_chat_automation_console`:
 
 ```text
-┌─ left-pane (48%, min 30 cols, bg_surface, right border, pad 1×2) ─┐
-│  [ CONFIGURATION: SLOT N ]                     ← pane title       │
-│  Prompt Template (Quick Select)               ← section-label     │
-│  [Select: "Select a template or type file path below"]            │
-│  Prompt File / Role (Required) *                                   │
-│  [input path/to/prompt.md or role …]              [Browse]        │
-│  Attachment File or Folder (Optional)                              │
-│  [input path/to/file or folder]                   [Browse]        │
-│  Output Destination                                                │
-│  [input .qwen-web/output/…]                       [Browse]        │
-│  ┌─ card-inner (headless toggle) ─────────────────────────────┐   │
-│  │ Headless Browser                          [Switch ● on]     │   │
-│  │ 1 independent browser in background                         │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  [ RUN IN SLOT N ]              ← primary, full width, height 3   │
-│  [ Cancel Slot N ]              ← danger red, full width          │
-│  [ ↻ Retry Slot N ]             ← indigo, hidden unless FAILED    │
-│  ┌─ card-inner (template sheet) ──────────────────────────────┐   │
-│  │ PROMPT TEMPLATES          [ OPEN ]   ← design mockup row    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-├─ right-pane (52%, min 30 cols, bg_overlay, pad 1×2) ───────────────┤
-│  [ LIVE LOG: BROWSER #N ]   [● READY]   [📋]   ← title + badge    │
-│  (LoadingIndicator, hidden unless running)                         │
-│  ┌─ slot log (RichLog, wrap, 2000 lines) ──────────────────────┐   │
-│  │ Set a prompt file, then press Enter or RUN.    ← empty hint │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+┌ slot carousel (3 rows, ten 1fr pills, no scrollbar) ──────────────┐
+│  ● 01  ● 02  ● 03 …                                             │
+├──────────────────────────────────────────────────────────────────┤
+│ [Event Log] [System Log]                        ● READY ●         │  ← telemetry header
+│ Pick a prompt file, or type a task below to get started.          │  ← transcript
+│ ┌ EVENT LOG [SLOT #1]  Copy ────────────────────────────────────┐ │  ← event log card (1fr)
+│ └────────────────────────────── 12:04:30 ───────────────────────┘ │
+│ [⬆ Upload Prompt (.md)] [📎 Attach File / Folder] [✨ Templates]  │
+│ [ > Type automated task or command...                    ]      │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Slot form fields
+- The pills split the row (`width: 1fr`, carousel `overflow-x: hidden`) and
+  relabel themselves: `● SLOT 07` while the row has the twelve columns a
+  pill needs, `● 07` below that (`_refresh_slot_chips`).
+- The transcript sizes to its content up to 12 rows; the log card takes
+  every leftover row, so the console fills the screen and the composer stays
+  put. The whole console needs about 29 rows; below that the pane clips.
+- A pill press switches the slot in one click and carries the focus with it
+  (`_switch_to_slot`), because Textual makes the pane holding the focused
+  widget the active tab.
+
+### 6.2 Settings pane (`tab-settings`)
+
+Per-slot configuration. No mockup ships for this screen, so it follows the
+same card language as the Overview and Swarm consoles; every id the workers
+and tests resolve is preserved.
+
+```text
+┌ slot carousel (same ten pills, #cfg-slot-N) ─────────────────────┐
+│ ⚙ SLOT 01 CONFIGURATION                     ← card title + chip   │
+│ PROMPT TEMPLATE                                                 │
+│ [ Select a template or type a file path below ▼ ]                │
+│ [Backend Engineer] [Business Analyst] [Devops…] [Frontend…]      │
+│ PROMPT FILE / ROLE (REQUIRED) *                                  │
+│ [path/to/prompt.md or role]                          [Browse]    │
+│ ATTACHMENT (OPTIONAL)                                            │
+│ [path/to/file or folder]                           [Browse]    │
+│ OUTPUT DESTINATION                                               │
+│ [.local/share/qwen-web-arwaky/output]               [Browse]    │
+│ HEADLESS BROWSER  1 independent browser in background   [Switch]  │
+│ [⚡ RUN IN SLOT 01] [✕ Cancel Slot 01] [↻ Retry Slot 01]          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+One card per slot; only the selected one is displayed (`#slot-config-N`).
+A carousel pill (`#cfg-slot-N`) swaps which card is shown.
+
+#### Slot form fields
 
 | Field | Widget | Default / placeholder | Notes |
 | --- | --- | --- | --- |
-| Prompt Template | `Select` (dropdown) | blank; prompt `Select a template or type file path below` | Options = role templates from `modules/templates/*.md` (backend-engineer, business-analyst, devops-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, software-architect, system-analyst, ui-ux-designer) with human titles. Selecting one fills the Prompt File input and logs `TEMPLATE: Slot N ← role 'x'`. Unknown path logs a WARNING. |
-| Prompt File / Role (Required) `*` | `Input` + Browse | placeholder `path/to/prompt.md or role (any .md in modules/templates/)` | Manual edits desync the Select back to blank. |
+| Prompt Template | `Select` | blank; prompt `Select a template or type a file path below` | Options = role templates from `modules/templates/*.md` (backend-engineer, business-analyst, devops-engineer, frontend-engineer, product-engineer, qa-engineer, security-engineer, software-architect, system-analyst, ui-ux-designer). Selecting one fills the Prompt File input and logs `TEMPLATE: Slot N ← role 'x'`. Unknown path logs a WARNING. |
+| Prompt Template quick select | chips `chip-N-role` (one row, frameless) | first four roles | Labelled from the role (`backend-engineer` → `Backend Engineer`): every shipped template opens with `## Summary`, so the manifest titles are all identical. Selecting a chip sets the `Select`. |
+| Prompt File / Role (Required) `*` | `Input` + Browse | placeholder `path/to/prompt.md or role` | Manual edits desync the Select back to blank. |
 | Attachment File or Folder (Optional) | `Input` + Browse | placeholder `path/to/file or folder` | Browse opens picker in directory mode. |
-| Output Destination | `Input` + Browse | default `.qwen-web/output/` (DEFAULT_OUTPUT) | Browse opens picker in file mode. |
+| Output Destination | `Input` + Browse | default `.local/share/qwen-web-arwaky/output` (DEFAULT_OUTPUT) | Browse opens picker in file mode. |
 | Headless Browser | `Switch` (default ON) | subtext `1 independent browser in background` | |
 
-### Slot action buttons (all full-width, height 3)
+Two Textual geometry traps are handled here: the Browse buttons are ten
+columns wide (at eight, minus the border and the default padding, "Browse"
+wrapped onto two rows) and the chips are frameless (a one-row box with a
+border has no content row left for the label). `SelectCurrent`'s own `tall`
+border is suppressed so the `Select` does not paint `▔▔▔` inside our border.
+
+#### Slot action buttons (one row, height 3)
 
 | Button | id | Style | Behavior |
 | --- | --- | --- | --- |
-| `RUN IN SLOT N` | `btn-run-N` | accent fill `fg_accent`/`fg_on_accent`, bold; hover inverts to outline | Validates inputs via resolver; starts worker; disabled state = already-running warning toast + log. Also bound to Enter/Ctrl+R. |
-| `Cancel Slot N` | `btn-cancel-N` | `danger_bg` fill, `status_err` border, bold; hover inverts | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"` ("Slot N has been running for Xs. Cancelling will lose the current progress."). Confirms only if same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
-| `↻ Retry Slot N` | `btn-retry-N` | `bg_raised` fill, `status_warn` text+border; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
-| `OPEN` | `btn-templates-N` | `.btn-copy-log`, inside a `.card-inner` row labeled `PROMPT TEMPLATES` | Surfaces the template sheet from `design/slot_chat_automation_console`: counts the configured role templates and logs `TEMPLATES: Slot N — K roles available (use the Quick Select dropdown to apply one).` into that slot's own log pane. |
-
-### Slot right pane
-
-- Title: `[ LIVE LOG: BROWSER #N ]` (`fg_accent`, bold).
-- Status badge (`#status-badge-N`, bold): shows live event badges
-  (section 8) while running; terminal statuses otherwise.
-- Copy button `📋` (icon-only, tooltip `Copy slot log`).
-- `LoadingIndicator` visible only while the slot runs.
-- Empty-state hint: `Set a prompt file, then press Enter or RUN.`
+| `⚡ RUN IN SLOT NN` | `btn-run-N` | accent fill, 2fr | Validates inputs via resolver; starts worker; already-running gives a warning toast + log. Also bound to Enter/Ctrl+R. |
+| `✕ Cancel Slot NN` | `btn-cancel-N` | `danger_bg` fill, 1fr | <30s running: cancels immediately. >30s: `ConfirmModal "Cancel Slot"`. Confirms only if the same worker still owns the slot. Status goes CANCELLING → CANCELLED. |
+| `↻ Retry Slot NN` | `btn-retry-N` | `bg_raised` fill, `status_warn` text; hidden (`display: none`) | Shown only after FAILED; same handler as RUN. |
 
 ---
 

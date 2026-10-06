@@ -1,8 +1,10 @@
-"""Event handlers and keyboard-action methods for the Qwen TUI application.
+"""Screen actions and handler helpers for the Qwen TUI application.
 
-Surface layer (surface_cli): Mixin providing all Textual event callbacks
-(``on_button_pressed``, ``on_select_changed``, ``on_input_changed``) and
-action methods (``action_*``).
+Surface layer (surface_cli): Mixin providing the ``action_*`` methods
+(keyboard bindings, tab navigation, copy, quit) plus the screen-level button
+helpers for the swarm, auth, account, and chat-console controls. The widget
+``on_*`` callbacks that route those controls live in
+:class:`~modules.cli.src.surface_cli_tui_events._TuiEventsMixin`.
 Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 """
 
@@ -22,6 +24,10 @@ from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
 from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
 from modules.cli.src.surface_cli_tui_css import THEME
 
+# The dock's active marker: a short accent bar centred over the active
+# section, the way the mockup draws it.
+NAV_ACTIVE_MARKER = "━━━"
+
 
 class _TuiHandlersMixin:
     """Mixin that owns all Textual event handlers and action bindings."""
@@ -33,11 +39,18 @@ class _TuiHandlersMixin:
     _NUM_SLOTS: int
     _run_swarm: Any
     _cancel_swarm: Any
+    _sessions_cache: list[Any]
+    _sessions_loaded_once: bool
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
+    _append_chat_message: Any
+    _run_composer_slot: Any
+    query: Any
     query_one: Any
+    _log_swarm_msg: Any
+    set_focus: Any
     _log_msg: Any
     copy_to_clipboard: Any
     push_screen: Any
@@ -51,56 +64,7 @@ class _TuiHandlersMixin:
     _session_manager: Any
     _refresh_sessions_table: Any
     _run_session_health_check: Any
-
-    # ── Widget event callbacks ───────────────────────────────────────────
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Dispatch button presses to slot, swarm, picker, and log-copy handlers."""
-        button_id = event.button.id or ""
-        if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
-            self._swarm_button_pressed(button_id)
-            return
-        if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
-            self._auth_panel_pressed(button_id)
-            return
-        if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm"):
-            self._nav_dock_go(button_id)
-            return
-        for prefix, handler in (
-            ("btn-run-", self._run_slot),
-            ("btn-cancel-", self._cancel_slot),
-            ("btn-retry-", self._run_slot),
-        ):
-            if button_id.startswith(prefix):
-                suffix = button_id.removeprefix(prefix)
-                if suffix.isdigit():
-                    handler(int(suffix))
-                    return
-        if button_id.startswith("chip-"):
-            self._apply_template_chip(button_id)
-            return
-        for field, picker in (("prompt", False), ("file", True), ("output", False)):
-            prefix = f"btn-browse-{field}-"
-            if button_id.startswith(prefix):
-                slot_id = int(button_id.removeprefix(prefix))
-                self._open_picker(f"input-{field}-{slot_id}", select_directories=picker)
-                return
-        if button_id in ("btn-copy-log", "btn-copy-swarm-log"):
-            self._copy_log_by_id(button_id)
-            return
-        if button_id.startswith("btn-copy-log-"):
-            slot_id = int(button_id.removeprefix("btn-copy-log-"))
-            self._copy_slot_log(slot_id)
-            return
-        if button_id in ("btn-sessions-refresh", "btn-sessions-rerefresh"):
-            self._refresh_sessions_table()
-            return
-        if button_id == "btn-sessions-login":
-            self._session_login_action()
-            return
-        if button_id == "btn-sessions-health":
-            self._run_session_health_check()
-            return
+    _render_account_cards: Any
 
     def _swarm_button_pressed(self, button_id: str) -> None:
         """Route Swarm-screen button presses to the right handler."""
@@ -162,9 +126,37 @@ class _TuiHandlersMixin:
             system_visible = self.query_one("#log-view-swarm-system", QwenTuiRichLog).display
             view = self.query_one("#log-view-swarm-system" if system_visible else "#log-view-swarm", QwenTuiRichLog)
             view.clear()
-            self._log_msg(
+            self._log_swarm_msg(
                 "[{}]Swarm log cleared.[/]".format(THEME["muted"]),
             )
+
+    def _account_button_pressed(self, action: str, position: int) -> None:
+        """Handle an action on the Sessions pane's account card at *position*."""
+        cache: list[Any] = getattr(self, "_sessions_cache", [])
+        session = cache[position - 1] if 0 < position <= len(cache) else None
+        name = str(getattr(session, "name", "") or f"session {position}")
+        if action == "test":
+            # The pool health check is the only real connectivity probe this
+            # build has, so one card's TEST runs it rather than inventing a
+            # single-session result from the last stored state.
+            self._log_msg("[bold {}]TEST:[/] Checking connection for {}.".format(THEME["accent_fg"], escape(name)))
+            self._run_session_health_check()
+            return
+        # Disconnecting drops the stored auth session. That is an approved-
+        # only operation, so the card points at the CLI command instead of
+        # doing it from the UI.
+        self.notify(
+            f"Run 'qwa sessions remove --name {name}' to disconnect.",
+            title="Disconnect",
+            severity="information",
+        )
+
+    def _ensure_sessions_loaded(self) -> None:
+        """Fetch the account pool the first time the Sessions pane is opened."""
+        if getattr(self, "_sessions_loaded_once", False) or getattr(self, "_session_manager", None) is None:
+            return
+        self._sessions_loaded_once = True
+        self._refresh_sessions_table()
 
     def _auth_panel_pressed(self, button_id: str) -> None:
         """Handle the Login screen's auth-panel buttons.
@@ -181,45 +173,6 @@ class _TuiHandlersMixin:
                 panel.display = False
                 if button_id == "btn-auth-connect":
                     self.action_login_action()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Fill a slot's prompt input from the chosen role template."""
-        select_id = event.select.id or ""
-        if not select_id.startswith("select-template-"):
-            return
-        slot_id = int(select_id.split("-")[-1])
-        role = event.value
-        if role is None:
-            return
-        with contextlib.suppress(NoMatches):
-            prompt_input = self.query_one(f"#input-prompt-{slot_id}", Input)
-            prompt_input.value = str(role)
-            self._log_msg(
-                "[bold {}]TEMPLATE:[/] Slot {} ← role '{}'".format(THEME["bright"], slot_id, escape(str(role))),
-                slot_id,
-            )
-            # U8: optimistic existence hint when the picked value is a file path.
-            if str(role) not in self._template_roles and not Path(str(role)).exists():
-                self._log_msg(
-                    "[{}]WARNING:[/] '{}' is not a known role and the file does not exist.".format(
-                        THEME["warn"], escape(str(role))
-                    ),
-                    slot_id,
-                )
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """U6: keep the template Select in sync with manual path/role entry."""
-        input_id = event.input.id or ""
-        if not input_id.startswith("input-prompt-"):
-            return
-        slot_id = int(input_id.split("-")[-1])
-        value = event.value.strip()
-        with contextlib.suppress(NoMatches):
-            select = self.query_one(f"#select-template-{slot_id}", Select)
-            if value in self._template_roles:
-                select.value = value
-            elif select.value not in (None, Select.BLANK) and select.value != value:
-                select.value = Select.BLANK
 
     # ── File picker ──────────────────────────────────────────────────────
 
@@ -264,25 +217,54 @@ class _TuiHandlersMixin:
             login_btn = self.query_one("#nav-login", Button)
             chat_btn = self.query_one("#nav-chat", Button)
             swarm_btn = self.query_one("#nav-swarm", Button)
-            # Reset all to inactive; then activate the one that matches.
-            for btn in (overview_btn, login_btn, chat_btn, swarm_btn):
+            settings_btn = self.query_one("#nav-settings", Button)
+            # Reset all to inactive; then activate the one that matches. The
+            # active rule must drop the inactive class too: both classes on one
+            # button makes the later-defined inactive rule win.
+            for btn in (overview_btn, login_btn, chat_btn, swarm_btn, settings_btn):
                 btn.set_class(True, "nav-inactive")
                 btn.set_class(False, "nav-active")
-            if active == "tab-overview":
-                overview_btn.set_class(True, "nav-active")
-            elif active == "tab-sessions":
-                login_btn.set_class(True, "nav-active")
-            elif active.startswith("tab-slot-"):
-                chat_btn.set_class(True, "nav-active")
-            elif active == "tab-swarm":
-                swarm_btn.set_class(True, "nav-active")
+            active_btn = {
+                "tab-overview": overview_btn,
+                "tab-sessions": login_btn,
+                "tab-swarm": swarm_btn,
+                "tab-settings": settings_btn,
+            }.get(active)
+            if active.startswith("tab-slot-"):
+                active_btn = chat_btn
+            if active_btn is not None:
+                active_btn.set_class(False, "nav-inactive")
+                active_btn.set_class(True, "nav-active")
+            self._refresh_nav_marker(active)
+
+    def _refresh_nav_marker(self, active_tab: str) -> None:
+        """Move the dock's accent bar over the cell that is now active.
+
+        The mockup marks the active section with a short bar centred above
+        its icon rather than a hairline across the whole cell, so the bar
+        lives in its own strip whose 1fr cells line up with the buttons.
+        """
+        with contextlib.suppress(Exception):
+            bars = {
+                "tab-overview": "#nav-bar-overview",
+                "tab-sessions": "#nav-bar-login",
+                "tab-swarm": "#nav-bar-swarm",
+                "tab-settings": "#nav-bar-settings",
+            }
+            slot_tab = active_tab.startswith("tab-slot-")
+            target = bars.get(active_tab, "#nav-bar-chat" if slot_tab else None)
+            for bar in self.query(".nav-bar"):
+                is_target = f"#{bar.id}" == target
+                bar.set_class(is_target, "nav-bar-active")
+                bar.update(NAV_ACTIVE_MARKER if is_target else "")
 
     def _nav_dock_go(self, button_id: str) -> None:
         """Switch the tab bar to whichever section a bottom nav item points at.
 
         CHAT has no single tab of its own: it stands for every per-slot job
         tab, so it lands on the slot the user is already on (slot 1 when the
-        active tab is not a slot tab).
+        active tab is not a slot tab). SETTINGS follows the same rule — it
+        opens on whichever slot is currently on screen.
         """
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
@@ -290,11 +272,15 @@ class _TuiHandlersMixin:
                 tabs.active = "tab-overview"
             elif button_id == "nav-login":
                 tabs.active = "tab-sessions"
+                self._ensure_sessions_loaded()
             elif button_id == "nav-chat":
                 active_id = tabs.active or ""
                 tabs.active = active_id if active_id.startswith("tab-slot-") else "tab-slot-1"
             elif button_id == "nav-swarm":
                 tabs.active = "tab-swarm"
+            elif button_id == "nav-settings":
+                self.action_switch_tab_settings()
+                return
         self._refresh_nav_dock()
 
     # ── Keyboard actions ─────────────────────────────────────────────────
@@ -346,13 +332,20 @@ class _TuiHandlersMixin:
         self._copy_rich_log(view)
 
     def _copy_slot_log(self, slot_id: int) -> None:
-        """Copy the per-slot log buffer identified by its slot number."""
+        """Copy whichever of the slot's two log buffers is on screen."""
         log_views: dict[Any, Any] = getattr(self, "_log_views", {})
+        system_views: dict[Any, Any] = getattr(self, "_system_log_views", {})
         view = log_views.get(slot_id)
-        if view is None:
+        system_view = system_views.get(slot_id)
+        if view is not None and not view.display:
+            view = None
+        if system_view is not None and not system_view.display:
+            system_view = None
+        target = view or system_view
+        if target is None:
             self._log_msg(f"[yellow]Slot {slot_id} log view not found.[/]")
             return
-        self._copy_rich_log(view)
+        self._copy_rich_log(target)
 
     def _copy_rich_log(self, view: QwenTuiRichLog) -> None:
         text = view.copy_text()
@@ -374,10 +367,91 @@ class _TuiHandlersMixin:
             self.query_one(TabbedContent).active = "tab-swarm"
         self._refresh_nav_dock()
 
-    def _switch_to_slot(self, slot_id: int) -> None:
+    def action_switch_tab_settings(self) -> None:
+        """Switch to the Settings tab (ctrl+comma), keeping the slot on screen.
+
+        Arriving from another tab picks the slot the user was just looking at;
+        pressing the shortcut while already on Settings leaves the configured
+        slot alone instead of snapping back to slot 1.
+        """
         with contextlib.suppress(Exception):
-            self.query_one(TabbedContent).active = f"tab-slot-{slot_id}"
+            tabs = self.query_one(TabbedContent)
+            if tabs.active != "tab-settings":
+                self._show_slot_config(self._get_active_slot_id())
+                tabs.active = "tab-settings"
         self._refresh_nav_dock()
+
+    def _switch_to_slot(self, slot_id: int) -> None:
+        """Show a slot's tab and carry the keyboard focus into it.
+
+        Clicking a pill focuses that pill, and Textual reacts to a focus
+        landing in a pane by making THAT pane the active tab — which undid
+        the switch and sent the console back to the slot the click came from.
+        Moving the focus into the new pane keeps the tab and the focus in
+        step, so one click lands and the keyboard follows.
+        """
+        with contextlib.suppress(Exception):
+            tabs = self.query_one(TabbedContent)
+            tab_id = f"tab-slot-{slot_id}"
+            tabs.active = tab_id
+            pane = tabs.get_pane(tab_id)
+            focusable = [widget for widget in pane.query("*") if widget.focusable]
+            self.set_focus(focusable[0] if focusable else None, scroll_visible=False)
+        self._refresh_nav_dock()
+
+    # ── Chat console / Settings pane ─────────────────────────────────────
+
+    def _show_slot_log(self, slot_id: int, show_system: bool) -> None:
+        """Swap a chat console between the slot's Event log and System log.
+
+        The two share one panel, so exactly one view stays visible and only
+        the pressed button keeps the active fill.
+        """
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#log-view-{slot_id}", QwenTuiRichLog).display = not show_system
+            self.query_one(f"#log-view-{slot_id}-system", QwenTuiRichLog).display = show_system
+        with contextlib.suppress(NoMatches):
+            event_btn = self.query_one(f"#btn-slot-event-{slot_id}", Button)
+            system_btn = self.query_one(f"#btn-slot-system-{slot_id}", Button)
+            event_btn.set_class(show_system, "seg-active")
+            system_btn.set_class(not show_system, "seg-active")
+
+    def _show_slot_config(self, slot_id: int) -> None:
+        """Display one slot's configuration block and mark its picker pill."""
+        for s in range(1, self._NUM_SLOTS + 1):
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#slot-config-{s}", Vertical).display = s == slot_id
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#cfg-slot-{s}", Button).set_class(s == slot_id, "slot-chip-active")
+
+    def _goto_slot_settings(self, slot_id: int) -> None:
+        """Open the Settings pane on *slot_id*'s form — the Templates pill."""
+        self._show_slot_config(slot_id)
+        with contextlib.suppress(Exception):
+            self.query_one(TabbedContent).active = "tab-settings"
+        self._refresh_nav_dock()
+
+    def _send_composer(self, slot_id: int) -> None:
+        """Echo the typed task into the transcript and dispatch it."""
+        text = ""
+        with contextlib.suppress(NoMatches):
+            composer = self.query_one(f"#composer-{slot_id}", Input)
+            text = composer.value.strip()
+            if text:
+                composer.value = ""
+        if not text:
+            with contextlib.suppress(Exception):
+                self.notify(
+                    "Type a task before sending.",
+                    severity="warning",
+                    title=f"Slot {slot_id}",
+                )
+            return
+        attachment = ""
+        with contextlib.suppress(NoMatches):
+            attachment = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
+        self._append_chat_message(slot_id, "user", text, attachment=attachment)
+        self._run_composer_slot(slot_id, text)
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""

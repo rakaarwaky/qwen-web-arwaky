@@ -126,6 +126,7 @@ class HelpScreen(ModalScreen[None]):
             "ctrl+x           Cancel active slot",
             "ctrl+c           Copy active log to clipboard",
             "ctrl+alt+s       Swarm tab",
+            "ctrl+comma       Settings tab",
             "ctrl+l           Login / session setup",
             "ctrl+i           Init workspace",
             "ctrl+q           Quit (confirm when jobs running)",

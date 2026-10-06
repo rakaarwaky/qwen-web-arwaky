@@ -17,11 +17,10 @@ from rich.markup import escape
 from textual import work
 from textual.app import ScreenStackError
 from textual.css.query import NoMatches
-from textual.widgets import DataTable, Input, Label, LoadingIndicator, Switch
+from textual.widgets import Input, LoadingIndicator, Switch
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
@@ -60,15 +59,17 @@ class _TuiWorkersMixin:
     _login_in_flight: bool
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
+    _direct: Any
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
+    _append_chat_message: Any
+    _render_account_cards: Any
     query_one: Any
     notify: Any
     _set_slot_tab_title: Any
     _truncate_name: Any
     _update_slot_status: Any
-    _update_table_row: Any
     _refresh_metrics: Any
     _format_status: Any
     _format_event_status: Any
@@ -78,7 +79,7 @@ class _TuiWorkersMixin:
     _ensure_log_handler: Any
     push_screen: Any
     _session_check_timer: Any
-    _render_swarm_snapshot: Any
+    _log_swarm_msg: Any
 
     # ── Slot run / cancel ────────────────────────────────────────────────
 
@@ -119,6 +120,10 @@ class _TuiWorkersMixin:
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
 
+        # The chat console's transcript mirrors what this slot was asked to
+        # do, so a run started from Settings still shows up in the Chat view.
+        self._append_chat_message(slot_id, "user", p_name, attachment=file_val)
+
         # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
         # never touches another slot's in-flight browser context.
         self._slot_cancel_events[slot_id] = threading.Event()
@@ -134,12 +139,56 @@ class _TuiWorkersMixin:
             "event": "EVENT_WEB_LOADED",
             "_start_perf": time.perf_counter(),
         }
-        self._update_table_row(slot_id, self._format_status("RUNNING", "table"), p_name, "running…")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
+
+    def _run_composer_slot(self, slot_id: int, text: str) -> None:
+        """Dispatch a chat-console task as a direct text prompt.
+
+        The composer is the mockup's inline execution surface: it takes a
+        typed task instead of a prompt file, so it runs through the direct
+        prompt capability while reusing the same per-slot status, table, and
+        finalize plumbing every other run uses.
+        """
+        if self._slot_workers.get(slot_id) is not None:
+            self._log_msg("[bold {}]WARNING:[/] Slot {} already running.".format(THEME["warn"], slot_id), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
+            return
+        if getattr(self, "_direct", None) is None:
+            msg = f"Direct prompt capability is not available for Slot {slot_id}."
+            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(msg, severity="error", title=f"Slot {slot_id}")
+            return
+
+        headless = True
+        out_val = ""
+        with contextlib.suppress(Exception):
+            headless = self.query_one(f"#switch-headless-{slot_id}", Switch).value
+            out_val = self.query_one(f"#input-output-{slot_id}", Input).value
+
+        filename = self._truncate_name(text, 24)
+        self._slot_cancel_events[slot_id] = threading.Event()
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {filename} ▶")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = False
+        self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
+        self._slot_stats[slot_id] = {
+            "status": "RUNNING",
+            "file": filename,
+            "duration": 0.0,
+            "event": "EVENT_WEB_LOADED",
+            "_start_perf": time.perf_counter(),
+        }
+        self._refresh_metrics()
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
+
+        self._slot_workers[slot_id] = self._execute_direct_worker(slot_id, text, headless, out_val)
 
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
@@ -182,12 +231,6 @@ class _TuiWorkersMixin:
         # U1: show CANCELLING intermediate status while browser process stops
         self._update_slot_status(slot_id, self._format_status("CANCELLING", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} {self._format_status('CANCELLING', 'badge')}")
-        self._update_table_row(
-            slot_id,
-            self._format_status("CANCELLING", "table"),
-            self._slot_stats[slot_id].get("file", "-"),
-            "stopping…",
-        )
         self._slot_generation[slot_id] = self._slot_generation.get(slot_id, 0) + 1
         # AR-2/FE-1: cancel only this slot's run via its own cancel event.
         # Sibling slots' browser contexts are untouched.
@@ -207,8 +250,6 @@ class _TuiWorkersMixin:
         self._update_slot_status(slot_id, self._format_status("CANCELLED", "badge"))
         self._set_slot_tab_title(slot_id, f"Slot {slot_id} ●")
         self._slot_stats[slot_id]["status"] = "CANCELLED"
-        file_name = self._slot_stats[slot_id]["file"]
-        self._update_table_row(slot_id, self._format_status("CANCELLED", "table"), file_name, "stopped")
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
@@ -235,31 +276,14 @@ class _TuiWorkersMixin:
         self._slot_stats[slot_id] = {"status": status, "file": filename, "duration": duration}
         self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {self._truncate_name(filename)} {icon}")
         self._update_slot_status(slot_id, self._format_status(status, "badge"))
-        self._update_table_row(slot_id, self._format_status(status, "table"), filename, f"{duration}s")
         with contextlib.suppress(NoMatches):
             self.query_one(f"#btn-retry-{slot_id}").display = status == "FAILED"
         self._refresh_metrics()
         with contextlib.suppress(NoMatches):
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = False
 
-    def _tick_elapsed(self, slot_id: int) -> None:
-        """U4: update the Duration column with live elapsed time."""
-        stats = self._slot_stats.get(slot_id)
-        if stats is None or stats.get("status") != "RUNNING":
-            return
-        elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
-        label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
-        event = stats.get("event")
-        status_text = self._format_event_status(event, "table") if event else self._format_status("RUNNING", "table")
-        self._update_table_row(
-            slot_id,
-            status_text,
-            stats.get("file", "-"),
-            label,
-        )
-
     def _update_slot_event_status(self, slot_id: int, event_name: str) -> None:
-        """Render the current pipeline event on the slot badge and table.
+        """Render the current pipeline event on the slot badge.
 
         Called from the worker thread via ``call_from_thread``; only updates
         the UI while the slot is still RUNNING so a stale event cannot
@@ -268,15 +292,7 @@ class _TuiWorkersMixin:
         stats = self._slot_stats.get(slot_id)
         if stats is None or stats.get("status") != "RUNNING":
             return
-        elapsed = time.perf_counter() - stats.get("_start_perf", time.perf_counter())
-        dur_label = f"{elapsed:.0f}s" if elapsed < 60 else f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
         self._update_slot_status(slot_id, self._format_event_status(event_name, "badge"))
-        self._update_table_row(
-            slot_id,
-            self._format_event_status(event_name, "table"),
-            stats.get("file", "-"),
-            dur_label,
-        )
 
     # ── Adaptive Swarm run / cancel ──────────────────────────────────────
 
@@ -302,6 +318,47 @@ class _TuiWorkersMixin:
         self._swarm_pending_input = input_path
         self._confirm_or_start_swarm(input_path)
 
+    def _render_swarm_snapshot(self, snapshot: Any) -> None:
+        """Report a swarm snapshot to the log panel.
+
+        The mockup's Swarm screen has no agent table: the panel is a single
+        log, so per-agent progress and the aggregate line are written there
+        instead. The worker polls once a second and a run rarely changes
+        every tick, so a line is only written when the agent states or the
+        aggregate actually move — otherwise an idle swarm would add a line
+        every second.
+        """
+        states: dict[str, tuple[str, int]] = getattr(self, "_swarm_agent_states", None) or {}
+        for agent in snapshot.agents:
+            state = (str(agent.status), int(agent.attempt))
+            if states.get(agent.agent_id) != state:
+                states[agent.agent_id] = state
+                self._log_swarm_msg(
+                    "[bold {}]{}[/] {} · attempt {}/{}".format(
+                        THEME["accent_fg"],
+                        agent.agent_id,
+                        state[0].upper(),
+                        state[1],
+                        snapshot.max_attempts,
+                    )
+                )
+        self._swarm_agent_states = states
+        total = len(snapshot.agents)
+        aggregate = (str(snapshot.status), int(snapshot.completed_count), int(snapshot.failed_count))
+        if aggregate == getattr(self, "_swarm_aggregate", None):
+            return
+        self._swarm_aggregate = aggregate
+        self._log_swarm_msg(
+            "[bold {}]SWARM:[/] {} · {}/{} completed · {} failed · max {} browsers".format(
+                THEME["ok"] if aggregate[0] == "completed" else THEME["warn"],
+                aggregate[0].upper(),
+                aggregate[1],
+                total,
+                aggregate[2],
+                snapshot.browser_concurrency,
+            )
+        )
+
     def _cancel_swarm(self) -> None:
         if self._swarm_id is None or self._swarm is None:
             self.notify("No Swarm is currently running.", severity="warning")
@@ -310,7 +367,7 @@ class _TuiWorkersMixin:
         snapshot = self._swarm.execute(SwarmRequest(verb="snapshot", swarm_id=self._swarm_id)).snapshot
         if snapshot is not None:
             self._render_swarm_snapshot(snapshot)
-        self._log_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
+        self._log_swarm_msg("[bold {}]SWARM:[/] cancelled; active browsers are stopping.".format(THEME["warn"]))
 
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
@@ -322,7 +379,7 @@ class _TuiWorkersMixin:
             self._swarm_started_perf = time.perf_counter()
             self.call_from_thread(self._render_swarm_snapshot, snapshot)
             self.call_from_thread(
-                self._log_msg,
+                self._log_swarm_msg,
                 "[bold {}]SWARM:[/] started {} with {} agents.".format(
                     THEME["accent_fg"], snapshot.swarm_id, len(snapshot.agents)
                 ),
@@ -336,7 +393,7 @@ class _TuiWorkersMixin:
                 self.call_from_thread(self._refresh_metrics)
                 if latest.status in {"completed", "partial", "failed", "cancelled"}:
                     self.call_from_thread(
-                        self._log_msg,
+                        self._log_swarm_msg,
                         "[bold {}]SWARM:[/] {} ({}/{} completed).".format(
                             THEME["ok"] if latest.status == "completed" else THEME["warn"],
                             latest.status,
@@ -347,13 +404,26 @@ class _TuiWorkersMixin:
                     break
         except Exception as exc:
             self.call_from_thread(
-                self._log_msg,
+                self._log_swarm_msg,
                 "[bold {}]SWARM ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
         finally:
             self._swarm_id = None
             self._swarm_started_perf = None
             self.call_from_thread(self._refresh_metrics)
+
+    def _observe_slot_event(self, slot_id: int) -> Any:
+        """Build the lifecycle observer that mirrors pipeline events into the UI."""
+
+        def _on_event(_event_type: Any, _event: Any) -> None:
+            # Event-level status: render the actual pipeline event (thinking /
+            # streaming / prompting) in the slot badge and overview table so a
+            # running slot is never just "RUNNING".
+            event_name = str(_event.name)
+            self._slot_stats.setdefault(slot_id, {})["event"] = event_name
+            self.call_from_thread(self._update_slot_event_status, slot_id, event_name)
+
+        return _on_event
 
     @work(thread=True)
     def _execute_slot_worker(self, slot_id: int, cfg: AppConfig) -> None:
@@ -373,22 +443,7 @@ class _TuiWorkersMixin:
         start_t = time.perf_counter()
         # U7: capture the generation at worker start for finalize guard
         gen = self._slot_generation.get(slot_id, 0)
-        # U4: start periodic elapsed-time updater via call_from_thread
-        # (set_timer must be called from the main event loop thread)
-        timer_holder: list[Any] = []
-
-        def _create_timer() -> None:
-            timer_holder.append(self.set_interval(5.0, lambda: self._tick_elapsed(slot_id)))
-
-        self.call_from_thread(_create_timer)
-
-        def _on_event(_event_type: Any, _event: Any) -> None:
-            # Event-level status: render the actual pipeline event (thinking /
-            # streaming / prompting) in the slot badge and overview table so a
-            # running slot is never just "RUNNING".
-            event_name = str(_event.name)
-            self._slot_stats.setdefault(slot_id, {})["event"] = event_name
-            self.call_from_thread(self._update_slot_event_status, slot_id, event_name)
+        _on_event = self._observe_slot_event(slot_id)
 
         try:
             if cfg.file_path:
@@ -429,6 +484,7 @@ class _TuiWorkersMixin:
                     "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
+                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True, gen)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
@@ -438,183 +494,69 @@ class _TuiWorkersMixin:
                 slot_id,
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", prompt_name, dur, False, gen)
-        finally:
-            if timer_holder:
-                self.call_from_thread(timer_holder[0].stop)
-
-    # ── Login worker ─────────────────────────────────────────────────────
 
     @work(thread=True)
-    def _login_worker(self) -> None:
+    def _execute_direct_worker(
+        self,
+        slot_id: int,
+        prompt: str,
+        headless: bool,
+        output_val: str,
+    ) -> None:
+        """Run one composer task through the direct prompt capability.
+
+        Mirrors ``_execute_slot_worker``: the worker thread takes the slot's
+        name so the log handler routes its records into that slot's event
+        log, and every UI write crosses threads through ``call_from_thread``
+        behind the same generation guard a file run uses.
+        """
+        threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
         self._ensure_log_handler()
-        # U5: update session badge to show login in progress
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            badge.update("LOGGING IN…")
+        filename = self._truncate_name(prompt, 24)
+        start_t = time.perf_counter()
+        gen = self._slot_generation.get(slot_id, 0)
+        _on_event = self._observe_slot_event(slot_id)
+
+        self.call_from_thread(
+            self._log_msg,
+            "[bold {}]>>> [Slot {}] Direct prompt: {}[/]".format(THEME["accent_fg"], slot_id, escape(filename)),
+            slot_id,
+        )
+
         try:
-            if self._setup is None:
-                raise RuntimeError("Session setup orchestrator not available.")
-            res = self._setup.execute(SetupRequest())
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]LOGIN RESULT:[/] {}".format(
-                    THEME["ok"],
-                    escape(str(res.error or res.message or res.profile_path or "")),
-                ),
+            res = self._direct.process_direct_prompt(
+                prompt=PromptText(prompt),
+                timeout_sec=600,
+                output_file=Path(output_val) if output_val.strip() else None,
+                headless=HeadlessFlag(headless),
+                event_observer=_on_event,
             )
-            self.call_from_thread(self._refresh_session_badge)
-        except Exception as exc:
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(exc))),
-            )
-        finally:
-            self._login_in_flight = False
-
-    # ── Session badge ────────────────────────────────────────────────────
-
-    def _refresh_session_badge(self) -> None:
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            if getattr(self, "_session", None) is None:
-                badge.update("N/A")
-            else:
-                badge.update("CHECKING…")
-        self._session_check_timed_out = False
-        timer = getattr(self, "_session_check_timer", None)
-        if timer is not None:
-            timer.stop()
-        self._session_check_timer = self.set_timer(15.0, self._session_check_timeout)
-        self._session_check_worker()
-
-    def _session_check_timeout(self) -> None:
-        if self._session_check_timed_out:
-            return
-        self._session_check_timed_out = True
-        self._last_session_state = "TIMEOUT"
-        msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            # Only show TIMEOUT if the badge is still in CHECKING state.
-            if "CHECKING" not in str(badge.render() or ""):
-                return
-            badge.update("TIMEOUT")
-            badge.set_classes("invalid")
-        self._log_msg("[bold {}]WARNING:[/] {}".format(THEME["warn"], msg))
-        with contextlib.suppress(Exception):
-            self.notify(msg, severity="warning", title="Session")
-
-    @work(thread=True)
-    def _session_check_worker(self) -> None:
-        if self._session is None:
-            self.call_from_thread(self._apply_session_badge, False)
-            return
-        try:
-            from modules.shared.src.taxonomy_session_vo import SessionRequest
-
-            response = self._session.execute(SessionRequest(verb="validate"))
-            valid = response.valid
-        except Exception:
-            valid = False
-        self.call_from_thread(self._apply_session_badge, valid)
-
-    def _apply_session_badge(self, valid: bool) -> None:
-        self._last_session_state = "VALID" if valid else "EXPIRED"
-        with contextlib.suppress(*_BADGE_UNAVAILABLE):
-            badge = self.query_one("#session-badge", Label)
-            badge.update("VALID" if valid else "EXPIRED")
-            badge.set_classes("invalid" if not valid else "")
-        # BUG FIX: cancel the timeout timer when the worker completes.
-        # Without this, a 15s timer can fire AFTER the badge is already
-        # set to VALID, overwriting it with "TIMEOUT".
-        if hasattr(self, "_session_check_timer") and self._session_check_timer is not None:
-            self._session_check_timer.stop()
-            self._session_check_timer = None
-
-    # ── Session Pool Management ────────────────────────────────────────
-
-    @work(thread=True)
-    def _refresh_sessions_table(self) -> None:
-        """Load and display all sessions in the Sessions tab table."""
-        if not hasattr(self, "_session_manager") or self._session_manager is None:
-            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
-            return
-        try:
-            pool = self._session_manager.load_pool()
-            sessions = pool.sessions
-
-            def _update() -> None:
-                table = self.query_one("#sessions-table", DataTable)
-                table.clear()
-                table.add_columns("ID", "Name", "Status", "Last Used", "Path")
-                table.add_rows(
-                    (
-                        s.session_id,
-                        s.name,
-                        s.status.value,
-                        s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never",
-                        str(s.path),
-                    )
-                    for s in sessions
-                )
-                total = pool.total_count
-                healthy = sum(1 for s in sessions if s.is_healthy)
-                limited = sum(1 for s in sessions if s.is_limited)
-                with contextlib.suppress(NoMatches):
-                    self.query_one("#session-total", Label).update(f"{total}")
-                    self.query_one("#session-healthy", Label).update(f"{healthy}")
-                    self.query_one("#session-limited", Label).update(f"{limited}")
+            dur = round(time.perf_counter() - start_t, 1)
+            res_str = str(res)
+            fail_reason = detect_processing_failure(res_str)
+            if fail_reason is not None:
                 self.call_from_thread(
                     self._log_msg,
-                    "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
-                        THEME["ok"], total, healthy, limited
-                    ),
+                    "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(fail_reason))),
+                    slot_id,
                 )
-
-            self.call_from_thread(_update)
+                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
+            else:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
+                    slot_id,
+                )
+                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
+                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", filename, dur, True, gen)
         except Exception as exc:
+            dur = round(time.perf_counter() - start_t, 1)
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]SESSION LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(exc))),
+                slot_id,
             )
-
-    @work(thread=True)
-    def _run_session_health_check(self) -> None:
-        """Run health checks on all sessions."""
-        if not hasattr(self, "_session_manager") or self._session_manager is None:
-            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
-            return
-        try:
-            from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
-
-            results = SessionHealthChecker(timeout_seconds=10).check_pool_sync(
-                self._session_manager.load_pool(),
-                self._session_manager,
-            )
-            healthy_count = sum(1 for _, h in results if h)
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]HEALTH CHECK:[/] {}/{} sessions healthy.".format(THEME["ok"], healthy_count, len(results)),
-            )
-            self.call_from_thread(self._refresh_sessions_table)
-        except Exception as exc:
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]HEALTH CHECK ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
-            )
-
-    def _session_login_action(self) -> None:
-        """Trigger session login flow."""
-        if getattr(self, "_session_manager", None) is None:
-            self._log_msg("[yellow]Session manager not available.[/]")
-            return
-        self._log_msg("[bold {}]>>> Opening session login dialog...[/]".format(THEME["accent_fg"]))
-        # For now, log that login would be triggered; the actual flow uses subprocess
-        self.notify(
-            "Use 'qwen-web-arwaky sessions login --name <name>' command",
-            title="Session Login",
-            severity="information",
-        )
+            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
 
 
 __all__ = ["_TuiWorkersMixin"]

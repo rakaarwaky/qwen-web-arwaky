@@ -7,13 +7,10 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-from textual.widgets import DataTable, Label, RichLog, TabbedContent
-from textual.widgets._data_table import CellDoesNotExist
+from textual.widgets import Label, RichLog, TabbedContent
 
 from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
 from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
-from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 
 
@@ -40,8 +37,10 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             tabs = app.query_one(TabbedContent)
             assert tabs.active == "tab-overview"
 
-            table = app.query_one("#slots-table", DataTable)
-            assert table.row_count >= 2
+            # The mockup-driven Overview is four cards; the log card is the
+            # one element the layout tests keep gated on.
+            assert app.query_one("#log-view-overview", RichLog) is not None
+            assert app.query_one(".log-card") is not None
 
             # Test tab switching actions
             app.action_switch_tab_slot(1)
@@ -67,9 +66,13 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             assert slot_log is not None
             assert slot_log.wrap
 
-            # Log views must stay inside the visible tab container.
+            # Log views must fit inside the visible tab container. The
+            # Overview's log card is the 1fr child of a non-scrolling band, so
+            # it takes exactly the rows the engine cards leave and ends at the
+            # nav dock — and the band must never grow a scrollbar of its own.
             active_pane = tabs.get_pane("tab-overview")
             overview_log = app.query_one("#log-view-overview", RichLog)
+            band = app.query_one("#overview-cards")
             assert overview_log.region.height > 0
             assert overview_log.region.width > 0
             assert overview_log.region.y >= active_pane.region.y
@@ -78,6 +81,8 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
                 overview_log.region.y + overview_log.region.height <= active_pane.region.y + active_pane.region.height
             )
             assert overview_log.region.x + overview_log.region.width <= active_pane.region.x + active_pane.region.width
+            # Only the log panel scrolls: the Overview itself is one screen.
+            assert band.styles.overflow_y == "hidden"
 
             # Test metrics update
             app._slot_stats[1]["status"] = "RUNNING"
@@ -106,135 +111,6 @@ def test_log_handler_routes_thread_to_slot() -> None:
     assert args[2] == 2
 
 
-# ── Regression: #slots-table columns must be addressed by KEY, not label ──────
-#
-# Textual's add_columns("Status") treats the string as a LABEL and auto-generates
-# a ColumnKey, so update_cell(row, "Status") raises CellDoesNotExist — which the
-# contextlib.suppress in _update_table_row swallows. Result: the dashboard table
-# froze at "IDLE / - / 0.0s" forever, and only row_count was ever asserted, so
-# the old test passed green. These tests read actual cells.
-
-
-def test_slots_table_uses_stable_column_keys() -> None:
-    """The table's column keys must be the declared ones, not auto-generated."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test():
-            table = app.query_one("#slots-table", DataTable)
-            assert list(table.columns.keys()) == [
-                _TuiUtilsMixin.COL_SLOT,
-                _TuiUtilsMixin.COL_STATUS,
-                _TuiUtilsMixin.COL_FILE,
-                _TuiUtilsMixin.COL_DURATION,
-            ]
-            # Labels are still what the user sees (Textual stores them as Rich Text).
-            assert [str(c.label) for c in table.columns.values()] == ["Slot", "Status", "Prompt File", "Duration"]
-            # Cells must be readable BY KEY — this raises CellDoesNotExist if
-            # _init_table goes back to label-only add_columns().
-            assert table.get_cell("row-slot-1", "status") == "IDLE ●"
-
-    asyncio.run(_run())
-
-
-def test_slots_table_update_table_row_actually_writes_cells() -> None:
-    """_update_table_row must move cells off their IDLE/-/0.0s initial values."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test():
-            table = app.query_one("#slots-table", DataTable)
-            before = (
-                table.get_cell("row-slot-1", "status"),
-                table.get_cell("row-slot-1", "file"),
-                table.get_cell("row-slot-1", "duration"),
-            )
-            assert before == ("IDLE ●", "-", "0.0s")
-
-            app._update_table_row(1, "SUCCESS", "task.md", "12.3s")
-
-            after = (
-                table.get_cell("row-slot-1", "status"),
-                table.get_cell("row-slot-1", "file"),
-                table.get_cell("row-slot-1", "duration"),
-            )
-            assert after == ("SUCCESS", "task.md", "12.3s")
-            assert after != before, "_update_table_row was a silent no-op (CellDoesNotExist suppressed?)"
-            # The Slot column is untouched.
-            assert table.get_cell("row-slot-1", "slot") == "Slot 1"
-
-            # Other rows must not be affected.
-            assert table.get_cell("row-slot-2", "status") == "IDLE ●"
-
-    asyncio.run(_run())
-
-
-def test_slots_table_update_table_row_multi_digit_slot() -> None:
-    """row-slot-10 (multi-digit id) resolves too — not just single digits."""
-    if NUM_SLOTS < 10:
-        pytest.skip(f"app configured with only {NUM_SLOTS} slots")
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test():
-            table = app.query_one("#slots-table", DataTable)
-            app._update_table_row(10, "FAILED", "long-job.md", "1m 4s")
-            assert table.get_cell("row-slot-10", "status") == "FAILED"
-            assert table.get_cell("row-slot-10", "file") == "long-job.md"
-            assert table.get_cell("row-slot-10", "duration") == "1m 4s"
-
-    asyncio.run(_run())
-
-
-def test_slots_table_tick_elapsed_updates_duration_live() -> None:
-    """The live path: a RUNNING slot's Duration cell advances from 'running…'."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test():
-            table = app.query_one("#slots-table", DataTable)
-            app._slot_stats[1] = {
-                "status": "RUNNING",
-                "file": "task.md",
-                "duration": 0.0,
-                "_start_perf": time.perf_counter() - 42,
-            }
-            app._update_table_row(1, "RUNNING ▶", "task.md", "running…")
-            assert table.get_cell("row-slot-1", "duration") == "running…"
-
-            app._tick_elapsed(1)
-
-            assert table.get_cell("row-slot-1", "duration") == "42s"
-            assert table.get_cell("row-slot-1", "status") == "RUNNING ▶"
-
-    asyncio.run(_run())
-
-
-def test_slots_table_update_missing_row_stays_quiet() -> None:
-    """Narrow suppression must survive: unknown slot no-ops instead of raising."""
-    app = _make_app()
-
-    async def _run() -> None:
-        async with app.run_test():
-            app._update_table_row(999, "SUCCESS", "x.md", "1.0s")  # no raise
-            table = app.query_one("#slots-table", DataTable)
-            with pytest.raises(CellDoesNotExist):
-                table.get_cell("row-slot-999", "status")
-
-    asyncio.run(_run())
-
-
-# ── Regression: the ACTIVE tab's label must actually render ────────────────────
-#
-# `Tab.-active { border-bottom: solid $accent }` on a Tab (Textual default
-# height:1) consumes the tab's only row — the active tab measured
-# content_region.height == 0 and its label vanished behind the highlight.
-# The old test asserted `str(tab.label)`, which passes even when nothing is
-# drawn. This asserts on composited screen text instead, and pins the
-# replacement accent indicator (Textual's Underline, styled via the bare
-# type selector — `Tabs > Underline` is a measured no-op on 8.2.8).
-
-
 def test_active_tab_label_renders_on_screen() -> None:
     """The active tab's relabelled text must reach the rendered screen."""
     from textual.color import Color
@@ -255,20 +131,18 @@ def test_active_tab_label_renders_on_screen() -> None:
 
             strips = list(app.screen._compositor.render_strips())
             rendered = "".join(s.text for s in strips)
-            # Load-bearing: the label is drawn somewhere on screen.
-            assert "deep-review" in rendered
-
-            # …and specifically on the tab row (the strip holding "Overview").
-            tab_row = next(s.text for s in strips if "Overview" in s.text)
-            assert "deep-review" in tab_row
-
-            # Geometry: the active Tab keeps a full text row; inactive ones are
-            # unchanged.
+            # Load-bearing: the label reaches the Tab widget, not just the model.
             active_tab = app.query_one("#--content-tab-tab-slot-1", Tab)
-            assert active_tab.content_region.height > 0
+            assert "deep-review" in str(active_tab.label)
+
+            # The tab strip is hidden (design has no tab bar), so no Tab paints
+            # a text row and none of the pane names leak onto screen.
             for w in app.query(Tab):
-                if w.id != "--content-tab-tab-slot-1":
-                    assert w.content_region.height == 1, w.id
+                assert w.content_region.height == 0, w.id
+            for name in ("Overview", "Sessions", "Swarm", "Settings"):
+                assert name not in rendered, f"{name} tab label must not paint"
+            # The in-page brand row is visible and carries the identity block.
+            assert "QWEN-CLI" in rendered
 
             # The accent active-indicator survives on Textual's Underline.
             underline = tabs.query_one(Underline)
@@ -277,44 +151,40 @@ def test_active_tab_label_renders_on_screen() -> None:
     asyncio.run(_run())
 
 
-# ── Regression: session-badge writes during teardown must not crash the app ───
+# ── Regression: the session verdict must survive a teardown write ───────
 #
-# The login/session workers call call_from_thread(self._refresh_session_badge)
-# (and _apply_session_badge) from background threads. When that callback lands
-# while the app is tearing down — badge already unmounted, or screen stack
-# popped — query_one raises NoMatches / ScreenStackError. Those are NOT
-# subclasses of (LookupError, AttributeError), so the old handlers let them
-# escape and run_test re-raised them as an app crash (~1 in 6-8 flaky runs of
-# this file). With the badge removed we can reproduce the teardown state
-# deterministically.
+# The session worker calls _check_session / _apply_session_state from a
+# background thread via call_from_thread. When that callback lands while the
+# app is tearing down — screen stack popped, timers cancelled — an unguarded
+# write used to escape as an app crash. The verdict now goes to the log and
+# to _last_session_state instead of a badge widget, so this guards the
+# reporting path rather than a widget lookup.
 
 
-def test_session_badge_survives_teardown_state() -> None:
-    """Badge writers no-op when #session-badge is gone instead of raising NoMatches."""
-    from textual.widgets import Label as _Label
-
+def test_session_check_reports_verdict_without_a_badge_widget() -> None:
+    """_check_session reports VALID/EXPIRED/N/A and never needs a widget."""
     app = _make_app()
 
     async def _run() -> None:
         async with app.run_test() as pilot:
-            # Sanity: on the normal path the badge IS updated (the widened
-            # except-clause must not swallow real work).
             app._session = None
-            app._refresh_session_badge()
-            assert str(app.query_one("#session-badge", _Label).render()) == "N/A"
-            app._apply_session_badge(True)
-            assert str(app.query_one("#session-badge", _Label).render()) == "VALID"
+            app._check_session()
+            app._apply_session_state("N/A")
+            assert app._last_session_state == "N/A"
 
-            # Teardown state: badge unmounted while a queued callback still
-            # targets it. Before the fix each of these raised NoMatches.
-            app.query_one("#session-badge", _Label).remove()
+            # A stored session that validates is reported as VALID.
+            app._session = MagicMock()
+            app._check_session()
+            for _ in range(4):
+                await pilot.pause()
+            assert app._last_session_state in {"VALID", "EXPIRED"}
+
+            # Teardown state: the timer and log paths must still be safe to
+            # hit while the app is shutting down.
+            app._session_check_timeout()
+            app._session_check_timeout()
             for _ in range(3):
                 await pilot.pause()
-
-            app._session = MagicMock()  # non-None → refresh takes the CHECKING path
-            app._refresh_session_badge()  # must not raise
-            app._apply_session_badge(True)  # must not raise
-            app._session_check_timeout()  # must not raise (also covers the render() read)
 
     asyncio.run(_run())
 
@@ -468,7 +338,6 @@ def test_flush_metrics_writes_engine_readouts() -> None:
             from textual.widgets import Label
 
             assert str(app.query_one("#metric-active", Label).render()) == "1"
-            assert str(app.query_one("#metric-done", Label).render()) == "1"
             # Swarm card tracks the swarm engine (0 when idle), not slots.
             assert str(app.query_one("#metric-swarm-ring", Label).render()) == "0/0"
             assert str(app.query_one("#metric-swarm-detail", Label).render()) == "Idle"
@@ -523,8 +392,8 @@ def test_swarm_toggle_buttons_drive_log_views() -> None:
     asyncio.run(_run())
 
 
-def test_swarm_clear_button_emptys_the_active_log() -> None:
-    """Clear writes no logs but the log buffer empties."""
+def test_swarm_clear_button_empties_the_active_log() -> None:
+    """Clear drops the buffer and leaves the mockup's flush notice behind."""
     app = _make_app()
 
     async def _run() -> None:
@@ -537,7 +406,50 @@ def test_swarm_clear_button_emptys_the_active_log() -> None:
 
             app.query_one("#btn-clear-swarm-log", Button).press()
             await pilot.pause()
-            assert log.copy_text() == ""
+            # The mockup replaces the terminal content with a flushed notice,
+            # and the notice is written into the panel that was just cleared.
+            flushed = log.copy_text()
+            assert "hello" not in flushed
+            assert "cleared" in flushed
+
+    asyncio.run(_run())
+
+
+# ── Regression: one pill click must land on the slot it names ──────────────
+#
+# Clicking a slot pill focuses that pill, and Textual makes the pane holding
+# the focused widget the active tab. Without carrying the focus into the new
+# pane, TabPane.Focused pulled the tab straight back to the slot the click
+# came from, so the console only moved after several clicks.
+
+
+def test_slot_pill_click_switches_the_pane_in_one_click() -> None:
+    """A pill press shows that slot's pane, and the focus follows it."""
+    from textual.widgets import TabbedContent
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(120, 45)) as pilot:
+            await pilot.pause()
+            await pilot.click("#nav-chat")
+            await pilot.pause()
+            tabs = app.query_one(TabbedContent)
+            assert tabs.active == "tab-slot-1"
+
+            # Each pill press comes from the pane that is currently on screen.
+            current = 1
+            for target in (5, 2, 7, 1):
+                await pilot.click(f"#chat-slot-{current}-{target}")
+                for _ in range(3):
+                    await pilot.pause(0.02)
+                assert tabs.active == f"tab-slot-{target}", target
+                current = target
+
+            # The keyboard path is unaffected.
+            await pilot.press("alt+9")
+            await pilot.pause()
+            assert tabs.active == "tab-slot-9"
 
     asyncio.run(_run())
 
@@ -579,13 +491,11 @@ def test_overview_at_regression_size_keeps_log_visible() -> None:
             await pilot.pause()
             for _ in range(15):
                 await pilot.pause()
-            from textual.widgets import DataTable, TabbedContent
+            from textual.widgets import TabbedContent
 
             pane = app.query_one(TabbedContent).get_pane("tab-overview")
             log = app.query_one("#log-view-overview", RichLog)
-            table = app.query_one("#slots-table", DataTable)
             assert log.region.y >= pane.region.y
             assert log.region.height > 0
-            assert table.region.height < 12
 
     asyncio.run(_run())

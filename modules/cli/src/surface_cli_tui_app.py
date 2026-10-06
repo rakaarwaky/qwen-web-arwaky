@@ -22,7 +22,9 @@ from textual.binding import Binding
 from modules.cli.src.surface_cli_tui_components import ConfirmModal
 from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
 from modules.cli.src.surface_cli_tui_css import TUI_CSS
+from modules.cli.src.surface_cli_tui_events import _TuiEventsMixin
 from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
+from modules.cli.src.surface_cli_tui_sessions_worker import _TuiSessionsWorkerMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
@@ -54,7 +56,9 @@ _APP_VERSION = get_package_version()
 class QwenTuiApp(
     _TuiComposeMixin,
     _TuiHandlersMixin,
+    _TuiEventsMixin,
     _TuiWorkersMixin,
+    _TuiSessionsWorkerMixin,
     _TuiUtilsMixin,
     App[None],
 ):
@@ -68,6 +72,7 @@ class QwenTuiApp(
     BINDINGS = [
         Binding("alt+0", "switch_tab_overview", "Overview"),
         Binding("ctrl+alt+s", "switch_tab_swarm", "Swarm"),
+        Binding("ctrl+comma", "switch_tab_settings", "Settings"),
         *[
             Binding(
                 f"alt+{s}" if s <= 9 else _EXTRA_SLOT_KEYS[s],
@@ -135,7 +140,6 @@ class QwenTuiApp(
         self._template_roles: set[str] = set(manifest)
         # P3: widget refs cached at mount time.
         self._metric_active: Any = None
-        self._metric_done: Any = None
         self._metric_model: Any = None
         self._metric_swarm_ring: Any = None
         self._metric_swarm_detail: Any = None
@@ -161,6 +165,10 @@ class QwenTuiApp(
         self._swarm_pending_input: Path | None = None
         # Redesign v6.5.2: uptime stamp for the Overview Swarm Status card.
         self._swarm_started_perf: float | None = None
+        # Sessions pane: the cards currently on screen plus a one-shot guard so
+        # the account pool is fetched on the first visit, not on every visit.
+        self._sessions_cache: list[Any] = []
+        self._sessions_loaded_once = False
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406

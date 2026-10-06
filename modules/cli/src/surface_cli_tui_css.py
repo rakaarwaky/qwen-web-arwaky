@@ -27,6 +27,7 @@ _COLORS: dict[str, str] = {
     "bg_overlay": "#181c24",  # surface-container-low
     "bg_hover": "#262a33",  # surface-container-high
     "bg_active": "#31353e",  # surface-container-highest
+    "primary_fixed": "#c4e7ff",  # primary-fixed
     "border": "#3e484f",  # outline-variant
     # Status colors (mapped from material error/tertiary/primary tokens)
     "status_ok": "#56e5a9",  # tertiary
@@ -74,12 +75,35 @@ Screen {
     layers: base modal;
 }
 
-Header {
+/* --- In-page brand row (replaces the docked Header) ------------------------
+   The mockups carry no top bar: `>_ QWEN-CLI` plus the `v6.5.2` chip sit as
+   the first row inside the page canvas, on the surface color with no border
+   below. Every screen yields this row as its first child, so the identity
+   block is integrated into the page rather than docked above it. */
+.app-brand-row {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
     background: $bg_base;
-    color: $fg_accent;
-    border-bottom: solid $border;
-    height: 3;
-    dock: top;
+    align: left middle;
+}
+
+.app-brand-title {
+    color: $fg_primary;
+    text-style: bold;
+    width: auto;
+}
+
+/* The mockup's version chip: a surface-container-high block with a hairline
+   border. A one-row cell cannot carry a border, so the chip reads through its
+   background alone. */
+.app-brand-version {
+    color: $status_muted;
+    background: $bg_hover;
+    width: auto;
+    height: 1;
+    margin-left: 1;
+    padding: 0 1;
 }
 
 Footer {
@@ -99,6 +123,10 @@ Tabs {
     border-bottom: solid $border;
     height: 3;
     overflow-x: auto;
+    /* No tab strip in the mockups: navigation is via the bottom nav dock
+       and the slot carousel inside the Chat pane. Hide the strip so slot
+       tabs do not appear on Overview, Sessions, Swarm, or Settings. */
+    display: none;
 }
 
 Tab {
@@ -117,41 +145,68 @@ Underline {
 }
 
 /* --- Bottom nav dock (redesign v6.5.2) -------------------------------- */
-/* The mockup's dock replaces the key-hint Footer: same single row at the
-   bottom of the screen, but carrying the four section names with the active
-   one underlined. dock: bottom takes it out of the flow, so it costs no
-   layout rows and the Overview keeps its table/log geometry
-   (tests/unit_tui_log_containment.py). */
+/* The mockup's dock replaces the key-hint Footer: five equal cells spread
+   across the full width, each stacking its icon above its caption, with the
+   active cell carrying a short accent bar centred over its icon. dock: bottom
+   takes the dock out of the flow, so it costs no layout rows and the Overview
+   keeps its card/log geometry (tests/unit_tui_log_containment.py). */
 .nav-dock {
-    layout: horizontal;
-    height: 3;
+    layout: vertical;
+    height: 4;
     dock: bottom;
     background: $bg_surface;
     border-top: solid $border;
     padding: 0 1;
-    align: center middle;
 }
 
-.nav-item {
-    min-width: 14;
-    height: 3;
-    padding: 0 1;
-    background: $bg_raised;
-    color: $fg_muted;
-    border: solid $border;
+/* The marker strip: one 1fr cell per nav item, so a bar sits exactly over
+   the button below it. A terminal cannot centre a bar inside a bordered
+   button, so the strip carries it instead. */
+.nav-bar-strip {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+}
+
+.nav-bar {
+    width: 1fr;
+    height: 1;
+    content-align: center middle;
+    color: $accent;
+}
+
+.nav-bar-active {
     text-style: bold;
 }
 
+/* The five cells share one row so their 1fr widths line up with the marker
+   strip above. */
+.nav-items {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+}
+
+/* One icon-over-label cell: the icon row sits above the caption. */
+.nav-item {
+    width: 1fr;
+    min-width: 8;
+    height: 2;
+    padding: 0;
+    border: none;
+    background: $bg_surface;
+    color: $fg_muted;
+    text-style: bold;
+    text-align: center;
+    content-align: center middle;
+}
+
 .nav-item.nav-active {
-    background: $bg_active;
-    color: $fg_primary;
-    border-bottom: none;
+    color: $fg_accent;
 }
 
 .nav-item.nav-inactive {
-    background: $bg_raised;
     color: $fg_muted;
-    border: solid $border;
 }
 
 .nav-item.nav-active:hover {
@@ -162,14 +217,6 @@ Underline {
 .nav-item.nav-inactive:hover {
     background: $bg_hover;
     color: $fg_accent;
-}
-
-/* Trailing keyboard hint inside the dock, replacing the key list the old
-   Footer rendered. */
-.nav-hint {
-    color: $fg_muted;
-    margin-left: 2;
-    width: auto;
 }
 
 /* --- Obsidian Terminal card language ------------------------------------
@@ -230,27 +277,99 @@ Underline {
 .overview-container {
     height: 1fr;
     width: 100%;
-    padding: 1 2;
+    /* No bottom padding: the log strip sits directly above the dock's
+       hairline, which buys the scroll band the row the THREADS MATRIX needs
+       to show all five of its cell rows on a 42-row terminal. */
+    padding: 1 2 0 2;
     background: $bg_base;
 }
 
 /* The engine cards + THREADS MATRIX live in this scroll band so the log
    strip below the band stays inside the tab pane at every terminal size. */
+/* The Overview never scrolls: the mockup is a single screen, and the only
+   scrollbar on it belongs to the log panel. `hidden` rather than `auto`
+   because a scroll container sizes its 1fr children against the container
+   instead of the rows the auto siblings leave over — which is what lets the
+   log card fill the gap exactly. Below the size where the four blocks fit
+   (about 36 rows) the band clips its last block instead of growing a
+   scrollbar. */
 .overview-scroll {
     width: 100%;
     height: 1fr;
-    overflow-y: auto;
-    margin-bottom: 1;
+    overflow-y: hidden;
+    margin-bottom: 0;
 }
 
+/* Realtime System Log card: the mockup's bordered panel with a header row
+   (live pips + LIVE STREAM) above the stream itself. It is the only 1fr child
+   of the scroll band, so it takes every row the cards above it leave over and
+   the stream reaches the nav dock instead of leaving a dead gap. min-height
+   is the card's own content height (2 border + 2 padding + 2 header + 3 log
+   rows), so a short terminal scrolls the band rather than flattening the
+   panel. */
+/* Compound selector: .screen-card is declared later in this file, so at equal
+   specificity its `height: auto` would win and the card would size to its
+   content instead of taking the rows the engine cards leave. */
+.screen-card.log-card {
+    height: 1fr;
+    min-height: 9;
+    background: $bg_surface;
+    margin-bottom: 0;
+}
+
+/* Height 2 because Textual's height is border-box: the hairline takes one
+   row and the header text the other. */
+.log-card-head {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    padding: 0 1;
+    border-bottom: solid $border;
+    align: left middle;
+}
+
+.log-pip {
+    width: auto;
+    margin-right: 1;
+    text-style: bold;
+}
+
+.log-pip-live {
+    color: $status_ok;
+}
+
+.log-pip-stream {
+    color: $accent;
+    margin-left: 2;
+}
+
+.log-card-title {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.log-live-label {
+    width: auto;
+    color: $fg_muted;
+}
+
+.log-head-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+/* The card carries the border, so the view only paints the stream rows. It
+   fills the card's leftover height, and min-height 3 keeps the panel visible
+   on a 20-row terminal (tests/unit_tui_log_containment.py). */
 #log-view-overview {
-    height: 4;
+    height: 1fr;
     min-height: 3;
     max-width: 100%;
-    background: $bg_base;
-    border: solid $border;
+    background: transparent;
+    border: none;
     color: $fg_primary;
-    padding: 1;
+    padding: 0 1;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -271,20 +390,6 @@ Underline {
     margin-right: 3;
     color: $fg_primary;
     text-style: bold;
-}
-
-/* The Overview's slot table lives below the THREADS MATRIX. It carries the
-   per-slot prompt file and exact pipeline status that the matrix's one-word
-   state does not. Fixed height = 5 (1 header + 4 data rows) so its content
-   actually renders instead of collapsing to a header-only band — see tests
-   for the regression lock that the log panel must remain visible at every
-   terminal size. */
-#slots-table {
-    height: 5;
-    background: $bg_surface;
-    border: solid $border;
-    margin-bottom: 1;
-    overflow-y: scroll;
 }
 
 .template-row {
@@ -365,9 +470,11 @@ Underline {
     border: solid $fg_accent;
 }
 
+/* Ten columns: the border and the default padding leave six for the label,
+   which is exactly "Browse". At eight it wrapped into "Brow" / "se". */
 .btn-browse {
-    width: 8;
-    min-width: 8;
+    width: 10;
+    min-width: 10;
     background: $bg_hover;
     color: $fg_accent;
     border: solid $border;
@@ -386,6 +493,12 @@ Underline {
     padding: 0 1;
     margin-bottom: 1;
     align: left middle;
+}
+
+/* The leading filler label spans the row so its trailing action sits flush
+   right, as in the mockup. */
+.toggle-row .field-label {
+    width: 1fr;
 }
 
 .toggle-label-box {
@@ -447,6 +560,8 @@ Switch.-on {
 
 .slot-loading {
     display: none;
+    width: 1;
+    height: 1;
     height: 1;
     margin-bottom: 1;
 }
@@ -454,17 +569,6 @@ Switch.-on {
 .status-badge {
     color: $status_ok;
     text-style: bold;
-}
-
-#session-badge {
-    color: $status_ok;
-    text-style: bold;
-    background: $bg_raised;
-    padding: 0 1;
-}
-
-#session-badge.invalid {
-    color: $status_warn;
 }
 
 /* --- Modal File Picker -------------------------------------------------- */
@@ -530,6 +634,14 @@ Select {
 
 Select:focus {
     border: solid $fg_accent;
+}
+
+/* Textual's SelectCurrent ships a `tall` border of its own, which painted
+   ▔▔▔ / ▁▁▁ / ▎ inside the Select's own border. The Select already has one. */
+SelectCurrent {
+    border: none;
+    background: transparent;
+    padding: 0 1;
 }
 
 SelectOverlay {
@@ -602,9 +714,12 @@ HelpScreen {
     width: auto;
     height: 1;
     margin-left: 1;
-    background: $bg_base;
+    background: $bg_raised;
     color: $fg_accent;
-    border: solid $border;
+    /* Frameless: the card header is one row tall, so a border would leave the
+       label no viewport at all. */
+    border: none;
+    padding: 0 1;
 }
 
 .btn-copy-log:hover {
@@ -701,9 +816,42 @@ HelpScreen {
    THREADS MATRIX below is the element that takes the free space, so a
    fractional height here would let the matrix's scrollable region starve
    the readouts to 0 on a 20-row terminal. */
-.engine-card {
+/* Compound selector: .screen-card is declared later in this file, and equal
+   specificity would let its padding win. The Overview cards drop the vertical
+   padding so the mockup's title / readout / bar stack costs seven rows. */
+.screen-card.engine-card {
     height: auto;
+    padding: 0 2;
     margin-bottom: 1;
+}
+
+/* Card heading row: the mockup puts the section icon in a rounded chip on
+   the left, then the heading beside it. The chip is roughly one text row tall
+   in the mockup, so it is a padded accent glyph rather than a 3-row box —
+   that keeps the whole card at the mockup's seven rows. */
+.card-title-row {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    align: left middle;
+}
+
+.card-icon {
+    width: auto;
+    height: 1;
+    margin-right: 1;
+    padding: 0 1;
+    color: $accent;
+    background: $bg_raised;
+    text-style: bold;
+}
+
+.card-title {
+    width: auto;
+    height: 1;
+    color: $fg_primary;
+    text-style: bold;
 }
 
 /* The overview's counter row renders a single line of labels, so it takes one
@@ -744,48 +892,92 @@ HelpScreen {
 }
 
 /* Right-aligned uptime readout pinned to the Swarm card's trailing edge,
-   mirroring the mockup's "Uptime Elapsed 21m 53s". */
+   mirroring the mockup's stacked "Uptime Elapsed / 21m 53s". The label and
+   its value share one Label; they split onto two lines only while a run is
+   live, because tests pin the idle text ("Uptime Elapsed —"). A horizontal
+   Textual container top-aligns its children (align only positions the group),
+   so every readout fills the ring's three rows and centres its own text. */
 .engine-uptime {
     color: $fg_muted;
     margin-left: 2;
+    width: auto;
+    height: 100%;
+    content-align: right middle;
 }
 
-.engine-readout {
+/* The mockup's telemetry bento: an inset surface-container panel holding the
+   ring, its caption and the trailing uptime block. It is one row taller than
+   a bare border would allow, so the panel is drawn with its own background
+   instead of a border — the colour step is what makes it read as inset. */
+.engine-bento {
     layout: horizontal;
     width: 100%;
-    height: 1;
+    height: 3;
+    margin: 0 1;
+    background: $bg_raised;
     padding: 0 1;
-    margin: 0;
     align: left middle;
 }
 
+/* Terminal ring: an arc cannot be drawn, so the gauge is a bordered box
+   holding the same n/m count the mockup puts inside its circle. The count
+   stays a single centred line, so the ring reads as a dial rather than a
+   badge. */
 .engine-ring {
     color: $accent;
     text-style: bold;
     background: $bg_raised;
+    border: solid $accent;
     padding: 0 1;
     margin-right: 2;
     min-width: 7;
     width: auto;
+    height: 3;
+    text-align: center;
+    content-align: center middle;
 }
 
-.engine-name {
-    color: $fg_primary;
-    text-style: bold;
-    margin-right: 2;
+/* Dim sub-caption the mockup prints above a readout ("Active Threads"). */
+.engine-sub {
     width: auto;
+    height: 1;
+    color: $fg_muted;
 }
 
 .engine-detail {
     color: $fg_muted;
-    width: 1fr;
+    width: auto;
+    height: 100%;
+    content-align: left middle;
 }
 
-/* Cluster bar: one character per slot, coloured by that slot's state. */
+/* Two-line caption block (sub + detail) beside the chat status ring. It
+   fills the readout so the pair hangs from the ring's top edge, which is
+   how the mockup aligns its caption against the gauge. */
+.engine-body {
+    layout: vertical;
+    width: auto;
+    height: 100%;
+    align: left middle;
+}
+
+.engine-body .engine-detail {
+    height: 1;
+}
+
+/* Fills the space between a readout and the trailing uptime block. */
+.engine-spacer {
+    width: 1fr;
+    height: 100%;
+}
+
+/* Cluster bar: one tinted segment per slot, stretched to the bar's own width
+   so the strip reaches both card edges like the mockup's segment row. */
 .cluster-bar {
     width: 100%;
     height: 1;
-    padding: 0 1;
+    margin-top: 0;
+    padding: 0;
     color: $status_muted;
 }
 
@@ -808,18 +1000,6 @@ HelpScreen {
     color: $status_muted;
 }
 
-/* Threads Matrix: the mockup renders a 2-column grid of numbered cells
-   (01 Streaming 4m12s). A DataTable keeps the same information readable in a
-   fixed-width terminal while preserving its selectable rows. Height 1fr so
-   it fills the free space between the readouts card above and the two pinned
-   bands below; it scrolls when terminals are too short for every row to fit. */
-#threads-matrix {
-    height: 1fr;
-    background: $bg_surface;
-    border: solid $border;
-    margin-bottom: 1;
-}
-
 .card-caption {
     color: $fg_accent;
     text-style: bold;
@@ -831,11 +1011,17 @@ HelpScreen {
 .btn-sessions-refresh,
 .btn-sessions-login,
 .btn-sessions-health {
+    /* Ghost geometry: these ride in a 1-row .toggle-row, and a default 3-row
+       Button overflows that single content line and renders as a clipped fill
+       with no label. */
+    width: auto;
+    height: 1;
     min-width: 12;
     padding: 0 1;
+    margin-right: 1;
     background: $bg_raised;
     color: $fg_primary;
-    border: solid $border;
+    border: none;
     text-style: bold;
 }
 
@@ -848,7 +1034,7 @@ HelpScreen {
 .btn-sessions-login {
     background: $accent;
     color: $fg_on_accent;
-    border: solid $accent;
+    border: none;
 }
 
 .btn-sessions-login:hover {
@@ -868,7 +1054,11 @@ HelpScreen {
     overflow-y: auto;
 }
 
+/* Vertical's default is height: 1fr with overflow hidden, so a card would take
+   an equal share of the pane and clip everything past its first rows. Cards
+   size to their content and let .screen-body scroll instead. */
 .screen-card {
+    height: auto;
     background: $bg_overlay;
     border: solid $border;
     padding: 1 2;
@@ -882,20 +1072,94 @@ HelpScreen {
     margin-bottom: 1;
 }
 
-/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). */
+/* Mockup parity: the Overview telemetry card is two raised tiles — ACTIVE
+   ACCOUNTS and MODEL — with the SLOTS / DONE / SESSION cluster tucked into
+   the right tile's trailing edge. Each tile is two content rows (caption
+   over value), and the tiles are split by a one-column gap that shows the
+   card behind them. No vertical card padding: the tiles sit edge to edge so
+   the banner stays four rows tall, as in the mockup. */
+.screen-card.metric-card {
+    padding: 0 2;
+}
+
+.metric-tiles {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    margin-bottom: 0;
+    align: left middle;
+}
+
+.metric-tile {
+    layout: vertical;
+    width: 1fr;
+    height: 2;
+    margin-right: 1;
+    padding: 0 1;
+    background: $bg_raised;
+    align: left middle;
+}
+
+.metric-tile-label {
+    width: auto;
+    height: 1;
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.metric-tile-value {
+    layout: horizontal;
+    width: auto;
+    height: 1;
+    align: left middle;
+}
+
+.metric-tile-number {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.metric-tile-unit {
+    width: auto;
+    color: $fg_muted;
+}
+
+/* The model tile is the trailing one, so it carries no gap on its right. */
+.metric-tile-model {
+    margin-right: 0;
+}
+
+/* The mockup prints the routed model in primary-fixed, the one tinted
+   monospace value in the banner. */
+.metric-tile-model-value {
+    color: $primary_fixed;
+}
+
+/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). The overview strip is
+   a single row of label/value pairs, so it sizes to its content — a fixed
+   height would add blank rows inside an already bordered card. The login grid
+   stacks label over value inside a tile, so it overrides the height for two
+   content rows. */
 .login-metric-row {
     layout: horizontal;
     width: 100%;
-    height: 3;
-    margin-bottom: 1;
+    height: auto;
+    margin-bottom: 0;
+}
+
+.login-metric-row.login-metric-grid {
+    height: 4;
 }
 
 .login-metric-cell {
     width: 1fr;
-    height: 3;
+    height: 4;
     background: $bg_raised;
     border: solid $border;
     padding: 0 1;
+    margin-right: 1;
 }
 
 .login-metric-label {
@@ -937,14 +1201,31 @@ HelpScreen {
     color: $fg_accent;
 }
 
-/* One account row: avatar, email, status dot, and the two action buttons. */
+/* One account card: identity on top, hairline telemetry row underneath with
+   the health state and the two per-account actions (mockup Login). */
 .account-card {
-    layout: horizontal;
+    layout: vertical;
     width: 100%;
-    height: 3;
+    height: auto;
     background: $bg_raised;
     border: solid $border;
     margin-bottom: 1;
+}
+
+.account-card-head {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+.account-card-foot {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    border-top: solid $border;
     align: left middle;
 }
 
@@ -965,7 +1246,7 @@ HelpScreen {
 }
 
 .account-status {
-    width: auto;
+    width: 1fr;
     text-style: bold;
     margin-right: 1;
 }
@@ -979,16 +1260,17 @@ HelpScreen {
 }
 
 .account-btn {
-    width: 4;
-    min-width: 4;
-    height: 3;
-    border: solid $border;
+    width: 6;
+    min-width: 6;
+    height: 2;
+    border: none;
     background: $bg_hover;
     text-style: bold;
 }
 
 .account-btn-test {
     color: $accent;
+    margin-right: 1;
 }
 
 .account-btn-disconnect {
@@ -1002,26 +1284,34 @@ HelpScreen {
 /* ═══ Mockup parity: CHAT (slot console) ═══════════════════════════════ */
 
 /* Horizontal slot picker: one pill per job slot, active one filled. */
+/* The strip is a bare row of pills in the mockup, so it carries no frame of
+   its own: a border here would eat the two rows the chips need and clip their
+   labels out of the viewport. */
 .slot-carousel {
     layout: horizontal;
     width: 100%;
     height: 3;
     background: $bg_surface;
-    border: solid $border;
     padding: 0 1;
     margin-bottom: 1;
-    overflow-x: auto;
+    /* Hidden, not auto: the pills below size themselves to the terminal, so
+       the carousel can never overflow and never grows a scrollbar. */
+    overflow-x: hidden;
 }
 
+/* The pills split the width instead of sizing to their labels, so all ten
+   slots fit whatever the terminal is. Textual's Button also ships
+   min-width: 16, which alone pushed the last pills off the viewport. */
 .slot-chip {
-    width: auto;
-    min-width: 11;
+    width: 1fr;
+    min-width: 0;
     height: 3;
     margin-right: 1;
     background: $bg_raised;
     color: $fg_muted;
     border: solid $border;
-    padding: 0 1;
+    padding: 0;
+    text-align: center;
 }
 
 .slot-chip.slot-chip-active {
@@ -1031,21 +1321,29 @@ HelpScreen {
     text-style: bold;
 }
 
-/* Telemetry header: segmented Event/System log switch plus the live beacon. */
+/* Telemetry header: segmented Event/System log switch plus the live beacon.
+   The switch sits on the left as in the mockup; an auto-width spacer carries
+   the badge and beacon to the right edge. */
 .telemetry-header {
     layout: horizontal;
     width: 100%;
     height: 3;
-    align: right middle;
+    align: left middle;
     margin-bottom: 1;
 }
 
+.telemetry-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+/* Frameless: the two segments abut, so the container only supplies the
+   backing colour. A border would leave the buttons a one-row viewport. */
 .seg-switch {
     layout: horizontal;
     width: auto;
     height: 3;
     background: $bg_hover;
-    border: solid $border;
     margin-right: 1;
 }
 
@@ -1071,10 +1369,13 @@ HelpScreen {
     width: 1;
 }
 
-/* Chat transcript: user prompt on the right, agent response on the left. */
+/* Chat transcript: user prompt on the right, agent response on the left.
+   It sizes to its own content up to a cap instead of taking 1fr, so an idle
+   slot hands its rows to the log card below instead of leaving a void. */
 .chat-stream {
     width: 100%;
-    height: 1fr;
+    height: auto;
+    max-height: 12;
     background: $bg_base;
     padding: 1 2;
     overflow-y: auto;
@@ -1212,9 +1513,102 @@ HelpScreen {
     text-style: bold;
 }
 
+/* The console shell: a vertical stack of carousel, telemetry header,
+   transcript, log card, action pills, and composer. The transcript takes the
+   slack (1fr) while the log card keeps a fixed block so a chatty run cannot
+   squeeze the composer off the pane. */
+.chat-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2;
+}
+
+.chat-hint {
+    width: 100%;
+    height: auto;
+    color: $fg_muted;
+    text-style: italic;
+    text-align: center;
+}
+
+.msg-author.msg-author-right {
+    text-align: right;
+}
+
+/* EVENT LOG [SLOT #N] card: header row, the buffer, and the trailing clock. */
+/* The log card is the pane's 1fr child: it takes every row the carousel,
+   header, transcript and composer leave, so the console always fills the
+   screen exactly, and min-height 10 keeps the buffer readable when the
+   terminal is short. */
+.event-log-card {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    min-height: 4;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+/* One row, as the mockup draws it: title, slot tag and the Copy ghost share
+   the header line, so the card's floor is 4 rows (2 border + header + clock)
+   and the console still fits a 30-row terminal. */
+.event-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    align: left middle;
+}
+
+.event-log-title {
+    width: auto;
+    margin-right: 1;
+    color: $fg_accent;
+    text-style: bold;
+}
+
+.event-log-slot {
+    width: 1fr;
+    color: $status_ok;
+    text-style: bold;
+}
+
+.slot-log-time {
+    width: 100%;
+    height: 1;
+    text-align: left;
+    color: $status_muted;
+}
+
+/* Settings: one configuration block per slot, only the chosen one shown. */
+.slot-config {
+    width: 100%;
+    height: auto;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
 /* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */
 
-/* Attachment drop-card: file icon, resolved filename, Browse button. */
+/* The console shell, same as the chat console: attachment card, view toggle,
+   log card, action deck. The log card is the only 1fr child, so the deck
+   lands above the nav dock at every terminal height. */
+.swarm-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2 0 2;
+}
+
+/* Attachment card: file icon, resolved filename, Browse chip. The chip is a
+   one-row ghost — the default three-row Button overflowed this three-row card
+   and rendered as an empty box with no label. */
 .swarm-file-card {
     layout: horizontal;
     width: 100%;
@@ -1222,19 +1616,36 @@ HelpScreen {
     background: $bg_raised;
     border: solid $border;
     margin-bottom: 1;
+    padding: 0 1;
     align: left middle;
 }
 
 .swarm-file-icon {
     color: $fg_accent;
     text-style: bold;
-    width: 3;
+    width: auto;
+    margin-right: 1;
 }
 
 .swarm-file-name {
     width: 1fr;
     color: $fg_primary;
     text-style: bold;
+}
+
+.swarm-browse-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_active;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-browse-chip:hover {
+    color: $fg_accent;
 }
 
 .swarm-file-input {
@@ -1245,20 +1656,216 @@ HelpScreen {
     color: $fg_primary;
 }
 
-/* Output Inspection header: caption on the left, view switch on the right. */
+/* View toggle row: caption on the left, segmented switch on the right. The
+   swarm switch is one row (the mockup's pill pair); the chat console keeps
+   its taller switch under .telemetry-header. */
 .output-inspection {
     layout: horizontal;
     width: 100%;
     height: 1;
-    margin-bottom: 0;
+    margin-bottom: 1;
     align: left middle;
 }
 
 .output-inspection .card-caption {
     width: 1fr;
+    color: $status_muted;
+    text-style: bold;
 }
 
-/* Stop / Restart action deck pinned under the swarm log. */
+.swarm-seg {
+    height: 1;
+}
+
+.swarm-seg .seg-btn {
+    height: 1;
+    min-width: 10;
+}
+
+/* Log card: the path header with its hairline, the stream, and the socket
+   footer. Compound selector so .screen-card's padding cannot win over the
+   1fr height the mockup gives the panel. */
+.screen-card.swarm-log-card {
+    height: 1fr;
+    min-height: 8;
+    background: $bg_surface;
+    margin-bottom: 0;
+}
+
+.swarm-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    align: left middle;
+    border-bottom: solid $border;
+}
+
+.swarm-log-path {
+    width: 1fr;
+    height: 1;
+    color: $status_muted;
+    text-style: bold;
+}
+
+.swarm-clear-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_surface;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-clear-chip:hover {
+    color: $status_err;
+}
+
+/* The card carries the frame, so the view only paints stream rows. */
+.swarm-log-view {
+    width: 100%;
+    height: 1fr;
+    max-width: 100%;
+    background: transparent;
+    border: none;
+    color: $fg_primary;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.swarm-log-foot {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    align: left middle;
+}
+
+.swarm-caret {
+    width: auto;
+    color: $accent;
+    text-style: bold;
+    margin-right: 1;
+}
+
+/* Socket listener line under the stream. */
+.listener-line {
+    width: 1fr;
+    height: 1;
+    color: $fg_muted;
+    text-style: italic;
+}
+
+/* ═══ SETTINGS (per-slot configuration) ═══════════════════════════════ */
+
+/* Same shell as the chat and swarm consoles: brand row, slot carousel, and
+   one card per slot with only the selected one displayed. */
+.settings-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2 0 2;
+}
+
+/* Compound selector: .screen-card is declared later with `height: auto`, and
+   at equal specificity that would stop the card from filling the pane. */
+.screen-card.settings-card {
+    height: 1fr;
+    min-height: 26;
+    background: $bg_overlay;
+    margin-bottom: 0;
+}
+
+/* Uppercase field captions, the mockup's label treatment. */
+.settings-caption {
+    width: auto;
+    height: 1;
+    color: $status_muted;
+    text-style: bold;
+}
+
+/* Quick-select chips share one row; a long template list is clipped rather
+   than growing the card. */
+.settings-chips {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    margin-bottom: 1;
+    overflow-x: hidden;
+}
+
+/* Frameless: a one-row chip cannot carry a border — the border would eat the
+   row and the label would vanish (that is what the empty boxes were). */
+.settings-chips .template-chip {
+    height: 1;
+    min-width: 0;
+    padding: 0 1;
+    margin-right: 1;
+    border: none;
+    background: $bg_raised;
+}
+
+/* Headless row: caption, subtext, switch on the trailing edge. */
+.settings-toggle {
+    layout: horizontal;
+    width: 100%;
+    /* Three rows: Textual's Switch is a three-row control, and squeezed into
+       one row it rendered as a bare ▊ ▔▔▔ stub. */
+    height: 3;
+    align: left middle;
+    margin-bottom: 1;
+}
+
+.settings-toggle .settings-caption {
+    width: auto;
+    height: 3;
+    content-align: left middle;
+}
+
+.settings-toggle .toggle-subtext {
+    width: auto;
+    height: 3;
+    content-align: left middle;
+    margin-left: 1;
+}
+
+.settings-toggle-spacer {
+    width: 1fr;
+    height: 3;
+}
+
+.settings-toggle Switch {
+    width: 4;
+    height: 3;
+}
+
+/* Run controls on the card's last row: the primary takes half, the other two
+   share the rest, so nothing hides below the fold. */
+.settings-actions {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+}
+
+/* margin-top: 0 — the slot buttons carry a one-row top margin for the old
+   stacked form, and inside this row it pushed each button down a row. */
+.settings-actions .btn-slot-run {
+    width: 2fr;
+    height: 3;
+    margin-top: 0;
+}
+
+.settings-actions .btn-slot-cancel,
+.settings-actions .btn-slot-retry {
+    width: 1fr;
+    height: 3;
+    margin-top: 0;
+    margin-left: 1;
+}
+
+/* Stop / Restart action deck under the log card. */
 .swarm-action-deck {
     layout: horizontal;
     width: 100%;
@@ -1282,14 +1889,6 @@ HelpScreen {
     color: $fg_on_accent;
     border: solid $accent;
     text-style: bold;
-}
-
-/* Terminal-style listener line under the swarm log. */
-.listener-line {
-    width: 100%;
-    height: 1;
-    color: $status_muted;
-    text-style: italic;
 }
 """
 )
