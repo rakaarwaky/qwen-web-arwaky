@@ -223,16 +223,23 @@ class TemplatePickerModal(ModalScreen[str | None]):
         self._title = title
 
     def compose(self) -> ComposeResult:
-        """Render one button per discovered template role, newest first."""
-        seen_roles = set()
+        """Render one button per discovered template role, newest first.
+
+        Options are ``(display, role)`` pairs from the app builder; each
+        button labels with the human-readable template name and dismisses
+        with the machine role key that the composer accepts.
+        """
+        seen_roles: set[str] = set()
         with Vertical(id="template-picker-container"):
             yield Label(f"[ {self._title} ]", id="template-picker-title")
             if not self._options:
                 yield Label("[dim]No templates discovered under modules/templates/.[/]\n")
-            for role, display in self._options:
+            for display, role in self._options:
                 if role in seen_roles:
                     continue
                 seen_roles.add(role)
+                # Role keys may carry spaces / punctuation; sanitize the
+                # widget id only, keep the label human-friendly.
                 safe_role = role.replace(" ", "_")
                 yield Button(display, id=f"tpl-{safe_role}", variant="default")
             yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
@@ -244,7 +251,9 @@ class TemplatePickerModal(ModalScreen[str | None]):
             self.dismiss(None)
             return
         if button_id.startswith("tpl-"):
-            self.dismiss(button_id.removeprefix("tpl-"))
+            safe_role = button_id.removeprefix("tpl-")
+            role = safe_role.replace("_", " ")
+            self.dismiss(role)
 
     def action_dismiss_none(self) -> None:
         """Cancel the picker without a selection."""

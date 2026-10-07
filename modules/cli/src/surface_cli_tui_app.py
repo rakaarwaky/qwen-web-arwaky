@@ -235,7 +235,13 @@ class QwenTuiApp(
         if self._template_roles_dirty:
             manifest = prompt_template_manifest()
             self._template_roles = set(manifest)
-            self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
+            # Each option is (display, role). The display label is the
+            # humanized role key (e.g. "Backend Engineer") because the
+            # manifest "title" field is the shared file heading and does
+            # not distinguish one template from another.
+            self._template_options = [
+                (role.replace("-", " ").replace("_", " ").title(), role) for role in sorted(manifest)
+            ]
             self._template_roles_dirty = False
 
 
