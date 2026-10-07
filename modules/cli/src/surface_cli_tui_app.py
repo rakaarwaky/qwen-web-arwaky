@@ -210,14 +210,6 @@ class QwenTuiApp(
         self._swarm_worker(pending)
 
     # ── Prompt template lazy reload ─────────────────────────────────────────
-    def _check_template_roles(self) -> None:
-        """Ensure the in-memory template_roles set matches disk, lazy-loaded."""
-        if self._template_roles_dirty:
-            manifest = prompt_template_manifest()
-            self._template_roles = set(manifest)
-            self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
-            self._template_roles_dirty = False
-
     def _open_template_picker(self, slot_id: int) -> None:
         """Open the template picker modal for the given slot.
 
@@ -237,6 +229,32 @@ class QwenTuiApp(
                     )
 
         self.push_screen(TemplatePickerModal(self._template_options), _on_picked)
+
+    def _open_template_picker(self, slot_id: int) -> None:
+        """Open the template picker modal for the given slot.
+
+        Choosing a role fills that slot's composer input with the role so
+        the operator can append a task before hitting Send.
+        """
+        self._check_template_roles()
+
+        def _on_picked(role: str | None) -> None:
+            if role:
+                with contextlib.suppress(NoMatches):
+                    composer = self.query_one(f"#composer-{slot_id}", Input)
+                    composer.value = role
+                    self._log_msg(
+                        "[bold {}]TEMPLATE:[/] Slot {} ← '{}'".format(THEME["bright"], slot_id, escape(role)),
+                        slot_id,
+                    )
+
+    def _check_template_roles(self) -> None:
+        """Ensure the in-memory template_roles set matches disk, lazy-loaded."""
+        if self._template_roles_dirty:
+            manifest = prompt_template_manifest()
+            self._template_roles = set(manifest)
+            self._template_options = [(meta["title"], role) for role, meta in manifest.items()]
+            self._template_roles_dirty = False
 
 
 __all__ = [
