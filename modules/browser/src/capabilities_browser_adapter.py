@@ -93,6 +93,7 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
         "adobedtm",
         "err_aborted",
         "err_failed",
+        "failed to load resource",
     }
 )
 

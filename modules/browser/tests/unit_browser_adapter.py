@@ -532,6 +532,8 @@ def test_err_failed_in_noise_patterns_is_lowercase():
     from modules.browser.src.capabilities_browser_adapter import _NOISE_CONSOLE_PATTERNS
 
     assert "err_failed" in _NOISE_CONSOLE_PATTERNS
+    assert "err_aborted" in _NOISE_CONSOLE_PATTERNS
+    assert "failed to load resource" in _NOISE_CONSOLE_PATTERNS
     assert "ERR_FAILED" not in _NOISE_CONSOLE_PATTERNS, (
         "uppercase 'ERR_FAILED' will never match lower-cased console text"
     )
