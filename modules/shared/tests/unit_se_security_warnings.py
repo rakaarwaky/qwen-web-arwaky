@@ -179,14 +179,15 @@ def test_delete_session_refuses_qwen_session_named_dir_under_home(tmp_path: Path
 
 def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
     """The whitelisted location is still deletable."""
-    fake_default = tmp_path / "share" / "qwen_session"
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
     (fake_default / "Cookies").write_text("token", encoding="utf-8")
     # A retained generation keeps the no-backup guard from short-circuiting.
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     orchestrator = _orchestrator()
     with (
-        patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default

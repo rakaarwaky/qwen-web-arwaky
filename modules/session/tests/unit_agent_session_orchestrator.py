@@ -77,18 +77,20 @@ def test_relative_path_is_refused() -> None:
 
 def test_default_session_directory_is_allowed(tmp_path: Path) -> None:
     """The application's own session directory stays deletable."""
-    fake_default = tmp_path / "share" / "qwen-web-arwaky" / "qwen_session"
+    fake_sessions = tmp_path / "share" / "qwen-web-arwaky" / "sessions"
+    fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
-    with patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default):
+    with patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions):
         assert is_safe_session_target(fake_default) is True
 
 
 def test_child_of_default_session_is_allowed(tmp_path: Path) -> None:
     """Anything inside the application session directory is in scope."""
-    fake_default = tmp_path / "share" / "qwen_session"
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
     child = fake_default / "Default"
     child.mkdir(parents=True)
-    with patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default):
+    with patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions):
         assert is_safe_session_target(child) is True
 
 
@@ -202,7 +204,8 @@ def test_delete_session_missing_target_reports_no_error(tmp_path: Path) -> None:
 def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     """The happy path removes the directory and reports success."""
     orch = _orchestrator()
-    fake_default = tmp_path / "share" / "qwen_session"
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
     (fake_default / "Cookies").write_text("token", encoding="utf-8")
     # A retained generation lets the delete go through the normal path instead
@@ -210,7 +213,7 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     backups_dir = fake_default / ".backups" / "20250101T000000Z"
     backups_dir.mkdir(parents=True)
     with (
-        patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
@@ -222,12 +225,13 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
 def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     """A failing ``rmtree`` must name the target and flag possible residue."""
     orch = _orchestrator()
-    fake_default = tmp_path / "share" / "qwen_session"
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
     # Seed a generation so the no-backup guard does not short-circuit.
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     with (
-        patch("modules.shared.src.utility_session_guard.DEFAULT_SESSION", fake_default),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
         patch("modules.session.src.capabilities_session_manager.shutil.rmtree", side_effect=OSError("device busy")),
     ):
