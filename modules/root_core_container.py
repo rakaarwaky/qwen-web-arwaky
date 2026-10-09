@@ -54,10 +54,11 @@ from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 
 # agent_session_orchestrator
+# SessionOrchestrator is the single agent in the session feature folder; it
+# implements both ISessionAggregate (validate/delete) and ISetupAggregate
+# (login). The ``agent_setup_orchestrator`` attribute below reuses the same
+# class so the setup-labelled surfaces keep a stable container attribute.
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-
-# agent_setup_orchestrator
-from modules.session.src.agent_setup_orchestrator import SetupOrchestrator
 from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
@@ -211,9 +212,10 @@ class SharedContainer:
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = SetupOrchestrator(
+        self.agent_setup_orchestrator: ISetupAggregate = SessionOrchestrator(
             browser=self.browser,
             observability=self.observability,
+            sessions=self.session_manager,
         )
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)

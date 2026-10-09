@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.cli.src.surface_cli_login_command import handle
-from modules.session.src.agent_setup_orchestrator import SetupOrchestrator
+from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.shared.src import AppConfig
 from modules.shared.src.taxonomy_setup_vo import SetupResponse
 
@@ -56,11 +56,11 @@ class _BrowserHarness:
         return None
 
 
-def _orchestrator(browser: _BrowserHarness) -> SetupOrchestrator:
+def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
     """Build an orchestrator with the non-browser capabilities mocked."""
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
-    return SetupOrchestrator(browser=browser, observability=observability)
+    return SessionOrchestrator(browser=browser, observability=observability)
 
 
 def test_existing_valid_session_skips_visible_login(tmp_path: Path) -> None:

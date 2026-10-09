@@ -202,14 +202,18 @@ class SessionRequest:
 
     ``validate`` reads ``session_path`` to locate the profile;
     ``delete`` reads it and ``force`` to bypass the no-backup guard that
-    protects the master profile from accidental deletion. Fields the chosen
-    verb does not read stay at their defaults, so no verb passes arguments
-    another ignores.
+    protects the master profile from accidental deletion; ``login`` reads
+    ``session_path`` (or ``name`` under ``SESSIONS_DIR``) and
+    ``wait_for_confirmation``. Fields the chosen verb does not read stay
+    at their defaults, so no verb passes arguments another ignores.
     """
 
     verb: str = "validate"
     session_path: Path | None = None
     force: bool = False
+    #: Named account the ``login`` verb registers in the pool. Ignored by
+    #: ``validate`` and ``delete``; defaults to "default".
+    name: str = "default"
 
 
 @dataclass(frozen=True)
