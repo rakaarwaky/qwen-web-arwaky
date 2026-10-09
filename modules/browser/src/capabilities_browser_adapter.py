@@ -97,17 +97,6 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 )
 
 
-def _is_third_party_noise(url: str) -> bool:
-    """Return True when *url* points at a known third-party tracking/CDN domain."""
-    from urllib.parse import urlparse
-
-    try:
-        host = (urlparse(url).netloc or "").lower()
-    except Exception:
-        return False
-    return any(host == d or host.endswith("." + d) for d in _THIRD_PARTY_NOISE_HOSTS)
-
-
 # Block 1: Class Definition & Constructor
 
 
@@ -740,3 +729,14 @@ def _active_model() -> str:
     if isinstance(value, str) and value:
         return value
     return DEFAULT_MODEL
+
+
+def _is_third_party_noise(url: str) -> bool:
+    """Return True when *url* points at a known third-party tracking/CDN domain."""
+    from urllib.parse import urlparse
+
+    try:
+        host = (urlparse(url).netloc or "").lower()
+    except Exception:
+        return False
+    return any(host == d or host.endswith("." + d) for d in _THIRD_PARTY_NOISE_HOSTS)
