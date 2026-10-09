@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePath
 
-from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
+from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION_OLD, SESSIONS_DIR
 
 # A relative path resolves against the CWD; its part count is small even when
 # it is not a real filesystem root.  The caller must always pass a *resolved*
@@ -51,12 +51,13 @@ def is_safe_session_target(target: Path) -> bool:
     3. Reject directories with fewer than ``_PARTS_FLOOR`` path components —
        this blocks ``/etc``, ``/usr``, ``C:\\Windows``, and other near-root
        paths that would be catastrophic to delete.
-    4. Allow only the application's ``DEFAULT_SESSION`` (or a strict child
-       of it). A name-pattern fallback such as "any directory called
-       ``session`` under the home directory" is intentionally dropped — the
-       destructive authorisation policy must whitelist exactly one known
-       location, not a pattern that could match ``~/projects/session`` or
-       ``~/dev/qwen_session``.
+    4. Allow any per-account profile directory under ``SESSIONS_DIR`` (i.e.
+       ``SESSIONS_DIR`` itself or a strict child of it), or the legacy
+       single-profile location ``DEFAULT_SESSION_OLD``.  A name-pattern
+       fallback such as "any directory called ``session`` under the home
+       directory" is intentionally dropped — the destructive authorisation
+       policy must whitelist exactly the known locations, not a pattern
+       that could match ``~/projects/session`` or ``~/dev/qwen_session``.
 
     No other path shape is permitted.
     """
@@ -70,8 +71,11 @@ def is_safe_session_target(target: Path) -> bool:
     if not target.is_dir():
         return False
 
-    default_session = DEFAULT_SESSION.resolve()
-    return target == default_session or default_session in target.parents
+    # Allow deletion of any profile dir under SESSIONS_DIR,
+    # or the legacy single-profile location.
+    sessions_root = SESSIONS_DIR.resolve()
+    legacy_root = DEFAULT_SESSION_OLD.resolve()
+    return target in (sessions_root, legacy_root) or sessions_root in target.parents or legacy_root in target.parents
 
 
 __all__ = ["is_filesystem_root", "is_safe_session_target"]

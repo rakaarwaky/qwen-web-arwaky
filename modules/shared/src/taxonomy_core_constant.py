@@ -75,7 +75,6 @@ DEFAULT_OUTPUT = XDG_DATA_HOME / "output"
 # per-swarm run folders do not collide with regular prompt outputs.
 SWARM_OUTPUT_ROOT = XDG_DATA_HOME / "swarm"
 DEFAULT_LOG = XDG_STATE_HOME / "log"
-DEFAULT_SESSION = XDG_DATA_HOME / "qwen_session"
 DEFAULT_VENV = XDG_DATA_HOME / "venv"
 DEFAULT_JOBS_DIR = XDG_STATE_HOME / "jobs"
 XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
@@ -544,8 +543,14 @@ SAFETY_TIMEOUT_ENV: str = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 STATUS_SCHEMA_VERSION: int = 2
 
 # ─── Session domain ──────────────────────────────────────────────────────────
-#: Root directory for persistent session pools and profiles.
-SESSIONS_DIR: Path = Path.home() / ".qwen-web" / "sessions"
+#: The old single-profile location (pre-multi-account). Used only for migration.
+DEFAULT_SESSION_OLD: Path = XDG_DATA_HOME / "qwen_session"
+
+#: New per-account session root.
+SESSIONS_DIR: Path = XDG_DATA_HOME / "sessions"
+
+#: Default account profile (the one used when no --session flag is given).
+DEFAULT_SESSION: Path = SESSIONS_DIR / "default"
 
 #: Pool file recording active session pool under ``SESSIONS_DIR``.
 POOL_FILE: Path = SESSIONS_DIR / "sessions.json"

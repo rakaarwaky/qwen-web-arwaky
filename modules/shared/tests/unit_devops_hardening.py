@@ -325,10 +325,11 @@ def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
     from modules.session.src.capabilities_session_manager import SessionManager
 
     orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=SessionManager())
-    session = tmp_path / "qwen_session"
-    session.mkdir()
+    fake_sessions = tmp_path / "sessions"
+    session = fake_sessions / "default"
+    session.mkdir(parents=True)
     (session / "Cookies").write_text("x", encoding="utf-8")
-    monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
+    monkeypatch.setattr(session_guard, "SESSIONS_DIR", fake_sessions)
 
     with pytest.raises(Exception, match="no session backup is retained"):
         orch.execute(SessionRequest(verb="delete", session_path=session))
@@ -340,10 +341,11 @@ def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
     from modules.session.src.capabilities_session_manager import SessionManager
 
     orch = session_module.SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=SessionManager())
-    session = tmp_path / "qwen_session"
-    session.mkdir()
+    fake_sessions = tmp_path / "sessions"
+    session = fake_sessions / "default"
+    session.mkdir(parents=True)
     (session / "Cookies").write_text("x", encoding="utf-8")
-    monkeypatch.setattr(session_guard, "DEFAULT_SESSION", session)
+    monkeypatch.setattr(session_guard, "SESSIONS_DIR", fake_sessions)
 
     result = orch.execute(SessionRequest(verb="delete", session_path=session, force=True))
 
