@@ -442,3 +442,56 @@ def test_is_third_party_noise_returns_false_for_qwen_domains():
 
     assert not _is_third_party_noise("https://chat.qwen.ai/")
     assert not _is_third_party_noise("https://api.qwen.ai/completion")
+
+
+# ── login_form_selector regression tests ─────────────────────────────────────
+
+
+def test_login_form_selectors_do_not_include_class_wildcards():
+    """[class*='login'] and [class*='passport'] were false positives that
+    triggered AuthRequiredError on the authenticated chat page (avatar menu,
+    .login-info elements, etc.).  They must not appear in the tuple."""
+    from modules.shared.src.taxonomy_core_constant import LOGIN_FORM_SELECTORS
+
+    for sel in LOGIN_FORM_SELECTORS:
+        assert "[class*='login']" not in sel, f"false-positive selector still present: {sel}"
+        assert "[class*='passport']" not in sel, f"false-positive selector still present: {sel}"
+
+
+def test_assert_on_chat_page_no_false_positive_when_class_wildcards_absent():
+    """When the DOM has elements with .login-info / .login class but no actual
+    login form, _assert_on_chat_page must NOT raise AuthRequiredError.
+
+    We patch is_any_visible to return True only if the combined selector
+    string contains the old false-positive patterns, simulating the bug."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+    from modules.shared.src.utility_dom_helper import is_any_visible
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+
+    def fake_is_any_visible(page, selectors):
+        # Simulate the old behaviour: if [class*='login'] or [class*='passport']
+        # is in the combined string, return True (false positive); otherwise False.
+        if "[class*='login'" in selectors or "[class*='passport'" in selectors:
+            return True
+        return False
+
+    with patch.object(adapter_mod, "is_any_visible", side_effect=fake_is_any_visible):
+        # Must NOT raise — the bug fix removes the false-positive selectors,
+        # so fake_is_any_visible returns False and the check passes.
+        adapter_mod._assert_on_chat_page(mock_page)
+
+
+def test_assert_on_chat_page_happy_path_no_login_form_visible():
+    """No login form selectors match and textarea is present → no exception."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        # Should complete without raising AuthRequiredError.
+        adapter_mod._assert_on_chat_page(mock_page)
