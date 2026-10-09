@@ -212,11 +212,7 @@ class SharedContainer:
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = SessionOrchestrator(
-            browser=self.browser,
-            observability=self.observability,
-            sessions=self.session_manager,
-        )
+        self.agent_setup_orchestrator: ISetupAggregate = self.agent_session_orchestrator
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(

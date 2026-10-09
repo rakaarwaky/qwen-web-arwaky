@@ -23,7 +23,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT, DEFAULT_SESSION
+from modules.shared.src.taxonomy_core_constant import (
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_OUTPUT,
+    DEFAULT_SESSION,
+    SESSIONS_DIR,
+)
 from modules.shared.src.utility_core_capacity import describe_capacity, recommended_max_workers
 from modules.shared.src.utility_core_env import (
     ENVIRONMENT,
@@ -216,8 +221,7 @@ def _check_session() -> dict[str, Any]:
         return _check(
             "Session Authentication Token",
             False,
-            f"No active session found in {DEFAULT_SESSION} "
-            "(run: qwen-web-arwaky login --session default)",
+            f"No active session found in {DEFAULT_SESSION} (run: qwen-web-arwaky login --session default)",
         )
     retained = snapshots_count(DEFAULT_SESSION)
     detail = f"Saved session found at {DEFAULT_SESSION}"

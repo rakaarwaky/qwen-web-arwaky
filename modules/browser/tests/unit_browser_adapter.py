@@ -465,7 +465,6 @@ def test_assert_on_chat_page_no_false_positive_when_class_wildcards_absent():
     We patch is_any_visible to return True only if the combined selector
     string contains the old false-positive patterns, simulating the bug."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
-    from modules.shared.src.utility_dom_helper import is_any_visible
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -474,9 +473,7 @@ def test_assert_on_chat_page_no_false_positive_when_class_wildcards_absent():
     def fake_is_any_visible(page, selectors):
         # Simulate the old behaviour: if [class*='login'] or [class*='passport']
         # is in the combined string, return True (false positive); otherwise False.
-        if "[class*='login'" in selectors or "[class*='passport'" in selectors:
-            return True
-        return False
+        return "[class*='login'" in selectors or "[class*='passport'" in selectors
 
     with patch.object(adapter_mod, "is_any_visible", side_effect=fake_is_any_visible):
         # Must NOT raise — the bug fix removes the false-positive selectors,

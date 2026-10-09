@@ -644,7 +644,7 @@ class McpToolCommand:
             JSON string with setup result message.
         """
         try:
-            response = self._setup.execute(SetupRequest())
+            response = self._setup.execute_setup(SetupRequest())
             return _format_success_payload(str(response.error or response.message or response.profile_path or ""))
         except Exception as exc:
             return _format_error_payload(

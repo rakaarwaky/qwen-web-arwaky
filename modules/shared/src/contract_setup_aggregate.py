@@ -2,7 +2,7 @@
 
 ``ISetupAggregate`` is the single entry point over the interactive
 manual-login feature. The CLI and interactive controller call
-``execute``; the agent behind it owns the launch → navigate → CAPTCHA
+``execute_setup``; the agent behind it owns the launch → navigate → CAPTCHA
 → validate sequence, so no surface can forget the authentication check
 every manual-login run depends on.
 """
@@ -23,7 +23,7 @@ class ISetupAggregate(ABC):
     """
 
     @abstractmethod
-    def execute(self, request: SetupRequest) -> SetupResponse:
+    def execute_setup(self, request: SetupRequest) -> SetupResponse:
         """Run the requested setup operation and return the result."""
         ...
 

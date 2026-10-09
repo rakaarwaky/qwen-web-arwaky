@@ -109,9 +109,12 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     executed, and the new profile is registered in the session pool via
     ``SessionManager.add_session``.
     """
-    from modules.root_core_container import SharedContainer
+    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+    from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+    from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+    from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
     from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-    from modules.shared.src.taxonomy_core_constant import SESSIONS_DIR
+    from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, SESSIONS_DIR
     from modules.shared.src.taxonomy_setup_vo import SetupRequest
 
     profile_path = SESSIONS_DIR / args.name
@@ -128,14 +131,25 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     print("💡 Tip: Close the browser window to continue.")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    container = SharedContainer()
+    # Build the orchestrator with minimal capability dependencies — no
+    # full DI container (the Surface layer must not import the Root
+    # layer; AES205).
+    log_path = DEFAULT_LOG
+    log_path.mkdir(parents=True, exist_ok=True)
+    metrics = MetricsCounter(metrics_path=log_path / "metrics.json")
+    status_writer = StatusFileWriter(log_path / "status.json")
+    observability = ObservabilitySetup(
+        log_path=log_path,
+        status_writer=status_writer,
+        metrics=metrics,
+    )
     orchestrator = SessionOrchestrator(
-        browser=container.browser,
-        observability=container.observability,
+        browser=BrowserAdapter(),
+        observability=observability,
         sessions=manager,
     )
 
-    response = orchestrator.execute(
+    response = orchestrator.execute_setup(
         SetupRequest(profile_path=profile_path, name=args.name, browser_headless=False)
     )
 

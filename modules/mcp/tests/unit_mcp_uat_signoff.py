@@ -132,7 +132,7 @@ def test_uat_mcp_007_empty_prompt_is_rejected(tools_and_mocks) -> None:
 def test_uat_mcp_008_setup_session_error_carries_actionable_hint(tools_and_mocks) -> None:
     """UAT-MCP-008: a failed setup_session surfaces a hint, not a bare traceback."""
     tools, mocks, _ = tools_and_mocks
-    mocks["setup"].execute.side_effect = RuntimeError("Browser launch requires a display")
+    mocks["setup"].execute_setup.side_effect = RuntimeError("Browser launch requires a display")
 
     payload = json.loads(tools.setup_session())
 

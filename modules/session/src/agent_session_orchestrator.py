@@ -16,27 +16,34 @@ from modules.shared.src.contract_core_protocol import (
     IBrowserProtocol,
 )
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.taxonomy_core_constant import (
     CHAT_URL,
     DEFAULT_OUTPUT,
     SESSIONS_DIR,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.taxonomy_setup_vo import SetupRequest, SetupResponse
 from modules.shared.src.taxonomy_session_vo import (
     SessionRequest,
     SessionResponse,
 )
+from modules.shared.src.taxonomy_setup_vo import SetupRequest, SetupResponse
 from modules.shared.src.utility_config_app_factory import build_app_config
 from modules.shared.src.utility_core_session_backup import take_snapshot
 
 
 class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
-    """Orchestrates Qwen session checking, deletion, and manual login."""
+    """Orchestrates Qwen session checking, deletion, and manual login.
+
+    Implements :class:`ISessionAggregate` (``execute``) and
+    :class:`ISetupAggregate` (``execute_setup``). The two contracts use
+    different method names so both can be satisfied without a signature
+    conflict.
+    """
 
     def __init__(
         self,
@@ -50,19 +57,15 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
 
     # Block 2: Protocol Method Implementation
 
-    def execute(self, request: SessionRequest | SetupRequest) -> SessionResponse | SetupResponse:
-        """Run the requested verb and return its outcome.
+    def execute(self, request: SessionRequest) -> SessionResponse:
+        """Run the requested session verb and return its outcome.
 
-        Routes on ``isinstance`` first: a ``SetupRequest`` runs the manual
-        login flow; a ``SessionRequest`` routes on ``request.verb`` —
-        ``validate`` runs the headless auth check and returns the verdict,
-        ``delete`` runs the path-safety guard then removes the profile, and
-        ``login`` mirrors the setup flow via the session-verb spelling. All
-        I/O is delegated to the browser capability — this agent only routes
-        and wraps results.
+        Routes on ``request.verb``: ``validate`` runs the headless auth
+        check and returns the verdict; ``delete`` runs the path-safety
+        guard then removes the profile; ``login`` mirrors the setup flow
+        via the session-verb spelling. All I/O is delegated to the browser
+        capability — this agent only routes and wraps results.
         """
-        if isinstance(request, SetupRequest):
-            return self._login_from_setup_request(request)
         if request.verb == "validate":
             valid, message = self._validate(request.session_path)
             return SessionResponse(valid=valid, message=message)
@@ -71,12 +74,25 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
             return SessionResponse(deleted=True, message=message)
         if request.verb == "login":
             outcome = self._login(request.session_path, request.name)
+            error_val: str | None = outcome["error"] if isinstance(outcome["error"], str) else None
             return SessionResponse(
-                valid=outcome["success"],
-                message=outcome["message"] or outcome["error"] or "",
-                error=outcome["error"],
+                valid=bool(outcome["success"]),
+                message=str(outcome["message"] or outcome["error"] or ""),
+                error=error_val,
             )
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
+
+    def execute_setup(self, request: SetupRequest) -> SetupResponse:
+        """Run the interactive manual-login flow (setup aggregate entry point).
+
+        This method matches the :class:`ISetupAggregate` interface so that
+        consumers holding an ``ISetupAggregate`` reference can call it via
+        a duck-typed or cast adapter. ``SessionOrchestrator`` intentionally
+        does not inherit from ``ISetupAggregate`` because the two aggregate
+        contracts declare conflicting ``execute`` signatures; this separate
+        method keeps both paths type-safe.
+        """
+        return self._login_from_setup_request(request)
 
     # Block 3: Dunder Methods, Factories, Helpers
 
@@ -91,7 +107,7 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         need a string verdict do not have to build a ``SetupRequest``
         themselves.
         """
-        response = self.execute(
+        response = self._login_from_setup_request(
             SetupRequest(
                 profile_path=session_path,
                 wait_for_confirmation=wait_for_confirmation,
@@ -211,7 +227,12 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         )
 
         if cfg.session_path.is_dir() and self._validate_saved_session(cfg):
-            return {"success": True, "message": "Session already valid.", "error": None, "profile_path": str(cfg.session_path)}
+            return {
+                "success": True,
+                "message": "Session already valid.",
+                "error": None,
+                "profile_path": str(cfg.session_path),
+            }
 
         with self._browser.browser_session(cfg) as bctx:
             page = bctx.pages[0] if bctx.pages else bctx.new_page()
@@ -298,6 +319,8 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
             session_path=session_path,
             headless=True,
         )
+        if self._sessions is None:
+            raise QwenCliError("Session manager not available for delete")
         delete_profile = self._sessions.delete_session_profile
         delete_profile(cfg.session_path, force=force)
         return "Session deleted successfully."

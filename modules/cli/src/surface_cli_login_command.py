@@ -25,7 +25,5 @@ def handle(
     # register it in the pool. ``default`` is used when the profile path does
     # not resolve to a known SESSIONS_DIR child.
     session_name = cfg.session_path.name if cfg.session_path else "default"
-    response = setup.execute(
-        SetupRequest(profile_path=cfg.session_path, name=session_name)
-    )
+    response = setup.execute_setup(SetupRequest(profile_path=cfg.session_path, name=session_name))
     return success_response(response.error or response.message or response.profile_path or "")

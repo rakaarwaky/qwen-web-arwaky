@@ -64,6 +64,19 @@ class SessionInfo:
             created_at=self.created_at,
         )
 
+    def with_name(self, name: SessionName) -> SessionInfo:
+        """Return a copy with an updated account name."""
+        return SessionInfo(
+            session_id=self.session_id,
+            name=name,
+            path=self.path,
+            status=self.status,
+            last_used=self.last_used,
+            total_requests=self.total_requests,
+            failed_requests=self.failed_requests,
+            created_at=self.created_at,
+        )
+
     def with_usage(self, success: bool) -> SessionInfo:
         """Return a copy with updated usage counters."""
         return SessionInfo(

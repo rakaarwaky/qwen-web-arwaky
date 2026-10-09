@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION_OLD, DEFAULT_SESSION, POOL_FILE, SESSIONS_DIR
+from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
 from modules.shared.src.utility_logger_factory import get_logger
@@ -82,11 +82,13 @@ class SessionManager(ISessionManagerProtocol):
         than adding a duplicate row.
         """
         pool = self.load_pool()
-        for s in pool.sessions:
+        for i, s in enumerate(pool.sessions):
             if s.path == profile_path:
-                s.name = name
+                # Frozen dataclass: replace the entry with a copy that has
+                # the new name instead of mutating in place.
+                pool.sessions[i] = s.with_name(name)
                 self.save_pool(pool)
-                return s
+                return pool.sessions[i]
         session_id = f"session_{len(pool.sessions) + 1}"
         info = SessionInfo(
             session_id=session_id,

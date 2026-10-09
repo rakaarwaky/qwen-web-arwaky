@@ -149,7 +149,7 @@ def test_cli_login_passes_confirmation_callback_to_core(tmp_path: Path) -> None:
     )
     session = MagicMock()
     setup = MagicMock()
-    setup.execute.return_value = SetupResponse(
+    setup.execute_setup.return_value = SetupResponse(
         success=True,
         profile_path=str(cfg.session_path),
         message="Manual login completed successfully.",
@@ -159,8 +159,8 @@ def test_cli_login_passes_confirmation_callback_to_core(tmp_path: Path) -> None:
         result = handle(None, session, setup, cfg)
 
     assert result == {"success": True, "message": "Manual login completed successfully."}
-    setup.execute.assert_called_once()
-    assert setup.execute.call_args.args[0].profile_path == cfg.session_path
+    setup.execute_setup.assert_called_once()
+    assert setup.execute_setup.call_args.args[0].profile_path == cfg.session_path
 
 
 def test_browser_check_session_requires_authenticated_chat_ui() -> None:
