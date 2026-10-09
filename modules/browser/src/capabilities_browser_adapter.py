@@ -91,8 +91,8 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
         "aplus.qwen.ai",
         "doubleclick",
         "adobedtm",
-        "ERR_ABORTED",
-        "ERR_FAILED",
+        "err_aborted",
+        "err_failed",
     }
 )
 
