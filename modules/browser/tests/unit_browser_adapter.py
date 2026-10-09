@@ -523,3 +523,15 @@ def test_assert_on_chat_page_no_false_positive_when_signin_button_visible():
     with patch.object(adapter_mod, "is_any_visible", side_effect=fake_is_any_visible):
         # Must NOT raise — the has-text selectors have been removed.
         adapter_mod._assert_on_chat_page(mock_page)
+
+
+def test_err_failed_in_noise_patterns_is_lowercase():
+    """_NOISE_CONSOLE_PATTERNS must use lowercase 'err_failed' so the
+    .lower()-normalised console text actually matches.  Uppercase patterns
+    in a frozenset compared against lower-cased text will never match."""
+    from modules.browser.src.capabilities_browser_adapter import _NOISE_CONSOLE_PATTERNS
+
+    assert "err_failed" in _NOISE_CONSOLE_PATTERNS
+    assert "ERR_FAILED" not in _NOISE_CONSOLE_PATTERNS, (
+        "uppercase 'ERR_FAILED' will never match lower-cased console text"
+    )
