@@ -145,8 +145,15 @@ class SessionCheck:
         return f"SessionCheck(page={self.page!r})"
 
 
-def _assert_on_chat_page(page: Page) -> None:
-    """Raise AuthRequiredError if the page is a login/auth/guest page (URL + DOM check)."""
+def _assert_on_chat_page(page: Page, strict: bool = True) -> None:
+    """Raise AuthRequiredError if the page is a login/auth/guest page (URL + DOM check).
+
+    When ``strict=False`` (used right after the initial page load in
+    ``navigate_to_chat`` where React may not have hydrated yet), a missing
+    textarea without a login form is logged at ``info`` level instead of
+    ``warning``; a missing textarea is a real signal in the steady-state
+    session-check path (``strict=True``, the default).
+    """
     current_url = page.url.lower()
 
     if any(k in current_url for k in AUTH_KEYWORDS):
@@ -163,7 +170,10 @@ def _assert_on_chat_page(page: Page) -> None:
         )
 
     if not page.query_selector(TEXTAREA_SELECTOR):
-        log.warning("chat_textarea_missing_but_no_login_form_detected %s", page.url)
+        if strict:
+            log.warning("chat_textarea_missing_but_no_login_form_detected %s", page.url)
+        else:
+            log.info("chat_textarea_missing_but_no_login_form_detected %s", page.url)
 
 
 # Block 1: Class Definition & Constructor
@@ -255,8 +265,14 @@ class BrowserAdapter(IBrowserProtocol):
         # Step 1: Navigate to chat URL
         self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
 
+        # The committed document may arrive before React hydration renders the
+        # input; a slow hydrate is not an operator signal, so give the
+        # textarea a short grace period before the (non-strict) assert below.
+        with contextlib.suppress(Error):
+            page.wait_for_selector(TEXTAREA_SELECTOR, timeout=5000)
+
         # Step 2: Verify user authentication
-        _assert_on_chat_page(page)
+        _assert_on_chat_page(page, strict=False)
 
         # Step 3: Start clean conversation state. Qwen hydrates the model picker
         # asynchronously after this reset; wait for its actual default option rather

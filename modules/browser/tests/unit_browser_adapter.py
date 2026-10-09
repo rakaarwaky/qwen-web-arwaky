@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -70,6 +70,56 @@ def test_check_auth_login_url():
 
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
         BrowserAdapter().check_auth(mock_page)
+
+
+def test_assert_on_chat_page_strict_logs_warning_when_textarea_missing():
+    """Steady-state default (strict=True) keeps the warning log level."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    loc = MagicMock()
+    loc.count.return_value = 0
+    mock_page.locator.return_value = loc
+    mock_page.query_selector.return_value = None  # textarea missing, no login form
+
+    with patch.object(adapter_mod.log, "warning") as warn, patch.object(adapter_mod.log, "info") as info:
+        adapter_mod._assert_on_chat_page(mock_page)  # default strict=True
+
+    warn.assert_called_once_with("chat_textarea_missing_but_no_login_form_detected %s", mock_page.url)
+    info.assert_not_called()
+
+
+def test_assert_on_chat_page_non_strict_logs_info_when_textarea_missing():
+    """navigate_to_chat (strict=False) demotes the transient-missing state to info."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    loc = MagicMock()
+    loc.count.return_value = 0
+    mock_page.locator.return_value = loc
+    mock_page.query_selector.return_value = None  # textarea missing, no login form
+
+    with patch.object(adapter_mod.log, "warning") as warn, patch.object(adapter_mod.log, "info") as info:
+        adapter_mod._assert_on_chat_page(mock_page, strict=False)
+
+    info.assert_called_once_with("chat_textarea_missing_but_no_login_form_detected %s", mock_page.url)
+    warn.assert_not_called()
+
+
+def test_assert_on_chat_page_strict_still_raises_on_auth_redirect():
+    """strict=False must not suppress a real AuthRequiredError."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/passport/login"
+    loc = MagicMock()
+    loc.count.return_value = 0
+    mock_page.locator.return_value = loc
+
+    with pytest.raises(AuthRequiredError, match="Not authenticated"):
+        adapter_mod._assert_on_chat_page(mock_page, strict=False)
 
 
 def test_reset_page_emits_reconnecting():
