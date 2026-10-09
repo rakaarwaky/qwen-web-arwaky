@@ -492,3 +492,34 @@ def test_assert_on_chat_page_happy_path_no_login_form_visible():
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
         # Should complete without raising AuthRequiredError.
         adapter_mod._assert_on_chat_page(mock_page)
+
+
+def test_login_form_selectors_do_not_include_has_text_buttons():
+    """button:has-text / a:has-text selectors (Log in, Sign in, Sign up) are
+    visible on the authenticated Qwen chat page nav bar.  They must not appear
+    in LOGIN_FORM_SELECTORS or _assert_on_chat_page will raise a false-positive
+    AuthRequiredError."""
+    from modules.shared.src.taxonomy_core_constant import LOGIN_FORM_SELECTORS
+
+    for sel in LOGIN_FORM_SELECTORS:
+        assert ":has-text(" not in sel, f"false-positive has-text selector still present: {sel}"
+
+
+def test_assert_on_chat_page_no_false_positive_when_signin_button_visible():
+    """Qwen's authenticated chat page shows a 'Sign in' anchor in the nav bar
+    (for account switching).  Simulate that DOM: is_any_visible returns True
+    only for the old has-text patterns, so it must NOT raise when those
+    patterns are absent from the combined selector string."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+
+    def fake_is_any_visible(page, selectors):
+        old_fp_patterns = ("has-text('Log in')", "has-text('Sign in')", "has-text('Sign up')")
+        return any(p in selectors for p in old_fp_patterns)
+
+    with patch.object(adapter_mod, "is_any_visible", side_effect=fake_is_any_visible):
+        # Must NOT raise — the has-text selectors have been removed.
+        adapter_mod._assert_on_chat_page(mock_page)
