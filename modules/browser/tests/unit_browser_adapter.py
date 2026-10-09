@@ -376,3 +376,19 @@ def test_verify_default_model_raises_when_unreadable():
 
 
 MODEL_SELECTOR_BUTTON_NAME = "Select Model"
+
+
+def test_is_third_party_noise_returns_true_for_known_domains():
+    from modules.browser.src.capabilities_browser_adapter import _is_third_party_noise
+
+    assert _is_third_party_noise("https://www.google.com/measurement/conversion")
+    assert _is_third_party_noise("https://analytics.google.com/g/collect")
+    assert _is_third_party_noise("https://img.alicdn.com/imgextra/x.png")
+    assert _is_third_party_noise("https://aplus.qwen.ai/v.gif")
+
+
+def test_is_third_party_noise_returns_false_for_qwen_domains():
+    from modules.browser.src.capabilities_browser_adapter import _is_third_party_noise
+
+    assert not _is_third_party_noise("https://chat.qwen.ai/")
+    assert not _is_third_party_noise("https://api.qwen.ai/completion")
