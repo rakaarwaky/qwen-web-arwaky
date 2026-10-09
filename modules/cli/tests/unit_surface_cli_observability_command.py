@@ -10,13 +10,6 @@ from modules.cli.src.surface_cli_observability_command import handle as handle_o
 from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot
 
 
-def _report_args(json_output: bool = False) -> MagicMock:
-    args = MagicMock()
-    args.observability_command = "report"
-    args.json = json_output
-    return args
-
-
 def _status_args(json_output: bool = False) -> MagicMock:
     args = MagicMock()
     args.observability_command = "status"
@@ -24,9 +17,22 @@ def _status_args(json_output: bool = False) -> MagicMock:
     return args
 
 
+def _report_args(json_output: bool = False) -> MagicMock:
+    args = MagicMock()
+    args.observability_command = "report"
+    args.json = json_output
+    return args
+
+
 def _metrics_mock(snapshot: MetricsSnapshot) -> MagicMock:
+    """Mock an IMetricsProtocol whose snapshot() returns the dict form the contract defines."""
     metrics = MagicMock()
-    metrics.snapshot.return_value = snapshot
+    metrics.snapshot.return_value = {
+        "counters": snapshot.counters,
+        "total_executions": snapshot.total_executions,
+        "successful_executions": snapshot.successful_executions,
+        "success_rate": snapshot.success_rate,
+    }
     return metrics
 
 
@@ -56,10 +62,13 @@ class TestObservabilityReport:
 
 
 class TestObservabilityStatus:
-    def test_status_without_metrics_is_refused(self, capsys) -> None:
+    def test_status_without_metrics_falls_back_to_status_file(self, capsys) -> None:
+        # metrics=None is a valid runtime state; the surface degrades
+        # gracefully to the status file rather than erroring out.
         rc = handle_observability_command(_status_args(), MagicMock(), None)
-        assert rc == 1
-        assert "Metrics not available" in capsys.readouterr().err
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "no metrics recorded" in out
 
     def test_status_reports_the_metrics_snapshot(self, capsys) -> None:
         snapshot = MetricsSnapshot(
@@ -94,6 +103,34 @@ class TestObservabilityStatus:
         assert rc == 0
         out = capsys.readouterr().out
         assert "idle" in out
+
+    def test_status_invalid_json_falls_back_gracefully(self, tmp_path, capsys) -> None:
+        """A status.json containing malformed JSON is skipped, not raised (Issue 14)."""
+        status_file = tmp_path / "status.json"
+        status_file.write_text("{not valid json", encoding="utf-8")
+        snapshot = MetricsSnapshot()
+        with (
+            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+        ):
+            rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
+        assert rc == 0
+        out = capsys.readouterr().out
+        # Invalid JSON means status_map stays None; the output falls back to
+        # the "no status file present" message path (status_map is falsy).
+        assert "no status file present" in out or "state" not in out
+
+    def test_status_double_absent(self, capsys) -> None:
+        """metrics=None and no status file: both sections report their absence (Issue 15)."""
+        with (
+            patch(
+                "modules.shared.src.utility_core_status.status_path_for", return_value=Path("/nonexistent/status.json")
+            ),
+        ):
+            rc = handle_observability_command(_status_args(), MagicMock(), None)
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "no status file present" in out
+        assert "no metrics recorded" in out
 
 
 class TestObservabilityDispatch:

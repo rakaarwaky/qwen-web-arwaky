@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
 from modules.shared.src.taxonomy_core_vo import JobRecord
@@ -72,6 +72,41 @@ class TestJobsSubmit:
         payload = json.loads(capsys.readouterr().out)
         assert payload["success"] is True
         assert payload["job_id"] == "job-1"
+
+    def test_submit_role_template_resolves_path(self, capsys) -> None:
+        """A role-template string (e.g. 'code-review') is materialised before submission."""
+        from pathlib import Path
+
+        materialised = Path("/tmp/qwa-templates/code-review.md")
+        jobs = MagicMock()
+        jobs.execute.return_value = MagicMock(record=_record(input_file="code-review.md"), error=None)
+        args = _submit_args(prompt_path="code-review")
+        with patch(
+            "modules.cli.src.surface_cli_jobs_command.resolve_prompt_path",
+            return_value=materialised,
+        ):
+            rc = handle_jobs_command(args, jobs)
+        assert rc == 0
+        # The resolved materialised path should reach JobRequest.prompt_file.
+        request = jobs.execute.call_args[0][0]
+        assert request.prompt_file == str(materialised)
+
+    def test_submit_regular_file_path_resolves_path(self, capsys) -> None:
+        """A regular file path is resolved (not materialised) before submission."""
+        from pathlib import Path
+
+        target = Path("/home/user/prompts/task.md")
+        jobs = MagicMock()
+        jobs.execute.return_value = MagicMock(record=_record(input_file="task.md"), error=None)
+        args = _submit_args(prompt_path="task.md")
+        with patch(
+            "modules.cli.src.surface_cli_jobs_command.resolve_prompt_path",
+            return_value=target,
+        ):
+            rc = handle_jobs_command(args, jobs)
+        assert rc == 0
+        request = jobs.execute.call_args[0][0]
+        assert request.prompt_file == str(target)
 
     def test_submit_failure_returns_nonzero(self, capsys) -> None:
         jobs = MagicMock()

@@ -15,8 +15,9 @@ import json
 import sys
 from typing import Any
 
+from modules.shared.src.contract_core_protocol import IMetricsProtocol
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.taxonomy_logging_vo import ObservabilityRequest
+from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest
 
 
 def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate) -> int:
@@ -36,7 +37,7 @@ def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate)
     return 0
 
 
-def _cmd_status(args: argparse.Namespace, metrics: Any) -> int:
+def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None) -> int:
     """Show the current status file contents and metrics snapshot."""
     json_output = bool(getattr(args, "json", False))
 
@@ -49,7 +50,17 @@ def _cmd_status(args: argparse.Namespace, metrics: Any) -> int:
         with contextlib.suppress(OSError, json.JSONDecodeError):
             status_map = json.loads(status_path.read_text(encoding="utf-8"))
 
-    metrics_snapshot = metrics.snapshot() if metrics is not None else None
+    # contract_core_protocol.IMetricsProtocol.snapshot() returns a plain dict;
+    # wrap it so the access pattern below matches MetricsSnapshot's fields.
+    metrics_snapshot: MetricsSnapshot | None = None
+    if metrics is not None:
+        raw = metrics.snapshot()
+        metrics_snapshot = MetricsSnapshot(
+            counters=raw.get("counters", {}),
+            total_executions=raw.get("total_executions", 0),
+            successful_executions=raw.get("successful_executions", 0),
+            success_rate=raw.get("success_rate"),
+        )
 
     if json_output:
         payload: dict[str, Any] = {"success": True, "status_path": str(status_path), "status": status_map}
@@ -83,15 +94,16 @@ def _cmd_status(args: argparse.Namespace, metrics: Any) -> int:
     return 0
 
 
-def handle(args: argparse.Namespace, orchestrator: IObservabilityAggregate, metrics: Any = None) -> int:
+def handle(
+    args: argparse.Namespace, orchestrator: IObservabilityAggregate, metrics: IMetricsProtocol | None = None
+) -> int:
     """Dispatch the observability subcommand to the matching handler."""
     verb = getattr(args, "observability_command", None)
     if verb == "report":
         return _cmd_report(args, orchestrator)
     if verb == "status":
-        if metrics is None:
-            print("[ERROR] Metrics not available.", file=sys.stderr)
-            return 1
+        # metrics=None is a valid runtime state (e.g. container not fully
+        # initialised); fall back to the status file only rather than erroring.
         return _cmd_status(args, metrics)
     print("Use 'qwen-web-arwaky observability --help' for usage")
     return 1

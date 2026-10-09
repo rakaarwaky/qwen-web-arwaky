@@ -10,11 +10,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
 
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_vo import JobRecord
 from modules.shared.src.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.utility_core_prompt_template import resolve_prompt_path
 
 
 def _job_status(record: JobRecord) -> str:
@@ -22,16 +23,6 @@ def _job_status(record: JobRecord) -> str:
     if not record.completed:
         return "RUNNING"
     return "FAILED" if record.error else "COMPLETED"
-
-
-def _format_job_row(record: JobRecord) -> str:
-    """Format one job record as a table row."""
-    status = _job_status(record)
-    input_file = (record.input_file or "-")[:30]
-    output_file = (record.output_file or "-")[:30]
-    duration = f"{record.duration_sec}s" if record.duration_sec else "-"
-    error = (record.error or "")[:40]
-    return f"{record.job_id:<40} {status:<10} {input_file:<30} {output_file:<30} {duration:<8} {error}"
 
 
 def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
@@ -42,10 +33,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     headless = bool(getattr(args, "headless", True))
 
     # Resolve role templates to materialized paths.
-    from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
-
-    if is_prompt_role(prompt_path):
-        prompt_path = str(materialize_role_template(prompt_path))
+    prompt_path = str(resolve_prompt_path(prompt_path))
 
     if attachment:
         request = JobRequest(
@@ -203,12 +191,17 @@ def _cmd_list(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
         print(f"{'JOB ID':<40} {'STATUS':<10} {'INPUT':<30} {'OUTPUT':<30} {'DURATION':<8} {'ERROR'}")
         print("─" * 110)
         for r in records:
-            print(_format_job_row(r))
+            status = _job_status(r)
+            input_file = (r.input_file or "-")[:30]
+            output_file = (r.output_file or "-")[:30]
+            duration = f"{r.duration_sec}s" if r.duration_sec else "-"
+            error = (r.error or "")[:40]
+            print(f"{r.job_id:<40} {status:<10} {input_file:<30} {output_file:<30} {duration:<8} {error}")
         print("─" * 110)
     return 0
 
 
-def _cmd_cleanup(args: argparse.Namespace, storage: Any) -> int:
+def _cmd_cleanup(args: argparse.Namespace, storage: IJobStorageProtocol) -> int:
     """Remove stale job records past their retention window."""
     json_output = bool(getattr(args, "json", False))
     try:
@@ -226,7 +219,7 @@ def _cmd_cleanup(args: argparse.Namespace, storage: Any) -> int:
         return 1
 
 
-def handle(args: argparse.Namespace, jobs: IJobManagerAggregate, storage: Any = None) -> int:
+def handle(args: argparse.Namespace, jobs: IJobManagerAggregate, storage: IJobStorageProtocol | None = None) -> int:
     """Dispatch the jobs subcommand to the matching handler."""
     verb = getattr(args, "job_command", None)
     if verb == "submit":

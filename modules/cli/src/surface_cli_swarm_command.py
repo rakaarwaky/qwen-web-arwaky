@@ -82,6 +82,9 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
 def _cmd_status(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     """Report the current state of a Swarm by ID."""
     swarm_id = args.swarm_id
+    if len(swarm_id) > 128 or any(c in swarm_id for c in "/\\\0"):
+        print(f"[ERROR] Invalid swarm ID: {swarm_id!r}", file=sys.stderr)
+        return 1
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="snapshot", swarm_id=swarm_id))
     if response.error:
@@ -118,6 +121,9 @@ def _cmd_status(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
 def _cmd_cancel(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     """Cancel a running Swarm by ID."""
     swarm_id = args.swarm_id
+    if len(swarm_id) > 128 or any(c in swarm_id for c in "/\\\0"):
+        print(f"[ERROR] Invalid swarm ID: {swarm_id!r}", file=sys.stderr)
+        return 1
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="cancel", swarm_id=swarm_id))
     if response.error:

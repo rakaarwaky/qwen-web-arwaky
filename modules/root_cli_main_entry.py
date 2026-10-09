@@ -50,7 +50,11 @@ from modules.shared.src.taxonomy_core_constant import (
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.utility_core_env import install_settings
-from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
+from modules.shared.src.utility_core_prompt_template import (
+    is_prompt_role,
+    materialize_role_template,
+    resolve_prompt_path,
+)
 
 _ERROR_PREFIX = "[ERROR]"
 
@@ -115,6 +119,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Reinstall package and browser binaries even when already up to date",
     )
     p_update.add_argument("--json", action="store_true", help="Format output as JSON")
+    p_update.add_argument(
+        "--rollback",
+        metavar="VERSION",
+        default=None,
+        help="Roll back to a previous package version instead of upgrading",
+    )
 
     # ── sessions ────────────────────────────────────────────────────────────
     p_sessions = sub.add_parser("sessions", help="Manage Qwen login sessions", parents=[parent])
@@ -243,16 +253,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     obs_status = obs_sub.add_parser("status", help="Show current status file contents")
     obs_status.add_argument("--json", action="store_true", help="Format output as JSON")
 
-    # ── update (rollback flag added) ──────────────────────────────────────────
-    # p_update is defined above; add the --rollback flag here for the dispatch
-    # to detect it.
-    p_update.add_argument(
-        "--rollback",
-        metavar="VERSION",
-        default=None,
-        help="Roll back to a previous package version instead of upgrading",
-    )
-
     return p.parse_args(argv)
 
 
@@ -317,7 +317,7 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
             prompt_p = materialize_role_template(raw_prompt)
             prompt_label = raw_prompt.strip().lower()
         else:
-            prompt_p = Path(raw_prompt).resolve()
+            prompt_p = resolve_prompt_path(raw_prompt)
             if not prompt_p.exists():
                 raise ValueError(f"Prompt file not found: {prompt_p}")
 
@@ -482,9 +482,8 @@ def _dispatch(
 
     if action == "update":
         if getattr(args, "rollback", None):
-            result = handle_rollback(args, container.agent_update_orchestrator)
-        else:
-            result = handle_update_command(args, container.updater)
+            return handle_rollback(args, container.agent_update_orchestrator)
+        result = handle_update_command(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "jobs":

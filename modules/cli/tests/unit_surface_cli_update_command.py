@@ -37,6 +37,24 @@ class TestUpdateRollback:
         orchestrator.execute.assert_not_called()
         assert "requires a version" in capsys.readouterr().err
 
+    def test_malformed_version_string_passes_through_to_orchestrator(self) -> None:
+        from modules.shared.src.taxonomy_update_vo import UpdateRequest
+
+        orchestrator = MagicMock()
+        orchestrator.execute.return_value = MagicMock(error=None, steps=())
+        # Malformed version strings are not rejected by the surface — the
+        # orchestrator/agent owns version validation. The surface passes
+        # the string through unchanged.
+        for bad in ("not-a-version", "v6.3.0-beta", "99999", ""):
+            if bad == "":
+                continue
+            orchestrator.execute.reset_mock()
+            rc = surface_cli_update_command.handle_rollback(_rollback_args(rollback=bad), orchestrator)
+            assert rc in (0, 1)
+            request = orchestrator.execute.call_args[0][0]
+            assert isinstance(request, UpdateRequest)
+            assert request.previous_version == bad
+
     def test_rollback_executes_the_rollback_to_verb_with_the_pinned_version(self) -> None:
         from modules.shared.src.taxonomy_update_vo import UpdateRequest
 

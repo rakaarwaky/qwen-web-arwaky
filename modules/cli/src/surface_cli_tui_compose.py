@@ -32,6 +32,9 @@ from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.utility_core_version import get_package_version
 
+# Widget ID shared between compose (widget creation) and handlers (query).
+JOBS_TABLE_ID = "jobs-table"
+
 
 class _TuiComposeMixin:
     """Mixin that owns the Textual compose tree and app lifecycle hooks."""
@@ -542,13 +545,9 @@ class _TuiComposeMixin:
                     with Horizontal(classes="card-title-row"):
                         yield Static("⚡", classes="card-icon")
                         yield Label("BACKGROUND JOBS", classes="card-title")
-                    yield DataTable(id="jobs-table")
+                    yield DataTable(id=JOBS_TABLE_ID)
                     with Horizontal(classes="toggle-row"):
                         yield Button("↻ Refresh", id="btn-jobs-refresh", classes="btn-jobs-refresh")
-                        yield Label(
-                            "Submit via 'qwa jobs submit -i <prompt.md>' or MCP tools",
-                            classes="jobs-hint",
-                        )
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no
