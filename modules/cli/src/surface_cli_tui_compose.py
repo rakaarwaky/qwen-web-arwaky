@@ -224,6 +224,22 @@ class _TuiComposeMixin:
                         variant="default",
                     )
 
+                # Named-account login row: pick the account name, then run the
+                # in-process headed login that registers it in the pool.
+                with Horizontal(classes="toggle-row"):
+                    yield Input(
+                        placeholder="account name (e.g. work)",
+                        id="input-sessions-name",
+                        classes="field-label",
+                        max_length=64,
+                    )
+                    yield Button(
+                        "🔐 Add Account",
+                        id="btn-sessions-login",
+                        classes="btn-sessions-login",
+                        variant="primary",
+                    )
+
                 # Account cards container.
                 yield Label("Registered Sessions", classes="field-label")
                 with Vertical(id="account-cards", classes="screen-card"):

@@ -31,7 +31,12 @@ from modules.cli.src.surface_cli_run_command import handle as handle_run_command
 from modules.cli.src.surface_cli_sessions_command import handle_sessions
 from modules.cli.src.surface_cli_update_command import handle as handle_update_command
 from modules.root_core_container import SharedContainer
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION
+from modules.shared.src.taxonomy_core_constant import (
+    DEFAULT_LOG,
+    DEFAULT_OUTPUT,
+    DEFAULT_SESSION,
+    SESSIONS_DIR,
+)
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.utility_core_env import install_settings
@@ -71,7 +76,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_init.add_argument("--dir", dest="target_dir", default=None, help="Target directory (default: cwd)")
 
     # ── login ─────────────────────────────────────────────────────────────────
-    sub.add_parser("login", help="Open browser for manual login and save session", parents=[parent])
+    p_login = sub.add_parser(
+        "login",
+        help="Open browser for manual login and save session",
+        parents=[parent],
+    )
+    p_login.add_argument(
+        "--session",
+        required=True,
+        metavar="NAME",
+        help="Session account name (e.g., personal, work). Resolves to SESSIONS_DIR/NAME.",
+    )
 
     # ── update ────────────────────────────────────────────────────────────────
     p_update = sub.add_parser(
@@ -259,7 +274,12 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     }
 
     # Check for session path override from rotation
-    effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
+    session_name = getattr(args, "session", None)
+    if action == "login" and session_name:
+        # login: resolve --session NAME to SESSIONS_DIR/NAME
+        effective_session = SESSIONS_DIR / session_name
+    else:
+        effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
     model = str(getattr(args, "model", None) or "").strip()
 
     return AppConfig(

@@ -116,7 +116,7 @@ class TestMain:
 
     def test_main_login_mode(self):
         with (
-            patch("sys.argv", ["qwen-cli", "login"]),
+            patch("sys.argv", ["qwen-cli", "login", "--session", "default"]),
             patch("modules.root_cli_main_entry._run_manual_login", return_value=0),
         ):
             result = main()

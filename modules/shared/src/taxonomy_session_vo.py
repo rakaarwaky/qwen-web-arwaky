@@ -64,6 +64,19 @@ class SessionInfo:
             created_at=self.created_at,
         )
 
+    def with_name(self, name: SessionName) -> SessionInfo:
+        """Return a copy with an updated account name."""
+        return SessionInfo(
+            session_id=self.session_id,
+            name=name,
+            path=self.path,
+            status=self.status,
+            last_used=self.last_used,
+            total_requests=self.total_requests,
+            failed_requests=self.failed_requests,
+            created_at=self.created_at,
+        )
+
     def with_usage(self, success: bool) -> SessionInfo:
         """Return a copy with updated usage counters."""
         return SessionInfo(
@@ -202,14 +215,18 @@ class SessionRequest:
 
     ``validate`` reads ``session_path`` to locate the profile;
     ``delete`` reads it and ``force`` to bypass the no-backup guard that
-    protects the master profile from accidental deletion. Fields the chosen
-    verb does not read stay at their defaults, so no verb passes arguments
-    another ignores.
+    protects the master profile from accidental deletion; ``login`` reads
+    ``session_path`` (or ``name`` under ``SESSIONS_DIR``) and
+    ``wait_for_confirmation``. Fields the chosen verb does not read stay
+    at their defaults, so no verb passes arguments another ignores.
     """
 
     verb: str = "validate"
     session_path: Path | None = None
     force: bool = False
+    #: Named account the ``login`` verb registers in the pool. Ignored by
+    #: ``validate`` and ``delete``; defaults to "default".
+    name: str = "default"
 
 
 @dataclass(frozen=True)

@@ -35,6 +35,9 @@ class SetupRequest:
     browser_headless: bool = False
     profile_path: Path | str | None = None
     wait_for_confirmation: Callable[[], bool] | None = None
+    #: Named account. When set and ``profile_path`` is None the orchestrator
+    #: resolves the profile to ``SESSIONS_DIR / name``. Defaults to "default".
+    name: str = "default"
 
 
 @dataclass(frozen=True)

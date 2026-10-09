@@ -38,7 +38,17 @@ def register_sessions_subparser(subparsers: Any) -> None:
     remove_parser = sessions_sub.add_parser("remove", help="Remove a session")
     remove_parser.add_argument(
         "session_id",
-        help="Session ID to remove (e.g., session_1)",
+        help="Session ID (e.g., session_1) or name (e.g., personal)",
+    )
+    remove_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Delete the profile even without a retained backup generation",
+    )
+    remove_parser.add_argument(
+        "--keep-profile",
+        action="store_true",
+        help="Drop the pool entry only; leave the Chromium profile directory on disk",
     )
 
     # Status command
@@ -92,14 +102,22 @@ def cmd_list(manager: SessionManager) -> int:
 
 
 def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
-    """Add a new session by launching a headed browser for manual login."""
-    import subprocess
-    import sys
+    """Add a new session by launching a headed browser for manual login.
 
-    pool = manager.load_pool()
-    next_num = len(pool.sessions) + 1
-    session_id = f"session_{next_num}"
-    profile_path = manager._base_dir / session_id
+    Uses ``SessionOrchestrator`` in-process so the validation loop (the
+    headless auth check that runs after the visible browser closes) is
+    executed, and the new profile is registered in the session pool via
+    ``SessionManager.add_session``.
+    """
+    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+    from modules.jobs.src.capabilities_status_writer import StatusFileWriter
+    from modules.logging.src.capabilities_metrics_counter import MetricsCounter
+    from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
+    from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+    from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, SESSIONS_DIR
+    from modules.shared.src.taxonomy_setup_vo import SetupRequest
+
+    profile_path = SESSIONS_DIR / args.name
     profile_path.mkdir(parents=True, exist_ok=True)
 
     print(f"\n🔐 Login to Qwen ({args.name})")
@@ -113,57 +131,42 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     print("💡 Tip: Close the browser window to continue.")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Launch Playwright to open chat.qwen.ai with isolated profile
-    launch_script = f'''
-import asyncio
-from playwright.async_api import async_playwright
-
-async def main():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch_persistent_context(
-            "{profile_path}",
-            headless=False,
-            args=[
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-blink-features=AutomationControlled",
-            ],
-        )
-        page = browser.pages[0] if browser.pages else await browser.new_page()
-        await page.goto("https://chat.qwen.ai")
-        # Wait until user closes the browser
-        try:
-            await browser.wait_for_event("close")
-        except Exception:
-            pass
-        await browser.close()
-
-asyncio.run(main())
-'''
-    proc = subprocess.Popen(
-        [sys.executable, "-c", launch_script],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    # Build the orchestrator with minimal capability dependencies — no
+    # full DI container (the Surface layer must not import the Root
+    # layer; AES205).
+    log_path = DEFAULT_LOG
+    log_path.mkdir(parents=True, exist_ok=True)
+    metrics = MetricsCounter(metrics_path=log_path / "metrics.json")
+    status_writer = StatusFileWriter(log_path / "status.json")
+    observability = ObservabilitySetup(
+        log_path=log_path,
+        status_writer=status_writer,
+        metrics=metrics,
     )
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        proc.terminate()
-        print("\nLogin cancelled.")
+    orchestrator = SessionOrchestrator(
+        browser=BrowserAdapter(),
+        observability=observability,
+        sessions=manager,
+    )
+
+    response = orchestrator.execute_setup(
+        SetupRequest(profile_path=profile_path, name=args.name, browser_headless=False)
+    )
+
+    if not response.success:
+        print(f"\n❌ {response.error or 'Login failed'}")
         return 1
 
-    if not profile_path.exists():
-        print("❌ Profile was not created. Login may have failed.")
-        return 1
-
-    info = manager.add_session(args.name, profile_path)
     print(f"\n✅ Session '{args.name}' saved!")
-    print(f"   ID: {info.session_id}")
     print(f"   Path: {profile_path}")
     print()
 
     again = input("Add another session? [y/N]: ").strip().lower()
     if again in ("y", "yes"):
+        name = input("Session name: ").strip()
+        if not name:
+            name = f"session_{len(manager.load_pool().sessions) + 1}"
+        args.name = name
         return cmd_login(manager, args)
 
     return 0
@@ -217,12 +220,30 @@ def cmd_health_check(manager: SessionManager) -> int:
 
 
 def cmd_remove(manager: SessionManager, args: argparse.Namespace) -> int:
-    """Remove a session."""
-    if manager.remove_session(args.session_id):
-        print(f"✅ Removed {args.session_id}")
+    """Remove a session entry and, unless --keep-profile, its Chromium profile."""
+    token = args.session_id
+    info = manager.get_session(token) or manager.get_session_by_name(token)
+    if info is None:
+        print(f"❌ Session '{token}' not found")
+        return 1
+
+    if not manager.remove_session(info.session_id):
+        print(f"❌ Could not remove '{info.session_id}' from the pool")
+        return 1
+    print(f"✅ Removed {info.name} ({info.session_id}) from the pool")
+
+    if getattr(args, "keep_profile", False):
+        print(f"   Profile kept at {info.path}")
         return 0
-    print(f"❌ Session {args.session_id} not found")
-    return 1
+
+    try:
+        manager.delete_session_profile(info.path, force=getattr(args, "force", False))
+    except Exception as exc:
+        print(f"❌ Pool entry removed, but the profile was kept: {exc}")
+        print(f"   Path: {info.path} (retry with --force to delete anyway)")
+        return 1
+    print(f"   Profile deleted: {info.path}")
+    return 0
 
 
 def cmd_status(manager: SessionManager) -> int:

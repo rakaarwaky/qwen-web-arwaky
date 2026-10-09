@@ -53,7 +53,7 @@ class _TuiSessionsWorkerMixin:
         try:
             if self._setup is None:
                 raise RuntimeError("Session setup orchestrator not available.")
-            res = self._setup.execute(SetupRequest())
+            res = self._setup.execute_setup(SetupRequest())
             self.call_from_thread(
                 self._log_msg,
                 "[bold {}]LOGIN RESULT:[/] {}".format(

@@ -359,8 +359,6 @@ LOGIN_FORM_SELECTORS: tuple[str, ...] = (
     "button:has-text('Sign up')",
     "a:has-text('Sign up')",
     ".login-form",
-    "[class*='login']",
-    "[class*='passport']",
 )
 
 CHALLENGE_KEYWORDS: tuple[str, ...] = (
