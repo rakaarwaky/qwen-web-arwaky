@@ -62,6 +62,52 @@ log = get_logger("browser")
 _TARGET_MODEL: contextvars.ContextVar[str] = contextvars.ContextVar("qwa_target_model", default=DEFAULT_MODEL)
 
 
+#: Hostnames that are third-party tracking/CDN pixels — their failures and
+#: console errors are noise, not domain signals. Demoted to DEBUG so they
+#: never reach the stderr handler or the TUI log panel.
+_THIRD_PARTY_NOISE_HOSTS: frozenset[str] = frozenset(
+    {
+        "google.com",
+        "google-analytics.com",
+        "googleapis.com",
+        "googletagmanager.com",
+        "alicdn.com",
+        "aplus.qwen.ai",
+        "adjust.io",
+        "facebook.com",
+        "fb.com",
+        "doubleclick.net",
+        "adobedtm.com",
+    }
+)
+
+#: Console-message substrings (lowercase) that mark third-party SDK/CDN noise.
+_NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
+    {
+        "adjust-sdk",
+        "google-analytics",
+        "googletagmanager",
+        "alicdn",
+        "aplus.qwen.ai",
+        "doubleclick",
+        "adobedtm",
+        "ERR_ABORTED",
+        "ERR_FAILED",
+    }
+)
+
+
+def _is_third_party_noise(url: str) -> bool:
+    """Return True when *url* points at a known third-party tracking/CDN domain."""
+    from urllib.parse import urlparse
+
+    try:
+        host = (urlparse(url).netloc or "").lower()
+    except Exception:
+        return False
+    return any(host == d or host.endswith("." + d) for d in _THIRD_PARTY_NOISE_HOSTS)
+
+
 # Block 1: Class Definition & Constructor
 
 
@@ -612,11 +658,20 @@ class BrowserAdapter(IBrowserProtocol):
 
                         def on_request_failed(request: Any) -> None:
                             """Log failed browser requests with sanitized URLs."""
+                            if _is_third_party_noise(request.url):
+                                log.debug("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
+                                return
                             log.warning("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
 
                         def on_console(message: Any) -> None:
                             """Log page console errors and warnings."""
-                            if message.type in {"error", "warning"}:
+                            if message.type not in {"error", "warning"}:
+                                return
+                            text = (message.text or "").lower()
+                            is_noise = any(pat in text for pat in _NOISE_CONSOLE_PATTERNS)
+                            if is_noise:
+                                log.debug("browser_console_message %s %s", message.type, message.text)
+                            else:
                                 log.warning("browser_console_message %s %s", message.type, message.text)
 
                         def on_request(request: Any) -> None:
@@ -630,7 +685,12 @@ class BrowserAdapter(IBrowserProtocol):
                             if response.status >= 400 and any(
                                 token in url for token in ("chat", "completion", "generate", "conversation", "api")
                             ):
-                                log.warning("browser_http_error %s %s", response.status, _sanitize_url(response.url))
+                                if _is_third_party_noise(response.url):
+                                    log.debug("browser_http_error %s %s", response.status, _sanitize_url(response.url))
+                                else:
+                                    log.warning(
+                                        "browser_http_error %s %s", response.status, _sanitize_url(response.url)
+                                    )
                             elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
                                 log.info(
                                     "browser_mutation_response %s %s", response.status, _sanitize_url(response.url)
