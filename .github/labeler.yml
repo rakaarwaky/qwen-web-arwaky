@@ -15,7 +15,6 @@ cli:
 mcp:
   - changed-files:
       - any-glob-to-any-file: modules/mcp/**
-      - any-glob-to-any-file: .mcp.json
       - any-glob-to-any-file: mcp.local.json
 
 core:
