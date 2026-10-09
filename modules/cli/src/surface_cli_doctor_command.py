@@ -183,18 +183,41 @@ def _check_workspace() -> dict[str, Any]:
 
 
 def _check_session() -> dict[str, Any]:
-    """Report whether a saved session profile exists and is backed up.
+    """Report session pool status.
+
+    When the pool has one or more entries, report per-session health from
+    ``sessions.json`` status fields. When the pool is empty, fall back to
+    checking the ``DEFAULT_SESSION`` profile directly.
 
     A profile with no retained backup has no recovery path other than an
     interactive CAPTCHA re-login, so that state is reported as a warning even
     when the profile itself is intact (issue #300).
     """
+    from modules.session.src.capabilities_session_manager import SessionManager
+
+    manager = SessionManager()
+    pool = manager.load_pool()
+
+    # Multi-account pool: report per-session status
+    if pool.total_count > 0:
+        lines = [f"Session pool: {pool.total_count} account(s) under {SESSIONS_DIR}"]
+        for s in pool.sessions:
+            icon = "✅" if s.is_healthy else ("⚠️" if s.is_limited else "🔵")
+            lines.append(f"  {icon} {s.session_id} ({s.name}): {s.status.value}")
+        healthy = pool.healthy_count
+        limited = pool.limited_count
+        detail = f"{healthy} healthy, {limited} limited"
+        severity = "warning" if healthy == 0 else "ok"
+        return _check("Session Authentication Token", healthy > 0, detail, severity=severity)
+
+    # Single-account / empty pool: check DEFAULT_SESSION profile
     exists = DEFAULT_SESSION.exists() and any(DEFAULT_SESSION.iterdir())
     if not exists:
         return _check(
             "Session Authentication Token",
             False,
-            f"No active session found in {DEFAULT_SESSION} (run: qwen-web-arwaky login)",
+            f"No active session found in {DEFAULT_SESSION} "
+            "(run: qwen-web-arwaky login --session default)",
         )
     retained = snapshots_count(DEFAULT_SESSION)
     detail = f"Saved session found at {DEFAULT_SESSION}"

@@ -62,6 +62,16 @@ class ISessionManagerProtocol(ABC):
         ...
 
     @abstractmethod
+    def get_session_by_name(self, name: SessionName) -> SessionInfo | None:
+        """Return the pool entry registered under *name*, or None when absent."""
+        ...
+
+    @abstractmethod
+    def remove_session_by_name(self, name: SessionName) -> bool:
+        """Remove the pool entry registered under *name*; True when found."""
+        ...
+
+    @abstractmethod
     def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
         """Remove the saved Chromium profile directory at *profile_path*.
 
