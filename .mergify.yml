@@ -1,0 +1,109 @@
+# Mergify configuration for rakaarwaky/qwen-web-arwaky
+#
+# Products used:
+#   Merge Queue     — serializes merges on main so CI checks always run on
+#                     the final cumulative state before merge.
+#   Workflow Automation — auto-labels PRs so merge protections and queue
+#                     rules can branch on label, keeping the human
+#                     responsible for deciding *what* gets queued, Mergify
+#                     responsible for *whether* it's safe to land.
+#
+# Validate before pushing:
+#   mergify config validate
+#   mergify config simulate https://github.com/rakaarwaky/qwen-web-arwaky/pull/<N>
+#
+# Note: this repo's CI runs per-job check runs (there is no single "verify"
+# check), so queue/merge gate on the concrete check-run names produced by
+# .github/workflows/ci.yml: the "Tests (pytest)" job (3.12 + 3.13 matrix)
+# and the "Self-Lint (lint-arwaky-cli)" job (AD-05 template hygiene).
+
+# ── Merge Queue ───────────────────────────────────────────────────────────────
+# main is the only protected branch; the queue serializes merges through
+# speculative check runs so CI failures surface before they reach main.
+
+queue_rules:
+  - name: default
+    queue_conditions:
+      - base=main
+      - -draft
+      - check-success=Tests (pytest)
+      - check-success=Self-Lint (lint-arwaky-cli)
+    merge_conditions:
+      - check-success=Tests (pytest)
+      - check-success=Self-Lint (lint-arwaky-cli)
+      - "label~=(ci|docs)"
+    merge_method: squash
+    batch_size: 1
+    checks_timeout: 45m
+
+merge_queue:
+  queued_label: queued
+  dequeued_label: dequeued
+  checking_label: queue-checking
+  status_comments: outcomes
+
+# ── Pull Request Rules (Workflow Automation) ─────────────────────────────────
+# These rules auto-label PRs on open and update; merge_protections then
+# gates the merge on the right labels + green checks.
+
+pull_request_rules:
+  # Auto-queue low-risk PRs once CI passes.
+  - name: auto-queue-ci-and-docs
+    description: Queue PRs labelled ci or docs when the checks are green
+    conditions:
+      - "label~=(ci|docs)"
+      - check-success=Tests (pytest)
+      - check-success=Self-Lint (lint-arwaky-cli)
+      - -draft
+      - base=main
+    actions:
+      queue:
+        name: default
+
+  # Merge only when CI is green. Mergify injects GitHub branch protections
+  # automatically, so a required review set there gates this too.
+  - name: merge-when-ci-green
+    description: Squash-merge a ready PR to main once CI checks pass
+    conditions:
+      - base=main
+      - -draft
+      - check-success=Tests (pytest)
+      - check-success=Self-Lint (lint-arwaky-cli)
+      - "label~=(ci|docs)"
+    actions:
+      merge:
+        method: squash
+        merge_bot_account: rakaarwaky
+
+# ── Merge Protections ─────────────────────────────────────────────────────────
+# Auto-merge only when CI passes.
+
+merge_protections:
+  - name: auto-merge-gate
+    description: Hold the merge until the checks report success
+    if:
+      - base=main
+      - -draft
+    success_conditions:
+      - check-success=Tests (pytest)
+      - check-success=Self-Lint (lint-arwaky-cli)
+
+merge_protections_settings:
+  auto_merge_conditions:
+    - "label~=(ci|docs)"
+    - check-success=Tests (pytest)
+    - check-success=Self-Lint (lint-arwaky-cli)
+    - base=main
+
+# ── Priority Rules ─────────────────────────────────────────────────────────────
+
+priority_rules:
+  - name: urgent-priority
+    conditions:
+      - label=urgent
+    priority: high
+
+  - name: default-priority
+    conditions:
+      - -label=urgent
+    priority: medium
