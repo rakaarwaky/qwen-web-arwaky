@@ -11,6 +11,12 @@ Usage:
   qwen-web-arwaky prompt-with-attachment \\
                                  --prompt-path FILE --attachment-path FILE \\
                                  [--output-path FILE] [--headless]
+  qwen-web-arwaky sessions                          {list|login|health-check|remove|status}
+  qwen-web-arwaky jobs                              {submit|status|list|cleanup}
+  qwen-web-arwaky swarm                             {start|status|cancel}
+  qwen-web-arwaky observability                     {report|status}
+  qwen-web-arwaky doctor [--json] [--smoke]
+  qwen-web-arwaky update [--check] [--force] [--rollback VERSION]
   qwen-web-arwaky mcp
 """
 
@@ -26,10 +32,14 @@ from pathlib import Path
 
 from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
+from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
 from modules.cli.src.surface_cli_login_command import handle as handle_login_command
+from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
 from modules.cli.src.surface_cli_run_command import handle as handle_run_command
 from modules.cli.src.surface_cli_sessions_command import handle_sessions
+from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
 from modules.cli.src.surface_cli_update_command import handle as handle_update_command
+from modules.cli.src.surface_cli_update_command import handle_rollback
 from modules.root_core_container import SharedContainer
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_LOG,
@@ -104,6 +114,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Reinstall package and browser binaries even when already up to date",
     )
+    p_update.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # ── sessions ────────────────────────────────────────────────────────────
     p_sessions = sub.add_parser("sessions", help="Manage Qwen login sessions", parents=[parent])
@@ -169,6 +180,78 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     # ── mcp ───────────────────────────────────────────────────────────────────
     sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
+
+    # ── jobs ──────────────────────────────────────────────────────────────────
+    p_jobs = sub.add_parser(
+        "jobs",
+        help="Manage asynchronous background prompt jobs (submit, status, list, cleanup)",
+        parents=[parent],
+    )
+    jobs_sub = p_jobs.add_subparsers(dest="job_command")
+    jobs_submit = jobs_sub.add_parser("submit", help="Submit a prompt job to the background worker pool")
+    jobs_submit.add_argument(
+        "-i",
+        "-p",
+        "--prompt-path",
+        required=True,
+        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
+    )
+    jobs_submit.add_argument("-a", "--attachment-path", default=None, help="Optional file to attach")
+    jobs_submit.add_argument("-o", "--output-path", default=None, help="Output file path")
+    jobs_submit.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run browser headlessly (default: true; use --no-headless to watch)",
+    )
+    jobs_submit.add_argument("--json", action="store_true", help="Format output as JSON")
+    jobs_status = jobs_sub.add_parser("status", help="Check status of a background job")
+    jobs_status.add_argument("job_id", help="Job ID to query")
+    jobs_status.add_argument("--json", action="store_true", help="Format output as JSON")
+    jobs_list = jobs_sub.add_parser("list", help="List recent background jobs")
+    jobs_list.add_argument("--limit", type=int, default=10, help="Maximum jobs to list (default: 10)")
+    jobs_list.add_argument("--json", action="store_true", help="Format output as JSON")
+    jobs_cleanup = jobs_sub.add_parser("cleanup", help="Remove stale job records past their retention window")
+    jobs_cleanup.add_argument("--json", action="store_true", help="Format output as JSON")
+
+    # ── swarm ────────────────────────────────────────────────────────────────
+    p_swarm = sub.add_parser(
+        "swarm",
+        help="Run a multi-agent Swarm fan-out across role templates",
+        parents=[parent],
+    )
+    swarm_sub = p_swarm.add_subparsers(dest="swarm_command")
+    swarm_start = swarm_sub.add_parser("start", help="Start a Swarm fan-out over a file or folder")
+    swarm_start.add_argument("input", help="Path to file or folder to fan out across all role templates")
+    swarm_start.add_argument("--json", action="store_true", help="Format output as JSON")
+    swarm_status = swarm_sub.add_parser("status", help="Show status of a running or completed Swarm")
+    swarm_status.add_argument("swarm_id", help="Swarm ID to query")
+    swarm_status.add_argument("--json", action="store_true", help="Format output as JSON")
+    swarm_cancel = swarm_sub.add_parser("cancel", help="Cancel a running Swarm")
+    swarm_cancel.add_argument("swarm_id", help="Swarm ID to cancel")
+    swarm_cancel.add_argument("--json", action="store_true", help="Format output as JSON")
+
+    # ── observability ────────────────────────────────────────────────────────
+    p_obs = sub.add_parser(
+        "observability",
+        help="Query observability status: run metrics and quality reports",
+        parents=[parent],
+    )
+    obs_sub = p_obs.add_subparsers(dest="observability_command")
+    obs_report = obs_sub.add_parser("report", help="Write and display the quality report for the last run")
+    obs_report.add_argument("--json", action="store_true", help="Format output as JSON")
+    obs_status = obs_sub.add_parser("status", help="Show current status file contents")
+    obs_status.add_argument("--json", action="store_true", help="Format output as JSON")
+
+    # ── update (rollback flag added) ──────────────────────────────────────────
+    # p_update is defined above; add the --rollback flag here for the dispatch
+    # to detect it.
+    p_update.add_argument(
+        "--rollback",
+        metavar="VERSION",
+        default=None,
+        help="Roll back to a previous package version instead of upgrading",
+    )
 
     return p.parse_args(argv)
 
@@ -271,6 +354,9 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         "prompt-with-attachment": "single",
         "init": "init",
         "mcp": "mcp",
+        "jobs": "direct",
+        "swarm": "single",
+        "observability": "direct",
     }
 
     # Check for session path override from rotation
@@ -368,6 +454,8 @@ def _dispatch(
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
             container.session_manager,
+            container.updater,
+            container.job_storage,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -393,8 +481,20 @@ def _dispatch(
         return _result_exit_code(result, json_output=json_output)
 
     if action == "update":
-        result = handle_update_command(args, container.updater)
+        if getattr(args, "rollback", None):
+            result = handle_rollback(args, container.agent_update_orchestrator)
+        else:
+            result = handle_update_command(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
+
+    if action == "jobs":
+        return handle_jobs_command(args, container.agent_job_orchestrator, container.job_storage)
+
+    if action == "swarm":
+        return handle_swarm_command(args, container.agent_swarm_orchestrator)
+
+    if action == "observability":
+        return handle_observability_command(args, container.agent_logging_orchestrator, container.metrics)
 
     if action == "sessions":
         return handle_sessions(args)
@@ -441,7 +541,9 @@ def main(argv: list[str] | None = None) -> int:
     cfg: AppConfig | None = None
     if args is not None:
         action = getattr(args, "action", None)
-        if action not in ("init",):
+        # actions that do not need an AppConfig (no prompt path, no browser run)
+        no_cfg_actions = ("init", "jobs", "swarm", "observability", "sessions")
+        if action not in no_cfg_actions:
             try:
                 cfg = _build_config(args)
             except (OSError, ValueError) as exc:

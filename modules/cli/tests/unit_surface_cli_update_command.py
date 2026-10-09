@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,71 @@ from modules.shared.src.taxonomy_core_vo import (
     VersionString,
 )
 from modules.update.src.capabilities_update_manager import UpdateManager, compare_versions
+
+
+def _rollback_args(rollback: str = "6.3.0", json_output: bool = False) -> MagicMock:
+    args = MagicMock()
+    args.rollback = rollback
+    args.json = json_output
+    return args
+
+
+class TestUpdateRollback:
+    """The --rollback verb must delegate to the update aggregate, not pip."""
+
+    def test_missing_version_is_refused_without_executing(self, capsys) -> None:
+        orchestrator = MagicMock()
+        rc = surface_cli_update_command.handle_rollback(_rollback_args(rollback="  "), orchestrator)
+        assert rc == 1
+        orchestrator.execute.assert_not_called()
+        assert "requires a version" in capsys.readouterr().err
+
+    def test_rollback_executes_the_rollback_to_verb_with_the_pinned_version(self) -> None:
+        from modules.shared.src.taxonomy_update_vo import UpdateRequest
+
+        orchestrator = MagicMock()
+        orchestrator.execute.return_value = MagicMock(error=None, steps=())
+        rc = surface_cli_update_command.handle_rollback(_rollback_args(), orchestrator)
+        assert rc == 0
+        request = orchestrator.execute.call_args[0][0]
+        assert isinstance(request, UpdateRequest)
+        assert request.verb == "rollback_to"
+        assert request.previous_version == "6.3.0"
+
+    def test_rollback_failure_propagates_the_error(self, capsys) -> None:
+        orchestrator = MagicMock()
+        orchestrator.execute.return_value = MagicMock(error="boom", steps=())
+        rc = surface_cli_update_command.handle_rollback(_rollback_args(), orchestrator)
+        assert rc == 1
+        assert "Rollback failed" in capsys.readouterr().err
+
+    def test_rollback_success_reports_the_ordered_steps(self, capsys) -> None:
+        orchestrator = MagicMock()
+        orchestrator.execute.return_value = MagicMock(
+            error=None,
+            steps=(
+                UpdateStepResult("package_restore", True, True, "reinstall 6.3.0"),
+                UpdateStepResult("browser_sync", True, True, "chromium pinned"),
+            ),
+        )
+        rc = surface_cli_update_command.handle_rollback(_rollback_args(), orchestrator)
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "package_restore" in out
+        assert "browser_sync" in out
+
+    def test_rollback_json_envelope(self, capsys) -> None:
+        orchestrator = MagicMock()
+        orchestrator.execute.return_value = MagicMock(
+            error=None,
+            steps=(UpdateStepResult("step_a", True, True, "ok"),),
+        )
+        rc = surface_cli_update_command.handle_rollback(_rollback_args(json_output=True), orchestrator)
+        assert rc == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["success"] is True
+        assert payload["version"] == "6.3.0"
+        assert payload["steps"][0]["name"] == "step_a"
 
 
 class TestVersionComparison(unittest.TestCase):

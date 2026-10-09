@@ -64,6 +64,162 @@ class _TuiHandlersMixin:
     _refresh_sessions_table: Any
     _run_session_health_check: Any
     _render_account_cards: Any
+    _jobs: Any
+    _job_storage: Any
+    _updater: Any
+    _update_orchestrator: Any
+    _log_msg: Any
+
+    # ── System Actions (Settings pane) ──────────────────────────────────
+
+    def _system_action_pressed(self, button_id: str) -> None:
+        """Route Settings-pane system-action button presses."""
+        router = {
+            "btn-tui-doctor": self._run_doctor_worker,
+            "btn-tui-update": self._run_update_worker,
+            "btn-tui-jobs-cleanup": self._run_jobs_cleanup,
+            "btn-jobs-refresh": self._refresh_jobs_table,
+        }
+        router.get(button_id, lambda: None)()
+
+    @work(thread=True)
+    def _run_doctor_worker(self) -> None:
+        """Run the doctor diagnostic checks in a background thread."""
+        self._log_msg("[bold {}]DOCTOR:[/] Running system diagnostics...".format(THEME["accent_fg"]))
+        try:
+            from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+
+            checks = run_doctor_checks()
+            failed = [c for c in checks if not c["passed"]]
+            if failed:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DOCTOR:[/] {} check(s) failed.".format(THEME["err"], len(failed)),
+                )
+                for c in failed:
+                    self.call_from_thread(
+                        self._log_msg,
+                        "  ✗ {} — {}".format(escape(c["name"]), escape(c["detail"])),
+                    )
+            else:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DOCTOR:[/] All checks passed. System is healthy.".format(THEME["ok"]),
+                )
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]DOCTOR ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
+
+    @work(thread=True)
+    def _run_update_worker(self) -> None:
+        """Run a self-update check in a background thread."""
+        self._log_msg("[bold {}]UPDATE:[/] Checking for updates...".format(THEME["accent_fg"]))
+        updater = getattr(self, "_updater", None)
+        if updater is None:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]UPDATE:[/] No updater injected — run 'qwa update --check' from the shell.".format(
+                    THEME["warn"]
+                ),
+            )
+            return
+        try:
+            check = updater.check_update()
+            if check.latest_version is None:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]UPDATE:[/] Could not reach version source ({}).".format(
+                        THEME["warn"], escape(str(check.error or "unknown"))
+                    ),
+                )
+            elif check.update_available:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]UPDATE:[/] Update available: {} → {} — run 'qwa update' to upgrade.".format(
+                        THEME["ok"],
+                        escape(check.current_version or "unknown"),
+                        escape(check.latest_version or "latest"),
+                    ),
+                )
+            else:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]UPDATE:[/] Already up to date ({}).".format(
+                        THEME["ok"], escape(check.current_version or "unknown")
+                    ),
+                )
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]UPDATE ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
+
+    def _run_jobs_cleanup(self) -> None:
+        """Remove stale job records past their retention window (non-destructive for active jobs)."""
+        self._log_msg("[bold {}]JOBS:[/] Cleaning up stale job records...".format(THEME["accent_fg"]))
+        jobs_storage = getattr(self, "_job_storage", None)
+        if jobs_storage is None:
+            self.notify(
+                "Job storage not available. Use 'qwa jobs cleanup' from the shell instead.",
+                severity="warning",
+            )
+            return
+        try:
+            removed = jobs_storage.cleanup_stale_jobs()
+            self.notify(f"Removed {removed} stale job record(s).", severity="information")
+        except Exception as exc:
+            self.notify(f"Job cleanup failed: {exc}", severity="error")
+
+    def _refresh_jobs_table(self) -> None:
+        """Load and display recent jobs in the Settings pane's jobs table."""
+        if getattr(self, "_jobs", None) is None:
+            self.notify("Jobs aggregate not available in this container.", severity="warning")
+            return
+        self._refresh_jobs_table_worker()
+
+    @work(thread=True, group="jobs-table", exclusive=True)
+    def _refresh_jobs_table_worker(self) -> None:
+        """Load recent jobs from the job storage and render the table."""
+        try:
+            from modules.shared.src.taxonomy_jobs_vo import JobRequest
+
+            response = self._jobs.execute(JobRequest(verb="list_jobs", limit=20))
+            records = response.records or []
+
+            def _update() -> None:
+                from textual.css.query import NoMatches as _NoMatches
+                from textual.widgets import DataTable as _DataTable
+
+                with contextlib.suppress(_NoMatches):
+                    table = self.query_one("#jobs-table", _DataTable)
+                    table.clear()
+                    table.add_columns("JOB ID", "STATUS", "INPUT", "DURATION", "COMPLETED")
+                    for rec in records:
+                        status = "RUNNING" if not rec.completed else ("FAILED" if rec.error else "DONE")
+                        duration = f"{rec.duration_sec}s" if rec.duration_sec else "-"
+                        completed_at = (rec.completed_at or "")[:19]
+                        table.add_rows(
+                            (
+                                str(rec.job_id)[:30],
+                                status,
+                                str(rec.input_file or "-")[:30],
+                                duration,
+                                completed_at,
+                            )
+                        )
+                self._log_msg(
+                    "[bold {}]JOBS:[/] {} background job(s) listed.".format(THEME["ok"], len(records)),
+                )
+
+            with contextlib.suppress(ValueError):
+                self.call_from_thread(_update)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]JOBS LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
 
     def _swarm_button_pressed(self, button_id: str) -> None:
         """Route Swarm-screen button presses to the right handler."""

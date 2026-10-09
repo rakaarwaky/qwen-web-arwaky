@@ -526,6 +526,30 @@ class _TuiComposeMixin:
                                     yield Button("Apply", id=f"override-apply-{name}", classes="btn-apply")
                                     yield Button("Reset", id=f"override-reset-{name}", classes="btn-apply btn-reset")
 
+                # System Actions card: doctor, update, and jobs management.
+                with Vertical(classes="screen-card settings-card system-actions-card", id="system-actions-card"):
+                    with Horizontal(classes="card-title-row"):
+                        yield Static("🛠", classes="card-icon")
+                        yield Label("SYSTEM ACTIONS", classes="card-title")
+
+                    with Horizontal(classes="toggle-row"):
+                        yield Button("🏥 Run Doctor", id="btn-tui-doctor", classes="btn-doctor")
+                        yield Button("🔄 Update", id="btn-tui-update", classes="btn-update")
+                        yield Button("🧹 Cleanup Jobs", id="btn-tui-jobs-cleanup", classes="btn-jobs-cleanup")
+
+                # Jobs table card.
+                with Vertical(classes="screen-card settings-card jobs-card", id="jobs-card"):
+                    with Horizontal(classes="card-title-row"):
+                        yield Static("⚡", classes="card-icon")
+                        yield Label("BACKGROUND JOBS", classes="card-title")
+                    yield DataTable(id="jobs-table")
+                    with Horizontal(classes="toggle-row"):
+                        yield Button("↻ Refresh", id="btn-jobs-refresh", classes="btn-jobs-refresh")
+                        yield Label(
+                            "Submit via 'qwa jobs submit -i <prompt.md>' or MCP tools",
+                            classes="jobs-hint",
+                        )
+
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no
         # key-hint line. The strip above them holds the active marker: a short
