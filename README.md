@@ -55,32 +55,6 @@ qwen-web-arwaky doctor
 
 The command prints the diagnostic checks and exits successfully when required components are healthy.
 
-## Project Structure
-
-```text
-.
-├── modules/
-│   ├── cli/                 # CLI commands and Textual terminal UI
-│   ├── core/                # Browser automation and orchestration
-│   ├── mcp/                 # MCP tool surface
-│   ├── shared/              # Contracts, domain types, constants, utilities
-│   ├── templates/           # Built-in SDLC role prompt templates
-│   ├── root_cli_main_entry.py
-│   └── root_mcp_main_entry.py
-├── tests/                   # Cross-module and pipeline tests
-├── benches/                 # Performance benchmarks
-├── scripts/                 # Install, quality-gate, release, and utility scripts
-├── deploy/                  # Deployment and alert configuration
-├── design/                  # Product design sources and screenshots
-├── docs/                    # README media
-├── pyproject.toml           # Package metadata, dependencies, and tool settings
-├── uv.lock                  # Reproducible dependency lockfile
-├── ARCHITECTURE.md          # Layer rules and design decisions
-└── TEST.md                  # Test strategy and regression-lock documentation
-```
-
-Feature requirements live in `modules/*/FRD.md`; repository-level product requirements live in `PRD.md`. Start in `modules/root_cli_main_entry.py` for CLI composition or `modules/root_mcp_main_entry.py` for MCP composition.
-
 ## Architecture
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -99,6 +73,8 @@ Capabilities -----> Playwright / filesystem / telemetry
         v
 Shared contracts, taxonomy, and utilities
 ```
+
+The workspace layout and module map live in [AGENTS.md](AGENTS.md) Project Structure; feature requirements live in `modules/*/FRD.md`; repository-level product requirements live in `PRD.md`. Start in `modules/root_cli_main_entry.py` for CLI composition or `modules/root_mcp_main_entry.py` for MCP composition.
 
 ## Available Scripts/Commands
 
