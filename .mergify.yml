@@ -41,6 +41,7 @@ merge_queue:
   dequeued_label: dequeued
   checking_label: queue-checking
   status_comments: outcomes
+  max_parallel_checks: 10
 
 # ── Pull Request Rules (Workflow Automation) ─────────────────────────────────
 # These rules auto-label PRs on open and update; merge_protections then
