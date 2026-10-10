@@ -84,11 +84,15 @@ def test_tui_app_mounts_and_populates_tabs() -> None:
             # Only the log panel scrolls: the Overview itself is one screen.
             assert band.styles.overflow_y == "hidden"
 
-            # Test metrics update
+            # Test metrics update: slot 1 is the Chat card's counter, while
+            # the Overview ACTIVE ACCOUNTS tile tracks the session pool —
+            # this fixture has no manager, so it renders 0.
             app._slot_stats[1]["status"] = "RUNNING"
             app._flush_metrics()
             metric_active = app.query_one("#metric-active", Label)
-            assert "1" in str(metric_active.render())
+            assert "0" in str(metric_active.render())
+            threads_ring = app.query_one("#metric-threads-ring", Label)
+            assert "1/10" in str(threads_ring.render())
 
     asyncio.run(_run())
 
@@ -337,7 +341,9 @@ def test_flush_metrics_writes_engine_readouts() -> None:
 
             from textual.widgets import Label
 
-            assert str(app.query_one("#metric-active", Label).render()) == "1"
+            # ACTIVE ACCOUNTS tracks the session pool (no manager here → 0);
+            # the slot counter lives on the Chat card's threads ring below.
+            assert str(app.query_one("#metric-active", Label).render()) == "0"
             # Swarm card tracks the swarm engine (0 when idle), not slots.
             assert str(app.query_one("#metric-swarm-ring", Label).render()) == "0/0"
             assert str(app.query_one("#metric-swarm-detail", Label).render()) == "Idle"

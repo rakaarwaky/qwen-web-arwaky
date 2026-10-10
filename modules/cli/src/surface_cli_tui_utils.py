@@ -218,6 +218,8 @@ class _TuiUtilsMixin:
     screen: Any
     set_timer: Any
     _get_active_slot_id: Any
+    _ensure_sessions_loaded: Any
+    _session_manager: Any
 
     # ── Metrics bar ──────────────────────────────────────────────────────
 
@@ -236,7 +238,7 @@ class _TuiUtilsMixin:
 
         with contextlib.suppress(NoMatches):
             if self._metric_active is not None:
-                self._metric_active.update(f"{active}")
+                self._metric_active.update(f"{self._active_account_count()}")
         with contextlib.suppress(NoMatches):
             swarm_ring = getattr(self, "_metric_swarm_ring", None)
             if swarm_ring is not None:
@@ -274,6 +276,24 @@ class _TuiUtilsMixin:
                 threads_bar.update(_cluster_bar_markup(n_slots, stats, threads_bar.region.width))
 
     # ── Swarm engine readout ─────────────────────────────────────────────
+
+    def _active_account_count(self) -> int:
+        """Number of usable session accounts in the pool.
+
+        The Overview's ACTIVE ACCOUNTS tile tracks the session pool, which is
+        a different resource from the per-slot job threads tracked by the Chat
+        Status card. Unknown (untested) sessions count as usable — the pool
+        marks them limited only after a real rate-limit hit — so a fresh app
+        run with profiles on disk reports them all. A forced reload happens
+        when the login flow just registered a new profile.
+        """
+        self._ensure_sessions_loaded()
+        manager = self._session_manager
+        if manager is None:
+            return 0
+        pool = manager.load_pool()
+        limited = sum(1 for s in pool.sessions if s.is_limited)
+        return int(pool.total_count - limited)
 
     def _swarm_engine_state(self) -> tuple[int, int, float]:
         """Return (active_agents, total_agents, uptime_seconds) for the Swarm card.
