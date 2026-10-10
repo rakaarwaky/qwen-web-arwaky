@@ -34,7 +34,19 @@ class SessionManager(ISessionManagerProtocol):
     # Block 2: Protocol Method Implementation
 
     def load_pool(self) -> SessionPool:
-        """Load session pool from disk."""
+        """Load session pool from disk, auto-discovering profile dirs on disk.
+
+        Missing Chromium profiles are registered so users who added a
+        profile manually (or on another machine/tool) do not re-login.
+        """
+        pool = self._load_pool_from_file()
+        added = self._register_discovered_profiles(pool)
+        if added:
+            self.save_pool(pool)
+        return pool
+
+    def _load_pool_from_file(self) -> SessionPool:
+        """Load the session pool from POOL_FILE, or an empty pool when absent."""
         if not POOL_FILE.exists():
             return SessionPool.empty()
 
@@ -54,6 +66,40 @@ class SessionManager(ISessionManagerProtocol):
                 )
             )
         return SessionPool(sessions=sessions, current_index=data.get("current_index", 0))
+
+    def _register_discovered_profiles(self, pool: SessionPool) -> int:
+        """Register profile dirs on disk missing from *pool*; returns the count added."""
+        known = {s.path.resolve() for s in pool.sessions}
+        added = 0
+        for profile_dir in self._iter_profile_dirs():
+            if profile_dir.resolve() in known:
+                continue
+            name = profile_dir.name
+            pool.add_session(
+                SessionInfo(
+                    session_id=f"session_{len(pool.sessions) + 1}",
+                    name=name,
+                    path=profile_dir,
+                    status=SessionStatus.UNKNOWN,
+                )
+            )
+            known.add(profile_dir.resolve())
+            added += 1
+            log.info("auto_discovered_profile %s registered in session pool", profile_dir)
+        return added
+
+    @staticmethod
+    def _iter_profile_dirs() -> list[Path]:
+        """Yield subdirectories of SESSIONS_DIR that look like Chromium profiles."""
+        if not SESSIONS_DIR.is_dir():
+            return []
+        profiles: list[Path] = []
+        for child in sorted(SESSIONS_DIR.iterdir()):
+            if not child.is_dir():
+                continue
+            if (child / "Local State").is_file() or (child / "Default" / "Cookies").is_file():
+                profiles.append(child)
+        return profiles
 
     def save_pool(self, pool: SessionPool) -> None:
         """Persist session pool to disk."""
