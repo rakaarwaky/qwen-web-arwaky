@@ -8,13 +8,18 @@ outcomes to the standardized success/error response envelope.
 
 from __future__ import annotations
 
+import json
+import sys
+
 from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_update_aggregate import IUpdateAggregate
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
     UpdateReport,
     UpdateStepResult,
 )
+from modules.shared.src.taxonomy_update_vo import UpdateRequest
 from modules.shared.src.utility_response_normalizer import error_response, safe_handle, success_response
 
 _DIVIDER = "─" * 58
@@ -121,3 +126,51 @@ def handle(args: object, updater: IUpdateProtocol) -> dict[str, object]:
             "cli-422",
         )
     return success_response(_format_report(report))
+
+
+def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
+    """Handle the --rollback subcommand of update: restore a previous version."""
+    version = str(getattr(args, "rollback", "")).strip()
+    if not version:
+        print("[ERROR] --rollback requires a version, e.g. 'qwen-web-arwaky update --rollback 6.3.0'", file=sys.stderr)
+        return 1
+
+    json_output = bool(getattr(args, "json", False))
+    response = orchestrator.execute(UpdateRequest(verb="rollback_to", previous_version=version))
+
+    if response.error:
+        msg = f"Rollback failed: {response.error}"
+        if json_output:
+            print(json.dumps({"success": False, "error": response.error}, indent=2))
+        else:
+            print(f"❌ {msg}", file=sys.stderr)
+        return 1
+
+    if response.steps:
+        lines = ["", "↩️  Rolling back to " + version, _DIVIDER]
+        for step in response.steps:
+            lines.append(f"  {_step_icon(step)} {step.name}: {_step_detail(step)}")
+        lines.append(_DIVIDER)
+        report = "\n".join(lines)
+    else:
+        report = f"✅ Rollback to {version} completed."
+
+    if json_output:
+        steps_data = (
+            [{"name": s.name, "success": s.success, "detail": s.detail or ""} for s in response.steps]
+            if response.steps
+            else []
+        )
+        print(
+            json.dumps(
+                {
+                    "success": True,
+                    "version": version,
+                    "steps": steps_data,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(report)
+    return 0
