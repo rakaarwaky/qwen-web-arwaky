@@ -11,10 +11,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
 
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest, SwarmSnapshot
+from modules.shared.src.utility_core_path_validation import (
+    validate_swarm_id,
+    validate_swarm_input_path,
+)
 
 
 def _render_snapshot(snapshot: SwarmSnapshot) -> None:
@@ -38,11 +41,14 @@ def _render_snapshot(snapshot: SwarmSnapshot) -> None:
 
 def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     """Start a Swarm fan-out over every discovered role template."""
-    input_path = Path(args.input).expanduser().resolve()
     json_output = bool(getattr(args, "json", False))
 
-    if not input_path.exists():
-        print(f"[ERROR] Swarm input not found: {input_path}", file=sys.stderr)
+    input_path, error = validate_swarm_input_path(args.input)
+    if error is not None:
+        if json_output:
+            print(json.dumps({"success": False, "error": error}, indent=2))
+        else:
+            print(f"[ERROR] {error['message']}", file=sys.stderr)
         return 1
 
     response = swarm.execute(SwarmRequest(verb="start", input_path=input_path))
@@ -82,8 +88,13 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
 def _cmd_status(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     """Report the current state of a Swarm by ID."""
     swarm_id = args.swarm_id
-    if len(swarm_id) > 128 or any(c in swarm_id for c in "/\\\0"):
-        print(f"[ERROR] Invalid swarm ID: {swarm_id!r}", file=sys.stderr)
+    error = validate_swarm_id(swarm_id)
+    if error is not None:
+        json_output = bool(getattr(args, "json", False))
+        if json_output:
+            print(json.dumps({"success": False, "error": error}, indent=2))
+        else:
+            print(f"[ERROR] {error['message']}", file=sys.stderr)
         return 1
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="snapshot", swarm_id=swarm_id))
@@ -121,8 +132,13 @@ def _cmd_status(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
 def _cmd_cancel(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     """Cancel a running Swarm by ID."""
     swarm_id = args.swarm_id
-    if len(swarm_id) > 128 or any(c in swarm_id for c in "/\\\0"):
-        print(f"[ERROR] Invalid swarm ID: {swarm_id!r}", file=sys.stderr)
+    error = validate_swarm_id(swarm_id)
+    if error is not None:
+        json_output = bool(getattr(args, "json", False))
+        if json_output:
+            print(json.dumps({"success": False, "error": error}, indent=2))
+        else:
+            print(f"[ERROR] {error['message']}", file=sys.stderr)
         return 1
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="cancel", swarm_id=swarm_id))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -62,42 +63,76 @@ class TestObservabilityReport:
 
 
 class TestObservabilityStatus:
-    def test_status_without_metrics_falls_back_to_status_file(self, capsys) -> None:
+    def test_status_without_metrics_falls_back_to_status_file(self, tmp_path, capsys) -> None:
         # metrics=None is a valid runtime state; the surface degrades
         # gracefully to the status file rather than erroring out.
-        rc = handle_observability_command(_status_args(), MagicMock(), None)
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        # Set up a status file within the workspace (under DEFAULT_LOG relative to workspace)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
+        status_file.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+        with (
+            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+        ):
+            rc = handle_observability_command(_status_args(), MagicMock(), None)
         assert rc == 0
         out = capsys.readouterr().out
-        assert "no metrics recorded" in out
+        assert "idle" in out
 
-    def test_status_reports_the_metrics_snapshot(self, capsys) -> None:
+    def test_status_reports_the_metrics_snapshot(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
+        status_file.write_text(json.dumps({}), encoding="utf-8")
+
         snapshot = MetricsSnapshot(
             counters={"run_count": 5},
             total_executions=5,
             successful_executions=4,
             success_rate=0.8,
         )
-        rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
+        with (
+            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+        ):
+            rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
         out = capsys.readouterr().out
         assert "Total executions" in out
         assert "4" in out
 
-    def test_status_json_envelope_carries_metrics(self, capsys) -> None:
+    def test_status_json_envelope_carries_metrics(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
+        status_file.write_text(json.dumps({}), encoding="utf-8")
+
         snapshot = MetricsSnapshot(counters={}, total_executions=0, successful_executions=0, success_rate=None)
-        rc = handle_observability_command(_status_args(json_output=True), MagicMock(), _metrics_mock(snapshot))
+        with (
+            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+        ):
+            rc = handle_observability_command(_status_args(json_output=True), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
         payload = json.loads(capsys.readouterr().out)
         assert payload["success"] is True
         assert payload["metrics"]["total_executions"] == 0
 
     def test_status_reads_the_status_file_when_present(self, tmp_path, capsys) -> None:
-        status_file = tmp_path / "status.json"
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
         status_file.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
         snapshot = MetricsSnapshot()
-        # status_path_for is imported inside _cmd_status; patch the source module.
         with (
             patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -106,11 +141,15 @@ class TestObservabilityStatus:
 
     def test_status_invalid_json_falls_back_gracefully(self, tmp_path, capsys) -> None:
         """A status.json containing malformed JSON is skipped, not raised (Issue 14)."""
-        status_file = tmp_path / "status.json"
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
         status_file.write_text("{not valid json", encoding="utf-8")
         snapshot = MetricsSnapshot()
         with (
             patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -119,12 +158,16 @@ class TestObservabilityStatus:
         # the "no status file present" message path (status_map is falsy).
         assert "no status file present" in out or "state" not in out
 
-    def test_status_double_absent(self, capsys) -> None:
+    def test_status_double_absent(self, tmp_path, capsys) -> None:
         """metrics=None and no status file: both sections report their absence (Issue 15)."""
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        log_dir = tmp_path / "log"
+        log_dir.mkdir()
+        status_file = log_dir / "status.json"
+        # File doesn't exist
         with (
-            patch(
-                "modules.shared.src.utility_core_status.status_path_for", return_value=Path("/nonexistent/status.json")
-            ),
+            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), None)
         assert rc == 0

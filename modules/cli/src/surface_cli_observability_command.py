@@ -10,7 +10,6 @@ relying on the interactive TUI.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import sys
 from typing import Any
@@ -37,18 +36,43 @@ def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate)
     return 0
 
 
-def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None) -> int:
+def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = None) -> int:
     """Show the current status file contents and metrics snapshot."""
     json_output = bool(getattr(args, "json", False))
 
     from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
+    from modules.shared.src.utility_core_path_validation import _get_workspace_root
     from modules.shared.src.utility_core_status import status_path_for
 
     status_path = status_path_for(DEFAULT_LOG)
+
+    # Validate that the status file path is within the workspace root
+    # (not a fixed DEFAULT_LOG path, since the log location may be configured)
+    workspace_root = _get_workspace_root()
+    try:
+        status_path_resolved = status_path.resolve()
+        status_path_resolved.relative_to(workspace_root)
+    except (OSError, ValueError):
+        # Path is outside workspace root
+        error = {
+            "code": "PATH_OUTSIDE_WORKSPACE",
+            "message": "Status file path is outside the workspace root",
+            "hint": f"Status file must be under {workspace_root}",
+            "field": "status_file",
+        }
+        if json_output:
+            print(json.dumps({"success": False, "error": error}, indent=2))
+        else:
+            print(f"[ERROR] {error['message']}", file=sys.stderr)
+        return 1
+
     status_map: dict[str, Any] | None = None
     if status_path.exists():
-        with contextlib.suppress(OSError, json.JSONDecodeError):
+        try:
             status_map = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            # Invalid or unreadable status file - treat as absent
+            status_map = None
 
     # contract_core_protocol.IMetricsProtocol.snapshot() returns a plain dict;
     # wrap it so the access pattern below matches MetricsSnapshot's fields.

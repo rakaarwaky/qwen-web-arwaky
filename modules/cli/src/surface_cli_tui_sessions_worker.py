@@ -47,6 +47,8 @@ class _TuiSessionsWorkerMixin:
     _jobs: Any
     _job_storage: Any
     _updater: Any
+    _ensure_sessions_loaded: Any
+    _sessions_loaded_once: bool
 
     # ── Login worker ─────────────────────────────────────────────────────
 
@@ -66,6 +68,11 @@ class _TuiSessionsWorkerMixin:
                 ),
             )
             self.call_from_thread(self._check_session)
+            # A login just registered a new session profile — the pool counts
+            # and account cards on the Sessions pane are stale. Force a reload
+            # so the REGISTERED/ACTIVE/LIMITED tiles and cards reflect the
+            # account that was just added.
+            self.call_from_thread(self._force_sessions_refresh)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
@@ -73,6 +80,17 @@ class _TuiSessionsWorkerMixin:
             )
         finally:
             self._login_in_flight = False
+
+    def _force_sessions_refresh(self) -> None:
+        """Reset the one-shot load guard and reload the account pool.
+
+        ``_ensure_sessions_loaded`` skips the reload once
+        ``_sessions_loaded_once`` is set, which is correct for nav-dock
+        re-visits but wrong right after a login that mutated the pool. This
+        helper clears the guard and re-runs the load.
+        """
+        self._sessions_loaded_once = False
+        self._ensure_sessions_loaded()
 
     # ── Session validation ───────────────────────────────────────────────
 

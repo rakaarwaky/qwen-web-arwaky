@@ -15,7 +15,12 @@ from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.taxonomy_core_vo import JobRecord
 from modules.shared.src.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.utility_core_prompt_template import resolve_prompt_path
+from modules.shared.src.utility_core_path_validation import (
+    validate_attachment_path,
+    validate_output_path,
+    validate_prompt_path,
+)
+from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 
 def _job_status(record: JobRecord) -> str:
@@ -27,42 +32,91 @@ def _job_status(record: JobRecord) -> str:
 
 def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     """Submit a file or attachment prompt job to the background worker pool."""
-    prompt_path = args.prompt_path
-    attachment = getattr(args, "attachment_path", None)
-    output_path = getattr(args, "output_path", None)
+    json_output = bool(getattr(args, "json", False))
     headless = bool(getattr(args, "headless", True))
 
-    # Resolve role templates to materialized paths.
-    prompt_path = str(resolve_prompt_path(prompt_path))
+    # Validate and resolve prompt path (handles role templates)
+    prompt_raw = args.prompt_path
+    if is_prompt_role(prompt_raw):
+        prompt_path = materialize_role_template(prompt_raw)
+    else:
+        validated_path, error = validate_prompt_path(prompt_raw, field="prompt_file")
+        if error is not None:
+            if json_output:
+                print(json.dumps({"success": False, "error": error}, indent=2))
+            else:
+                print(f"[ERROR] {error['message']}", file=sys.stderr)
+            return 1
+        # validated_path is guaranteed non-None when error is None
+        if validated_path is None:
+            if json_output:
+                print(json.dumps({"success": False, "error": "Internal error: validated path is None"}, indent=2))
+            else:
+                print("[ERROR] Internal error: validated path is None", file=sys.stderr)
+            return 1
+        prompt_path = validated_path
 
-    if attachment:
+    # Validate attachment path if provided
+    attachment_raw = getattr(args, "attachment_path", None)
+    attachment_path = None
+    if attachment_raw:
+        validated_attachment, error = validate_attachment_path(attachment_raw, field="attachment_file")
+        if error is not None:
+            if json_output:
+                print(json.dumps({"success": False, "error": error}, indent=2))
+            else:
+                print(f"[ERROR] {error['message']}", file=sys.stderr)
+            return 1
+        attachment_path = validated_attachment
+
+    # Validate output path if provided
+    output_raw = getattr(args, "output_path", None)
+    output_path = None
+    if output_raw:
+        validated_output, error = validate_output_path(output_raw, field="output_file")
+        if error is not None:
+            if json_output:
+                print(json.dumps({"success": False, "error": error}, indent=2))
+            else:
+                print(f"[ERROR] {error['message']}", file=sys.stderr)
+            return 1
+        output_path = validated_output
+
+    # Build request
+    if attachment_path:
         request = JobRequest(
             verb="submit_attachment_job",
-            prompt_file=prompt_path,
-            attachment_file=attachment,
-            output_file=output_path,
+            prompt_file=str(prompt_path),
+            attachment_file=str(attachment_path),
+            output_file=str(output_path) if output_path else None,
             headless=headless,
         )
     else:
         request = JobRequest(
             verb="submit_file_job",
-            prompt_file=prompt_path,
-            output_file=output_path,
+            prompt_file=str(prompt_path),
+            output_file=str(output_path) if output_path else None,
             headless=headless,
         )
 
     try:
         response = jobs.execute(request)
     except Exception as exc:
-        print(f"[ERROR] Job submission failed: {exc}", file=sys.stderr)
+        if json_output:
+            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        else:
+            print(f"[ERROR] Job submission failed: {exc}", file=sys.stderr)
         return 1
 
     record = response.record
     if record is None:
-        print(f"[ERROR] Job submission returned no record: {response.error}")
+        err_msg = response.error or "Job submission returned no record"
+        if json_output:
+            print(json.dumps({"success": False, "error": err_msg}, indent=2))
+        else:
+            print(f"[ERROR] Job submission returned no record: {response.error}")
         return 1
 
-    json_output = bool(getattr(args, "json", False))
     if json_output:
         print(
             json.dumps(

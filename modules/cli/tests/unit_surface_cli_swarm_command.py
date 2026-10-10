@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -52,12 +53,14 @@ def _cancel_args(swarm_id: str = "swarm-1", json_output: bool = False) -> MagicM
 
 class TestSwarmStart:
     def test_missing_input_is_refused(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
         missing = tmp_path / "does-not-exist"
         rc = handle_swarm_command(_start_args(missing), MagicMock())
         assert rc == 1
         assert "Swarm input not found" in capsys.readouterr().err
 
     def test_start_uses_the_start_verb_and_reports(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
         (tmp_path / "input.md").write_text("task")
         swarm = MagicMock()
         swarm.execute.return_value = MagicMock(snapshot=_snapshot("running"), error=None)
@@ -71,6 +74,7 @@ class TestSwarmStart:
         assert "swarm status" in out
 
     def test_start_orm_error_returns_nonzero(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
         (tmp_path / "input.md").write_text("task")
         swarm = MagicMock()
         swarm.execute.return_value = MagicMock(snapshot=None, error="no sessions")
@@ -79,6 +83,7 @@ class TestSwarmStart:
         assert "no sessions" in capsys.readouterr().err
 
     def test_start_json_envelope(self, tmp_path, capsys) -> None:
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
         (tmp_path / "input.md").write_text("task")
         swarm = MagicMock()
         swarm.execute.return_value = MagicMock(snapshot=_snapshot("running"), error=None)
