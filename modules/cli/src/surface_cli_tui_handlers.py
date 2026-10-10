@@ -11,6 +11,7 @@ Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,10 @@ from modules.cli.src.surface_cli_tui_css import THEME
 # The dock's active marker: a short accent bar centred over the active
 # section, the way the mockup draws it.
 NAV_ACTIVE_MARKER = "━━━"
+
+
+def _noop() -> None:
+    """No-op handler for unrecognised Settings-pane button IDs."""
 
 
 class _TuiHandlersMixin:
@@ -64,6 +69,38 @@ class _TuiHandlersMixin:
     _refresh_sessions_table: Any
     _run_session_health_check: Any
     _render_account_cards: Any
+    _jobs: Any
+    _job_storage: Any
+    _updater: Any
+    _update_orchestrator: Any
+
+    # System-action workers live in _TuiSessionsWorkerMixin; declared here
+    # so the router below type-checks and the AES scanner sees no
+    # duplicate method definitions in this file.
+    _run_doctor_worker: Any
+    _run_update_worker: Any
+    _run_jobs_cleanup: Any
+    _refresh_jobs_table: Any
+
+    # ── System Actions (Settings pane) ──────────────────────────────────
+
+    def _system_action_pressed(self, button_id: str) -> None:
+        """Route Settings-pane system-action button presses."""
+        # @work(thread=True) returns a Worker; the router type must allow
+        # handlers that return any object (Worker or None for sync handlers).
+        router: dict[str, Callable[[], Any]] = {
+            "btn-tui-doctor": self._run_doctor_worker,
+            "btn-tui-update": self._run_update_worker,
+            "btn-tui-jobs-cleanup": self._run_jobs_cleanup,
+            "btn-jobs-refresh": self._refresh_jobs_table,
+        }
+        handler = router.get(button_id)
+        if handler is None:
+            # Unknown button IDs are silently swallowed by the TUI; log a
+            # warning so a forgotten compose-side button is not a dead code path.
+            self._log_msg(f"[bold {THEME['warn']}]WARNING:[/] Unknown system-action button: {button_id!r}")
+            return
+        handler()
 
     def _swarm_button_pressed(self, button_id: str) -> None:
         """Route Swarm-screen button presses to the right handler."""

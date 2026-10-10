@@ -49,6 +49,7 @@ class _TuiEventsMixin:
     _run_session_health_check: Any
     _check_template_roles: Any
     _open_template_picker: Any
+    _system_action_pressed: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -156,6 +157,11 @@ class _TuiEventsMixin:
             return
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
+            return
+        # Settings pane: system actions (doctor, update, jobs).
+        if button_id in ("btn-tui-doctor", "btn-tui-update", "btn-tui-jobs-cleanup", "btn-jobs-refresh"):
+            self._system_action_pressed(button_id)
+            return
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Enter inside a composer input sends that slot's typed task."""

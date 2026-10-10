@@ -11,8 +11,9 @@ from __future__ import annotations
 import sys
 
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
+from modules.shared.src.contract_core_protocol import IUpdateProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
@@ -41,6 +42,8 @@ class InteractiveController:
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
         session_manager: ISessionManagerProtocol | None = None,
+        updater: IUpdateProtocol | None = None,
+        job_storage: IJobStorageProtocol | None = None,
     ) -> None:
         """Inject the specialized pipeline orchestrators, workspace, and setup."""
         self._workspace = workspace
@@ -55,6 +58,8 @@ class InteractiveController:
         self._jobs = jobs
         self._swarm = swarm
         self._session_manager = session_manager
+        self._updater = updater
+        self._job_storage = job_storage
 
     @safe_handle
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
@@ -89,6 +94,8 @@ class InteractiveController:
                 self._jobs,
                 self._swarm,
                 self._session_manager,
+                self._updater,
+                self._job_storage,
             )
             app.run()
             return success_response("TUI Session Closed.")

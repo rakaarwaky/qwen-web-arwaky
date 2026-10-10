@@ -32,6 +32,9 @@ from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.utility_core_version import get_package_version
 
+# Widget ID shared between compose (widget creation) and handlers (query).
+JOBS_TABLE_ID = "jobs-table"
+
 
 class _TuiComposeMixin:
     """Mixin that owns the Textual compose tree and app lifecycle hooks."""
@@ -525,6 +528,26 @@ class _TuiComposeMixin:
                                     )
                                     yield Button("Apply", id=f"override-apply-{name}", classes="btn-apply")
                                     yield Button("Reset", id=f"override-reset-{name}", classes="btn-apply btn-reset")
+
+                # System Actions card: doctor, update, and jobs management.
+                with Vertical(classes="screen-card settings-card system-actions-card", id="system-actions-card"):
+                    with Horizontal(classes="card-title-row"):
+                        yield Static("🛠", classes="card-icon")
+                        yield Label("SYSTEM ACTIONS", classes="card-title")
+
+                    with Horizontal(classes="toggle-row"):
+                        yield Button("🏥 Run Doctor", id="btn-tui-doctor", classes="btn-doctor")
+                        yield Button("🔄 Update", id="btn-tui-update", classes="btn-update")
+                        yield Button("🧹 Cleanup Jobs", id="btn-tui-jobs-cleanup", classes="btn-jobs-cleanup")
+
+                # Jobs table card.
+                with Vertical(classes="screen-card settings-card jobs-card", id="jobs-card"):
+                    with Horizontal(classes="card-title-row"):
+                        yield Static("⚡", classes="card-icon")
+                        yield Label("BACKGROUND JOBS", classes="card-title")
+                    yield DataTable(id=JOBS_TABLE_ID)
+                    with Horizontal(classes="toggle-row"):
+                        yield Button("↻ Refresh", id="btn-jobs-refresh", classes="btn-jobs-refresh")
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no

@@ -2045,6 +2045,70 @@ HelpScreen {
     border: solid $accent;
     text-style: bold;
 }
+
+/* ═══ SYSTEM ACTIONS CARD (Settings pane) ═══════════════════════════ */
+
+/* The Settings pane's override card scrolls inside its own band. The system
+   actions card and jobs card are fixed-height siblings below it. */
+.screen-card.system-actions-card {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.screen-card.jobs-card {
+    height: 12;
+    margin-bottom: 0;
+}
+
+.btn-doctor {
+    width: auto;
+    height: 3;
+    background: $bg_raised;
+    color: $status_ok;
+    border: solid $status_ok;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.btn-update {
+    width: auto;
+    height: 3;
+    background: $bg_raised;
+    color: $fg_accent;
+    border: solid $border;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.btn-jobs-cleanup {
+    width: auto;
+    height: 3;
+    background: $bg_raised;
+    color: $status_warn;
+    border: solid $border;
+    text-style: bold;
+}
+
+.jobs-hint {
+    width: 1fr;
+    color: $status_muted;
+    text-overflow: ellipsis;
+}
+
+.btn-jobs-refresh {
+    width: auto;
+    height: 3;
+    background: $bg_hover;
+    color: $fg_accent;
+    border: solid $border;
+    margin-right: 1;
+}
+
+#jobs-table {
+    height: 1fr;
+    width: 100%;
+    background: transparent;
+}
 """
 )
 
