@@ -115,6 +115,17 @@ def materialize_role_template(role: str) -> Path:
     return tmp
 
 
+def resolve_prompt_path(value: str) -> Path:
+    """Resolve a CLI prompt-path argument to a concrete file path.
+
+    If *value* names a built-in role template, it is materialised to a temp
+    file; otherwise it is treated as a filesystem path and resolved.
+    """
+    if is_prompt_role(value):
+        return materialize_role_template(value)
+    return Path(value).resolve()
+
+
 def _extract_title(body: str) -> str:
     """Derive a display title from the first ``##`` heading in a template body."""
     for line in body.splitlines():
@@ -156,4 +167,5 @@ __all__ = [
     "materialize_role_template",
     "prompt_template_manifest",
     "render_prompt",
+    "resolve_prompt_path",
 ]
