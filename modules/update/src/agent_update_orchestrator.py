@@ -59,6 +59,7 @@ class UpdateOrchestrator(IUpdateAggregate):
             if previous is None:
                 return UpdateResponse(error="rollback_to verb requires previous_version")
             return UpdateResponse(steps=self._updater.rollback_to(VersionString(previous)))
+        # Untrusted callers (MCP) may pass any string; refuse it by name.
         return UpdateResponse(error=f"unknown update verb: {request.verb!r}")
 
     # Block 3: Dunder Methods, Factories, Helpers

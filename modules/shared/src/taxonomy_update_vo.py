@@ -45,7 +45,7 @@ class UpdateRequest:
     passing arguments the other ignores.
     """
 
-    verb: UpdateVerb
+    verb: UpdateVerb | str
     force: ForceFlag = ForceFlag(False)
     previous_version: VersionString | str | None = None
 
