@@ -90,7 +90,6 @@ merge_protections:
 
 merge_protections_settings:
   auto_merge_conditions:
-    - "label~=(ci|docs)"
     - check-success=Tests (pytest)
     - check-success=Self-Lint (lint-arwaky-cli)
     - base=main
