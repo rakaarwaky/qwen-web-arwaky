@@ -380,6 +380,7 @@ def _dispatch(
             json_output=bool(getattr(args, "json", False)),
             smoke=bool(getattr(args, "smoke", False)),
             session=container.agent_session_orchestrator,
+            session_manager=container.session_manager,
         )
 
     if action == "login":

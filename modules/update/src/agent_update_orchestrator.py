@@ -44,8 +44,14 @@ class UpdateOrchestrator(IUpdateAggregate):
         agent routes it to the right capability call and wraps the result.
         No I/O happens here; every byte of output comes from the capability.
         """
+        if request.verb == "current_version":
+            return UpdateResponse(version=self._updater.current_version())
         if request.verb == "check_update":
             return UpdateResponse(check_result=self._updater.check_update())
+        if request.verb == "upgrade_package":
+            return UpdateResponse(step_result=self._updater.upgrade_package(force=request.force))
+        if request.verb == "sync_browser":
+            return UpdateResponse(step_result=self._updater.sync_browser(force=request.force))
         if request.verb == "perform_update":
             return UpdateResponse(report=self._updater.perform_update(force=request.force))
         if request.verb == "rollback_to":

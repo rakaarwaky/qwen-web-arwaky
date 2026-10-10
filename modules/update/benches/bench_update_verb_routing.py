@@ -33,7 +33,9 @@ def bench_verb_routing(iterations: int = 2000) -> float:
 
     start = time.perf_counter()
     for _ in range(iterations):
-        orchestrator.execute(request)
+        response = orchestrator.execute(request)
+        assert response.error is None, f"unexpected verb routing error: {response.error!r}"
+        assert response.version is not None
     elapsed = time.perf_counter() - start
     return elapsed / iterations * 1_000_000
 

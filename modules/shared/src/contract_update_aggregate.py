@@ -6,7 +6,7 @@ the rollback decision (run the post-update health gate, then restore the
 previous version when the gate fails), so no surface can skip that gate.
 
 The capability seam this aggregate sits on — ``IUpdateProtocol`` — lives
-in ``contract_update_protocol.py``.
+in ``contract_core_protocol.py``.
 """
 
 from __future__ import annotations

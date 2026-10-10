@@ -30,7 +30,6 @@ UpdateVerb: TypeAlias = Literal[
     "sync_browser",
     "perform_update",
     "rollback_to",
-    "sync_env",
 ]
 
 #: The ordered per-step outcomes a rollback recorded, in execution order.
