@@ -44,6 +44,7 @@ from modules.shared.src.utility_session_cloner import session_age_warning
 
 if TYPE_CHECKING:
     from modules.shared.src.contract_session_aggregate import ISessionAggregate
+    from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -187,7 +188,7 @@ def _check_workspace() -> dict[str, Any]:
     )
 
 
-def _check_session() -> dict[str, Any]:
+def _check_session(session_manager: ISessionManagerProtocol | None = None) -> dict[str, Any]:
     """Report session pool status.
 
     When the pool has one or more entries, report per-session health from
@@ -198,13 +199,10 @@ def _check_session() -> dict[str, Any]:
     interactive CAPTCHA re-login, so that state is reported as a warning even
     when the profile itself is intact (issue #300).
     """
-    from modules.session.src.capabilities_session_manager import SessionManager
-
-    manager = SessionManager()
-    pool = manager.load_pool()
+    pool = session_manager.load_pool() if session_manager is not None else None
 
     # Multi-account pool: report per-session status
-    if pool.total_count > 0:
+    if pool is not None and pool.total_count > 0:
         lines = [f"Session pool: {pool.total_count} account(s) under {SESSIONS_DIR}"]
         for s in pool.sessions:
             icon = "✅" if s.is_healthy else ("⚠️" if s.is_limited else "🔵")
@@ -364,6 +362,7 @@ def run_doctor_checks(
     include_heavy: bool = False,
     smoke: bool = False,
     session: ISessionAggregate | None = None,
+    session_manager: ISessionManagerProtocol | None = None,
 ) -> list[dict[str, Any]]:
     """Run every diagnostic check and return the records as plain dictionaries.
 
@@ -375,7 +374,7 @@ def run_doctor_checks(
         _check_python(),
         _check_chromium(include_heavy),
         _check_workspace(),
-        _check_session(),
+        _check_session(session_manager),
         _check_output_writable(),
         _check_capacity(),
         _check_sandbox(),
@@ -388,16 +387,20 @@ def run_doctor_checks(
     return checks
 
 
-def build_smoke_gate() -> Callable[[], tuple[tuple[str, bool, str], ...]]:
+def build_smoke_gate(
+    session_manager: ISessionManagerProtocol | None = None,
+) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
     """Return a callable the update pipeline runs as its postflight functional gate.
 
     Returns the non-interactive diagnostic checks as ``(name, passed, detail)``
     triples. The Root layer composes this so the Capabilities update pipeline
-    depends only on an injected callable, never on a Surface.
+    depends only on an injected callable, never on a Surface. The checks run
+    at gate-execution time (not container-construction time) so the post-update
+    gate reflects the post-upgrade state (issue #506).
     """
-    checks = run_doctor_checks()
 
     def _gate() -> tuple[tuple[str, bool, str], ...]:
+        checks = run_doctor_checks(session_manager=session_manager)
         return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
 
     return _gate
@@ -410,13 +413,23 @@ def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]],
     return not failed, failed, warned
 
 
-def run_doctor(json_output: bool = False, smoke: bool = False, session: ISessionAggregate | None = None) -> int:
+def run_doctor(
+    json_output: bool = False,
+    smoke: bool = False,
+    session: ISessionAggregate | None = None,
+    session_manager: ISessionManagerProtocol | None = None,
+) -> int:
     """Perform system health diagnostics and print a formatted report or JSON summary.
 
     With *smoke* enabled, a final check runs a headless browser session round-trip
     through the injected session aggregate; it needs a saved session and Chromium.
     """
-    checks = run_doctor_checks(include_heavy=_flag("QWEN_DOCTOR_DEEP"), smoke=smoke, session=session)
+    checks = run_doctor_checks(
+        include_heavy=_flag("QWEN_DOCTOR_DEEP"),
+        smoke=smoke,
+        session=session,
+        session_manager=session_manager,
+    )
     all_passed, failed, warned = summarize(checks)
 
     if json_output:

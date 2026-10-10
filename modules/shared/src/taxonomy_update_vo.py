@@ -30,7 +30,6 @@ UpdateVerb: TypeAlias = Literal[
     "sync_browser",
     "perform_update",
     "rollback_to",
-    "sync_env",
 ]
 
 #: The ordered per-step outcomes a rollback recorded, in execution order.
@@ -46,7 +45,7 @@ class UpdateRequest:
     passing arguments the other ignores.
     """
 
-    verb: UpdateVerb
+    verb: UpdateVerb | str
     force: ForceFlag = ForceFlag(False)
     previous_version: VersionString | str | None = None
 

@@ -132,7 +132,8 @@ class SharedContainer:
             metrics=self.metrics,
         )
         self.workspace = WorkspaceProvisioner()
-        self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate())
+        self.session_manager: ISessionManagerProtocol = SessionManager()
+        self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate(self.session_manager))
         # The three feature agents sit between their capability and the
         # Surfaces so no caller repeats the sequence each one owns: browser
         # auth, observability verb routing, and the update rollback gate.
@@ -198,7 +199,6 @@ class SharedContainer:
             cancel=self.run_cancel_registry,
         )
         # Session rotation infrastructure
-        self.session_manager: ISessionManagerProtocol = SessionManager()
         self.session_health_checker = SessionHealthChecker()
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,

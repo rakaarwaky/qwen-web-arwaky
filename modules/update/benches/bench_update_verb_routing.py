@@ -1,7 +1,7 @@
-"""Benchmark for the update health-gate step result formatting.
+"""Benchmark for update-verb routing through UpdateOrchestrator.execute (current_version path over a stubbed updater).
 
 Uses time.perf_counter for measuring performance without requiring the
-pytest-benchmark plugin. The formatting path is pure, so the benchmark needs
+pytest-benchmark plugin. The routing path is pure, so the benchmark needs
 no network, no subprocess, and no installed release.
 """
 
@@ -30,6 +30,12 @@ def bench_verb_routing(iterations: int = 2000) -> float:
     """Benchmark one read-only verb routed through the orchestrator."""
     orchestrator = _orchestrator()
     request = UpdateRequest(verb="current_version")
+
+    # Verify routing correctness before measuring; per-iteration asserts would
+    # add comparison overhead to the timed region.
+    response = orchestrator.execute(request)
+    assert response.error is None, f"unexpected verb routing error: {response.error!r}"
+    assert response.version is not None
 
     start = time.perf_counter()
     for _ in range(iterations):

@@ -10,7 +10,7 @@ import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from playwright.sync_api import ElementHandle, Page
 
@@ -279,6 +279,12 @@ class IUpdateProtocol(ABC):
         """Rollback to a previously installed package version."""
 
 
+#: Post-update functional health gate: a callable returning ``(name, passed, detail)`` triples.
+#: The Root layer injects it so the update pipeline re-runs the doctor checks at
+#: gate-execution time rather than at container-construction time (issue #506).
+ISmokeGate: TypeAlias = Callable[[], tuple[tuple[str, bool, str], ...]]
+
+
 class IWorkspaceProtocol(ABC):
     """Workspace directory provisioning capability contract."""
 
@@ -374,6 +380,7 @@ __all__ = [
     "ISaverProtocol",
     "IObservabilityProtocol",
     "IUpdateProtocol",
+    "ISmokeGate",
     "IWorkspaceProtocol",
     "IStatusProtocol",
     "IMetricsProtocol",

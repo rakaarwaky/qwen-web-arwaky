@@ -12,7 +12,7 @@ Seams:
 
 The status-file seam ``IStatusProtocol`` belongs to the jobs feature,
 whose ``StatusFileWriter`` implements it; it lives in
-``contract_jobs_protocol.py``.
+``contract_core_protocol.py``.
 """
 
 from __future__ import annotations

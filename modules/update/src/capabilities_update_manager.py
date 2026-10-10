@@ -27,7 +27,7 @@ from typing import Any
 from urllib import request
 from urllib.parse import unquote, urlparse
 
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_core_protocol import ISmokeGate, IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_GITHUB_REPO,
     DEFAULT_PACKAGE_NAME,
@@ -127,7 +127,7 @@ class UpdateManager(IUpdateProtocol):
         http_timeout_sec: float = 15.0,
         pip_timeout_sec: float = 600.0,
         browser_timeout_sec: float = 900.0,
-        smoke_gate: Any = None,
+        smoke_gate: ISmokeGate | None = None,
     ) -> None:
         """Initialize with package identity and subprocess timeout budgets.
 

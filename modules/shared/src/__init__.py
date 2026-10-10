@@ -17,6 +17,7 @@ from .contract_core_protocol import (
     IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
+    ISmokeGate,
     IStreamProtocol,
     IUploadProtocol,
 )
@@ -406,6 +407,7 @@ __all__ = [
     "IStreamProtocol",
     "IBrowserProtocol",
     "ISaverProtocol",
+    "ISmokeGate",
     "IObservabilityProtocol",
     "IBrowserAggregate",
     "IConfigAggregate",
