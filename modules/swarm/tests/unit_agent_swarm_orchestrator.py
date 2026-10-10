@@ -268,6 +268,10 @@ def test_resource_warning_only_above_threshold(monkeypatch, tmp_path: Path) -> N
     """Issue #277 AC-4: the warning is raised at or above the documented
     threshold and stays silent below it, so a small fan-out is frictionless."""
     _patch_templates(monkeypatch, tmp_path)
+    # The runner clamps explicit concurrency to the host's measured memory
+    # budget (issue #291), so pin the budget to the default cap and let the
+    # requested value through unchanged.
+    monkeypatch.setattr("modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 16)
     aggregate = FakeAttachmentAggregate()
 
     quiet = SwarmOrchestrator(
