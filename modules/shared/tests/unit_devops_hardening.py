@@ -309,6 +309,32 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
     assert "Browser Smoke Test" not in names
 
 
+def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:
+    """build_smoke_gate(session_manager=…) threads the pool check into the gate triples."""
+    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+    from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+
+    # A mock pool with one healthy session so _check_session takes the multi-account path
+    pool = MagicMock()
+    pool.total_count = 1
+    pool.healthy_count = 1
+    pool.limited_count = 0
+    session = MagicMock()
+    session.session_id = "abc"
+    session.name = "default"
+    session.is_healthy = True
+    session.status.value = "healthy"
+    pool.sessions = [session]
+    manager = MagicMock(spec=ISessionManagerProtocol)
+    manager.load_pool.return_value = pool
+
+    gate = build_smoke_gate(session_manager=manager)
+    results = gate()
+    names = {name for name, _, _ in results}
+    assert "Session Authentication Token" in names
+    manager.load_pool.assert_called_once()
+
+
 def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:
     """Root composes the gate; the Capabilities updater only sees a callable."""
     from modules.root_core_container import SharedContainer

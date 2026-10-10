@@ -25,7 +25,6 @@ OutputPath = NewType("OutputPath", Path)
 FilePath = NewType("FilePath", Path)
 RunId = NewType("RunId", str)
 RunIdHex = NewType("RunIdHex", str)
-CompileDepth = NewType("CompileDepth", int)
 JobName = NewType("JobName", str)
 RunContextId = NewType("RunContextId", str)
 MessageCount = NewType("MessageCount", int)
@@ -700,7 +699,6 @@ __all__ = [
     "Pid",
     "RunId",
     "RunIdHex",
-    "CompileDepth",
     "RunContextId",
     "MessageCount",
     "FailureCategory",
