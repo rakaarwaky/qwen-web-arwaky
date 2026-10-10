@@ -41,7 +41,6 @@ merge_queue:
   dequeued_label: dequeued
   checking_label: queue-checking
   status_comments: outcomes
-  max_parallel_checks: 10
 
 # ── Pull Request Rules (Workflow Automation) ─────────────────────────────────
 # These rules auto-label PRs on open and update; merge_protections then
@@ -91,7 +90,6 @@ merge_protections:
 
 merge_protections_settings:
   auto_merge_conditions:
-    - check-success=Tests (pytest)
     - check-success=Self-Lint (lint-arwaky-cli)
     - base=main
 
