@@ -17,6 +17,14 @@
 # .github/workflows/ci.yml: the "Tests (pytest) (3.13)" matrix check run
 # (the single, latest-supported Python interpreter) and the "Self-Lint
 # (lint-arwaky-cli)" job (AD-05 template hygiene).
+#
+# Label matching: Mergify's condition lists are AND-lists with no built-in
+# OR. To match "ci OR docs", use the `or:` combinator (or the equivalent
+# one-line expression `label=ci or label=docs`). The previous config used
+# "label~=(ci|docs)", which is not valid regex syntax for Mergify (labels
+# are matched with `~=^(...)$` for regex, not parenthesized groups) and
+# therefore never matched — silently defeating the queue and merge rules
+# below.
 
 # ── Merge Queue ───────────────────────────────────────────────────────────────
 # main is the only protected branch; the queue serializes merges through
@@ -32,7 +40,9 @@ queue_rules:
     merge_conditions:
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
-      - "label~=(ci|docs)"
+      - or:
+          - label=ci
+          - label=docs
     merge_method: squash
     batch_size: 1
     checks_timeout: 45m
@@ -52,7 +62,9 @@ pull_request_rules:
   - name: auto-queue-ci-and-docs
     description: Queue PRs labelled ci or docs when the checks are green
     conditions:
-      - "label~=(ci|docs)"
+      - or:
+          - label=ci
+          - label=docs
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - -draft
@@ -70,7 +82,9 @@ pull_request_rules:
       - -draft
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
-      - "label~=(ci|docs)"
+      - or:
+          - label=ci
+          - label=docs
     actions:
       merge:
         method: squash
