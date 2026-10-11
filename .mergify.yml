@@ -14,8 +14,9 @@
 #
 # Note: this repo's CI runs per-job check runs (there is no single "verify"
 # check), so queue/merge gate on the concrete check-run names produced by
-# .github/workflows/ci.yml: the "Tests (pytest)" job (3.12 + 3.13 matrix)
-# and the "Self-Lint (lint-arwaky-cli)" job (AD-05 template hygiene).
+# .github/workflows/ci.yml: the "Tests (pytest) (3.12)" and
+# "Tests (pytest) (3.13)" matrix check runs (one per Python version), and
+# the "Self-Lint (lint-arwaky-cli)" job (AD-05 template hygiene).
 
 # ── Merge Queue ───────────────────────────────────────────────────────────────
 # main is the only protected branch; the queue serializes merges through
@@ -26,10 +27,12 @@ queue_rules:
     queue_conditions:
       - base=main
       - -draft
-      - check-success=Tests (pytest)
+      - check-success=Tests (pytest) (3.12)
+      - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
     merge_conditions:
-      - check-success=Tests (pytest)
+      - check-success=Tests (pytest) (3.12)
+      - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - "label~=(ci|docs)"
     merge_method: squash
@@ -52,7 +55,8 @@ pull_request_rules:
     description: Queue PRs labelled ci or docs when the checks are green
     conditions:
       - "label~=(ci|docs)"
-      - check-success=Tests (pytest)
+      - check-success=Tests (pytest) (3.12)
+      - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - -draft
       - base=main
@@ -67,7 +71,8 @@ pull_request_rules:
     conditions:
       - base=main
       - -draft
-      - check-success=Tests (pytest)
+      - check-success=Tests (pytest) (3.12)
+      - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - "label~=(ci|docs)"
     actions:
@@ -85,7 +90,8 @@ merge_protections:
       - base=main
       - -draft
     success_conditions:
-      - check-success=Tests (pytest)
+      - check-success=Tests (pytest) (3.12)
+      - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
 
 merge_protections_settings:
