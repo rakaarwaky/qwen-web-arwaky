@@ -163,8 +163,8 @@ class _TuiEventsMixin:
         if button_id == "btn-sessions-health":
             self._run_session_health_check()
             return
-        # Settings pane: system actions (doctor, update, jobs).
-        if button_id in ("btn-tui-doctor", "btn-tui-update", "btn-tui-jobs-cleanup", "btn-jobs-refresh"):
+        # Settings pane: system actions (doctor, update).
+        if button_id in ("btn-tui-doctor", "btn-tui-update"):
             self._system_action_pressed(button_id)
             return
 

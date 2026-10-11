@@ -19,7 +19,6 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import DataTable, Label
 
-from modules.cli.src.surface_cli_tui_compose import JOBS_TABLE_ID
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
 
@@ -300,83 +299,6 @@ class _TuiSessionsWorkerMixin:
             self.call_from_thread(
                 self._log_msg,
                 "[bold {}]UPDATE ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
-            )
-
-    @work(thread=True)
-    def _run_jobs_cleanup(self) -> None:
-        """Remove stale job records past their retention window (non-destructive for active jobs)."""
-        self.call_from_thread(
-            self._log_msg,
-            "[bold {}]JOBS:[/] Cleaning up stale job records...".format(THEME["accent_fg"]),
-        )
-        jobs_storage = getattr(self, "_job_storage", None)
-        if jobs_storage is None:
-            self.call_from_thread(
-                self.notify,
-                "Job storage not available. Use 'qwa job cleanup' from the shell instead.",
-                severity="warning",
-            )
-            return
-        try:
-            removed = jobs_storage.cleanup_stale_jobs()
-            self.call_from_thread(
-                self.notify,
-                f"Removed {removed} stale job record(s). Running jobs are preserved.",
-                severity="information",
-            )
-        except Exception as exc:
-            self.call_from_thread(self.notify, f"Job cleanup failed: {exc}", severity="error")
-
-    def _refresh_jobs_table(self) -> None:
-        """Load and display recent jobs in the Settings pane's jobs table."""
-        if getattr(self, "_jobs", None) is None:
-            self.notify("Jobs aggregate not available in this container.", severity="warning")
-            return
-        self._refresh_jobs_table_worker()
-
-    @work(thread=True, group="jobs-table", exclusive=True)
-    def _refresh_jobs_table_worker(self) -> None:
-        """Load recent jobs from the job storage and render the table."""
-        # Generation guard: if a newer worker started, bail out before writing.
-        gen = getattr(self, "_jobs_table_gen", 0) + 1
-        self._jobs_table_gen = gen
-        try:
-            from modules.shared.src.taxonomy_jobs_vo import JobRequest
-
-            response = self._jobs.execute(JobRequest(verb="list_jobs", limit=20))
-            records = response.records or []
-
-            def _update() -> None:
-                # A newer worker started; this one is stale.
-                if getattr(self, "_jobs_table_gen", 0) != gen:
-                    return
-                with contextlib.suppress(NoMatches):
-                    table = self.query_one(f"#{JOBS_TABLE_ID}", DataTable)
-                    table.clear()
-                    table.add_columns("JOB ID", "STATUS", "INPUT", "DURATION", "COMPLETED")
-                    for rec in records:
-                        status = "RUNNING" if not rec.completed else ("FAILED" if rec.error else "DONE")
-                        duration = f"{rec.duration_sec}s" if rec.duration_sec else "-"
-                        completed_at = (rec.completed_at or "")[:19]
-                        table.add_rows(
-                            (
-                                str(rec.job_id)[:30],
-                                status,
-                                str(rec.input_file or "-")[:30],
-                                duration,
-                                completed_at,
-                            )
-                        )
-                self._log_msg(
-                    "[bold {}]JOBS:[/] {} background job(s) listed.".format(THEME["ok"], len(records)),
-                )
-
-            with contextlib.suppress(ValueError):
-                self.call_from_thread(_update)
-        except Exception as exc:
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]JOBS LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
 
     # ── Swarm engine readout ─────────────────────────────────────────────
