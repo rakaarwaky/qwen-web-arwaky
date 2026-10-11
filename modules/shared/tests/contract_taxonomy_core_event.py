@@ -20,10 +20,12 @@ from modules.shared.src.taxonomy_core_error import (
 )
 from modules.shared.src.taxonomy_core_error import QwenCliError as CANONICAL_QWEN_CLI_ERROR
 from modules.shared.src.taxonomy_core_event import (
+    EVENT_DESCRIPTIONS,
     EVENT_DOCUMENT_PARSED,
     EVENT_GENERATION_FINISHED,
     EVENT_OUTPUT_COPIED,
     EVENT_SEND_CLICKED,
+    EVENT_SESSION_EXPIRED,
     EVENT_STREAMING_GENERATION,
     EVENT_THINKING_STARTED,
     STANDARD_PROMPT_EVENTS,
@@ -77,6 +79,18 @@ def test_event_exports_are_available_and_legacy_vo_alias_is_compatible() -> None
     assert EVENT_STREAMING_GENERATION == QwenEventType.STREAMING_GENERATION
     assert EVENT_GENERATION_FINISHED == QwenEventType.GENERATION_FINISHED
     assert EVENT_OUTPUT_COPIED == QwenEventType.OUTPUT_COPIED
+    assert EVENT_SESSION_EXPIRED == QwenEventType.SESSION_EXPIRED
+    # Terminal error events (FAILED, SESSION_EXPIRED) are not part of the
+    # ordered pipeline sequences but must carry a description for logging.
+    assert QwenEventType.SESSION_EXPIRED in EVENT_DESCRIPTIONS
+
+
+def test_session_expired_is_a_terminal_error_event_not_happy_path() -> None:
+    """SESSION_EXPIRED mirrors FAILED's treatment: outside the happy-path
+    sequences, inside EVENT_DESCRIPTIONS and __all__, re-exported."""
+    assert EVENT_SESSION_EXPIRED not in PIPELINE_EVENT_SEQUENCE
+    assert EVENT_SESSION_EXPIRED not in STANDARD_PROMPT_EVENTS
+    assert EVENT_SESSION_EXPIRED in EVENT_DESCRIPTIONS
 
 
 def test_lifecycle_event_is_immutable_and_legacy_vo_classes_are_constructible() -> None:

@@ -10,7 +10,19 @@ class QwenCliError(RuntimeError):
 
 
 class AuthRequiredError(QwenCliError):
-    """Raised when authentication challenge/login is required in headless mode."""
+    """Raised when authentication challenge/login is required in headless mode.
+
+    Attributes:
+        session_expired: True when the trigger was an in-page session-expiry
+            banner rather than a redirect to a login URL. Callers that need to
+            distinguish the two cases read this flag instead of matching the
+            message text.
+    """
+
+    def __init__(self, message: object, *, session_expired: bool = False) -> None:
+        """Build the error, optionally tagging it as an in-page expiry."""
+        super().__init__(message)
+        self.session_expired = session_expired
 
 
 class ModelSwitchError(QwenCliError):

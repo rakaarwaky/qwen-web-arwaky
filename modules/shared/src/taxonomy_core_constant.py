@@ -355,6 +355,44 @@ LOGIN_FORM_SELECTORS: tuple[str, ...] = (
     ".login-form",
 )
 
+# In-page banners that Qwen renders when the saved token has expired while the
+# chat UI is still mounted (the composer persists but the session is dead).
+# Both the English and Chinese markers match the live DOM of an expired
+# session, so detection stays on the chat frame instead of a login redirect.
+SESSION_EXPIRED_KEYWORDS: tuple[str, ...] = (
+    "session has expired",
+    "session expired",
+    "your session has expired",
+    "login has expired",
+    "login expired",
+    "登录状态已失效",
+    "登录已过期",
+)
+
+#: CSS shells Qwen uses for the expiry notice; matched against
+#: ``SESSION_EXPIRED_KEYWORDS`` so a styled banner still fires the event when
+#: its wording drifts from the marker list.
+SESSION_EXPIRED_BANNER_SELECTORS: tuple[str, ...] = (
+    "[class*='login-expired']",
+    "[class*='session-expired']",
+    "[class*='auth-expired']",
+)
+
+SESSION_EXPIRED_KEYWORDS = SESSION_EXPIRED_KEYWORDS + (
+    "login again",
+    "log in again",
+    "sign in again",
+    "token expired",
+    "authentication expired",
+    "re-authenticate",
+    "re-login",
+    "session invalid",
+    "please login",
+    "please sign in",
+    "your session may have expired",
+    "expired. please",
+)
+
 CHALLENGE_KEYWORDS: tuple[str, ...] = (
     "just a moment",
     "attention required!",

@@ -12,8 +12,30 @@ from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
+    EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
+
+
+def _make_page_mock(body_text: str = "", banner_shell_visible: bool = False):
+    """Build a chat-page mock with controllable body text and banner shell.
+
+    The banner-shell visibility drives ``is_any_visible`` so tests can script
+    either detection path (keyword text or expired-banner CSS) without a real
+    Playwright page.
+    """
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.return_value = body_text
+    mock_page.locator.return_value = MagicMock()
+    mock_page.query_selector.return_value = MagicMock()
+
+    original_any_visible = None
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    original_any_visible = adapter_mod.is_any_visible
+    adapter_mod.is_any_visible = lambda page, selectors, _visible=banner_shell_visible: _visible
+    return mock_page, adapter_mod, original_any_visible
 
 
 def test_session_check_is_alive_success():
@@ -52,13 +74,11 @@ def test_session_check_auth_redirect():
 
 
 def test_check_auth_valid():
-    mock_page = MagicMock()
-    mock_page.url = "https://chat.qwen.ai/"
-    loc = MagicMock()
-    loc.count.return_value = 0
-    mock_page.locator.return_value = loc
-    mock_page.query_selector.return_value = MagicMock()
-    BrowserAdapter().check_auth(mock_page)
+    mock_page, adapter_mod, orig = _make_page_mock(body_text="")
+    try:
+        BrowserAdapter().check_auth(mock_page)
+    finally:
+        adapter_mod.is_any_visible = orig
 
 
 def test_check_auth_login_url():
@@ -67,6 +87,7 @@ def test_check_auth_login_url():
     loc = MagicMock()
     loc.count.return_value = 0
     mock_page.locator.return_value = loc
+    mock_page.inner_text.return_value = ""
 
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
         BrowserAdapter().check_auth(mock_page)
@@ -76,11 +97,7 @@ def test_assert_on_chat_page_strict_logs_warning_when_textarea_missing():
     """Steady-state default (strict=True) keeps the warning log level."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
-    mock_page = MagicMock()
-    mock_page.url = "https://chat.qwen.ai/"
-    loc = MagicMock()
-    loc.count.return_value = 0
-    mock_page.locator.return_value = loc
+    mock_page, _, _ = _make_page_mock(body_text="")
     mock_page.query_selector.return_value = None  # textarea missing, no login form
 
     with patch.object(adapter_mod.log, "warning") as warn, patch.object(adapter_mod.log, "info") as info:
@@ -94,11 +111,7 @@ def test_assert_on_chat_page_non_strict_logs_info_when_textarea_missing():
     """navigate_to_chat (strict=False) demotes the transient-missing state to info."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
-    mock_page = MagicMock()
-    mock_page.url = "https://chat.qwen.ai/"
-    loc = MagicMock()
-    loc.count.return_value = 0
-    mock_page.locator.return_value = loc
+    mock_page, _, _ = _make_page_mock(body_text="")
     mock_page.query_selector.return_value = None  # textarea missing, no login form
 
     with patch.object(adapter_mod.log, "warning") as warn, patch.object(adapter_mod.log, "info") as info:
@@ -117,6 +130,7 @@ def test_assert_on_chat_page_strict_still_raises_on_auth_redirect():
     loc = MagicMock()
     loc.count.return_value = 0
     mock_page.locator.return_value = loc
+    mock_page.inner_text.return_value = ""
 
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
         adapter_mod._assert_on_chat_page(mock_page, strict=False)
@@ -129,6 +143,57 @@ def test_reset_page_emits_reconnecting():
     BrowserAdapter().reset_page(mock_page, mock_emitter)
     mock_emitter.emit.assert_called_once()
     mock_page.goto.assert_called_once()
+
+
+def test_assert_on_chat_page_session_expired_banner_keyword():
+    """An in-page 'Session expired' notice raises AuthRequiredError tagged session_expired."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
+    try:
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            adapter_mod._assert_on_chat_page(mock_page)
+        assert exc_info.value.session_expired is True
+    finally:
+        adapter_mod.is_any_visible = orig
+
+
+def test_assert_on_chat_page_session_expired_banner_selector():
+    """A banner shell with no matching keyword text still fires the expiry raise."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, _ = _make_page_mock(body_text="", banner_shell_visible=True)
+    # Drive the two probes independently: login-form selectors are absent,
+    # banner-shell selectors are present, so only the expiry path can fire.
+    import modules.shared.src.taxonomy_core_constant as const
+
+    login = ", ".join(const.LOGIN_FORM_SELECTORS)
+    banner = ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
+
+    def _split_probe(page, selectors):
+        if selectors == login:
+            return False
+        return selectors == banner
+
+    original_is_any_visible = adapter_mod.is_any_visible
+    adapter_mod.is_any_visible = _split_probe
+    try:
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            adapter_mod._assert_on_chat_page(mock_page)
+        assert exc_info.value.session_expired is True
+    finally:
+        adapter_mod.is_any_visible = original_is_any_visible
+
+
+def test_assert_on_chat_page_no_false_positive_on_chat_text():
+    """Normal chat content must not trigger the session-expired path."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, orig = _make_page_mock(body_text="Hello, here is a response.")
+    try:
+        adapter_mod._assert_on_chat_page(mock_page)  # no raise
+    finally:
+        adapter_mod.is_any_visible = orig
 
 
 def test_goto_chat_uses_commit_when_domcontentloaded_is_slow():
@@ -144,8 +209,9 @@ def test_goto_chat_uses_commit_when_domcontentloaded_is_slow():
 
 
 def test_navigate_to_chat_emits_web_loaded():
-    mock_page = MagicMock()
-    mock_page.url = "https://chat.qwen.ai/"
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, orig = _make_page_mock(body_text="")
     loc = MagicMock()
     loc.count.return_value = 0
     loc.first.is_visible.return_value = False
@@ -156,15 +222,58 @@ def test_navigate_to_chat_emits_web_loaded():
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max"
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
-    BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+    try:
+        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+    finally:
+        adapter_mod.is_any_visible = orig
 
     # navigate_to_chat emits WEB_LOADED, LOGIN_VERIFIED, then MODEL_VERIFIED.
     emitted_events = [call.args[0] for call in mock_emitter.emit.call_args_list]
     assert emitted_events == [EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED, EVENT_MODEL_VERIFIED]
 
 
+def test_navigate_to_chat_emits_session_expired_on_in_page_banner():
+    """When the chat page shows an in-page expiry banner, navigate_to_chat
+    emits EVENT_SESSION_EXPIRED before propagating the AuthRequiredError."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
+    mock_emitter = MagicMock(spec=LifecycleEmitter)
+
+    try:
+        with pytest.raises(AuthRequiredError) as exc_info:
+            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+        assert exc_info.value.session_expired is True
+    finally:
+        adapter_mod.is_any_visible = orig
+
+    emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
+    assert EVENT_SESSION_EXPIRED in emitted, f"expected EVENT_SESSION_EXPIRED in {emitted}"
+    expired_calls = [c for c in mock_emitter.emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
+    assert expired_calls[0].args[1] == {"url": "https://chat.qwen.ai/", "reason": "in_page_banner"}
+
+
+def test_navigate_to_chat_no_session_expired_event_on_clean_page():
+    """A healthy chat page must not emit EVENT_SESSION_EXPIRED."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page, _, orig = _make_page_mock(body_text="Hello")
+    mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max"
+    mock_emitter = MagicMock(spec=LifecycleEmitter)
+
+    try:
+        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+    finally:
+        adapter_mod.is_any_visible = orig
+
+    emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
+    assert EVENT_SESSION_EXPIRED not in emitted, f"unexpected EVENT_SESSION_EXPIRED in {emitted}"
+
+
 def test_navigate_to_chat_reports_fallback_model_on_event():
     """issue #283 AC-2: an unlisted model degrades to the first available one."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
     trigger = MagicMock()
@@ -186,9 +295,15 @@ def test_navigate_to_chat_reports_fallback_model_on_event():
 
     mock_page.locator.side_effect = _fake_locator
     mock_page.get_by_role.return_value = trigger
+    mock_page.inner_text.return_value = ""
+    orig_vis = adapter_mod.is_any_visible
+    adapter_mod.is_any_visible = lambda page, selectors: False
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
-    BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+    try:
+        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+    finally:
+        adapter_mod.is_any_visible = orig_vis
 
     verified = [call for call in mock_emitter.emit.call_args_list if call.args[0] == EVENT_MODEL_VERIFIED]
     assert verified, "MODEL_VERIFIED must be emitted even on the fallback path"
@@ -300,6 +415,8 @@ def test_verify_default_model_retries_transient_picker_read_failure():
 
 def _navigate_fixture(mock_page: MagicMock, model_text: str) -> MagicMock:
     """Shared navigate_to_chat page mock: authenticated URL + model picker text."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
     mock_page.url = "https://chat.qwen.ai/"
     loc = MagicMock()
     loc.count.return_value = 0
@@ -308,6 +425,9 @@ def _navigate_fixture(mock_page: MagicMock, model_text: str) -> MagicMock:
     mock_page.locator.return_value = loc
     mock_page.query_selector.return_value = MagicMock()
     mock_page.get_by_role.return_value.inner_text.return_value = model_text
+    # No in-page expiry banner: body is clean and no login/expired shells show.
+    mock_page.inner_text.return_value = ""
+    adapter_mod.is_any_visible = lambda page, selectors: False
     return MagicMock(spec=LifecycleEmitter)
 
 
@@ -535,3 +655,95 @@ def test_err_failed_in_noise_patterns_is_lowercase():
     assert "ERR_FAILED" not in _NOISE_CONSOLE_PATTERNS, (
         "uppercase 'ERR_FAILED' will never match lower-cased console text"
     )
+
+
+# ── in-page session-expired banner regression tests ──────────────────────────
+
+
+def test_assert_on_chat_page_raises_on_in_page_expiration_banner():
+    """An in-page 'session expired' notice (no login URL redirect, no login
+    form) must raise AuthRequiredError with session_expired=True."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+    mock_page.inner_text.return_value = "Session expired, please login again"
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+
+    assert exc_info.value.session_expired is True
+
+
+def test_assert_on_chat_page_no_false_positive_on_normal_chat_body():
+    """Normal chat body text without any expiry keyword must not raise."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+    mock_page.inner_text.return_value = "Ask Qwen anything"
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        adapter_mod._assert_on_chat_page(mock_page, strict=False)
+
+
+def test_assert_on_chat_page_skips_banner_check_when_body_unreadable():
+    """A DOM that is still hydrating (inner_text raises) is not a signal —
+    the check is skipped rather than masking a genuine auth problem."""
+    from playwright.sync_api import Error as PwError
+
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.query_selector.return_value = MagicMock()
+    mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        adapter_mod._assert_on_chat_page(mock_page, strict=False)  # must not raise
+
+
+def test_navigate_to_chat_emits_session_expired_before_propagation():
+    """In-page banner path: EVENT_SESSION_EXPIRED is emitted with the banner
+    reason before AuthRequiredError propagates to the orchestrator."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.return_value = "Your session has expired. Please login again"
+    mock_page.query_selector.return_value = None
+    mock_emitter = MagicMock(spec=LifecycleEmitter)
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+
+    assert exc_info.value.session_expired is True
+    emitted = [call.args for call in mock_emitter.emit.call_args_list]
+    assert (EVENT_SESSION_EXPIRED, {"url": "https://chat.qwen.ai/", "reason": "in_page_banner"}) in emitted
+
+
+def test_navigate_to_chat_no_session_expired_emit_on_redirect_case():
+    """A URL redirect to login (not the in-page banner) must NOT emit
+    EVENT_SESSION_EXPIRED and the error must not carry session_expired."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/passport/login"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.inner_text.return_value = "login"
+    mock_emitter = MagicMock(spec=LifecycleEmitter)
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        with pytest.raises(AuthRequiredError, match="Not authenticated") as exc_info:
+            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+
+    assert exc_info.value.session_expired is False
+    emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
+    assert EVENT_SESSION_EXPIRED not in emitted
