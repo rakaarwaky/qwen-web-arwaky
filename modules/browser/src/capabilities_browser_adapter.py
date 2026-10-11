@@ -182,17 +182,38 @@ def _assert_on_chat_page(page: Page, strict: bool = True) -> None:
     # an "Session expired, please login again" banner instead of redirecting.
     # The DOM may still be hydrating, so banner detection is best-effort — skip
     # on any read failure rather than mask a genuine auth problem.
-    session_expired = False
+    if _in_page_expiry_banner_visible(page):
+        raise AuthRequiredError(
+            "Session expired — the saved Qwen login session is no longer valid "
+            f"(in-page notice detected on {page.url}). "
+            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
+            session_expired=True,
+        )
+
+
+def _in_page_expiry_banner_visible(page: Page) -> bool:
+    """True when the live page now shows an in-page session-expiry notice.
+
+    Re-runs the banner text/selector scan from ``_assert_on_chat_page``
+    against the CURRENT page state. Best-effort: a DOM that is unreadable
+    (mid-hydration) is not a signal, so the method returns False rather
+    than raising.
+    """
     try:
         body_text = page.inner_text("body")
         lowered = str(body_text or "").lower()
         if any(kw in lowered for kw in SESSION_EXPIRED_KEYWORDS):
-            session_expired = True
-        if not session_expired and is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
-            session_expired = True
+            return True
+        if is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
+            return True
     except (Error, TypeError):
-        return
-    if session_expired:
+        return False
+    return False
+
+
+def _raise_if_session_expired(page: Page) -> None:
+    """Raise AuthRequiredError when the in-page expiry banner is detected."""
+    if _in_page_expiry_banner_visible(page):
         raise AuthRequiredError(
             "Session expired — the saved Qwen login session is no longer valid "
             f"(in-page notice detected on {page.url}). "
@@ -277,9 +298,11 @@ class BrowserAdapter(IBrowserProtocol):
         """Navigate to chat.qwen.ai, verify session, and emit lifecycle events step-by-step:
 
         Step 1: Navigate to chat page
-        Step 2: Assert authentication session
-        Step 3: Start clean conversation state
-        Step 4: Emit lifecycle events (EVENT_WEB_LOADED, EVENT_LOGIN_VERIFIED)
+        Step 2: Start clean conversation state
+        Step 3: Emit EVENT_WEB_LOADED, then assert authentication
+        Step 4: Probe the in-page expiry banner; when present, emit
+        EVENT_SESSION_EXPIRED and raise before LOGIN_VERIFIED is emitted.
+        Otherwise emit EVENT_LOGIN_VERIFIED.
         Step 5: Select the configured default model (issue #283)
         Step 6: Verify the model is active; when the configured model is not
         offered by the picker, fall back to the first available model and log a
@@ -296,25 +319,28 @@ class BrowserAdapter(IBrowserProtocol):
         with contextlib.suppress(Error):
             page.wait_for_selector(TEXTAREA_SELECTOR, timeout=5000)
 
-        # Step 2: Verify user authentication
-        try:
-            _assert_on_chat_page(page, strict=False)
-        except AuthRequiredError as exc:
-            if exc.session_expired:
-                # In-page expiry banner: emit the terminal event before the
-                # pipeline propagates the failure to the orchestrator.
-                emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "in_page_banner"})
-            raise
-
-        # Step 3: Start clean conversation state. Qwen hydrates the model picker
+        # Step 2: Start clean conversation state. Qwen hydrates the model picker
         # asynchronously after this reset; wait for its actual default option rather
         # than sleeping for a fixed duration.
         self._start_new_chat(page)
         with contextlib.suppress(Error):
             self._wait_for_model_picker_ready(page)
 
-        # Step 4: Emit lifecycle events
+        # Step 3: Emit lifecycle events. WEB_LOADED marks the committed document.
         emitter.emit(EVENT_WEB_LOADED, {"url": page.url})
+
+        # Step 4: Banner detection precedes the login-form assert so a
+        # terminal EVENT_SESSION_EXPIRED lands before LOGIN_VERIFIED. The
+        # login-form check still owns the not-authenticated case when the
+        # banner is absent.
+        try:
+            _assert_on_chat_page(page, strict=False)
+        except AuthRequiredError as exc:
+            if exc.session_expired:
+                # In-page expiry banner: emit the terminal event before
+                # the pipeline propagates the failure to the orchestrator.
+                emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "in_page_banner"})
+            raise
         emitter.emit(EVENT_LOGIN_VERIFIED, {"url": page.url})
 
         # Step 5: Select the configured default model so the user never picks
@@ -554,6 +580,17 @@ class BrowserAdapter(IBrowserProtocol):
         except Error as exc:
             log.warning("session_validation_failed %s", str(exc))
             return False
+
+    def detect_session_expired(self, page: Page) -> bool:
+        """True when the live page now shows an in-page session-expiry notice.
+
+        Re-runs the banner text/selector scan from ``_assert_on_chat_page``
+        against the CURRENT page state. Best-effort: a DOM that is unreadable
+        (mid-hydration) is not a signal, so the method returns False rather
+        than raising. Used by prompt pipelines after a failed dispatch to
+        surface ``EVENT_SESSION_EXPIRED``.
+        """
+        return _in_page_expiry_banner_visible(page)
 
     @contextmanager
     def health_probe_page(self, cfg: Any) -> Iterator[Page]:

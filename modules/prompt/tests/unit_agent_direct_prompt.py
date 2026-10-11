@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError
+from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, SendDispatchError
 from modules.shared.src.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_SEND_CLICKED,
+    EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
     STANDARD_PROMPT_EVENTS,
 )
@@ -49,6 +52,7 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
 
+    flow = MagicMock()
     orchestrator = DirectPromptAdapter(
         browser=browser,
         injector=injector,
@@ -56,7 +60,7 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
         streamer=streamer,
         saver=saver,
         observability=observability,
-        flow=MagicMock(),
+        flow=flow,
     )
     mocks = {
         "browser": browser,
@@ -65,7 +69,8 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
         "streamer": streamer,
         "saver": saver,
         "observability": observability,
-        "flow": orchestrator._flow,
+        "flow": flow,
+        "emitter": MagicMock(),
     }
     return orchestrator, mocks
 
@@ -103,3 +108,56 @@ def test_process_direct_prompt_timeout_error() -> None:
     response = orch.process_direct_prompt("Test prompt", timeout_sec=10)
 
     assert "Timeout waiting for response" in str(response)
+
+
+def test_process_direct_prompt_emits_session_expired_when_banner_appears_after_send() -> None:
+    """When dispatch raises and the post-send banner is detected,
+    EVENT_SESSION_EXPIRED is emitted with reason=post_send_banner."""
+    orch, mocks = _make_direct_orchestrator()
+
+    mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
+
+    # Mock the browser to return True for detect_session_expired
+    mocks["browser"].detect_session_expired.return_value = True
+
+    with pytest.raises(SendDispatchError, match="Send failed"):
+        orch._execute_direct_on_page(
+            page=MagicMock(url="https://chat.qwen.ai/"),
+            filepath=MagicMock(),
+            prompt="Test prompt",
+            timeout_sec=30,
+            active_cfg=MagicMock(),
+            emitter=mocks["emitter"],
+            state=MagicMock(),
+        )
+
+    mocks["browser"].detect_session_expired.assert_called_once()
+    # The emitter emit should have been called with EVENT_SESSION_EXPIRED
+    emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
+    assert len(emit_calls) == 1
+    assert emit_calls[0].args[1] == {"url": "https://chat.qwen.ai/", "reason": "post_send_banner"}
+
+
+def test_process_direct_prompt_no_session_expired_emit_when_clean() -> None:
+    """When dispatch raises but no banner is detected, EVENT_SESSION_EXPIRED is not emitted."""
+    orch, mocks = _make_direct_orchestrator()
+
+    mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
+
+    # Mock the browser to return False for detect_session_expired
+    mocks["browser"].detect_session_expired.return_value = False
+
+    with pytest.raises(SendDispatchError, match="Send failed"):
+        orch._execute_direct_on_page(
+            page=MagicMock(url="https://chat.qwen.ai/"),
+            filepath=MagicMock(),
+            prompt="Test prompt",
+            timeout_sec=30,
+            active_cfg=MagicMock(),
+            emitter=mocks["emitter"],
+            state=MagicMock(),
+        )
+
+    mocks["browser"].detect_session_expired.assert_called_once()
+    emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
+    assert len(emit_calls) == 0

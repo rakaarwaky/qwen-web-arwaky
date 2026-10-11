@@ -13,7 +13,15 @@ from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 
 _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
-    {"browser_session", "check_auth", "check_session", "health_probe_page", "navigate_to_chat", "reset_page"}
+    {
+        "browser_session",
+        "check_auth",
+        "check_session",
+        "detect_session_expired",
+        "health_probe_page",
+        "navigate_to_chat",
+        "reset_page",
+    }
 )
 
 
