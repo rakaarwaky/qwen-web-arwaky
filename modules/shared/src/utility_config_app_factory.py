@@ -169,10 +169,17 @@ def resolve_pipeline_output_path(
         out_path = Path(output_file).resolve()
         if out_path.is_dir():
             out_path = out_path / f"{stem}_{ts}_{unique}.md"
-        elif out_path.exists():
-            out_path = out_path.parent / f"{out_path.stem}_{ts}_{unique}{out_path.suffix}"
+        elif out_path.suffix:
+            # A user-supplied file path with an extension is honoured exactly
+            # as named: the operator's -o argument writes in place (issue
+            # #280 AC-1 is about *default* filenames colliding, not about
+            # honoring an explicit -o argument).
+            out_path = out_path
         else:
-            out_path = out_path.parent / f"{stem}_{ts}_{unique}{out_path.suffix}"
+            # An explicit argument with no extension is not a precise file
+            # target, so auto-complete it with a timestamp + hex suffix to
+            # keep concurrent runs distinct.
+            out_path = out_path.parent / f"{out_path.name}_{ts}_{unique}"
     else:
         out_path = DEFAULT_OUTPUT / f"{stem}_{ts}_{unique}.md"
 
