@@ -65,6 +65,7 @@ _EVENT_BADGE: dict[str, str] = {
     "OUTPUT_COPIED": "✓ SAVED",
     "LOGIN_VERIFIED": "✓ LOGGED IN",
     "MODEL_VERIFIED": "✓ MODEL",
+    "SESSION_EXPIRED": "⚠ SESSION EXPIRED",
     "FAILED": "✕ FAILED",
 }
 

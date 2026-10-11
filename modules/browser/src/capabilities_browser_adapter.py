@@ -32,6 +32,8 @@ from modules.shared.src.taxonomy_core_constant import (
     NAVIGATION_LOAD_TIMEOUT_MS,
     NAVIGATION_TIMEOUT_MS,
     NEW_CHAT_SELECTORS,
+    SESSION_EXPIRED_BANNER_SELECTORS,
+    SESSION_EXPIRED_KEYWORDS,
     TEXTAREA_SELECTOR,
 )
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
@@ -44,6 +46,7 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_NETWORK_RECONNECTING,
+    EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
 from modules.shared.src.utility_browser_async_loop import isolate_thread_event_loop
@@ -175,6 +178,28 @@ def _assert_on_chat_page(page: Page, strict: bool = True) -> None:
         else:
             log.info("chat_textarea_missing_but_no_login_form_detected %s", page.url)
 
+    # In-page session-expiry notice: Qwen sometimes keeps the chat URL and shows
+    # an "Session expired, please login again" banner instead of redirecting.
+    # The DOM may still be hydrating, so banner detection is best-effort — skip
+    # on any read failure rather than mask a genuine auth problem.
+    session_expired = False
+    try:
+        body_text = page.inner_text("body")
+        lowered = str(body_text or "").lower()
+        if any(kw in lowered for kw in SESSION_EXPIRED_KEYWORDS):
+            session_expired = True
+        if not session_expired and is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
+            session_expired = True
+    except (Error, TypeError):
+        return
+    if session_expired:
+        raise AuthRequiredError(
+            "Session expired — the saved Qwen login session is no longer valid "
+            f"(in-page notice detected on {page.url}). "
+            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
+            session_expired=True,
+        )
+
 
 # Block 1: Class Definition & Constructor
 
@@ -272,7 +297,14 @@ class BrowserAdapter(IBrowserProtocol):
             page.wait_for_selector(TEXTAREA_SELECTOR, timeout=5000)
 
         # Step 2: Verify user authentication
-        _assert_on_chat_page(page, strict=False)
+        try:
+            _assert_on_chat_page(page, strict=False)
+        except AuthRequiredError as exc:
+            if exc.session_expired:
+                # In-page expiry banner: emit the terminal event before the
+                # pipeline propagates the failure to the orchestrator.
+                emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "in_page_banner"})
+            raise
 
         # Step 3: Start clean conversation state. Qwen hydrates the model picker
         # asynchronously after this reset; wait for its actual default option rather
