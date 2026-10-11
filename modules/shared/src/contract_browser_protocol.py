@@ -69,6 +69,23 @@ class IBrowserProtocol(ABC):
         ...
 
     @abstractmethod
+    def health_probe_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+        """Open one fresh, authenticated chat page on *cfg*'s session profile.
+
+        The returned context manager launches an ephemeral persistent
+        Chromium context scoped to *cfg.session_path*, navigates to the
+        chat URL, asserts authentication, and yields one ready page.
+        It performs no model selection and no prompt dispatch, so a
+        caller only pays the page-load cost. Exiting tears down the
+        browser process group.
+
+        Raises:
+            AuthRequiredError: When the page lands on a login or guest
+                view, or shows a login form.
+        """
+        ...
+
+    @abstractmethod
     def check_session(self, page: Page) -> bool:
         """Return True when *page* shows the authenticated chat UI.
 
