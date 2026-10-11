@@ -1631,16 +1631,6 @@ HelpScreen {
     color: $status_muted;
 }
 
-/* Settings: one configuration block per slot, only the chosen one shown. */
-.slot-config {
-    width: 100%;
-    height: auto;
-    background: $bg_overlay;
-    border: solid $border;
-    padding: 1 2;
-    margin-bottom: 1;
-}
-
 /* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */
 
 /* The console shell, same as the chat console: attachment card, view toggle,
