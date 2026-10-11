@@ -219,13 +219,11 @@ class QwenTuiApp(
     # ── Headless toggle ───────────────────────────────────────────────────
 
     def _toggle_headless(self, button_id: str) -> None:
-        """Flip the shared headless flag and update all headless button labels."""
+        """Flip the shared headless flag and update the headless button label."""
         self._headless = not self._headless
         state = "ON" if self._headless else "OFF"
         with contextlib.suppress(NoMatches):
-            for btn in self.query("[id^='btn-headless-']"):
-                if isinstance(btn, Button):
-                    btn.label = f"⬛ HEADLESS {state}"
+            self.query_one("#btn-headless-swarm", Button).label = f"⬛ HEADLESS {state}"
         self._log_msg(
             f"[{THEME['muted']}]Headless mode set to {state}[/] "
             f"[{THEME['ok'] if self._headless else THEME['warn']}]({button_id})[/]"
