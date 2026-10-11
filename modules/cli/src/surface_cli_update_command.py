@@ -2,8 +2,8 @@
 
 Smart surface: presentation only. Version discovery, pip upgrade, Playwright
 Chromium synchronization, and post-flight health checks are owned by the update
-manager capability (IUpdateProtocol); this surface formats reports and maps
-outcomes to the standardized success/error response envelope.
+capability protocols; this surface formats reports and maps outcomes to the
+standardized success/error response envelope.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import json
 import sys
 
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import IUpdateProtocol
+from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol, IUpdateVerifyProtocol
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
@@ -103,13 +103,17 @@ def _format_report(report: UpdateReport) -> str:
 
 
 @safe_handle
-def handle(args: object, updater: IUpdateProtocol) -> dict[str, object]:
-    """Dispatch the update subcommand to the update manager capability."""
+def handle(
+    args: object,
+    check: IUpdateCheckProtocol,
+    verify: IUpdateVerifyProtocol,
+) -> dict[str, object]:
+    """Dispatch the update subcommand to the check and verify capability protocols."""
     check_only = bool(getattr(args, "check", False))
     force = bool(getattr(args, "force", False))
 
     if check_only:
-        result = updater.check_update()
+        result = check.check_update()
         if result.latest_version is None:
             return error_response(
                 RuntimeError(f"Update check failed: {result.error or 'version source unavailable'}"),
@@ -118,7 +122,7 @@ def handle(args: object, updater: IUpdateProtocol) -> dict[str, object]:
             )
         return success_response(_format_check_result(result))
 
-    report = updater.perform_update(ForceFlag(force))
+    report = verify.perform_update(ForceFlag(force))
     if not report.healthy:
         return error_response(
             RuntimeError(_format_report(report)),

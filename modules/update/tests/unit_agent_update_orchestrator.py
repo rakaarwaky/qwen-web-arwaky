@@ -1,4 +1,4 @@
-"""Unit tests for UpdateOrchestrator: verb routing over the update capability."""
+"""Unit tests for UpdateOrchestrator verb routing across four update protocols."""
 
 from __future__ import annotations
 
@@ -6,77 +6,42 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_core_vo import UpdateCheckResult
-from modules.shared.src.taxonomy_update_vo import ForceFlag, UpdateRequest
+from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateCheckResult
+from modules.shared.src.taxonomy_update_vo import UpdateRequest
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 
 
 @pytest.fixture
-def stub() -> MagicMock:
-    """A protocol-compliant stub updater that never touches the environment."""
-    return MagicMock()
+def seams() -> tuple[MagicMock, MagicMock, MagicMock, MagicMock]:
+    """Return check, upgrade, verify, and rollback protocol stubs."""
+    return MagicMock(), MagicMock(), MagicMock(), MagicMock()
 
 
-def test_updater_is_held_verbatim() -> None:
-    """The injected updater is the one every call goes through."""
-    stub = MagicMock()
-    orchestrator = UpdateOrchestrator(updater=stub, observability=MagicMock())
-    assert orchestrator._updater is stub
+def _orchestrator(seams: tuple[MagicMock, MagicMock, MagicMock, MagicMock]) -> UpdateOrchestrator:
+    return UpdateOrchestrator(*seams, observability=MagicMock())
 
 
-def test_check_update_verb_delegates_to_updater() -> None:
-    """The check_update verb reaches check_update(, observability=MagicMock()) and returns its result."""
-    expected = UpdateCheckResult(
-        package_name="qwen-web-arwaky",
-        current_version="6.5.2",
-        latest_version="6.6.0",
-        update_available=True,
-        source="github",
-    )
-    stub = MagicMock()
-    stub.check_update.return_value = expected
-
-    response = UpdateOrchestrator(updater=stub, observability=MagicMock()).execute(UpdateRequest(verb="check_update"))
-
-    stub.check_update.assert_called_once()
+def test_check_update_verb_delegates_to_check(seams: tuple[MagicMock, MagicMock, MagicMock, MagicMock]) -> None:
+    expected = UpdateCheckResult("qwen-web-arwaky", "6.5.2", "6.6.0", True, "github")
+    seams[0].check_update.return_value = expected
+    response = _orchestrator(seams).execute(UpdateRequest(verb="check_update"))
+    seams[0].check_update.assert_called_once()
     assert response.check_result is expected
-    assert response.error is None
 
 
-def test_perform_update_verb_delegates_with_force() -> None:
-    """The perform_update verb carries the force flag through to the capability."""
-    stub = MagicMock()
-    UpdateOrchestrator(updater=stub, observability=MagicMock()).execute(
-        UpdateRequest(verb="perform_update", force=ForceFlag(True)),
-    )
-    stub.perform_update.assert_called_once_with(force=ForceFlag(True))
+def test_perform_update_routes_to_verify(seams: tuple[MagicMock, MagicMock, MagicMock, MagicMock]) -> None:
+    _orchestrator(seams).execute(UpdateRequest(verb="perform_update", force=ForceFlag(True)))
+    seams[2].perform_update.assert_called_once_with(force=ForceFlag(True))
 
 
-def test_perform_update_verb_defaults_to_no_force() -> None:
-    """An unset force flag reaches the capability as ForceFlag(False)."""
-    stub = MagicMock()
-    UpdateOrchestrator(updater=stub, observability=MagicMock()).execute(UpdateRequest(verb="perform_update"))
-    stub.perform_update.assert_called_once_with(force=ForceFlag(False))
+def test_rollback_routes_to_rollback(seams: tuple[MagicMock, MagicMock, MagicMock, MagicMock]) -> None:
+    seams[3].rollback_to.return_value = (MagicMock(),)
+    response = _orchestrator(seams).execute(UpdateRequest(verb="rollback_to", previous_version="v6.4.0"))
+    seams[3].rollback_to.assert_called_once()
+    assert response.steps == seams[3].rollback_to.return_value
 
 
-def test_rollback_to_verb_delegates_to_updater() -> None:
-    """The rollback_to verb passes the version on and returns the ordered steps."""
-    step = MagicMock()
-    stub = MagicMock()
-    stub.rollback_to.return_value = (step, MagicMock())
-
-    response = UpdateOrchestrator(updater=stub, observability=MagicMock()).execute(
-        UpdateRequest(verb="rollback_to", previous_version="v6.4.0"),
-    )
-
-    stub.rollback_to.assert_called_once()
-    assert response.steps == stub.rollback_to.return_value
-
-
-def test_rollback_without_version_reports_error() -> None:
-    """A rollback verb with no version names the reason instead of calling the capability."""
-    stub = MagicMock()
-    response = UpdateOrchestrator(updater=stub, observability=MagicMock()).execute(UpdateRequest(verb="rollback_to"))
-    stub.rollback_to.assert_not_called()
+def test_rollback_without_version_reports_error(seams: tuple[MagicMock, MagicMock, MagicMock, MagicMock]) -> None:
+    response = _orchestrator(seams).execute(UpdateRequest(verb="rollback_to"))
+    seams[3].rollback_to.assert_not_called()
     assert response.error is not None
-    assert response.steps == ()

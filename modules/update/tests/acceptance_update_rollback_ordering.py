@@ -20,9 +20,9 @@ def _step(name: str, success: bool = True, detail: str = "") -> UpdateStepResult
 
 
 def _orchestrator(steps: list[UpdateStepResult]) -> UpdateOrchestrator:
-    manager = MagicMock()
-    manager.rollback_to.return_value = steps
-    return UpdateOrchestrator(updater=manager, observability=MagicMock())
+    rollback = MagicMock()
+    rollback.rollback_to.return_value = steps
+    return UpdateOrchestrator(MagicMock(), MagicMock(), MagicMock(), rollback, observability=MagicMock())
 
 
 def test_acceptance_a_rollback_restores_the_package_before_the_browser() -> None:

@@ -433,7 +433,7 @@ def _dispatch(
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
             container.session_manager,
-            container.updater,
+            container.updater_check,
             container.job_storage,
         ).run()
         return _result_exit_code(result, json_output=json_output)
@@ -457,7 +457,7 @@ def _dispatch(
     if action == "update":
         if getattr(args, "rollback", None):
             return handle_rollback(args, container.agent_update_orchestrator)
-        result = handle_update_command(args, container.updater)
+        result = handle_update_command(args, container.updater_check, container.updater_verify)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "job":

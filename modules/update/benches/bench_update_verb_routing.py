@@ -18,12 +18,12 @@ pytestmark = pytest.mark.benchmark
 
 
 def _orchestrator() -> UpdateOrchestrator:
-    """Return an orchestrator over a stub manager that never upgrades."""
+    """Return an orchestrator over stub protocols that never upgrade."""
     from unittest.mock import MagicMock
 
-    manager = MagicMock()
-    manager.current_version.return_value = "0.0.0"
-    return UpdateOrchestrator(manager, MagicMock())
+    check = MagicMock()
+    check.current_version.return_value = "0.0.0"
+    return UpdateOrchestrator(check, MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
 
 def bench_verb_routing(iterations: int = 2000) -> float:
