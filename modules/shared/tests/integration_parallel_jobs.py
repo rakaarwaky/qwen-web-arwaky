@@ -80,7 +80,7 @@ def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None
 
     cfg = MagicMock()
     cfg.session_path = master_session
-    cfg.mode = "prompt-only"
+    cfg.mode = "single"
     cfg.headless = True
     cfg.disable_sandbox = False
 

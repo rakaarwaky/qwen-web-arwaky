@@ -105,7 +105,7 @@ The MCP surface (`modules/mcp`) exposes the Core aggregate as a Model Context Pr
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `process_direct_prompt(prompt, timeout_sec=120, headless=True, output_file=None)` | raw prompt text, timeout, headless flag, output path | JSON envelope string | `VALIDATION_ERROR` on an empty prompt | prompt lifecycle | Processes a raw text prompt; `output_file` mirrors the CLI's `prompt-direct -o FILE`. |
+| `process_direct_prompt(prompt, timeout_sec=120, headless=True, output_file=None)` | raw prompt text, timeout, headless flag, output path | JSON envelope string | `VALIDATION_ERROR` on an empty prompt | prompt lifecycle | Processes a raw text prompt; `output_file` mirrors the CLI's `prompt direct -o FILE`. |
 | `process_prompt_file_only(input_file, output_file=None, headless=True, async_run=True)` | prompt file path, output path, headless and async flags | JSON envelope string | missing file returns `VALIDATION_ERROR` | job accepted when async | Processes one Markdown file. |
 | `process_prompt_with_attachment(prompt_file, attachment_file, output_file=None, headless=True, async_run=True)` | prompt file, attachment path, output path, headless and async flags | JSON envelope string | missing file or attachment returns `VALIDATION_ERROR` | job accepted when async | Processes a Markdown file with a document attachment. |
 | `get_job_status(job_id)` | job id | JSON envelope (`RUNNING`/`COMPLETED`/`FAILED`) | unknown id returns `JOB_NOT_FOUND` | — | Queries state and progress of an asynchronous background job. |

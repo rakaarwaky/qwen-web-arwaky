@@ -111,10 +111,10 @@ Shipped entry points:
 
 ```bash
 qwen-web-arwaky
-qwen-web-arwaky prompt-direct -t "Hello" -o output.md --headless
-qwen-web-arwaky prompt-only -i prompt.md -o output.md --headless
-qwen-web-arwaky prompt-with-attachment -i p.md -a att.file --headless
-qwen-web-arwaky login
+qwen-web-arwaky prompt direct -t "Hello" -o output.md --headless
+qwen-web-arwaky prompt file -i prompt.md -o output.md --headless
+qwen-web-arwaky prompt attach -i p.md -a att.file --headless
+qwen-web-arwaky session login
 qwen-web-mcp
 ```
 

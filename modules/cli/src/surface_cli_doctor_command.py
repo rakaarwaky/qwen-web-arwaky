@@ -219,7 +219,7 @@ def _check_session(session_manager: ISessionManagerProtocol | None = None) -> di
         return _check(
             "Session Authentication Token",
             False,
-            f"No active session found in {DEFAULT_SESSION} (run: qwen-web-arwaky login --session default)",
+            f"No active session found in {DEFAULT_SESSION} (run: qwen-web-arwaky session login --name default)",
         )
     retained = snapshots_count(DEFAULT_SESSION)
     detail = f"Saved session found at {DEFAULT_SESSION}"

@@ -313,7 +313,7 @@ class _TuiSessionsWorkerMixin:
         if jobs_storage is None:
             self.call_from_thread(
                 self.notify,
-                "Job storage not available. Use 'qwa jobs cleanup' from the shell instead.",
+                "Job storage not available. Use 'qwa job cleanup' from the shell instead.",
                 severity="warning",
             )
             return

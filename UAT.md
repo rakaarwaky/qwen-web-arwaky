@@ -8,7 +8,7 @@ Start `qwen-web-arwaky`, initialize a slot with a Markdown prompt, and press Ent
 
 ## Automation operator
 
-Run `qwen-web-arwaky prompt-direct -t "Summarize this" -o output.md --headless`. The command must return a success envelope and write the response to `output.md`.
+Run `qwen-web-arwaky prompt direct -t "Summarize this" -o output.md --headless`. The command must return a success envelope and write the response to `output.md`.
 
 ## MCP client
 

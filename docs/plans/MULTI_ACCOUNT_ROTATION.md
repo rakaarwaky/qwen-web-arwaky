@@ -102,19 +102,19 @@ class SessionPool:
 
 ```bash
 # List all sessions
-qwen-web-arwaky sessions list
+qwen-web-arwaky session list
 
 # Add a new session (via login)
-qwen-web-arwaky sessions add --name "personal"
+qwen-web-arwaky session login --name "personal"
 
 # Remove a session
-qwen-web-arwaky sessions remove session_2
+qwen-web-arwaky session remove session_2
 
 # Test session health (ping test)
-qwen-web-arwaky sessions health-check
+qwen-web-arwaky session health
 
 # Show rotation status
-qwen-web-arwaky sessions status
+qwen-web-arwaky session status
 ```
 
 ### Ping Test Implementation
@@ -240,14 +240,14 @@ for role in roles:
 #### Phase 1: Session Storage (1-2 days)
 - [ ] Create session directory structure
 - [ ] Implement `SessionInfo` dataclass
-- [ ] Add CLI commands: `sessions add`, `sessions remove`, `sessions list`
+- [ ] Add CLI commands: `session login --name`, `session remove`, `session list`
 - [ ] Store Chromium profiles per session
 
 #### Phase 2: Health Checker (1 day)
 - [ ] Implement ping test (`SessionHealthChecker`)
 - [ ] Add rate limit detection logic
 - [ ] Test with real Qwen responses
-- [ ] Add `sessions health-check` command
+- [ ] Add `session health` command
 
 #### Phase 3: Rotation Logic (1-2 days)
 - [ ] Implement `SessionRotator` class
@@ -263,7 +263,7 @@ for role in roles:
 #### Phase 5: CLI/TUI Integration (1 day)
 - [ ] Add session status to TUI
 - [ ] Show rotation info in logs
-- [ ] Add `sessions status` command
+- [ ] Add `session status` command
 
 ### Files to Create/Modify
 

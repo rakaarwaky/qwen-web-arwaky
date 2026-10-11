@@ -30,11 +30,11 @@ Use this skill when an AI agent needs to send prompts or document files to **Qwe
 
 | Action | MCP Tool | CLI Command (`qwa` / `qwen-web-arwaky`) |
 | :--- | :--- | :--- |
-| Direct text prompt | `process_direct_prompt` | `qwa prompt-direct -t "<prompt>" [-o <out>]` |
-| Prompt file only | `process_prompt_file_only` | `qwa prompt-only -i <prompt.md> [-o <out>]` |
-| Prompt with attachment | `process_prompt_with_attachment` | `qwa prompt-with-attachment -i <prompt.md> -a <file> [-o <out>]` |
+| Direct text prompt | `process_direct_prompt` | `qwa prompt direct -t "<prompt>" [-o <out>]` |
+| Prompt file only | `process_prompt_file_only` | `qwa prompt file -i <prompt.md> [-o <out>]` |
+| Prompt with attachment | `process_prompt_with_attachment` | `qwa prompt attach -i <prompt.md> -a <file> [-o <out>]` |
 | Check session health | `check_session` | `qwa doctor` |
-| Manual login / CAPTCHA | `setup_session` | `qwa login` |
+| Manual login / CAPTCHA | `setup_session` | `qwa session login --name <name>` |
 | Reset session | `delete_session` | — |
 | Initialize workspace | `init` | `qwa init` |
 
@@ -57,7 +57,7 @@ Use for fast queries, factual explanations, or one-off code generation where no 
 
 **CLI:**
 ```bash
-qwa prompt-direct -t "Explain optimistic vs pessimistic locking" -o .qwen-web/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt direct -t "Explain optimistic vs pessimistic locking" -o .qwen-web/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -76,7 +76,7 @@ Use for multi-step instructions, complex refactor specs, or long prompts authore
 
 **CLI:**
 ```bash
-qwa prompt-only -i .qwen-web/input/refactor_task.md -o .qwen-web/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt file -i .qwen-web/input/refactor_task.md -o .qwen-web/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -96,7 +96,7 @@ Use when the prompt requires analyzing a codebase export, technical document, lo
 
 **CLI:**
 ```bash
-qwa prompt-with-attachment -i .qwen-web/input/audit_spec.md -a .qwen-web/input/codebase_export.md -o .qwen-web/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i .qwen-web/input/audit_spec.md -a .qwen-web/input/codebase_export.md -o .qwen-web/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -119,8 +119,8 @@ Instead of writing a custom prompt file, you can pass a built-in role template n
 
 **CLI:**
 ```bash
-qwa prompt-with-attachment -i backend -a src/api/auth.py -o .qwen-web/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
-qwa prompt-with-attachment -i architect -a README.md -o .qwen-web/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i backend -a src/api/auth.py -o .qwen-web/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i architect -a README.md -o .qwen-web/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -133,7 +133,7 @@ Use to verify login status or authenticate a new browser session when cookies ex
    - CLI: `qwa doctor`
 2. **Login / Re-authenticate (opens visible browser for login / CAPTCHA):**
    - MCP: call `setup_session`
-   - CLI: `qwa login`
+   - CLI: `qwa session login --name <name>`
 3. **Reset session profile (if corrupted):**
    - MCP: `delete_session` with `{"confirm": true}`
 
@@ -173,8 +173,8 @@ To ensure Qwen produces complete code without placeholders or omitted sections:
 
 | Error / Condition | Cause | Action |
 | :--- | :--- | :--- |
-| `AuthRequiredError` / `AUTH_REQUIRED` | Session expired or login needed | Call `setup_session` (MCP) or run `qwa login` (CLI) to re-authenticate. |
-| `OutputValidationError` (CAPTCHA) | Bot verification challenge | Run `setup_session` or `qwa login` to solve challenge manually. |
+| `AuthRequiredError` / `AUTH_REQUIRED` | Session expired or login needed | Call `setup_session` (MCP) or run `qwa session login --name <name>` (CLI) to re-authenticate. |
+| `OutputValidationError` (CAPTCHA) | Bot verification challenge | Run `setup_session` or `qwa session login --name <name>` to solve challenge manually. |
 | `NetworkTimeoutError` | Temporary network latency | Retry the request; if persistent, verify internet connection via `qwa doctor`. |
 | `FileValidationError` / `FILE_NOT_FOUND` | Missing, unreadable, or file > 100 MB | Verify file path, permissions, and ensure file size is under 100 MB. |
 | `CircuitBreakerOpenError` | Repeated consecutive failures | Wait 30 seconds before sending next request. |

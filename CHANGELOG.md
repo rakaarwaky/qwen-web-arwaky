@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING (CLI)**: standardize the command tree to
+  `qwen-web-arwaky <command> [subcommand] [flags]` with
+  `prompt {direct|file|attach}`, `session {list|login|health|remove|status}`,
+  `job {submit|status|list|cleanup}`, `swarm {start|status|cancel}`,
+  `observability {report|status}`, plus `doctor`, `init`, `update`, `mcp`.
+  The legacy flat names (`prompt-direct`, `prompt-only`,
+  `prompt-with-attachment`, `sessions`, `jobs`) are rejected by the parser.
+- Update all operator-facing docs (AGENTS.md, README.md, DEMO.md, UAT.md,
+  ISSUE.md, deploy service, scripts) to the standardized command shape.
+
+### Removed
+
+- **BREAKING (CLI)**: drop the top-level `login` command. Use
+  `qwen-web-arwaky session login --name <name>`, which registers the account in
+  the session pool instead of overwriting a single shared profile.
+
 ## [6.6.0] - 2026-10-06
 
 ### Added

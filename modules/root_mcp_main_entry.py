@@ -143,7 +143,7 @@ TOOLS: list[Tool] = [
                 },
                 "output_file": {
                     "type": "string",
-                    "description": "Optional destination path for the AI response (CLI parity with 'prompt-direct -o FILE').",
+                    "description": "Optional destination path for the AI response (CLI parity with 'prompt direct -o FILE').",
                 },
             },
             "required": ["prompt"],

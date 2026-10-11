@@ -4,9 +4,9 @@
 Invokes the real CLI binary/entry point (`modules/root_cli_main_entry.py` or `qwen-web-arwaky`)
 to execute 3 end-to-end pipelines using v5.0.0 release fixtures from `tests/fixtures/`:
 
-1. Pipeline 1: prompt-direct (direct inline string prompt)
-2. Pipeline 2: prompt-only (prompt file: tests/fixtures/sample_prompt_v5.md)
-3. Pipeline 3: prompt-with-attachment (prompt file + attachment: tests/fixtures/sample_attachment_v5.md)
+1. Pipeline 1: prompt direct (direct inline string prompt)
+2. Pipeline 2: prompt file (prompt file: tests/fixtures/sample_prompt_v5.md)
+3. Pipeline 3: prompt attach (prompt file + attachment: tests/fixtures/sample_attachment_v5.md)
 
 Outputs are saved in the default qwen-web output directory (~/.local/share/qwen-web/output).
 
@@ -66,16 +66,16 @@ def parse_args() -> TestArgs:
         "--direct",
         dest="run_p1",
         action="store_true",
-        help="Run Pipeline 1 (prompt-direct inline text)",
+        help="Run Pipeline 1 (prompt direct inline text)",
     )
     parser.add_argument(
         "-2",
         "--2",
         "--p2",
-        "--prompt-only",
+        "--prompt-file",
         dest="run_p2",
         action="store_true",
-        help="Run Pipeline 2 (prompt-only file sample_prompt.md)",
+        help="Run Pipeline 2 (prompt file sample_prompt_v5.md)",
     )
     parser.add_argument(
         "-3",
@@ -84,7 +84,7 @@ def parse_args() -> TestArgs:
         "--attachment",
         dest="run_p3",
         action="store_true",
-        help="Run Pipeline 3 (prompt-with-attachment sample_attachment.md)",
+        help="Run Pipeline 3 (prompt attach sample_attachment_v5.md)",
     )
     parser.add_argument(
         "-o",
@@ -188,14 +188,15 @@ def main() -> int:
         cmd_1 = [
             python_bin,
             str(cli_entry),
-            "prompt-direct",
+            "prompt",
+            "direct",
             "-t",
             direct_prompt_text,
             "-o",
             str(out_file_1),
             *headless_flag,
         ]
-        results["Pipeline 1: prompt-direct"] = (run_pipeline_cmd("Pipeline 1 (prompt-direct)", cmd_1), out_file_1)
+        results["Pipeline 1: prompt direct"] = (run_pipeline_cmd("Pipeline 1 (prompt direct)", cmd_1), out_file_1)
 
     # --------------------------------------------------------------------------
     # Pipeline 2: Prompt Only (File)
@@ -207,14 +208,15 @@ def main() -> int:
         cmd_2 = [
             python_bin,
             str(cli_entry),
-            "prompt-only",
+            "prompt",
+            "file",
             "-i",
             str(PROMPT_FIXTURE),
             "-o",
             str(out_file_2),
             *headless_flag,
         ]
-        results["Pipeline 2: prompt-only"] = (run_pipeline_cmd("Pipeline 2 (prompt-only)", cmd_2), out_file_2)
+        results["Pipeline 2: prompt file"] = (run_pipeline_cmd("Pipeline 2 (prompt file)", cmd_2), out_file_2)
 
     # --------------------------------------------------------------------------
     # Pipeline 3: Prompt With Attachment (File + Attachment)
@@ -226,7 +228,8 @@ def main() -> int:
         cmd_3 = [
             python_bin,
             str(cli_entry),
-            "prompt-with-attachment",
+            "prompt",
+            "attach",
             "-i",
             str(PROMPT_FIXTURE),
             "-a",
@@ -235,8 +238,8 @@ def main() -> int:
             str(out_file_3),
             *headless_flag,
         ]
-        results["Pipeline 3: prompt-with-attachment"] = (
-            run_pipeline_cmd("Pipeline 3 (prompt-with-attachment)", cmd_3),
+        results["Pipeline 3: prompt attach"] = (
+            run_pipeline_cmd("Pipeline 3 (prompt attach)", cmd_3),
             out_file_3,
         )
 

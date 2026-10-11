@@ -74,7 +74,7 @@ def test_create_ephemeral_session_standard_mode_clones_and_cleans_up(tmp_path: P
     (master / "token.txt").write_text("auth_token_123", encoding="utf-8")
 
     ephemeral_target = None
-    with create_ephemeral_session(master, mode="prompt-only") as session_dir:
+    with create_ephemeral_session(master, mode="single") as session_dir:
         ephemeral_target = session_dir
         assert session_dir != master
         assert session_dir.exists()

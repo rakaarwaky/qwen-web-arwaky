@@ -15,7 +15,7 @@ from modules.shared.src.taxonomy_core_vo import AppConfig
 def _cfg() -> AppConfig:
     """Build a minimal AppConfig for adapter calls."""
     return AppConfig(
-        mode="prompt-direct",
+        mode="direct",
         input_path=Path("/tmp/in.md"),
         output_path=Path("/tmp/out.md"),
         session_path=Path("/tmp/session"),

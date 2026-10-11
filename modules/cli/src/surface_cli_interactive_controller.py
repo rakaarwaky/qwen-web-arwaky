@@ -71,9 +71,9 @@ class InteractiveController:
                     "Interactive mode requires a TTY, but stdin is not interactive (pipe/cron detected).\n"
                     "Why: the Obsidian Nebula TUI needs a real terminal to render.\n"
                     "How to fix: use a non-interactive subcommand instead, e.g.:\n"
-                    '  qwen-web-arwaky prompt-direct -t "Summarize this" [--json]\n'
-                    "  qwen-web-arwaky prompt-only -i prompt.md [--json]\n"
-                    "  qwen-web-arwaky prompt-with-attachment -i prompt.md -a report.pdf [--json]\n"
+                    '  qwen-web-arwaky prompt direct -t "Summarize this" [--json]\n'
+                    "  qwen-web-arwaky prompt file -i prompt.md [--json]\n"
+                    "  qwen-web-arwaky prompt attach -i prompt.md -a report.pdf [--json]\n"
                     "Then verify your environment with: qwen-web-arwaky doctor"
                 ),
                 "validation_error",

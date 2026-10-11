@@ -10,7 +10,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Current: qwen-web-arwaky login                            │
+│  Current: qwen-web-arwaky session login --name personal                            │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -44,7 +44,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  New: qwen-web-arwaky sessions login --name personal       │
+│  New: qwen-web-arwaky session login --name personal        │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -108,7 +108,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  User runs: qwen-web-arwaky login                          │
+│  User runs: qwen-web-arwaky session login --name personal                          │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -149,7 +149,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
 ### Step 1: Session Discovery
 
 ```bash
-$ qwen-web-arwaky sessions list
+$ qwen-web-arwaky session list
 
 📊 Session Pool Status
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -165,7 +165,7 @@ Total: 3 sessions | Healthy: 1 | Limited: 1 | Unknown: 1
 ### Step 2: Login New Session
 
 ```bash
-$ qwen-web-arwaky sessions login --name "work"
+$ qwen-web-arwaky session login --name "work"
 
 🔐 Login to Qwen (Work Account)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -186,7 +186,7 @@ Waiting for login... (press Ctrl+C to cancel)
 ### Step 3: Health Check
 
 ```bash
-$ qwen-web-arwaky sessions health-check
+$ qwen-web-arwaky session health
 
 🏥 Running health checks...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -201,7 +201,7 @@ Result: 3/4 sessions healthy
 ### Step 4: Run with Auto-Rotation
 
 ```bash
-$ qwen-web-arwaky prompt-direct -t "Hello"
+$ qwen-web-arwaky prompt direct -t "Hello"
 
 🔄 Session rotation active
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -215,7 +215,7 @@ Response: Hello! How can I help you today?
 ### Step 5: Session Hits Limit
 
 ```bash
-$ qwen-web-arwaky prompt-direct -t "Hello again"
+$ qwen-web-arwaky prompt direct -t "Hello again"
 
 🔄 Session rotation active
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -274,34 +274,34 @@ browser = await launch_chromium(
 
 ```bash
 # List all sessions
-qwen-web-arwaky sessions list
+qwen-web-arwaky session list
 
 # Add new session
-qwen-web-arwaky sessions login --name "personal"
-qwen-web-arwaky sessions login --name "work"
-qwen-web-arwaky sessions login --name "test"
+qwen-web-arwaky session login --name "personal"
+qwen-web-arwaky session login --name "work"
+qwen-web-arwaky session login --name "test"
 
 # Remove session
-qwen-web-arwaky sessions remove session_2
+qwen-web-arwaky session remove session_2
 
 # Health check all sessions
-qwen-web-arwaky sessions health-check
+qwen-web-arwaky session health
 
 # Show session status
-qwen-web-arwaky sessions status
+qwen-web-arwaky session status
 ```
 
 ### Usage with Commands
 
 ```bash
 # Auto-rotate sessions (default)
-qwen-web-arwaky prompt-direct -t "Hello"
+qwen-web-arwaky prompt direct -t "Hello"
 
 # Force specific session
-qwen-web-arwaky prompt-direct -t "Hello" --session session_1
+qwen-web-arwaky prompt direct -t "Hello" --session session_1
 
 # Show which session was used
-qwen-web-arwaky prompt-direct -t "Hello" --verbose
+qwen-web-arwaky prompt direct -t "Hello" --verbose
 ```
 
 ---
@@ -357,7 +357,7 @@ Session 3 → ❌ Limited
             "All 3 sessions are rate-limited. Please wait until 
              tomorrow or add more sessions."
                     ↓
-            Suggest: qwen-web-arwaky sessions login --name "backup"
+            Suggest: qwen-web-arwaky session login --name "backup"
 ```
 
 ---
@@ -366,7 +366,7 @@ Session 3 → ❌ Limited
 
 ```mermaid
 flowchart TD
-    A[User runs: sessions login] --> B{Has existing sessions?}
+    A[User runs: session login] --> B{Has existing sessions?}
     B -->|No| C[Create session_1 directory]
     B -->|Yes| D[Ask for session name]
     D --> E[Create new session directory]

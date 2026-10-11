@@ -166,7 +166,7 @@ class _TuiHandlersMixin:
         # only operation, so the card points at the CLI command instead of
         # doing it from the UI.
         self.notify(
-            f"Run 'qwa sessions remove --name {name}' to disconnect.",
+            f"Run 'qwa session remove {name}' to disconnect.",
             title="Disconnect",
             severity="information",
         )
@@ -536,9 +536,9 @@ class _TuiHandlersMixin:
         if not confirmed:
             return
         self._log_msg("[bold {}]>>> Starting session login...[/]".format(THEME["accent_fg"]))
-        # This will be handled by the CLI sessions login command via subprocess
+        # This will be handled by the CLI session login command via subprocess
         self.notify(
-            "Use 'qwen-web-arwaky sessions login --name <name>' to add a session", title="Info", severity="information"
+            "Use 'qwen-web-arwaky session login --name <name>' to add a session", title="Info", severity="information"
         )
         self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
         self._init_worker()
