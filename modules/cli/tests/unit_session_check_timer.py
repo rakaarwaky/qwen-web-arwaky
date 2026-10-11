@@ -1,16 +1,21 @@
 """Regression tests for the session-check watchdog timer.
 
-The 15-second timer armed by ``_check_session`` must be stopped as soon as
+The 60-second timer armed by ``_check_session`` must be stopped as soon as
 the verdict callback (``_apply_session_state``) lands.  Without that, a
-successful check is followed 15 seconds later by a spurious
-``Session check timed out`` warning even though ``EVENT_LOGIN_VERIFIED``
-already reported a valid session — the exact log the user filed.
+successful check is followed by a spurious ``Session check timed out``
+warning even though ``EVENT_LOGIN_VERIFIED`` already reported a valid
+session — the exact log the user filed. The window is 60s because a
+legitimate successful validation (including up to ~25s of model-picker
+retries in ``navigate_to_chat``) takes ~30s; the old 15s window fired
+before that.
 """
 
 from __future__ import annotations
 
 import asyncio
 from unittest.mock import MagicMock
+
+from textual.timer import Timer
 
 from modules.cli.src.surface_cli_tui_app import QwenTuiApp
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
@@ -54,14 +59,26 @@ def test_no_spurious_timeout_after_successful_check() -> None:
 
     async def _run() -> None:
         async with app.run_test(size=(150, 44)) as pilot:
+            armed: dict[str, object] = {}
+            real_set_timer = pilot.app.set_timer
+
+            def _arm(seconds: float, callback) -> Timer:
+                armed["seconds"] = seconds
+                t = real_set_timer(seconds, callback)
+                armed["timer"] = t
+                return t
+
+            app.set_timer = _arm
             app._check_session()
+            # The armed timer must target the 60s window.
+            assert armed["seconds"] == 60.0, f"unexpected watchdog duration {armed['seconds']}"
             # Let the verdict land.
             for _ in range(6):
                 await pilot.pause(0.25)
             assert app._last_session_state == "VALID", app._last_session_state
             assert app._session_check_timer is None, "watchdog still armed"
-            # Now let the original 15s window fully elapse.
-            await pilot.pause(16.0)
+            # Now let the original 60s window fully elapse.
+            await pilot.pause(61.0)
 
     asyncio.run(_run())
 

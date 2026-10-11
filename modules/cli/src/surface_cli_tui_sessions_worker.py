@@ -106,7 +106,10 @@ class _TuiSessionsWorkerMixin:
         timer = getattr(self, "_session_check_timer", None)
         if timer is not None:
             timer.stop()
-        self._session_check_timer = self.set_timer(15.0, self._session_check_timeout)
+        # The 60s window must exceed the worst-case navigate_to_chat model-
+        # picker verification (up to ~25s of retries) plus page navigation;
+        # a successful check taking ~30s must not trip it.
+        self._session_check_timer = self.set_timer(60.0, self._session_check_timeout)
         self._session_check_worker()
 
     def _session_check_timeout(self) -> None:
@@ -135,9 +138,9 @@ class _TuiSessionsWorkerMixin:
 
     def _apply_session_state(self, state: str) -> None:
         # Record the verdict and cancel the watchdog BEFORE the timer can fire.
-        # The 15s timer is armed by _check_session; if the verdict callback
+        # The 60s timer is armed by _check_session; if the verdict callback
         # ever fails to reach us (e.g. a cross-thread dispatch dropped on a
-        # busy app loop) the timer would fire 15s later and print a spurious
+        # busy app loop) the timer would fire later and print a spurious
         # "Session check timed out" even though the check already succeeded —
         # which is exactly the log the user saw: EVENT_LOGIN_VERIFIED, then
         # the timeout warning. Stopping it here keeps the two in step.
