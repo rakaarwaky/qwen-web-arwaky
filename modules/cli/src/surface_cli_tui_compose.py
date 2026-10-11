@@ -367,6 +367,11 @@ class _TuiComposeMixin:
                             id=f"btn-pill-templates-{s}",
                             classes="action-pill action-pill-templates",
                         )
+                        yield Button(
+                            "⬛ HEADLESS ON",
+                            id=f"btn-headless-{s}",
+                            classes="action-pill action-pill-headless",
+                        )
                     # File indicator: shows the attached file/folder, hidden by default.
                     file_indicator = Label("", id=f"file-indicator-{s}", classes="file-indicator")
                     file_indicator.display = False
@@ -464,6 +469,11 @@ class _TuiComposeMixin:
                         "■ Stop",
                         id="btn-swarm-cancel",
                         classes="btn-stop",
+                    )
+                    yield Button(
+                        "⬛ HEADLESS ON",
+                        id="btn-headless-swarm",
+                        classes="swarm-headless-toggle",
                     )
                     yield Button(
                         "↻ RESTART",

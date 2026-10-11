@@ -50,6 +50,7 @@ class _TuiEventsMixin:
     _check_template_roles: Any
     _open_template_picker: Any
     _system_action_pressed: Any
+    _toggle_headless: Any
 
     # ── Widget event callbacks ───────────────────────────────────────────
 
@@ -121,6 +122,10 @@ class _TuiEventsMixin:
         # Clipped job-config chips and Browse buttons (revealed by the pills).
         if button_id.startswith("chip-"):
             self._apply_template_chip(button_id)
+            return
+        # Headless toggle: shared flag on Chat action pill and Swarm action deck.
+        if button_id.startswith("btn-headless-"):
+            self._toggle_headless(button_id)
             return
         for prefix, handler in (
             ("btn-run-", self._run_slot),
