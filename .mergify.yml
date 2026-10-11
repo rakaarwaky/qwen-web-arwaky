@@ -89,22 +89,23 @@ pull_request_rules:
         merge_bot_account: rakaarwaky
 
 # ── Merge Protections ─────────────────────────────────────────────────────────
-# Auto-merge only when CI passes.
-
-merge_protections:
-  - name: auto-merge-gate
-    description: Hold the merge until the checks report success
-    if:
-      - base=main
-      - -draft
-    success_conditions:
-      - check-success=Tests (pytest) (3.13)
-      - check-success=Self-Lint (lint-arwaky-cli)
-
-merge_protections_settings:
-  auto_merge_conditions:
-    - check-success=Self-Lint (lint-arwaky-cli)
-    - base=main
+# Intentionally empty.
+#
+# Mergify's `merge_protections` block injects a check run named
+# `@mergify/Mergify Merge Protections` that must report success before the
+# PR can merge. But that check is produced *by Mergify itself*, and its
+# success_conditions reference CI check runs (`Tests (pytest) (3.13)`,
+# `Self-Lint (lint-arwaky-cli)`) that — under the live protect-main
+# ruleset's `strict_required_status_checks_policy: true` — only run on the
+# final merge commit, which does not exist until *after* the merge. So the
+# protection check cannot complete before the merge, and the merge cannot
+# happen until the protection check completes: a deadlock. The check stays
+# `in_progress` forever, on every PR (merged or not).
+#
+# The live ruleset `protect-main` (required_status_checks + deletion guard)
+# is the actual merge gate. Mergify's pull_request_rules and queue_rules
+# already implement the "auto-merge when CI green" behaviour. No additional
+# Mergify-side merge_protections block is needed.
 
 # ── Priority Rules ─────────────────────────────────────────────────────────────
 
