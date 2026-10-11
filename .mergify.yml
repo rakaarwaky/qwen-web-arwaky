@@ -19,12 +19,15 @@
 # (lint-arwaky-cli)" job (AD-05 template hygiene).
 #
 # Label matching: Mergify's condition lists are AND-lists with no built-in
-# OR. To match "ci OR docs", use the `or:` combinator (or the equivalent
-# one-line expression `label=ci or label=docs`). The previous config used
-# "label~=(ci|docs)", which is not valid regex syntax for Mergify (labels
-# are matched with `~=^(...)$` for regex, not parenthesized groups) and
-# therefore never matched — silently defeating the queue and merge rules
-# below.
+# OR. To match "ci OR documentation", use the `or:` combinator. The previous
+# config used "label~=(ci|docs)", which is not valid regex syntax for Mergify
+# (labels are matched with `~=^(...)$` for regex, not parenthesized groups)
+# and therefore never matched — silently defeating the queue and merge rules
+# below. The labeler (.github/labeler.yml) applies `ci` for .github/workflows
+# changes and `documentation` for **/*.md changes; it never applies a label
+# literally named `docs`. Gating on `label=docs` therefore could never
+# match, so the merge protection stayed stuck. This config gates on the
+# labels the labeler actually produces.
 
 # ── Merge Queue ───────────────────────────────────────────────────────────────
 # main is the only protected branch; the queue serializes merges through
@@ -42,7 +45,7 @@ queue_rules:
       - check-success=Self-Lint (lint-arwaky-cli)
       - or:
           - label=ci
-          - label=docs
+          - label=documentation
     merge_method: squash
     batch_size: 1
     checks_timeout: 45m
@@ -60,11 +63,11 @@ merge_queue:
 pull_request_rules:
   # Auto-queue low-risk PRs once CI passes.
   - name: auto-queue-ci-and-docs
-    description: Queue PRs labelled ci or docs when the checks are green
+    description: Queue PRs labelled ci or documentation when the checks are green
     conditions:
       - or:
           - label=ci
-          - label=docs
+          - label=documentation
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - -draft
@@ -84,7 +87,7 @@ pull_request_rules:
       - check-success=Self-Lint (lint-arwaky-cli)
       - or:
           - label=ci
-          - label=docs
+          - label=documentation
     actions:
       merge:
         method: squash
