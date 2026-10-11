@@ -383,6 +383,7 @@ SESSION_EXPIRED_KEYWORDS = SESSION_EXPIRED_KEYWORDS + (
     "log in again",
     "sign in again",
     "token expired",
+    "token has expired",
     "authentication expired",
     "re-authenticate",
     "re-login",

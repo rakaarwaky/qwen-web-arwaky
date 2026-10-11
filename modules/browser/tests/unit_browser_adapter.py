@@ -692,6 +692,44 @@ def test_assert_on_chat_page_no_false_positive_on_normal_chat_body():
         adapter_mod._assert_on_chat_page(mock_page, strict=False)
 
 
+def test_assert_on_chat_page_raises_on_live_token_expired_banner():
+    """The banner the site actually renders ('Token has expired, please log in
+    again') must raise AuthRequiredError tagged session_expired. The 'token has
+    expired' phrase is a substring keyword, so it fires even when the trailing
+    'log in again' wording is absent or localized."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+    mock_page.inner_text.return_value = "Token has expired, please log in again"
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+
+    assert exc_info.value.session_expired is True
+
+
+def test_assert_on_chat_page_raises_on_token_has_expired_alone():
+    """A banner carrying only 'Token has expired.' (no 'log in again') still
+    fires the expiry raise via the dedicated keyword."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.locator.return_value.count.return_value = 0
+    mock_page.query_selector.return_value = MagicMock()  # textarea present
+    mock_page.inner_text.return_value = "Token has expired."
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
+            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+
+    assert exc_info.value.session_expired is True
+
+
 def test_assert_on_chat_page_skips_banner_check_when_body_unreadable():
     """A DOM that is still hydrating (inner_text raises) is not a signal —
     the check is skipped rather than masking a genuine auth problem."""
