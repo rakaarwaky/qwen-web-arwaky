@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import inspect
 
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_manager import UpdateManager
 

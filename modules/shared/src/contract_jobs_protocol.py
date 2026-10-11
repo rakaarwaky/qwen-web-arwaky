@@ -8,6 +8,7 @@ and never carries stubs.
 Seams:
 
 - ``IJobStorageProtocol``         → ``JobStorage``             (persist / read jobs / preview)
+- ``IStatusProtocol``              → ``StatusFileWriter``     (atomic status records)
 
 The outward export surface for outer layers is ``IJobManagerAggregate`` in
 ``contract_jobs_aggregate.py``, whose single ``execute`` takes a ``JobRequest``.
@@ -16,6 +17,7 @@ The outward export surface for outer layers is ``IJobManagerAggregate`` in
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from modules.shared.src.taxonomy_core_vo import (
     JobId,
@@ -25,6 +27,7 @@ from modules.shared.src.taxonomy_core_vo import (
     JobRecord,
     Pid,
     ResultText,
+    StatusRecordVO,
 )
 from modules.shared.src.taxonomy_jobs_vo import JobCount
 
@@ -100,11 +103,29 @@ class IJobStorageProtocol(ABC):
         ...
 
 
+class IStatusProtocol(ABC):
+    """Status file write/read capability contract."""
+
+    @abstractmethod
+    def write(self, **kwargs: Any) -> None:
+        """Atomically write status to disk."""
+
+    @abstractmethod
+    def write_record(self, record: StatusRecordVO) -> None:
+        """Atomically write a record to disk."""
+
+    @abstractmethod
+    def read(self) -> dict[str, Any] | None:
+        """Read and return the current status record."""
+
+
 __all__ = [
     "IJobStorageProtocol",
+    "IStatusProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
     "IJobStorageProtocol": IJobStorageProtocol,
+    "IStatusProtocol": IStatusProtocol,
 }

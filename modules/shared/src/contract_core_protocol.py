@@ -1,27 +1,42 @@
-"""Core capability protocols (contract layer).
+"""Prompt-domain capability contracts (AES102 `_protocol`).
 
-Taxonomy layer (contract(protocol)): pure ABCs, signatures use VOs.
-Capabilities implement these; agents/surfaces depend on them via DI.
+One file for the prompt feature. Each class below is one capability
+seam: a class carries every method that capability implements, with one
+concrete return type each, so a capability implements its class outright
+and never carries stubs.
+
+Seams:
+
+- ``IUploadProtocol``           → ``FileUploader``         (attachment upload, file validation)
+- ``IFolderCompileProtocol``    → ``FolderCompiler``       (folder-to-markdown compilation)
+- ``IFolderToAttachmentProtocol`` → ``FolderToAttachment`` (resolve folder to uploadable file)
+- ``IInjectionProtocol``        → ``PromptInjector``       (multi-strategy DOM text injection)
+- ``ISendProtocol``            → ``SendDispatcher``       (send action, message counting)
+- ``IStreamProtocol``          → ``StreamMonitor``        (stable-response waiting, completeness)
+- ``ISaverProtocol``           → ``OutputSaver``          (markdown persistence with metadata)
+
+The other features carry their own contract files in
+``modules/shared/src/``: ``contract_browser_protocol.py``,
+``contract_config_protocol.py``, ``contract_jobs_protocol.py``,
+``contract_logging_protocol.py``, ``contract_session_protocol.py``,
+``contract_swarm_protocol.py``, ``contract_update_protocol.py``.
 """
 
 from __future__ import annotations
 
-import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 from playwright.sync_api import ElementHandle, Page
 
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_event import EventMessage, LifecycleEvent, QwenEventType
+from modules.shared.src.taxonomy_core_event import LifecycleEvent, QwenEventType
 from modules.shared.src.taxonomy_core_vo import (
     FilePath,
     FileSizeBytes,
-    ForceFlag,
     HeadlessFlag,
     InjectorConfig,
     MaxFileSizeMb,
@@ -32,15 +47,8 @@ from modules.shared.src.taxonomy_core_vo import (
     PromptText,
     ResponseText,
     RunContext,
-    RunId,
-    RunState,
     StabilityChecks,
-    StatusRecordVO,
     TimeoutSec,
-    UpdateCheckResult,
-    UpdateReport,
-    UpdateStepResult,
-    VersionString,
 )
 
 # A lifecycle observer receives every emitted pipeline event; surfaces use
@@ -194,30 +202,6 @@ class IStreamProtocol(ABC):
         """True when Qwen is currently thinking/streaming."""
 
 
-class IBrowserProtocol(ABC):
-    """Browser lifecycle capability contract (Playwright adaptation)."""
-
-    @abstractmethod
-    def browser_session(self, cfg: Any) -> Any:
-        """Context manager yielding a BrowserContext."""
-
-    @abstractmethod
-    def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
-        """Navigate to chat and verify auth."""
-
-    @abstractmethod
-    def check_auth(self, page: Page) -> None:
-        """Raise AuthRequiredError if not authenticated."""
-
-    @abstractmethod
-    def check_session(self, page: Page) -> bool:
-        """Return True when the page contains the authenticated chat UI."""
-
-    @abstractmethod
-    def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
-        """Reset the page to a clean chat state."""
-
-
 class ISaverProtocol(ABC):
     """Output persistence capability contract."""
 
@@ -236,154 +220,25 @@ class ISaverProtocol(ABC):
         """Write processed output with metadata header + sidecar."""
 
 
-class IUpdateProtocol(ABC):
-    """Self-update & environment synchronization capability contract.
-
-    Owns the full update pipeline: remote version discovery via GitHub Releases API,
-    package upgrade via git pull / pip (with PEP 610 editable dev-repo detection),
-    Playwright Chromium binary synchronization, and post-update installation-integrity
-    health checks.
-    """
-
-    @abstractmethod
-    def current_version(self) -> VersionString:
-        """Return the installed package version ('unknown' when unresolvable)."""
-
-    @abstractmethod
-    def check_update(self) -> UpdateCheckResult:
-        """Compare the installed version against the latest published release.
-
-        Read-only: must never mutate the environment.
-        """
-
-    @abstractmethod
-    def upgrade_package(self, force: ForceFlag = ForceFlag(False)) -> UpdateStepResult:
-        """Upgrade (or reinstall, when forced) the package via pip."""
-
-    @abstractmethod
-    def sync_browser(self, force: ForceFlag = ForceFlag(False)) -> UpdateStepResult:
-        """Synchronize Playwright Chromium browser binaries.
-
-        When forced, cached Chromium builds are purged before re-downloading.
-        """
-
-    @abstractmethod
-    def perform_update(self, force: ForceFlag = ForceFlag(False)) -> UpdateReport:
-        """Run the full update pipeline and return the aggregated report.
-
-        Sequence: version check → package upgrade → browser sync → health checks.
-        """
-
-    @abstractmethod
-    def rollback_to(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
-        """Rollback to a previously installed package version."""
-
-
-#: Post-update functional health gate: a callable returning ``(name, passed, detail)`` triples.
-#: The Root layer injects it so the update pipeline re-runs the doctor checks at
-#: gate-execution time rather than at container-construction time (issue #506).
-ISmokeGate: TypeAlias = Callable[[], tuple[tuple[str, bool, str], ...]]
-
-
-class IWorkspaceProtocol(ABC):
-    """Workspace directory provisioning capability contract."""
-
-    @abstractmethod
-    def init_workspace(self, target_dir: FilePath) -> None:
-        """Initialize workspace directories, SKILL.md, symlinks, and .gitignore."""
-
-
-class IStatusProtocol(ABC):
-    """Status file write/read capability contract."""
-
-    @abstractmethod
-    def write(self, **kwargs: Any) -> None:
-        """Atomically write status to disk."""
-
-    @abstractmethod
-    def write_record(self, record: StatusRecordVO) -> None:
-        """Atomically write a record to disk."""
-
-    @abstractmethod
-    def read(self) -> dict[str, Any] | None:
-        """Read and return the current status record."""
-
-
-class IMetricsProtocol(ABC):
-    """In-memory metrics collection capability contract."""
-
-    @abstractmethod
-    def increment(self, key: EventMessage, amount: MessageCount = MessageCount(1)) -> None:
-        """Increment a counter by the given amount."""
-
-    @abstractmethod
-    def get(self, key: EventMessage) -> MessageCount:
-        """Return the current value of a counter."""
-
-    @abstractmethod
-    def snapshot(self) -> dict[str, Any]:
-        """Return a shallow copy of all counters."""
-
-    @abstractmethod
-    def record_execution(self, success: bool) -> None:
-        """Record a completed pipeline run for the rolling-window execution log."""
-
-
-class IRunCancelProtocol(ABC):
-    """Contract for the shared targeted-cancel registry of in-flight runs.
-
-    Implemented by ``capabilities_run_cancel_registry.CapabilitiesRunCancelRegistry``
-    and injected into the prompt file / attachment / swarm orchestrators so
-    that a cancel can stop one run's browser context without touching sibling
-    runs.  Runs are addressed by their stable ``RunId`` — never by object
-    identity of a ``threading.Event`` — so the handle cannot be invalidated
-    by a collected or recycled event object.
-    """
-
-    @abstractmethod
-    def register(self, run_state: RunState) -> None:
-        """Track a newly started in-flight run."""
-
-    @abstractmethod
-    def release(self, run_state: RunState) -> None:
-        """Drop the entry for a finished run."""
-
-    @abstractmethod
-    def cancel_run(self, run_id: RunId) -> None:
-        """Stop the run identified by ``run_id`` and close its browser context."""
-
-    @abstractmethod
-    def cancel_by_event(self, cancel_event: threading.Event) -> None:
-        """Cancel the run that was registered with this cancel event.
-
-        Convenience for surface callers that only hold the original
-        ``threading.Event``.  Delegates to the stable ``run_id`` lookup
-        internally; safe no-op when the run has already finished.
-        """
-
-    @abstractmethod
-    def set_active_bctx(self, run_id: RunId, bctx: Any) -> None:
-        """Update the live browser context for a registered run (None clears it)."""
-
-    @abstractmethod
-    def active_bctx(self, run_id: RunId) -> Any:
-        """Return the live browser context for ``run_id``, or None."""
-
-
 __all__ = [
     "IUploadProtocol",
     "IFolderCompileProtocol",
+    "IFolderToAttachmentProtocol",
     "IInjectionProtocol",
     "ISendProtocol",
     "IStreamProtocol",
-    "IBrowserProtocol",
     "ISaverProtocol",
-    "IObservabilityProtocol",
-    "IUpdateProtocol",
-    "ISmokeGate",
-    "IWorkspaceProtocol",
-    "IStatusProtocol",
-    "IMetricsProtocol",
-    "IRunCancelProtocol",
     "LifecycleObserver",
 ]
+
+# Layer-symbol registry (runtime reference for harness/loader introspection).
+_layer_symbols = {
+    "IUploadProtocol": IUploadProtocol,
+    "IFolderCompileProtocol": IFolderCompileProtocol,
+    "IFolderToAttachmentProtocol": IFolderToAttachmentProtocol,
+    "IInjectionProtocol": IInjectionProtocol,
+    "ISendProtocol": ISendProtocol,
+    "IStreamProtocol": IStreamProtocol,
+    "ISaverProtocol": ISaverProtocol,
+    "LifecycleObserver": LifecycleObserver,
+}

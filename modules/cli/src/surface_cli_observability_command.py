@@ -14,8 +14,8 @@ import json
 import sys
 from typing import Any
 
-from modules.shared.src.contract_core_protocol import IMetricsProtocol
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
+from modules.shared.src.contract_logging_protocol import IMetricsProtocol
 from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest
 
 
@@ -74,17 +74,11 @@ def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = Non
             # Invalid or unreadable status file - treat as absent
             status_map = None
 
-    # contract_core_protocol.IMetricsProtocol.snapshot() returns a plain dict;
-    # wrap it so the access pattern below matches MetricsSnapshot's fields.
+    # contract_logging_protocol.IMetricsProtocol.snapshot() returns a MetricsSnapshot;
+    # use its fields directly.
     metrics_snapshot: MetricsSnapshot | None = None
     if metrics is not None:
-        raw = metrics.snapshot()
-        metrics_snapshot = MetricsSnapshot(
-            counters=raw.get("counters", {}),
-            total_executions=raw.get("total_executions", 0),
-            successful_executions=raw.get("successful_executions", 0),
-            success_rate=raw.get("success_rate"),
-        )
+        metrics_snapshot = metrics.snapshot()
 
     if json_output:
         payload: dict[str, Any] = {"success": True, "status_path": str(status_path), "status": status_map}

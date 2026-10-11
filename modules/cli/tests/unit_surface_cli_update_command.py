@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src import surface_cli_update_command
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,

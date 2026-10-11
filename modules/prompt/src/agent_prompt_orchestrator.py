@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import cast
 
-from modules.shared.src.contract_core_protocol import IRunCancelProtocol
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.contract_prompt_protocol import (
@@ -18,6 +17,7 @@ from modules.shared.src.contract_prompt_protocol import (
     IDirectPromptProtocol,
     IPromptFileProtocol,
 )
+from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 
