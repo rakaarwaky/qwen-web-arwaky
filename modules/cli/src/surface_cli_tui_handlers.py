@@ -81,8 +81,6 @@ class _TuiHandlersMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
-    _run_jobs_cleanup: Any
-    _refresh_jobs_table: Any
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 
@@ -93,8 +91,6 @@ class _TuiHandlersMixin:
         router: dict[str, Callable[[], Any]] = {
             "btn-tui-doctor": self._run_doctor_worker,
             "btn-tui-update": self._run_update_worker,
-            "btn-tui-jobs-cleanup": self._run_jobs_cleanup,
-            "btn-jobs-refresh": self._refresh_jobs_table,
         }
         handler = router.get(button_id)
         if handler is None:
