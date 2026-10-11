@@ -6,6 +6,9 @@ orchestrator based on AppConfig.mode, then delegates with zero business logic.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+
 from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
@@ -30,11 +33,17 @@ def dispatch_run(
     direct: IDirectPromptProtocol,
     file_only: IPromptFileProtocol,
     attachment: IAttachmentPromptProtocol,
+    session_resolver: Callable[[], Path | None] | None = None,
 ) -> dict[str, object]:
     """C4: single shared dispatcher for direct/single modes.
 
     Used by both ``handle`` (run subcommand) and ``InteractiveController.run``
     so the dispatch semantics stay in exactly one place.
+
+    ``session_resolver`` returns the pool session path chosen by session
+    rotation so the direct pipeline can use it; ``build_app_config`` inside
+    the adapter builds a fresh AppConfig, so without the resolver the pool
+    selection would be dropped and the default session used.
     """
     mode = cfg.mode
 
@@ -48,6 +57,7 @@ def dispatch_run(
             prompt=prompt_text,
             output_file=cfg.output_path,
             headless=HeadlessFlag(cfg.headless),
+            session_resolver=session_resolver,
         )
     elif mode == "single":
         prompt_file = cfg.prompt_path or cfg.input_path
@@ -80,7 +90,8 @@ def handle(
     direct: IDirectPromptProtocol,
     file_only: IPromptFileProtocol,
     attachment: IAttachmentPromptProtocol,
+    session_resolver: Callable[[], Path | None] | None = None,
 ) -> dict[str, object]:
     """Dispatch single prompt processing to the matching pipeline orchestrator."""
     _ = args
-    return dispatch_run(cfg, direct, file_only, attachment)
+    return dispatch_run(cfg, direct, file_only, attachment, session_resolver=session_resolver)

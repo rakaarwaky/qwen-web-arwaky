@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -161,3 +162,59 @@ def test_process_direct_prompt_no_session_expired_emit_when_clean() -> None:
     mocks["browser"].detect_session_expired.assert_called_once()
     emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
     assert len(emit_calls) == 0
+
+
+class TestDirectPromptSessionResolver:
+    """Pool session selection must reach the direct pipeline (single-member pool included)."""
+
+    def test_resolver_session_reaches_the_browser_session(self) -> None:
+        orch, mocks = _make_direct_orchestrator()
+        pool_path = Path("/home/raka/.qwen-web/sessions/session_1")
+
+        def flow_stub(*, active_cfg, **_kwargs):
+            assert active_cfg.session_path == pool_path
+            return "ok"
+
+        mocks["flow"].dispatch_and_wait_for_response.side_effect = flow_stub
+
+        orch.process_direct_prompt(
+            "What is Python?",
+            session_resolver=lambda: pool_path,
+            output_file=Path("/tmp/direct_resolver_out.md"),
+        )
+
+        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        assert cfg_arg.session_path == pool_path
+
+    def test_resolver_returning_none_falls_back_to_the_default_session(self) -> None:
+        from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
+
+        orch, mocks = _make_direct_orchestrator()
+        mocks["flow"].dispatch_and_wait_for_response.side_effect = lambda **_: "ok"
+
+        orch.process_direct_prompt(
+            "What is Python?",
+            session_resolver=lambda: None,
+            output_file=Path("/tmp/direct_resolver_none.md"),
+        )
+
+        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        assert cfg_arg.session_path == DEFAULT_SESSION
+
+    def test_resolver_reraising_reports_no_session(self) -> None:
+        from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
+
+        orch, mocks = _make_direct_orchestrator()
+        mocks["flow"].dispatch_and_wait_for_response.side_effect = lambda **_: "ok"
+
+        def failing_resolver() -> Path | None:
+            raise RuntimeError("pool read failed")
+
+        orch.process_direct_prompt(
+            "What is Python?",
+            session_resolver=failing_resolver,
+            output_file=Path("/tmp/direct_resolver_fail.md"),
+        )
+
+        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        assert cfg_arg.session_path == DEFAULT_SESSION

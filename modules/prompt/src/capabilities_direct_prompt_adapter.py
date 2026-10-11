@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -80,12 +81,19 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
         event_observer: LifecycleObserver | None = None,
+        session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
         """Pipeline 1: Process a direct text prompt string and return AI response.
 
         ``event_observer`` optionally receives every emitted lifecycle event
         so a surface can render event-level status (thinking / streaming /
         prompting) instead of only IDLE/RUNNING.
+
+        ``session_resolver`` returns the session pool path chosen by session
+        rotation upstream of this pipeline. The pipeline builds its own
+        AppConfig, so without the resolver the pool choice would be dropped
+        and the default session used; a single-session pool must resolve the
+        logged-in profile through the resolver as well.
         """
         ctx = RunContext()
         try:
@@ -100,6 +108,7 @@ class DirectPromptAdapter(IDirectPromptProtocol):
                     input_path=p_path,
                     output_path=out_path,
                     headless=headless,
+                    session_path=self._resolve_session_path(session_resolver),
                 )
                 self._observability.bind_run_context(RunId(ctx.run_id), job_name=JobName("direct"))
                 self._observability.attach_run_log(job_name=JobName("direct"), run_id=RunId(ctx.run_id))
@@ -124,6 +133,22 @@ class DirectPromptAdapter(IDirectPromptProtocol):
             self._observability.clear_run_context()
 
     # Block 3: Dunder Methods, Factories & Helpers
+
+    @staticmethod
+    def _resolve_session_path(session_resolver: Callable[[], Path | None] | None) -> Path | None:
+        """Run the pool resolver; an empty pool must fall back to the default.
+
+        ``build_app_config`` falls back to ``DEFAULT_SESSION`` when nothing
+        is supplied, so a resolver that returned ``None`` reports the
+        default session back to the pipeline. A resolver that raises
+        reports no session instead of failing the prompt.
+        """
+        if session_resolver is None:
+            return None
+        try:
+            return session_resolver()
+        except Exception:
+            return None
 
     def _execute_direct_on_page(
         self,
