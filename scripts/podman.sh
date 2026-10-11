@@ -58,7 +58,7 @@ Commands:
   status                Show status of persistent container
   login                 Open browser in container to login to Qwen (saves session to Podman volume)
   doctor                Run doctor diagnostics inside container
-  prompt "text"         Run a direct prompt headlessly using saved login session
+  prompt "text"         Run a direct prompt headlessly using saved session
   run [args...]         Run any qwa command inside container (e.g. $0 run --help)
   shell                 Open an interactive bash shell inside the container
   test                  Run full pytest unit/integration test suite inside container
@@ -107,7 +107,8 @@ case "$cmd" in
         xhost +local:root 2>/dev/null || xhost +local: 2>/dev/null || true
         start_container
         echo "==> Opening headed browser in Podman for Qwen login..."
-        podman exec ${TTY_FLAGS} -e DISPLAY="${DISPLAY:-:0}" --workdir /root/src "${CONTAINER_NAME}" qwa login "${@:2}"
+        podman exec ${TTY_FLAGS} -e DISPLAY="${DISPLAY:-:0}" --workdir /root/src "${CONTAINER_NAME}" \
+            qwa session login --name "${2:-default}" "${@:3}"
         ;;
     doctor)
         start_container
@@ -140,7 +141,7 @@ case "$cmd" in
         fi
         start_container
         echo "==> Running prompt inside Podman..."
-        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" qwa prompt-direct -t "$2" --headless "${@:3}"
+        podman exec ${TTY_FLAGS} --workdir /root/src "${CONTAINER_NAME}" qwa prompt direct -t "$2" --headless "${@:3}"
         ;;
     run)
         start_container

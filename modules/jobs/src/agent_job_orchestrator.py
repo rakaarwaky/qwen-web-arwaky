@@ -230,7 +230,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         return record
 
     def _submit_attachment(self, request: JobRequest) -> JobRecord:
-        """Admit, persist, and dispatch a prompt-with-attachment job."""
+        """Admit, persist, and dispatch a prompt attach job."""
         p_path = self._storage.resolve_job_path(JobPath.from_raw(str(request.prompt_file)))
         a_path = self._storage.resolve_job_path(JobPath.from_raw(str(request.attachment_file)))
         out_path = (
@@ -453,7 +453,7 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         output_path: JobPath | None,
         headless: HeadlessFlag,
     ) -> None:
-        """Execute and persist a prompt-with-attachment job, then return its slot.
+        """Execute and persist a prompt attach job, then return its slot.
 
         The rate limiter is consumed on the worker thread, mirroring
         :meth:`_run_file_job`, so an admitted job still honours throughput

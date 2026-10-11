@@ -79,7 +79,8 @@ def restore_latest(session_path: Path) -> Path:
     if not generations:
         raise FileNotFoundError(
             f"No session backup found under {backups_dir(source)}. Recover by running "
-            "'qwen-web-arwaky login' (interactive CAPTCHA). See docs/runbooks/session-corruption.md"
+            "'qwen-web-arwaky session login --name default' (interactive CAPTCHA). "
+            "See docs/runbooks/session-corruption.md"
         )
     return restore_generation(source, generations[0])
 

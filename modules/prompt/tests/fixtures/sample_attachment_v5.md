@@ -3,7 +3,7 @@
 This is a release-verification attachment fixture for **qwen-web-arwaky v5.0.0**.
 
 ## Context
-Lampiran kecil untuk menguji pipeline `prompt-with-attachment` pada rilis
+Lampiran kecil untuk menguji pipeline `prompt attach` pada rilis
 5.0.0. Berisi daftar buah: apel, pisang, jeruk. Dan daftar hewan: kucing,
 anjing, burung.
 

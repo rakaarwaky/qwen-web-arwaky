@@ -13,12 +13,16 @@ if TYPE_CHECKING:
 
 
 def register_sessions_subparser(subparsers: Any) -> None:
-    """Register sessions subcommand."""
+    """Register the ``session`` command group.
+
+    Single source of truth for the group's parser shape: the Root CLI calls
+    this function so the command names and the handler below cannot drift.
+    """
     sessions_parser = subparsers.add_parser(
-        "sessions",
+        "session",
         help="Manage Qwen login sessions",
     )
-    sessions_sub = sessions_parser.add_subparsers(dest="session_command")
+    sessions_sub = sessions_parser.add_subparsers(dest="session_command", metavar="SUBCOMMAND")
 
     # List command
     sessions_sub.add_parser("list", help="List all sessions")
@@ -32,7 +36,7 @@ def register_sessions_subparser(subparsers: Any) -> None:
     )
 
     # Health check command
-    sessions_sub.add_parser("health-check", help="Check health of all sessions")
+    sessions_sub.add_parser("health", help="Check health of all sessions")
 
     # Remove command
     remove_parser = sessions_sub.add_parser("remove", help="Remove a session")
@@ -63,14 +67,14 @@ def handle_sessions(args: argparse.Namespace) -> int:
         return cmd_list(manager)
     if args.session_command == "login":
         return cmd_login(manager, args)
-    if args.session_command == "health-check":
+    if args.session_command == "health":
         return cmd_health_check(manager)
     if args.session_command == "remove":
         return cmd_remove(manager, args)
     if args.session_command == "status":
         return cmd_status(manager)
 
-    print("Use 'qwen-web-arwaky sessions --help' for usage")
+    print("Use 'qwen-web-arwaky session --help' for usage")
     return 1
 
 
@@ -79,7 +83,7 @@ def cmd_list(manager: SessionManager) -> int:
     sessions = manager.list_sessions()
 
     if not sessions:
-        print("No sessions found. Use 'sessions login --name <name>' to add one.")
+        print("No sessions found. Use 'session login --name <name>' to add one.")
         return 0
 
     print("\n📊 Session Pool")

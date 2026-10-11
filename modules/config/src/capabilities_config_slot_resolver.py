@@ -56,7 +56,7 @@ class SlotRunPlanResolver(IConfigSlotPlanProtocol):
         the same second never overwrite each other (issue #280 AC-1).
 
         Filesystem edge cases (issue #280): a missing attachment degrades the
-        run to prompt-only rather than failing validation, and an unwritable
+        run to prompt-file-only rather than failing validation, and an unwritable
         output directory is reported as an actionable error before any browser
         is launched.
         """
@@ -74,7 +74,7 @@ class SlotRunPlanResolver(IConfigSlotPlanProtocol):
         file_stripped = file_val.strip()
         f_path = Path(file_stripped).resolve() if file_stripped else None
         # AC-3: an attachment that does not exist on disk downgrades the run to
-        # prompt-only; the surface logs the downgrade from the plan.
+        # prompt-file-only; the surface logs the downgrade from the plan.
         if f_path is not None and not f_path.exists():
             f_path = None
 

@@ -35,14 +35,14 @@ def test_smoke_the_aggregate_builds_a_config_for_one_mode(tmp_path: Path) -> Non
     response = _orchestrator().execute(
         ConfigRequest(
             verb="for_mode",
-            mode=Mode("prompt-direct"),
+            mode=Mode("direct"),
             input_path=tmp_path / "in.md",
             output_path=tmp_path / "out.md",
         )
     )
 
     config = cast(AppConfig, response.config)
-    assert config.mode == "prompt-direct"
+    assert config.mode == "direct"
     assert config.output_path == tmp_path / "out.md"
 
 

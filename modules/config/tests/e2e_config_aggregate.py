@@ -39,7 +39,7 @@ def test_e2e_for_mode_builds_a_config_that_carries_its_timeout(tmp_path: Path, m
     monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
     request = ConfigRequest(
         verb="for_mode",
-        mode=Mode("prompt-direct"),
+        mode=Mode("direct"),
         input_path=tmp_path / "in.md",
         output_path=tmp_path / "out.md",
     )
@@ -49,7 +49,7 @@ def test_e2e_for_mode_builds_a_config_that_carries_its_timeout(tmp_path: Path, m
     assert response.error is None, "the verb must answer without a structured error"
     config = response.config
     assert isinstance(config, AppConfig)
-    assert config.mode == "prompt-direct"
+    assert config.mode == "direct"
     assert config.output_path == tmp_path / "out.md"
     assert response.timeout_sec is not None and TimeoutSec(response.timeout_sec) > 0
 
@@ -59,7 +59,7 @@ def test_e2e_environment_override_flows_into_the_built_config(tmp_path: Path, mo
     monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "120")
     request = ConfigRequest(
         verb="for_mode",
-        mode=Mode("prompt-direct"),
+        mode=Mode("direct"),
         input_path=tmp_path / "in.md",
         output_path=tmp_path / "out.md",
     )

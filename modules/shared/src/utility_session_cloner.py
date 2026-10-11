@@ -139,7 +139,7 @@ def session_age_warning(master_session: Path, max_age_days: int = DEFAULT_SESSIO
         return None
     return (
         f"Session profile is {age_days:.1f} days old (threshold: {max_age_days} days). "
-        "Cookies may be near IdP expiry — run 'qwen-web-arwaky login' to refresh credentials."
+        "Cookies may be near IdP expiry — run 'qwen-web-arwaky session login' to refresh credentials."
     )
 
 

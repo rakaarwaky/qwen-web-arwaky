@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_cli_main_entry import main
-from modules.shared.src import AppConfig
 
 
 def _make_controller() -> InteractiveController:
@@ -30,67 +28,6 @@ class TestInteractiveControllerRun:
     def test_explicit_exit_returns_success(self):
         result = _make_controller().run(cfg=None, prompt=False)
         assert result == {"success": True, "message": "Exited."}
-
-
-class TestRunManualLogin:
-    def test_not_tty_exits(self):
-        with (
-            patch("sys.stdin") as mock_stdin,
-            patch(
-                "modules.root_cli_main_entry.handle_login_command",
-                return_value={"success": False, "error": "TTY required"},
-            ) as mock_handle,
-        ):
-            mock_stdin.isatty.return_value = False
-            cfg = AppConfig(
-                mode="login",
-                input_path=Path("/tmp/in"),
-                output_path=Path("/tmp/out"),
-                session_path=Path("/tmp/session"),
-            )
-            from modules.root_cli_main_entry import _run_manual_login
-
-            result = _run_manual_login(cfg)
-            mock_handle.assert_called_once()
-            assert result == 1
-
-    def test_login_opens_browser(self):
-        with (
-            patch("sys.stdin") as mock_stdin,
-            patch(
-                "modules.root_cli_main_entry.handle_login_command", return_value={"success": True, "message": "ok"}
-            ) as mock_handle,
-        ):
-            mock_stdin.isatty.return_value = True
-            cfg = AppConfig(
-                mode="login",
-                input_path=Path("/tmp/in"),
-                output_path=Path("/tmp/out"),
-                session_path=Path("/tmp/session"),
-            )
-            from modules.root_cli_main_entry import _run_manual_login
-
-            result = _run_manual_login(cfg)
-            mock_handle.assert_called_once()
-            assert result == 0
-
-    def test_failure_prints_error_to_stderr(self, capsys):
-        with patch(
-            "modules.root_cli_main_entry.handle_login_command",
-            return_value={"success": False, "error": "Manual login requires an interactive terminal (TTY)"},
-        ):
-            cfg = AppConfig(
-                mode="login",
-                input_path=Path("/tmp/in"),
-                output_path=Path("/tmp/out"),
-                session_path=Path("/tmp/session"),
-            )
-            from modules.root_cli_main_entry import _run_manual_login
-
-            result = _run_manual_login(cfg)
-            captured = capsys.readouterr()
-            assert "Manual login requires an interactive terminal (TTY)" in captured.err
-            assert result == 1
 
 
 class TestMain:
@@ -114,13 +51,14 @@ class TestMain:
             assert result == 1
             assert "Interactive TUI mode requires a terminal (TTY)" in captured.err
 
-    def test_main_login_mode(self):
+    def test_main_session_login_dispatches(self):
         with (
-            patch("sys.argv", ["qwen-cli", "login", "--session", "default"]),
-            patch("modules.root_cli_main_entry._run_manual_login", return_value=0),
+            patch("sys.argv", ["qwen-cli", "session", "login", "--name", "default"]),
+            patch("modules.root_cli_main_entry.handle_sessions", return_value=0) as mock_sessions,
         ):
             result = main()
             assert result == 0
+            mock_sessions.assert_called_once()
 
 
 class TestQwenTuiLogHandler:

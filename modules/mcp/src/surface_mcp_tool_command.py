@@ -258,7 +258,7 @@ class McpToolCommand:
             timeout_sec: Maximum seconds to wait for assistant response (default: 120s).
             headless: Run browser headlessly (default: True).
             output_file: Optional destination path for the AI response, matching
-                the CLI's ``prompt-direct -o FILE`` flag.
+                the CLI's ``prompt direct -o FILE`` flag.
 
         Returns:
             JSON string containing success status, assistant response text, and metadata.

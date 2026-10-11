@@ -15,7 +15,7 @@ class TestCliPromptTemplateIntegration:
     """Test CLI argument parsing and config construction for role templates."""
 
     def test_prompt_only_with_role(self) -> None:
-        args = _parse_args(["prompt-only", "-i", "software-architect", "--headless"])
+        args = _parse_args(["prompt", "file", "-i", "software-architect", "--headless"])
         cfg = _build_config(args)
 
         assert cfg.mode == "single"
@@ -29,7 +29,7 @@ class TestCliPromptTemplateIntegration:
         dummy_att = tmp_path / "dummy.txt"
         dummy_att.write_text("hello world")
 
-        args = _parse_args(["prompt-with-attachment", "-i", "backend-engineer", "-a", str(dummy_att)])
+        args = _parse_args(["prompt", "attach", "-i", "backend-engineer", "-a", str(dummy_att)])
         cfg = _build_config(args)
 
         assert cfg.mode == "single"
