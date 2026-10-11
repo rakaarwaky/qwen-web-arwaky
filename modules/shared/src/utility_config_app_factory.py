@@ -142,12 +142,20 @@ def resolve_pipeline_output_path(
 ) -> tuple[Path, Path]:
     """Resolve prompt file and output file paths cleanly for prompt pipeline agents.
 
-    The output filename is derived from the attachment path (when provided),
-    otherwise from the prompt filename. In all cases the output name receives a
-    timestamp plus a 4-hex-digit suffix so repeated runs never silently
-    overwrite each other. The timestamp alone only has second-level
-    granularity, so two slot runs started in the same second would collide and
-    one would silently clobber the other (issue #280 AC-1).
+    ``output_file`` semantics
+    ------------------------
+    * ``None`` (default) → auto-name the destination under ``DEFAULT_OUTPUT``
+      as ``{stem}_{YYYYMMDD-HHMMSS}_{hex4}.md`` so concurrent slot runs that
+      start in the same second never overwrite each other (issue #280 AC-1).
+    * A **non-directory path**, with or without an extension → honored exactly
+      as the operator supplied it. No timestamp or hex suffix is appended;
+      repeated runs overwrite the same file. Collision safety is the
+      operator's choice.
+    * A **directory path** → auto-name a file inside it, using the same
+      ``{stem}_{YYYYMMDD-HHMMSS}_{hex4}.md`` form as the default case.
+
+    The stem is the attachment's stem when ``attachment_path`` is given,
+    otherwise the prompt's stem.
     """
     import uuid
     from datetime import datetime
@@ -167,19 +175,13 @@ def resolve_pipeline_output_path(
 
     if output_file:
         out_path = Path(output_file).resolve()
-        if out_path.is_dir():
-            out_path = out_path / f"{stem}_{ts}_{unique}.md"
-        elif out_path.suffix:
-            # A user-supplied file path with an extension is honoured exactly
-            # as named: the operator's -o argument writes in place (issue
-            # #280 AC-1 is about *default* filenames colliding, not about
-            # honoring an explicit -o argument).
-            out_path = out_path
-        else:
-            # An explicit argument with no extension is not a precise file
-            # target, so auto-complete it with a timestamp + hex suffix to
-            # keep concurrent runs distinct.
-            out_path = out_path.parent / f"{out_path.name}_{ts}_{unique}"
+        # A user-supplied -o path is honored exactly as named: the operator
+        # chose the destination, so write to that precise path in place. No
+        # timestamp or hex suffix is appended; repeated runs overwrite the
+        # same file (issue #280 AC-1 collision safety applies only to
+        # auto-generated names). A directory argument still auto-completes a
+        # unique filename inside it.
+        out_path = out_path / f"{stem}_{ts}_{unique}.md" if out_path.is_dir() else out_path
     else:
         out_path = DEFAULT_OUTPUT / f"{stem}_{ts}_{unique}.md"
 
