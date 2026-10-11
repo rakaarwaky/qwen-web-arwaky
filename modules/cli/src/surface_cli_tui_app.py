@@ -267,23 +267,6 @@ class QwenTuiApp(
             ]
             self._template_roles_dirty = False
 
-    # ── Headless toggle ───────────────────────────────────────────────────
-
-    def _toggle_headless(self, button_id: str) -> None:
-        """Flip the shared headless flag and update all headless button labels."""
-        self._headless = not self._headless
-        state = "ON" if self._headless else "OFF"
-        with contextlib.suppress(NoMatches):
-            for btn in self.query("[id^='btn-headless-']"):
-                if isinstance(btn, Button):
-                    btn.label = f"⬛ HEADLESS {state}"
-            for slot in range(1, self._NUM_SLOTS + 1):
-                self.query_one(f"#btn-headless-{slot}", Button).label = f"⬛ HEADLESS {state}"
-        self._log_msg(
-            f"[{THEME['muted']}]Headless mode set to {state}[/] "
-            f"[{THEME['ok'] if self._headless else THEME['warn']}]({button_id})[/]"
-        )
-
 
 __all__ = [
     "QwenTuiApp",
