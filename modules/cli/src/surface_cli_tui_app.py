@@ -47,7 +47,7 @@ from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.contract_update_protocol import IUpdateProtocol
+from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.taxonomy_swarm_vo import SwarmId
 from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
@@ -120,7 +120,7 @@ class QwenTuiApp(
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
         session_manager: ISessionManagerProtocol | None = None,
-        updater: IUpdateProtocol | None = None,
+        updater: IUpdateCheckProtocol | None = None,
         job_storage: IJobStorageProtocol | None = None,
     ) -> None:
         super().__init__()

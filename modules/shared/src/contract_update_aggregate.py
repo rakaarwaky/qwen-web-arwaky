@@ -5,8 +5,9 @@ The CLI update surface calls :meth:`execute`; the agent behind it owns
 the rollback decision (run the post-update health gate, then restore the
 previous version when the gate fails), so no surface can skip that gate.
 
-The capability seam this aggregate sits on — ``IUpdateProtocol`` — lives
-in ``contract_update_protocol.py``.
+The capability seams this aggregate sits on — the four FR protocols
+``IUpdateCheckProtocol``, ``IUpdateUpgradeProtocol``, ``IUpdateVerifyProtocol``,
+and ``IUpdateRollbackProtocol`` — live in ``contract_update_protocol.py``.
 """
 
 from __future__ import annotations

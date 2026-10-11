@@ -24,7 +24,10 @@ from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import SessionRequest
 from modules.shared.src.utility_config_app_factory import build_app_config, sandbox_unavailable
-from modules.update.src.capabilities_update_manager import UpdateManager
+from modules.update.src.capabilities_update_check import UpdateCheckCapability
+from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
+from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
+from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
 
 # ─── #290: sandbox is on by default ─────────────────────────────────────────
 
@@ -139,14 +142,25 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
 # ─── #294: post-update functional smoke gate ───────────────────────────────
 
 
+def _verify(smoke_gate=None) -> UpdateVerifyCapability:
+    upgrade = UpdateUpgradeCapability()
+    rollback = UpdateRollbackCapability(upgrade, package_name="qwen-web-arwaky")
+    return UpdateVerifyCapability(
+        UpdateCheckCapability("qwen-web-arwaky"),
+        upgrade,
+        rollback,
+        package_name="qwen-web-arwaky",
+        smoke_gate=smoke_gate,
+    )
+
+
 def test_smoke_gate_is_a_noop_when_none_is_injected() -> None:
-    manager = UpdateManager()
-    assert manager._run_smoke_gate() == ()
+    assert _verify()._run_smoke_gate() == ()
 
 
 def test_smoke_gate_failures_become_failed_health_checks() -> None:
     gate = lambda: (("Host Capacity", False, "recommended max workers 0"),)  # noqa: E731
-    results = UpdateManager(smoke_gate=gate)._run_smoke_gate()
+    results = _verify(smoke_gate=gate)._run_smoke_gate()
 
     assert len(results) == 1
     assert results[0].name == "smoke:Host Capacity"
@@ -157,7 +171,7 @@ def test_smoke_gate_failures_become_failed_health_checks() -> None:
 
 def test_smoke_gate_passes_when_every_check_passes() -> None:
     gate = lambda: (("Host Capacity", True, "10 recommended max workers"),)  # noqa: E731
-    results = UpdateManager(smoke_gate=gate)._run_smoke_gate()
+    results = _verify(smoke_gate=gate)._run_smoke_gate()
 
     assert results[0].success is True
 
@@ -166,7 +180,7 @@ def test_smoke_gate_exception_becomes_a_failed_check_not_a_crash() -> None:
     def explode() -> tuple[tuple[str, bool, str], ...]:
         raise RuntimeError("doctor crashed")
 
-    results = UpdateManager(smoke_gate=explode)._run_smoke_gate()
+    results = _verify(smoke_gate=explode)._run_smoke_gate()
 
     assert len(results) == 1
     assert results[0].success is False
@@ -340,8 +354,8 @@ def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:
     from modules.root_core_container import SharedContainer
 
     container = SharedContainer()
-    assert callable(getattr(container.updater, "_smoke_gate", None))
-    results = container.updater._run_smoke_gate()
+    assert callable(getattr(container.updater_verify, "_smoke_gate", None))
+    results = container.updater_verify._run_smoke_gate()
     assert any(r.name.startswith("smoke:") for r in results)
 
 

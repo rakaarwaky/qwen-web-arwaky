@@ -1,25 +1,40 @@
-"""Contract tests for the update capability's public seam.
-
-Pins the aggregate and protocol surface a caller may depend on, so a
-signature change fails here rather than in a caller that has to be reworked.
-"""
+"""Contract tests for the four update FR capability seams."""
 
 from __future__ import annotations
 
 import inspect
 
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import IUpdateProtocol
-from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
-from modules.update.src.capabilities_update_manager import UpdateManager
-
-_REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
-    {"current_version", "check_update", "upgrade_package", "sync_browser", "perform_update", "rollback_to"}
+from modules.shared.src.contract_update_protocol import (
+    IUpdateCheckProtocol,
+    IUpdateRollbackProtocol,
+    IUpdateUpgradeProtocol,
+    IUpdateVerifyProtocol,
 )
+from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
+from modules.update.src.capabilities_update_check import UpdateCheckCapability
+from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
+from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
+from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
+
+_FR_METHODS: dict[type, frozenset[str]] = {
+    IUpdateCheckProtocol: frozenset({"current_version", "check_update"}),
+    IUpdateUpgradeProtocol: frozenset({"upgrade_package", "sync_browser"}),
+    IUpdateVerifyProtocol: frozenset({"perform_update"}),
+    IUpdateRollbackProtocol: frozenset({"rollback_to"}),
+}
+
+_FR_CAPABILITIES: dict[type, type] = {
+    IUpdateCheckProtocol: UpdateCheckCapability,
+    IUpdateUpgradeProtocol: UpdateUpgradeCapability,
+    IUpdateVerifyProtocol: UpdateVerifyCapability,
+    IUpdateRollbackProtocol: UpdateRollbackCapability,
+}
 
 
-def test_manager_implements_the_update_protocol() -> None:
-    assert IUpdateProtocol in inspect.getmro(UpdateManager)
+def test_each_fr_protocol_has_a_single_implementing_capability() -> None:
+    for proto, capability in _FR_CAPABILITIES.items():
+        assert proto in inspect.getmro(capability), f"{capability.__name__} missing {proto.__name__}"
 
 
 def test_orchestrator_implements_the_update_aggregate() -> None:
@@ -31,12 +46,14 @@ def test_aggregate_declares_only_the_execute_door() -> None:
     assert public == {"execute"}
 
 
-def test_protocol_declares_exactly_the_sealed_method_set() -> None:
-    public = {name for name, _ in inspect.getmembers(IUpdateProtocol, predicate=inspect.isfunction)}
-    assert public == set(_REQUIRED_PROTOCOL_METHODS)
+def test_each_fr_protocol_seals_its_method_set() -> None:
+    for proto, methods in _FR_METHODS.items():
+        public = {name for name, _ in inspect.getmembers(proto, predicate=inspect.isfunction)}
+        assert public == methods, f"{proto.__name__}: {public} != {methods}"
 
 
-def test_every_protocol_method_is_abstract_with_a_return_annotation() -> None:
-    for name in _REQUIRED_PROTOCOL_METHODS:
-        signature = inspect.signature(getattr(IUpdateProtocol, name))
-        assert signature.return_annotation is not inspect.Signature.empty, f"{name} has no return annotation"
+def test_every_fr_protocol_method_is_abstract_with_a_return_annotation() -> None:
+    for proto, methods in _FR_METHODS.items():
+        for name in methods:
+            signature = inspect.signature(getattr(proto, name))
+            assert signature.return_annotation is not inspect.Signature.empty

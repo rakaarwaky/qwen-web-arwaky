@@ -40,18 +40,22 @@ class TestQwenAutoContract(unittest.TestCase):
             self.assertTrue(hasattr(CoreOrchestrator, m), f"CoreOrchestrator missing method {m}")
 
     def test_update_protocol_contract_methods(self) -> None:
-        from modules.shared.src.contract_update_protocol import IUpdateProtocol
+        from modules.shared.src.contract_update_protocol import (
+            IUpdateCheckProtocol,
+            IUpdateRollbackProtocol,
+            IUpdateUpgradeProtocol,
+            IUpdateVerifyProtocol,
+        )
 
-        expected = [
-            "current_version",
-            "check_update",
-            "upgrade_package",
-            "sync_browser",
-            "perform_update",
-            "rollback_to",
-        ]
-        for m in expected:
-            self.assertTrue(hasattr(IUpdateProtocol, m), f"IUpdateProtocol missing method {m}")
+        expected = {
+            IUpdateCheckProtocol: ["current_version", "check_update"],
+            IUpdateUpgradeProtocol: ["upgrade_package", "sync_browser"],
+            IUpdateVerifyProtocol: ["perform_update"],
+            IUpdateRollbackProtocol: ["rollback_to"],
+        }
+        for proto, methods in expected.items():
+            for m in methods:
+                self.assertTrue(hasattr(proto, m), f"{proto.__name__} missing method {m}")
 
 
 if __name__ == "__main__":

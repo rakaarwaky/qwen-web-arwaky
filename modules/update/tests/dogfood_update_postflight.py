@@ -7,13 +7,23 @@ this machine rather than a stub. No upgrade runs and no network is touched.
 
 from __future__ import annotations
 
-from modules.update.src.capabilities_update_manager import UpdateManager
+from modules.update.src.capabilities_update_check import UpdateCheckCapability
+from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
+from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
+from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
 
 
 def _postflight() -> tuple[str, ...]:
     """Return the names of the postflight steps and their outcomes."""
-    manager = UpdateManager()
-    return tuple(f"{step.name}={'ok' if step.success else 'failed'}" for step in manager._postflight_health_checks())
+    upgrade = UpdateUpgradeCapability()
+    rollback = UpdateRollbackCapability(upgrade, package_name="qwen-web-arwaky")
+    verify = UpdateVerifyCapability(
+        UpdateCheckCapability("qwen-web-arwaky"),
+        upgrade,
+        rollback,
+        package_name="qwen-web-arwaky",
+    )
+    return tuple(f"{step.name}={'ok' if step.success else 'failed'}" for step in verify._postflight_health_checks())
 
 
 def test_dogfood_postflight_reports_named_steps() -> None:

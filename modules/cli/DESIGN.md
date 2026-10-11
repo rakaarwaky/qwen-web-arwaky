@@ -309,7 +309,7 @@ Requirements:
 | `IAttachmentPromptProtocol.process_prompt_with_attachment(file, attachment, model, output, headless)` | prompt file, attachment, model, output, headless | response envelope | file or attachment missing or unsupported | prompt lifecycle events | Runs a prompt with a file attachment. |
 | `ISessionAggregate.check_session(storage_path)` | session storage path | session-valid verdict | storage unreadable | — | Verifies the persisted authenticated session. |
 | `ISetupAggregate.setup_session(headed_context)` | headed browser context | login-complete verdict | authentication not completed or browser launch failed | login complete | Manual login and session setup. |
-| `IUpdateProtocol.check_update()` / `IUpdateProtocol.perform_update(force)` | force flag | update report with per-stage results | a failed stage stops the sequence and reports the remedy | update stages | Self-update and Playwright binary synchronization. |
+| `IUpdateCheckProtocol.check_update()` / `IUpdateVerifyProtocol.perform_update(force)` | force flag | update report with per-stage results | a failed stage stops the sequence and reports the remedy | update stages | Self-update and Playwright binary synchronization. |
 | `IWorkspaceProtocol.init_workspace(target_dir)` | target directory | created workspace paths | unwritable target | — | Creates XDG storage directories and root symlinks. |
 | `ISlotRunPlanProtocol.resolve(plan, workspace)` | slot inputs (role template, paths, output name) | resolved slot-run plan | invalid role template or path | — | TUI slot-input resolution behind constructor injection. |
 
@@ -320,7 +320,7 @@ Requirements:
 | run-command `handle(args, cfg, direct, file_only, attachment)` | parsed args, `AppConfig`, prompt protocols | response envelope | a Core failure surfaces as a structured error | prompt lifecycle events | Subcommands `prompt direct`, `prompt file`, `prompt attach`. |
 | sessions-command `handle_sessions(args)` | parsed args | process exit code | an unknown subcommand prints usage and returns 1 | session pool events | Subcommands `session {list,login,health,remove,status}`. |
 | init-command `handle(args, workspace)` | parsed args, workspace protocol | response envelope | unwritable workspace | — | Subcommand `init`. |
-| update-command `handle(args, updater)` | parsed args, update protocol | staged update report | stage failure with remedy | update stages | Subcommand `update`. |
+| update-command `handle(args, check, verify)` | parsed args, update check/verify protocols | staged update report | stage failure with remedy | update stages | Subcommand `update`. |
 | doctor-command `run_doctor(json_output, smoke, session)` | doctor flags, optional session aggregate | process exit code | — | — | Subcommand `doctor`. |
 | TUI `InteractiveController.run(cfg, *, prompt)` | optional `AppConfig` | response envelope | TUI boot failure reported in-panel | prompt lifecycle events | No-argument TTY fallback driving the interactive TUI. |
 

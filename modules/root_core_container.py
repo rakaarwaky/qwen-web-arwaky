@@ -80,10 +80,16 @@ from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import IUpdateProtocol
+from modules.shared.src.contract_update_protocol import (
+    IUpdateCheckProtocol,
+    IUpdateRollbackProtocol,
+    IUpdateUpgradeProtocol,
+    IUpdateVerifyProtocol,
+)
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
+    DEFAULT_PACKAGE_NAME,
     SWARM_CONCURRENCY_ENV,
     SWARM_OUTPUT_ROOT,
 )
@@ -94,7 +100,10 @@ from modules.shared.src.utility_core_status import status_path_for
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
-from modules.update.src.capabilities_update_manager import UpdateManager
+from modules.update.src.capabilities_update_check import UpdateCheckCapability
+from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
+from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
+from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
 
 
 class SharedContainer:
@@ -133,13 +142,30 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
-        self.updater: IUpdateProtocol = UpdateManager(smoke_gate=build_smoke_gate(self.session_manager))
-        # The three feature agents sit between their capability and the
-        # Surfaces so no caller repeats the sequence each one owns: browser
-        # auth, observability verb routing, and the update rollback gate.
+        self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
+        self.updater_upgrade: IUpdateUpgradeProtocol = UpdateUpgradeCapability(DEFAULT_PACKAGE_NAME)
+        self.updater_rollback: IUpdateRollbackProtocol = UpdateRollbackCapability(
+            self.updater_upgrade,
+            package_name=DEFAULT_PACKAGE_NAME,
+        )
+        self.updater_verify: IUpdateVerifyProtocol = UpdateVerifyCapability(
+            self.updater_check,
+            self.updater_upgrade,
+            self.updater_rollback,
+            package_name=DEFAULT_PACKAGE_NAME,
+            smoke_gate=build_smoke_gate(self.session_manager),
+        )
+        # Feature agents sit between capabilities and surfaces so no caller
+        # repeats the sequencing each feature owns.
         self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser, self.observability)
         self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
-        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(self.updater, self.observability)
+        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(
+            self.updater_check,
+            self.updater_upgrade,
+            self.updater_verify,
+            self.updater_rollback,
+            self.observability,
+        )
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
