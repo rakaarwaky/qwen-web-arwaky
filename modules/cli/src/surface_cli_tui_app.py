@@ -219,11 +219,16 @@ class QwenTuiApp(
     # ── Headless toggle ───────────────────────────────────────────────────
 
     def _toggle_headless(self, button_id: str) -> None:
-        """Flip the shared headless flag and update the headless button label."""
+        """Flip the shared headless flag and update all headless button labels."""
         self._headless = not self._headless
         state = "ON" if self._headless else "OFF"
-        with contextlib.suppress(NoMatches):
-            self.query_one("#btn-headless-swarm", Button).label = f"⬛ HEADLESS {state}"
+        # Textual's CSS parser does not support the ^= attribute operator,
+        # so update button labels by known id rather than a CSS selector.
+        ids: list[str] = [f"btn-headless-{s}" for s in range(1, self._NUM_SLOTS + 1)]
+        ids.append("btn-headless-swarm")
+        for bid in ids:
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#{bid}", Button).label = f"⬛ HEADLESS {state}"
         self._log_msg(
             f"[{THEME['muted']}]Headless mode set to {state}[/] "
             f"[{THEME['ok'] if self._headless else THEME['warn']}]({button_id})[/]"
