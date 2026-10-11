@@ -225,7 +225,7 @@ class SharedContainer:
             cancel=self.run_cancel_registry,
         )
         # Session rotation infrastructure
-        self.session_health_checker = SessionHealthChecker()
+        self.session_health_checker = SessionHealthChecker(browser=self.browser)
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
             observability=self.observability,

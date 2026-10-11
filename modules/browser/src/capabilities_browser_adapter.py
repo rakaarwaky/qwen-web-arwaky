@@ -554,9 +554,60 @@ class BrowserAdapter(IBrowserProtocol):
         except Error as exc:
             log.warning("session_validation_failed %s", str(exc))
             return False
-        except Exception as exc:  # defensive fallback for closed pages/adapters
-            log.warning("session_validation_failed %s", str(exc))
-            return False
+
+    @contextmanager
+    def health_probe_page(self, cfg: Any) -> Iterator[Page]:
+        """Open one ready, authenticated chat page on ``cfg``'s session profile.
+
+        Mirrors the navigation half of ``browser_session`` (fresh ephemeral
+        profile copy, asset blocking, eager chat navigation, auth assert)
+        but stops before model selection and prompt dispatch, so a health
+        probe pays only the page-load cost. Yields the live page; the
+        context exit tears down the browser process group.
+
+        Raises:
+            AuthRequiredError: When the page lands on a login or guest
+                view, or shows a login form.
+        """
+        master_session = cfg.session_path
+        mode = getattr(cfg, "mode", "")
+
+        with create_ephemeral_session(master_session, mode=mode) as session_dir:
+            chrome_bin = find_chrome_binary()
+            chrome_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-session-crashed-bubble",
+                "--disable-infobars",
+            ]
+            if getattr(cfg, "disable_sandbox", False):
+                chrome_args.append("--no-sandbox")
+            if getattr(cfg, "headless", False):
+                chrome_args.extend(
+                    [
+                        "--disable-gpu",
+                        "--disable-software-compositing",
+                    ]
+                )
+
+            kwargs: dict[str, Any] = {
+                "user_data_dir": str(session_dir),
+                "channel": None,
+                "headless": bool(getattr(cfg, "headless", False)),
+                "args": chrome_args,
+                "viewport": {"width": 1280, "height": 800},
+            }
+            if chrome_bin and Path(chrome_bin).exists():
+                kwargs["executable_path"] = chrome_bin
+
+            with sync_playwright() as p:
+                ctx = self._launch_context(p, kwargs)
+                try:
+                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
+                    _assert_on_chat_page(page, strict=False)
+                    yield page
+                finally:
+                    ctx.close()
 
     def _clean_stale_locks(self, user_data_dir: str) -> None:
         """Clean up stale Chromium lock files if process crashed or before launch."""
