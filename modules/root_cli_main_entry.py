@@ -287,6 +287,10 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     """Build AppConfig from parsed subcommand args using hardcoded defaults."""
     action = args.action
     headless = bool(getattr(args, "headless", False))
+    # Login always runs in a visible browser: the user must complete the sign-in
+    # and CAPTCHA manually, so a headless launch can never satisfy it.
+    if action == "login":
+        headless = False
     verbose = bool(getattr(args, "verbose", False))
     dummy_path = Path(os.devnull)
 
