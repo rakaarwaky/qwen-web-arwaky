@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 import sys
 
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
