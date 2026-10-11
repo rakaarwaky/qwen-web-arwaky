@@ -12,8 +12,8 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
+from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.contract_core_protocol import (
-    IBrowserProtocol,
     IInjectionProtocol,
     ISaverProtocol,
     ISendProtocol,

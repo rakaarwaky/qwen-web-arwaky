@@ -237,20 +237,23 @@ def test_the_settings_pane_is_the_overrides_card_and_nothing_else() -> None:
     asyncio.run(_run())
 
 
-@pytest.mark.xfail(
-    reason="Textual TTY event-loop timing: button handler may not complete before the "
-    "assertion in headless CI. See ISSUE.md — pre-existing, tracked for a proper fix.",
-    strict=True,
-)
 def test_pressing_apply_writes_what_the_field_holds(store: Path) -> None:
-    """The button reads the field, so a mouse press and Enter take one path."""
+    """The button reads the field, so a mouse press and Enter take one path.
+
+    The click drives the widget through the app's event loop, and Textual
+    dispatches the handler as a separate message, so the write lands a
+    moment after ``pilot.click`` returns. Poll the observable side effect
+    (the environment variable) with a bounded wait instead of a fixed sleep:
+    a fixed sleep races the event loop and is the flake this test was
+    written to paper over.
+    """
+    import os
+
+    from textual.widgets import Input
+
     app = _make_app()
 
     async def _run() -> None:
-        import os
-
-        from textual.widgets import Input
-
         async with app.run_test(size=(150, 44)) as pilot:
             await pilot.pause()
             await pilot.click("#nav-settings")
@@ -260,7 +263,11 @@ def test_pressing_apply_writes_what_the_field_holds(store: Path) -> None:
             # ENVIRONMENT's row is the first one on screen, so this is a real
             # press rather than a direct call into the handler.
             await pilot.click("#override-apply-ENVIRONMENT")
-            for _ in range(3):
+            # The handler's write to os.environ is the observable effect;
+            # poll until it lands so we never assert mid-dispatch.
+            for _ in range(50):
+                if os.environ.get("ENVIRONMENT") == "staging":
+                    break
                 await pilot.pause(0.02)
             assert os.environ["ENVIRONMENT"] == "staging"
             assert load_settings(store) == {"ENVIRONMENT": "staging"}

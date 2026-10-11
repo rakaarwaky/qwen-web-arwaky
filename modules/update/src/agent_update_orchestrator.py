@@ -8,9 +8,9 @@ routes the request verb and wraps the outcome into the shared VO.
 
 from __future__ import annotations
 
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_vo import VersionString
 from modules.shared.src.taxonomy_update_vo import (
     UpdateRequest,

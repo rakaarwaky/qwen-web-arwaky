@@ -26,14 +26,9 @@ def _report_args(json_output: bool = False) -> MagicMock:
 
 
 def _metrics_mock(snapshot: MetricsSnapshot) -> MagicMock:
-    """Mock an IMetricsProtocol whose snapshot() returns the dict form the contract defines."""
+    """Mock an IMetricsProtocol whose snapshot() returns a MetricsSnapshot."""
     metrics = MagicMock()
-    metrics.snapshot.return_value = {
-        "counters": snapshot.counters,
-        "total_executions": snapshot.total_executions,
-        "successful_executions": snapshot.successful_executions,
-        "success_rate": snapshot.success_rate,
-    }
+    metrics.snapshot.return_value = snapshot
     return metrics
 
 

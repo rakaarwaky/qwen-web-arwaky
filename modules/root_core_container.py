@@ -66,7 +66,6 @@ from modules.session.src.capabilities_workspace_provisioner import WorkspaceProv
 from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_protocol import IUpdateProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
@@ -81,6 +80,7 @@ from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,

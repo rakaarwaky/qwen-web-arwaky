@@ -10,7 +10,7 @@ import inspect
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
-from modules.shared.src.contract_core_protocol import IBrowserProtocol
+from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 
 _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
     {"browser_session", "check_auth", "check_session", "navigate_to_chat", "reset_page"}

@@ -10,9 +10,9 @@ import inspect
 
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.shared.src.contract_core_protocol import IMetricsProtocol, IStatusProtocol
+from modules.shared.src.contract_jobs_protocol import IStatusProtocol
 from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (IObservabilityProtocol, IMetricsProtocol)
 

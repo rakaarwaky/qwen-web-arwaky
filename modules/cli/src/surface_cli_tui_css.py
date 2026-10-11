@@ -2071,16 +2071,11 @@ HelpScreen {
 
 /* ═══ SYSTEM ACTIONS CARD (Settings pane) ═══════════════════════════ */
 
-/* The Settings pane's override card scrolls inside its own band. The system
-   actions card and jobs card are fixed-height siblings below it. */
+/* The Settings pane is the runtime-override surface: a single scrolling
+   card. Doctor and update stay reachable through their own commands. */
 .screen-card.system-actions-card {
     height: auto;
     margin-bottom: 1;
-}
-
-.screen-card.jobs-card {
-    height: 12;
-    margin-bottom: 0;
 }
 
 .btn-doctor {
@@ -2101,36 +2096,6 @@ HelpScreen {
     border: solid $border;
     text-style: bold;
     margin-right: 1;
-}
-
-.btn-jobs-cleanup {
-    width: auto;
-    height: 3;
-    background: $bg_raised;
-    color: $status_warn;
-    border: solid $border;
-    text-style: bold;
-}
-
-.jobs-hint {
-    width: 1fr;
-    color: $status_muted;
-    text-overflow: ellipsis;
-}
-
-.btn-jobs-refresh {
-    width: auto;
-    height: 3;
-    background: $bg_hover;
-    color: $fg_accent;
-    border: solid $border;
-    margin-right: 1;
-}
-
-#jobs-table {
-    height: 1fr;
-    width: 100%;
-    background: transparent;
 }
 """
 )

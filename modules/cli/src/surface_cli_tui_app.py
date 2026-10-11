@@ -36,7 +36,6 @@ from modules.cli.src.surface_cli_tui_settings import _TuiSettingsMixin
 from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
 from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_core_protocol import IUpdateProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.contract_prompt_protocol import (
@@ -45,9 +44,10 @@ from modules.shared.src.contract_prompt_protocol import (
     IPromptFileProtocol,
 )
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.contract_update_protocol import IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.taxonomy_swarm_vo import SwarmId
 from modules.shared.src.utility_core_prompt_template import prompt_template_manifest

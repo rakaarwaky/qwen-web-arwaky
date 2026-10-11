@@ -12,9 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_core_protocol import IStatusProtocol
+from modules.shared.src.contract_jobs_protocol import IStatusProtocol
 from modules.shared.src.taxonomy_core_constant import STATUS_SCHEMA_VERSION
 from modules.shared.src.taxonomy_core_vo import StatusRecordVO
+from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot
 from modules.shared.src.utility_core_status import status_path_for
 from modules.shared.src.utility_io_writer import atomic_write_json, ensure_dir
 
@@ -64,7 +65,9 @@ class StatusFileWriter(IStatusProtocol):
             "failure_categories": normalise_categories(kwargs.get("failure_categories")),
         }
         metrics = kwargs.get("metrics")
-        if isinstance(metrics, dict):
+        if isinstance(metrics, MetricsSnapshot):
+            rec["metrics"] = metrics.__dict__
+        elif isinstance(metrics, dict):
             rec["metrics"] = metrics
         if kwargs.get("cpu_sec") is not None:
             rec["cpu_sec"] = round(kwargs["cpu_sec"], 2)
@@ -74,7 +77,7 @@ class StatusFileWriter(IStatusProtocol):
         with suppress(OSError):
             atomic_write_json(self._status_path, rec)
 
-    def write_record(self, record: StatusRecordVO, *, metrics: dict[str, Any] | None = None) -> None:
+    def write_record(self, record: StatusRecordVO, *, metrics: MetricsSnapshot | dict[str, Any] | None = None) -> None:
         """Write the status JSON from a typed status record.
 
         ``metrics`` carries the persisted counter snapshot so a monitor reading
