@@ -22,7 +22,7 @@ from playwright.sync_api import (
 )
 from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
-from modules.shared.src.contract_core_protocol import IBrowserProtocol
+from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.taxonomy_core_constant import (
     AUTH_KEYWORDS,
     CHAT_URL,

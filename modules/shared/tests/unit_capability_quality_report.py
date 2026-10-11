@@ -87,7 +87,7 @@ def test_record_failure_rejects_unknown_category(tmp_path: Path) -> None:
     mc.record_failure("completely_unexpected_xyz")
     mc.record_failure("ValueError")
     assert mc.failure_counts() == {}
-    assert "ValueError" not in mc.snapshot()
+    assert "ValueError" not in mc.snapshot().counters
 
 
 def test_failure_counts_survive_a_restart(tmp_path: Path) -> None:
@@ -110,9 +110,9 @@ def test_defect_density_is_errors_per_execution(tmp_path: Path) -> None:
         mc.record_failure("network")
     mc.record_failure("browser")
     snap = mc.snapshot()
-    assert int(snap["total_executions"]) == 7
-    assert int(snap["successful_executions"]) == 5
-    assert float(snap["success_rate"]) == pytest.approx(5 / 7, abs=1e-6)
+    assert int(snap.total_executions) == 7
+    assert int(snap.successful_executions) == 5
+    assert float(snap.success_rate) == pytest.approx(5 / 7, abs=1e-6)
 
 
 # ── AC2: status.json includes failure_categories ─────────────────────────────

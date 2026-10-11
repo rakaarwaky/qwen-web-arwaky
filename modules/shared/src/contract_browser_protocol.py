@@ -78,6 +78,16 @@ class IBrowserProtocol(ABC):
         """
         ...
 
+    @abstractmethod
+    def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
+        """Reset *page* to a clean chat state.
+
+        Navigates back to chat.qwen.ai and emits a network-reconnecting
+        event, so the observer sees the reset as a recoverable dip
+        rather than a new session.
+        """
+        ...
+
 
 __all__ = ["IBrowserProtocol"]
 

@@ -12,9 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_core_protocol import IMetricsProtocol
+from modules.shared.src.contract_logging_protocol import IMetricsProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
-from modules.shared.src.taxonomy_core_vo import MessageCount
+from modules.shared.src.taxonomy_core_event import EventMessage
+from modules.shared.src.taxonomy_core_vo import FailureCategory, FailureCategoryCounts, MessageCount
+from modules.shared.src.taxonomy_logging_vo import ExecutionTotal, MetricsSnapshot
 from modules.shared.src.utility_io_writer import atomic_write_json
 from modules.shared.src.utility_telemetry_scrubber import harden_private_file
 
@@ -34,7 +36,7 @@ class MetricsCounter(IMetricsProtocol):
 
     # Block 2: Protocol Method Implementation
 
-    def increment(self, key: str, amount: MessageCount = MessageCount(1)) -> None:
+    def increment(self, key: EventMessage, amount: MessageCount = MessageCount(1)) -> None:
         """Add *amount* to the counter *key* and persist the metrics file."""
         with self._lock:
             self._counters[key] = self._counters.get(key, MessageCount(0)) + amount
@@ -46,7 +48,7 @@ class MetricsCounter(IMetricsProtocol):
             self._execution_events.append({"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)})
             self._persist()
 
-    def record_failure(self, category: str) -> None:
+    def record_failure(self, category: FailureCategory) -> None:
         """Bump one occurrence for *category* in the rolling error counter.
 
         Unknown category names are ignored so a caller passing a raw exception
@@ -63,7 +65,7 @@ class MetricsCounter(IMetricsProtocol):
             self._counters[f"error.{category}"] = self._counters.get(f"error.{category}", 0) + 1
             self._persist()
 
-    def failure_counts(self) -> dict[str, int]:
+    def failure_counts(self) -> FailureCategoryCounts:
         """Return the rolling per-category error counts, ranked by descending count.
 
         Keys are ``ErrorCategory`` names with the ``error.`` counter prefix
@@ -72,24 +74,25 @@ class MetricsCounter(IMetricsProtocol):
         with self._lock:
             prefix = "error."
             counts = {key[len(prefix) :]: value for key, value in self._counters.items() if key.startswith(prefix)}
-        return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+        return FailureCategoryCounts(dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))))
 
-    def get(self, key: str) -> MessageCount:
+    def get(self, key: EventMessage) -> MessageCount:
         """Return the current value of counter *key* (0 when absent)."""
         with self._lock:
             return MessageCount(self._counters.get(key, 0))
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> MetricsSnapshot:
         """Return all counters plus rolling-24h execution totals and success rate."""
         with self._lock:
             self._prune_events()
-            result: dict[str, Any] = dict(self._counters)
             total = len(self._execution_events)
             successful = sum(1 for event in self._execution_events if event.get("success") is True)
-            result["total_executions"] = total
-            result["successful_executions"] = successful
-            result["success_rate"] = round(successful / total, 6) if total else None
-            return result
+            return MetricsSnapshot(
+                counters=dict(self._counters),
+                total_executions=ExecutionTotal(total),
+                successful_executions=ExecutionTotal(successful),
+                success_rate=round(successful / total, 6) if total else None,
+            )
 
     # Block 3: Dunder Methods, Factories & Helpers
 

@@ -12,9 +12,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from modules.shared.src.contract_core_protocol import (
-    IBrowserProtocol,
-)
+from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.contract_session_protocol import ISessionManagerProtocol

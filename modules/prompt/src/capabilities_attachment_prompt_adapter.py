@@ -12,11 +12,10 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
+from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.contract_core_protocol import (
-    IBrowserProtocol,
     IFolderToAttachmentProtocol,
     IInjectionProtocol,
-    IRunCancelProtocol,
     ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
@@ -28,6 +27,7 @@ from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IPromptFlowProtocol,
 )
+from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE

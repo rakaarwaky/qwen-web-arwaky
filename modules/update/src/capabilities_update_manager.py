@@ -27,7 +27,7 @@ from typing import Any
 from urllib import request
 from urllib.parse import unquote, urlparse
 
-from modules.shared.src.contract_core_protocol import ISmokeGate, IUpdateProtocol
+from modules.shared.src.contract_update_protocol import ISmokeGate, IUpdateProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_GITHUB_REPO,
     DEFAULT_PACKAGE_NAME,

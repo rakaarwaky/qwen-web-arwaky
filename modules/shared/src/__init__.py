@@ -8,28 +8,28 @@ from __future__ import annotations
 
 # ─── Contract: aggregates ─────────────────────────────────────
 from .contract_browser_aggregate import IBrowserAggregate
-from .contract_config_aggregate import IConfigAggregate
 
 # ─── Contract: protocols ──────────────────────────────────────
+from .contract_browser_protocol import IBrowserProtocol
+from .contract_config_aggregate import IConfigAggregate
 from .contract_core_protocol import (
-    IBrowserProtocol,
     IInjectionProtocol,
-    IObservabilityProtocol,
     ISaverProtocol,
     ISendProtocol,
-    ISmokeGate,
     IStreamProtocol,
     IUploadProtocol,
 )
 from .contract_jobs_aggregate import IJobManagerAggregate
 from .contract_jobs_protocol import IJobStorageProtocol
 from .contract_logging_aggregate import IObservabilityAggregate
+from .contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 from .contract_prompt_aggregate import IPromptAggregate
 from .contract_session_aggregate import ISessionAggregate
-from .contract_session_protocol import ISessionRotatorProtocol
+from .contract_session_protocol import ISessionRotatorProtocol, IWorkspaceProtocol
 from .contract_setup_aggregate import ISetupAggregate
 from .contract_swarm_aggregate import ISwarmAggregate
 from .contract_update_aggregate import IUpdateAggregate
+from .contract_update_protocol import ISmokeGate
 
 # ─── Taxonomy: constants ──────────────────────────────────────
 from .taxonomy_core_constant import (
@@ -409,6 +409,8 @@ __all__ = [
     "ISaverProtocol",
     "ISmokeGate",
     "IObservabilityProtocol",
+    "IMetricsProtocol",
+    "IWorkspaceProtocol",
     "IBrowserAggregate",
     "IConfigAggregate",
     "IJobManagerAggregate",

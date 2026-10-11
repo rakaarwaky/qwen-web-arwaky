@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from modules.shared.src.contract_core_protocol import IWorkspaceProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
@@ -20,6 +19,7 @@ from modules.shared.src.contract_prompt_protocol import (
     IPromptFileProtocol,
 )
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.contract_session_protocol import IWorkspaceProtocol
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.taxonomy_core_error import QwenCliError, RateLimitError
 from modules.shared.src.taxonomy_core_vo import (

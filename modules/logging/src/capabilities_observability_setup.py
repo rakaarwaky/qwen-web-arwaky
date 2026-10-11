@@ -46,8 +46,8 @@ with suppress(ImportError):
     OTelBatchSpanProcessor = BatchSpanProcessor
 
 from modules.shared.src import utility_core_exit
-from modules.shared.src.contract_core_protocol import IMetricsProtocol, IStatusProtocol
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.contract_jobs_protocol import IStatusProtocol
+from modules.shared.src.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.taxonomy_core_error import ErrorCategory
 from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
@@ -426,11 +426,9 @@ class ObservabilitySetup(IObservabilityProtocol):
             "error_records": total_lines,
             "error_distribution": ranked,
             "defect_density": (
-                round(total_lines / int(snapshot.get("total_executions", 0)), 6)
-                if int(snapshot.get("total_executions", 0))
-                else None
+                round(total_lines / int(snapshot.total_executions), 6) if int(snapshot.total_executions) else None
             ),
-            "executions": snapshot,
+            "executions": snapshot.__dict__,
         }
         with suppress(OSError):
             atomic_write_json(report_path, payload)

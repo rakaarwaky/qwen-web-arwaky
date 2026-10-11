@@ -15,7 +15,7 @@ from __future__ import annotations
 import contextlib
 import threading
 
-from modules.shared.src.contract_core_protocol import IRunCancelProtocol
+from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_vo import RunId, RunState
 
 
