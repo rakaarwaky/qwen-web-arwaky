@@ -123,7 +123,7 @@ class _TuiEventsMixin:
         if button_id.startswith("chip-"):
             self._apply_template_chip(button_id)
             return
-        # Headless toggle: shared flag on Chat action pill and Swarm action deck.
+        # Headless toggle: shared flag on the Swarm action deck.
         if button_id.startswith("btn-headless-"):
             self._toggle_headless(button_id)
             return
