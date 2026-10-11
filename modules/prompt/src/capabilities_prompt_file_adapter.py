@@ -27,7 +27,10 @@ from modules.shared.src.contract_prompt_protocol import (
 from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError
-from modules.shared.src.taxonomy_core_event import STANDARD_PROMPT_EVENTS
+from modules.shared.src.taxonomy_core_event import (
+    EVENT_SESSION_EXPIRED,
+    STANDARD_PROMPT_EVENTS,
+)
 from modules.shared.src.taxonomy_core_vo import (
     AppConfig,
     HeadlessFlag,
@@ -178,21 +181,26 @@ class PromptFileAdapter(IPromptFileProtocol):
 
         self._injector.find_input(page)
 
-        return self._flow.dispatch_and_wait_for_response(
-            page=page,
-            injector=self._injector,
-            sender=self._sender,
-            streamer=self._streamer,
-            emitter=emitter,
-            state=state,
-            observability=self._observability,
-            filepath=filepath,
-            prompt=prompt,
-            msg_count_before=msg_count_before,
-            timeout_sec=timeout_sec,
-            active_cfg=active_cfg,
-            cancel_event=cancel_event,
-        )
+        try:
+            return self._flow.dispatch_and_wait_for_response(
+                page=page,
+                injector=self._injector,
+                sender=self._sender,
+                streamer=self._streamer,
+                emitter=emitter,
+                state=state,
+                observability=self._observability,
+                filepath=filepath,
+                prompt=prompt,
+                msg_count_before=msg_count_before,
+                timeout_sec=timeout_sec,
+                active_cfg=active_cfg,
+                cancel_event=cancel_event,
+            )
+        except Exception:
+            if self._browser.detect_session_expired(page):
+                emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "post_send_banner"})
+            raise
 
     def execute(self, request: PromptRequest) -> PromptResponse:
         """Run one prompt verb and return the answer, with failures carried.

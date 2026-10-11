@@ -145,20 +145,20 @@ def test_reset_page_emits_reconnecting():
     mock_page.goto.assert_called_once()
 
 
-def test_assert_on_chat_page_session_expired_banner_keyword():
+def test_raise_if_session_expired_banner_keyword():
     """An in-page 'Session expired' notice raises AuthRequiredError tagged session_expired."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
     try:
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._assert_on_chat_page(mock_page)
+            adapter_mod._raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
         adapter_mod.is_any_visible = orig
 
 
-def test_assert_on_chat_page_session_expired_banner_selector():
+def test_raise_if_session_expired_banner_selector():
     """A banner shell with no matching keyword text still fires the expiry raise."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
@@ -167,19 +167,16 @@ def test_assert_on_chat_page_session_expired_banner_selector():
     # banner-shell selectors are present, so only the expiry path can fire.
     import modules.shared.src.taxonomy_core_constant as const
 
-    login = ", ".join(const.LOGIN_FORM_SELECTORS)
     banner = ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
 
     def _split_probe(page, selectors):
-        if selectors == login:
-            return False
         return selectors == banner
 
     original_is_any_visible = adapter_mod.is_any_visible
     adapter_mod.is_any_visible = _split_probe
     try:
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._assert_on_chat_page(mock_page)
+            adapter_mod._raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
         adapter_mod.is_any_visible = original_is_any_visible
@@ -660,7 +657,7 @@ def test_err_failed_in_noise_patterns_is_lowercase():
 # ── in-page session-expired banner regression tests ──────────────────────────
 
 
-def test_assert_on_chat_page_raises_on_in_page_expiration_banner():
+def test_raise_if_session_expired_raises_on_in_page_expiration_banner():
     """An in-page 'session expired' notice (no login URL redirect, no login
     form) must raise AuthRequiredError with session_expired=True."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
@@ -673,13 +670,13 @@ def test_assert_on_chat_page_raises_on_in_page_expiration_banner():
 
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+            adapter_mod._raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
 
-def test_assert_on_chat_page_no_false_positive_on_normal_chat_body():
-    """Normal chat body text without any expiry keyword must not raise."""
+def test_detect_session_expired_banner_no_false_positive_on_normal_chat_body():
+    """Normal chat body text without any expiry keyword must not flag the banner."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
@@ -689,10 +686,10 @@ def test_assert_on_chat_page_no_false_positive_on_normal_chat_body():
     mock_page.inner_text.return_value = "Ask Qwen anything"
 
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
-        adapter_mod._assert_on_chat_page(mock_page, strict=False)
+        assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
 
 
-def test_assert_on_chat_page_raises_on_live_token_expired_banner():
+def test_raise_if_session_expired_raises_on_live_token_expired_banner():
     """The banner the site actually renders ('Token has expired, please log in
     again') must raise AuthRequiredError tagged session_expired. The 'token has
     expired' phrase is a substring keyword, so it fires even when the trailing
@@ -707,12 +704,12 @@ def test_assert_on_chat_page_raises_on_live_token_expired_banner():
 
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+            adapter_mod._raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
 
-def test_assert_on_chat_page_raises_on_token_has_expired_alone():
+def test_raise_if_session_expired_raises_on_token_has_expired_alone():
     """A banner carrying only 'Token has expired.' (no 'log in again') still
     fires the expiry raise via the dedicated keyword."""
     from modules.browser.src import capabilities_browser_adapter as adapter_mod
@@ -725,12 +722,12 @@ def test_assert_on_chat_page_raises_on_token_has_expired_alone():
 
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._assert_on_chat_page(mock_page, strict=False)
+            adapter_mod._raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
 
-def test_assert_on_chat_page_skips_banner_check_when_body_unreadable():
+def test_detect_session_expired_banner_skips_when_body_unreadable():
     """A DOM that is still hydrating (inner_text raises) is not a signal —
     the check is skipped rather than masking a genuine auth problem."""
     from playwright.sync_api import Error as PwError
@@ -744,7 +741,65 @@ def test_assert_on_chat_page_skips_banner_check_when_body_unreadable():
     mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
 
     with patch.object(adapter_mod, "is_any_visible", return_value=False):
-        adapter_mod._assert_on_chat_page(mock_page, strict=False)  # must not raise
+        assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
+
+
+# ── detect_session_expired protocol method tests ─────────────────────────────
+
+
+def test_detect_session_expired_returns_true_on_token_expired_banner():
+    """The live 'Token has expired' banner must flag the session as expired."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.return_value = "Token has expired, please log in again"
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        assert BrowserAdapter().detect_session_expired(mock_page) is True
+
+
+def test_detect_session_expired_returns_false_on_clean_page():
+    """A clean chat body (no keyword, no visible banner shell) is not expired."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.return_value = "Hello, here is a response."
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        assert BrowserAdapter().detect_session_expired(mock_page) is False
+
+
+def test_detect_session_expired_returns_false_when_body_unreadable():
+    """An unreadable DOM (inner_text raises) is not a signal — returns False."""
+    from playwright.sync_api import Error as PwError
+
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
+
+    with patch.object(adapter_mod, "is_any_visible", return_value=False):
+        assert BrowserAdapter().detect_session_expired(mock_page) is False
+
+
+def test_detect_session_expired_fires_on_banner_shell_selector():
+    """A visible expiry banner shell (no keyword text) must flag the session."""
+    from modules.browser.src import capabilities_browser_adapter as adapter_mod
+
+    mock_page = MagicMock()
+    mock_page.url = "https://chat.qwen.ai/"
+    mock_page.inner_text.return_value = ""
+
+    def _banner_probe(_page, selectors):
+        import modules.shared.src.taxonomy_core_constant as const
+
+        return selectors == ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
+
+    with patch.object(adapter_mod, "is_any_visible", side_effect=_banner_probe):
+        assert BrowserAdapter().detect_session_expired(mock_page) is True
 
 
 def test_navigate_to_chat_emits_session_expired_before_propagation():

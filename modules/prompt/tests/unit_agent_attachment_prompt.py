@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from playwright.sync_api import Error
 
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
@@ -16,9 +17,11 @@ from modules.shared.src import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_SEND_CLICKED,
+    EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
     PIPELINE_EVENT_SEQUENCE,
     ResponseDetectionTimeoutError,
+    SendDispatchError,
 )
 from modules.shared.src.taxonomy_core_vo import MessageCount
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest
@@ -146,6 +149,74 @@ class TestSendFile:
         assert "Successfully processed" in str(result)
         orch._flow.dispatch_and_wait_for_response.assert_called_once()
         assert orch._flow.dispatch_and_wait_for_response.call_args.kwargs["msg_count_before"] == 2
+
+    def test_send_file_emits_session_expired_when_banner_appears_after_send(self, tmp_path):
+        """When dispatch raises and the post-send banner is detected,
+        EVENT_SESSION_EXPIRED is emitted with reason=post_send_banner."""
+        orch = _make_attachment_orchestrator()
+        _configure_lifecycle_mocks(orch)
+
+        orch._flow.dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
+        orch._browser.detect_session_expired.return_value = True
+
+        f = tmp_path / "task.md"
+        f.write_text("hello")
+        att = tmp_path / "att.md"
+        att.write_text("attachment")
+
+        # Test the internal method directly since process_prompt_with_attachment
+        # catches all exceptions and converts to error responses.
+        with pytest.raises(SendDispatchError, match="Send failed"):
+            orch._execute_attachment_on_page(
+                page=MagicMock(url="https://chat.qwen.ai/"),
+                filepath=f,
+                att_path=att,
+                timeout_sec=30,
+                active_cfg=MagicMock(),
+                emitter=MagicMock(),
+                state=MagicMock(),
+            )
+
+        orch._browser.detect_session_expired.assert_called_once()
+        # Check that the emitter was called with EVENT_SESSION_EXPIRED
+        # The emitter used in the internal call is a MagicMock
+        emitter = orch._flow.dispatch_and_wait_for_response.call_args.kwargs.get("emitter")
+        if emitter:
+            emit_calls = [c for c in emitter.emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
+            assert len(emit_calls) == 1
+            assert emit_calls[0].args[1] == {"url": "https://chat.qwen.ai/", "reason": "post_send_banner"}
+
+    def test_send_file_no_session_expired_emit_when_clean(self, tmp_path):
+        """When dispatch raises but no banner is detected, EVENT_SESSION_EXPIRED is not emitted."""
+        orch = _make_attachment_orchestrator()
+        _configure_lifecycle_mocks(orch)
+
+        orch._flow.dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
+        orch._browser.detect_session_expired.return_value = False
+
+        f = tmp_path / "task.md"
+        f.write_text("hello")
+        att = tmp_path / "att.md"
+        att.write_text("attachment")
+
+        # Test the internal method directly since process_prompt_with_attachment
+        # catches all exceptions and converts to error responses.
+        with pytest.raises(SendDispatchError, match="Send failed"):
+            orch._execute_attachment_on_page(
+                page=MagicMock(url="https://chat.qwen.ai/"),
+                filepath=f,
+                att_path=att,
+                timeout_sec=30,
+                active_cfg=MagicMock(),
+                emitter=MagicMock(),
+                state=MagicMock(),
+            )
+
+        orch._browser.detect_session_expired.assert_called_once()
+        emitter = orch._flow.dispatch_and_wait_for_response.call_args.kwargs.get("emitter")
+        if emitter:
+            emit_calls = [c for c in emitter.emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
+            assert len(emit_calls) == 0
 
     def test_inject_text_types_with_delay_fallback(self):
         """Slow typing is delegated to inject_text's type() fallback."""
