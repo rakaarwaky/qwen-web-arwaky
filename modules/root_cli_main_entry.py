@@ -26,6 +26,7 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
@@ -243,14 +244,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedContainer) -> None:
     """Resolve session path for prompt commands using rotation.
 
-    Only runs for the `prompt` command (direct/file/attach) when multiple
-    sessions exist. Picks a healthy session and overrides cfg.session_path.
+    Only runs for the `prompt` command (direct/file/attach). Picks a healthy
+    session from the pool and overrides cfg.session_path. Skips only when the
+    pool is empty — a single-session pool must still resolve so a logged-in
+    profile is used instead of an empty default.
     """
     if getattr(args, "action", None) != "prompt":
         return
 
     pool = container.session_manager.load_pool()
-    if pool.total_count <= 1:
+    if pool.total_count == 0:
         return
 
     async def _pick() -> Path | None:
@@ -264,6 +267,25 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
 
     if session_path is not None and session_path != DEFAULT_SESSION:
         args._session_override = session_path
+
+
+def _session_resolver(args: argparse.Namespace) -> Callable[[], Path | None]:
+    """Pool resolver for the direct prompt pipeline.
+
+    The direct pipeline builds its own AppConfig, so the pool selection made
+    by ``_resolve_session_for_prompt`` would otherwise be dropped. This
+    resolver reads back that selection instead of re-rotating: the override
+    is already the pool's chosen session, and an empty pool set no override
+    at all. Returning ``None`` keeps the pipeline's ``DEFAULT_SESSION``
+    fallback, matching an empty pool.
+    """
+    if getattr(args, "action", None) != "prompt":
+        return lambda: None
+
+    if getattr(args, "_session_override", None):
+        override = Path(args._session_override)
+        return lambda: override
+    return lambda: None
 
 
 def _build_config(args: argparse.Namespace) -> AppConfig:
@@ -488,6 +510,7 @@ def _dispatch(
         container.agent_direct_prompt_orchestrator,
         container.agent_prompt_file_orchestrator,
         container.agent_attachment_prompt_orchestrator,
+        session_resolver=_session_resolver(args),
     )
     container.observability.metrics.record_execution(bool(result.get("success")))
     return _result_exit_code(result, json_output=json_output)

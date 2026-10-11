@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from threading import Event
 
@@ -64,12 +65,20 @@ class IDirectPromptProtocol(ABC):
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
         event_observer: LifecycleObserver | None = None,
+        session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
         """Process a direct text prompt string.
 
         ``event_observer`` optionally receives every emitted lifecycle event
         so a surface can render event-level status (thinking / streaming /
         prompting) for the run.
+
+        ``session_resolver`` optionally returns the session pool path chosen
+        by session rotation for this run. The prompt pipeline itself builds
+        its own AppConfig, so without the resolver a pool selection made
+        upstream by the surface is silently dropped and the default session
+        is used instead. A resolver that raises reports no session and is
+        swallowed; an empty pool must resolve the logged-in profile.
         """
         ...
 
