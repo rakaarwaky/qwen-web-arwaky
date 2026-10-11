@@ -783,6 +783,24 @@ HelpScreen {
     height: 3;
 }
 
+/* --- Headless mode pill button ------------------------------------------ */
+.action-pill.action-pill-headless {
+    background: $bg_overlay;
+    color: $fg_primary;
+    border: solid $border;
+}
+
+.action-pill.action-pill-headless.headless-on {
+    background: $status_ok;
+    color: $bg_base;
+    text-style: bold;
+}
+
+.action-pill.action-pill-headless:hover {
+    background: $status_ok;
+    color: $bg_base;
+}
+
 .toggle-active:hover {
     background: $bg_active;
     color: $fg_accent;
@@ -2035,6 +2053,21 @@ HelpScreen {
     color: $status_err;
     border: solid $border;
     text-style: bold;
+}
+
+/* Headless toggle in the swarm action deck. */
+.swarm-headless-toggle {
+    width: 1fr;
+    height: 3;
+    background: $bg_raised;
+    color: $status_ok;
+    border: solid $status_ok;
+    text-style: bold;
+}
+
+.swarm-headless-toggle:hover {
+    background: $bg_hover;
+    color: $status_ok;
 }
 
 .btn-restart {

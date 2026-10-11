@@ -100,7 +100,7 @@ class _TuiWorkersMixin:
             prompt_val = self.query_one(f"#composer-{slot_id}", Input).value.strip()
         file_val = ""
         out_val = ""
-        headless_val = True
+        headless_val = getattr(self, "_headless", True)
 
         plan = self._slot_config.resolve_slot_run_plan(
             PromptText(prompt_val),
@@ -165,8 +165,8 @@ class _TuiWorkersMixin:
             return
 
         # The Settings form's headless switch and output field are gone; the
-        # composer inherits the session defaults for both.
-        headless = True
+        # composer inherits the shared headless flag and session default output.
+        headless = getattr(self, "_headless", True)
         out_val = ""
 
         filename = self._truncate_name(text, 24)

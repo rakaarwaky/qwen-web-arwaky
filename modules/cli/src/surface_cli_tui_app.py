@@ -21,7 +21,7 @@ from rich.markup import escape
 from textual.app import App
 from textual.binding import Binding
 from textual.css.query import NoMatches
-from textual.widgets import Input
+from textual.widgets import Button, Input
 
 from modules.cli.src.surface_cli_tui_components import (
     ConfirmModal,
@@ -185,6 +185,8 @@ class QwenTuiApp(
         # the account pool is fetched on the first visit, not on every visit.
         self._sessions_cache: list[Any] = []
         self._sessions_loaded_once = False
+        # Headless mode toggle: shared across all slot runs and swarm runs.
+        self._headless: bool = True
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406
@@ -214,7 +216,23 @@ class QwenTuiApp(
             return
         self._swarm_worker(pending)
 
+    # ── Headless toggle ───────────────────────────────────────────────────
+
+    def _toggle_headless(self, button_id: str) -> None:
+        """Flip the shared headless flag and update all headless button labels."""
+        self._headless = not self._headless
+        state = "ON" if self._headless else "OFF"
+        with contextlib.suppress(NoMatches):
+            for btn in self.query("[id^='btn-headless-']"):
+                if isinstance(btn, Button):
+                    btn.label = f"⬛ HEADLESS {state}"
+        self._log_msg(
+            f"[{THEME['muted']}]Headless mode set to {state}[/] "
+            f"[{THEME['ok'] if self._headless else THEME['warn']}]({button_id})[/]"
+        )
+
     # ── Prompt template lazy reload ─────────────────────────────────────────
+
     def _open_template_picker(self, slot_id: int) -> None:
         """Open the template picker modal for the given slot.
 
@@ -248,6 +266,23 @@ class QwenTuiApp(
                 (role.replace("-", " ").replace("_", " ").title(), role) for role in sorted(manifest)
             ]
             self._template_roles_dirty = False
+
+    # ── Headless toggle ───────────────────────────────────────────────────
+
+    def _toggle_headless(self, button_id: str) -> None:
+        """Flip the shared headless flag and update all headless button labels."""
+        self._headless = not self._headless
+        state = "ON" if self._headless else "OFF"
+        with contextlib.suppress(NoMatches):
+            for btn in self.query("[id^='btn-headless-']"):
+                if isinstance(btn, Button):
+                    btn.label = f"⬛ HEADLESS {state}"
+            for slot in range(1, self._NUM_SLOTS + 1):
+                self.query_one(f"#btn-headless-{slot}", Button).label = f"⬛ HEADLESS {state}"
+        self._log_msg(
+            f"[{THEME['muted']}]Headless mode set to {state}[/] "
+            f"[{THEME['ok'] if self._headless else THEME['warn']}]({button_id})[/]"
+        )
 
 
 __all__ = [

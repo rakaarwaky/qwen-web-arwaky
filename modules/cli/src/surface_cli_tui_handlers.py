@@ -74,6 +74,8 @@ class _TuiHandlersMixin:
     _updater: Any
     _update_orchestrator: Any
 
+    _toggle_headless: Any
+
     # System-action workers live in _TuiSessionsWorkerMixin; declared here
     # so the router below type-checks and the AES scanner sees no
     # duplicate method definitions in this file.
