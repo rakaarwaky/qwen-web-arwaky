@@ -35,6 +35,18 @@ class FilePickerModal(ModalScreen[str | None]):
         Binding("ctrl+s", "select_current_folder", "Select Folder", show=False),
     ]
 
+    # Disables Textual's text-selection machinery while the picker is open.
+    # A MouseDown that lands on a visible warning Toast (e.g. emitted by the
+    # session worker while the picker is up) makes Screen._forward_event
+    # resolve the selection container as ToastHolder (a 0x0 widget inside the
+    # modal's ToastRack); when that holder is removed in the same frame
+    # (ToastRack.show() prunes it on the next rack refresh), its MapGeometry
+    # no longer exists and the Screen crashes on container.region with
+    # AttributeError: 'NoneType' object has no attribute 'region'. The
+    # picker is a click-only UI and never needs to copy the tree text, so
+    # suppressing ALLOW_SELECT here is the root-cause fix, not a workaround.
+    ALLOW_SELECT = False
+
     def __init__(
         self,
         start_path: Path | None = None,
@@ -104,6 +116,12 @@ class HelpScreen(ModalScreen[None]):
         Binding("escape", "dismiss_modal", "Close"),
         Binding("q", "dismiss_modal", "Close"),
     ]
+
+    # Same text-selection guard as FilePickerModal: a warning Toast can be
+    # visible while the help overlay is open, and Screen._forward_event
+    # would crash building the SelectStart container from the Toast's
+    # (possibly just-removed) parent chain.
+    ALLOW_SELECT = False
 
     def __init__(self, num_slots: int = 10) -> None:
         super().__init__()
