@@ -56,14 +56,14 @@ def test_for_mode_passes_mode_and_paths_through(tmp_path: Path) -> None:
     cfg = _for_mode(
         ConfigRequest(
             verb="for_mode",
-            mode=Mode("prompt-direct"),
+            mode=Mode("direct"),
             input_path=tmp_path / "in.md",
             output_path=tmp_path / "out.md",
             headless=False,
         )
     )
 
-    assert cfg.mode == "prompt-direct"
+    assert cfg.mode == "direct"
     assert cfg.input_path == tmp_path / "in.md"
     assert cfg.output_path == tmp_path / "out.md"
     assert cfg.headless is False
@@ -108,7 +108,7 @@ def test_for_mode_sandbox_flag_follows_host_capability(monkeypatch: pytest.Monke
         "modules.config.src.capabilities_config_environment._sandbox_host_unavailable",
         return_value=True,
     ):
-        cfg = _for_mode(ConfigRequest(verb="for_mode", mode=Mode("prompt-direct")))
+        cfg = _for_mode(ConfigRequest(verb="for_mode", mode=Mode("direct")))
 
     assert cfg.disable_sandbox is True
 
@@ -117,7 +117,7 @@ def test_for_mode_env_can_force_sandbox_on(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("QWEN_ENABLE_SANDBOX", "1")
     monkeypatch.delenv("QWEN_DISABLE_SANDBOX", raising=False)
 
-    cfg = _for_mode(ConfigRequest(verb="for_mode", mode=Mode("prompt-direct")))
+    cfg = _for_mode(ConfigRequest(verb="for_mode", mode=Mode("direct")))
 
     assert cfg.disable_sandbox is False
 

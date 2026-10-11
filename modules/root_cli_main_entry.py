@@ -4,19 +4,18 @@ Root layer: CLI entry point — subcommand-based argument parsing, validation,
 lifecycle guards, and dispatch to the CLI surface commands via DI container.
 
 Usage:
+  qwen-web-arwaky <command> [subcommand] [flags]
+
   qwen-web-arwaky init                              [--dir TARGET_DIR]
-  qwen-web-arwaky login
-  qwen-web-arwaky prompt-direct  --text "..."       [--output-path FILE] [--headless] [--json]
-  qwen-web-arwaky prompt-only    --prompt-path FILE [--output-path FILE] [--headless]
-  qwen-web-arwaky prompt-with-attachment \\
-                                 --prompt-path FILE --attachment-path FILE \\
-                                 [--output-path FILE] [--headless]
-  qwen-web-arwaky sessions                          {list|login|health-check|remove|status}
-  qwen-web-arwaky jobs                              {submit|status|list|cleanup}
+  qwen-web-arwaky doctor                            [--json] [--smoke]
+  qwen-web-arwaky update                            [--check] [--force] [--json] [--rollback VERSION]
+  qwen-web-arwaky session                           {list|login|health|remove|status}
+  qwen-web-arwaky prompt direct  -t "..."           [-o FILE] [--headless] [--json]
+  qwen-web-arwaky prompt file    -i FILE            [-o FILE] [--headless] [--json]
+  qwen-web-arwaky prompt attach  -i FILE -a FILE    [-o FILE] [--headless] [--json]
+  qwen-web-arwaky job                               {submit|status|list|cleanup}
   qwen-web-arwaky swarm                             {start|status|cancel}
   qwen-web-arwaky observability                     {report|status}
-  qwen-web-arwaky doctor [--json] [--smoke]
-  qwen-web-arwaky update [--check] [--force] [--rollback VERSION]
   qwen-web-arwaky mcp
 """
 
@@ -33,10 +32,9 @@ from pathlib import Path
 from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
-from modules.cli.src.surface_cli_login_command import handle as handle_login_command
 from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
 from modules.cli.src.surface_cli_run_command import handle as handle_run_command
-from modules.cli.src.surface_cli_sessions_command import handle_sessions
+from modules.cli.src.surface_cli_sessions_command import handle_sessions, register_sessions_subparser
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
 from modules.cli.src.surface_cli_update_command import handle as handle_update_command
 from modules.cli.src.surface_cli_update_command import handle_rollback
@@ -45,7 +43,6 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
-    SESSIONS_DIR,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
@@ -74,7 +71,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Automate chat.qwen.ai without an API key.",
         parents=[parent],
     )
-    sub = p.add_subparsers(dest="action", metavar="ACTION")
+    sub = p.add_subparsers(dest="action", metavar="COMMAND")
 
     # ── doctor ────────────────────────────────────────────────────────────────
     p_doctor = sub.add_parser("doctor", help="Run system environment and health diagnostics", parents=[parent])
@@ -88,19 +85,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── init ──────────────────────────────────────────────────────────────────
     p_init = sub.add_parser("init", help="Initialize workspace (.agents/skills + .qwen-web symlinks)", parents=[parent])
     p_init.add_argument("--dir", dest="target_dir", default=None, help="Target directory (default: cwd)")
-
-    # ── login ─────────────────────────────────────────────────────────────────
-    p_login = sub.add_parser(
-        "login",
-        help="Open browser for manual login and save session",
-        parents=[parent],
-    )
-    p_login.add_argument(
-        "--session",
-        required=True,
-        metavar="NAME",
-        help="Session account name (e.g., personal, work). Resolves to SESSIONS_DIR/NAME.",
-    )
 
     # ── update ────────────────────────────────────────────────────────────────
     p_update = sub.add_parser(
@@ -126,19 +110,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Roll back to a previous package version instead of upgrading",
     )
 
-    # ── sessions ────────────────────────────────────────────────────────────
-    p_sessions = sub.add_parser("sessions", help="Manage Qwen login sessions", parents=[parent])
-    sessions_sub = p_sessions.add_subparsers(dest="session_command")
-    sessions_sub.add_parser("list", help="List all sessions")
-    sessions_login = sessions_sub.add_parser("login", help="Add a new session")
-    sessions_login.add_argument("--name", required=True, help="Session name (e.g., personal, work)")
-    sessions_sub.add_parser("health-check", help="Check health of all sessions")
-    sessions_remove = sessions_sub.add_parser("remove", help="Remove a session")
-    sessions_remove.add_argument("session_id", help="Session ID to remove")
-    sessions_sub.add_parser("status", help="Show detailed session status")
+    # ── session ───────────────────────────────────────────────────────────────
+    # Registration lives in the sessions surface so the parser shape and the
+    # handler stay in sync (single source of truth).
+    register_sessions_subparser(sub)
 
-    # ── prompt-direct ─────────────────────────────────────────────────────────
-    p_direct = sub.add_parser("prompt-direct", help="Send an inline text prompt to Qwen", parents=[parent])
+    # ── prompt ────────────────────────────────────────────────────────────────
+    p_prompt = sub.add_parser(
+        "prompt",
+        help="Send a prompt to Qwen (direct text, prompt file, or file + attachment)",
+        parents=[parent],
+    )
+    prompt_sub = p_prompt.add_subparsers(dest="prompt_command", metavar="SUBCOMMAND")
+
+    # prompt direct
+    p_direct = prompt_sub.add_parser("direct", help="Send an inline text prompt to Qwen", parents=[parent])
     p_direct.add_argument("-t", "--text", required=True, help="Prompt text to send directly")
     p_direct.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_direct.add_argument(
@@ -149,28 +135,26 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p_direct.add_argument("--json", action="store_true", help="Format output as JSON")
 
-    # ── prompt-only ───────────────────────────────────────────────────────────
-    p_only = sub.add_parser("prompt-only", help="Process a prompt file (no attachment)", parents=[parent])
-    p_only.add_argument(
+    # prompt file
+    p_file = prompt_sub.add_parser("file", help="Process a prompt file (no attachment)", parents=[parent])
+    p_file.add_argument(
         "-i",
         "-p",
         "--prompt-path",
         required=True,
         help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
     )
-    p_only.add_argument("-o", "--output-path", default=None, help="Output file path")
-    p_only.add_argument(
+    p_file.add_argument("-o", "--output-path", default=None, help="Output file path")
+    p_file.add_argument(
         "--headless",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Run browser headlessly (default: true; use --no-headless to watch)",
     )
-    p_only.add_argument("--json", action="store_true", help="Format output as JSON")
+    p_file.add_argument("--json", action="store_true", help="Format output as JSON")
 
-    # ── prompt-with-attachment ────────────────────────────────────────────────
-    p_attach = sub.add_parser(
-        "prompt-with-attachment", help="Process a prompt file with a file attachment", parents=[parent]
-    )
+    # prompt attach
+    p_attach = prompt_sub.add_parser("attach", help="Process a prompt file with a file attachment", parents=[parent])
     p_attach.add_argument(
         "-i",
         "-p",
@@ -191,13 +175,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # ── mcp ───────────────────────────────────────────────────────────────────
     sub.add_parser("mcp", help="Run as Model Context Protocol (MCP) server over stdio", parents=[parent])
 
-    # ── jobs ──────────────────────────────────────────────────────────────────
-    p_jobs = sub.add_parser(
-        "jobs",
+    # ── job ───────────────────────────────────────────────────────────────────
+    p_job = sub.add_parser(
+        "job",
         help="Manage asynchronous background prompt jobs (submit, status, list, cleanup)",
         parents=[parent],
     )
-    jobs_sub = p_jobs.add_subparsers(dest="job_command")
+    jobs_sub = p_job.add_subparsers(dest="job_command", metavar="SUBCOMMAND")
     jobs_submit = jobs_sub.add_parser("submit", help="Submit a prompt job to the background worker pool")
     jobs_submit.add_argument(
         "-i",
@@ -230,7 +214,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Run a multi-agent Swarm fan-out across role templates",
         parents=[parent],
     )
-    swarm_sub = p_swarm.add_subparsers(dest="swarm_command")
+    swarm_sub = p_swarm.add_subparsers(dest="swarm_command", metavar="SUBCOMMAND")
     swarm_start = swarm_sub.add_parser("start", help="Start a Swarm fan-out over a file or folder")
     swarm_start.add_argument("input", help="Path to file or folder to fan out across all role templates")
     swarm_start.add_argument("--json", action="store_true", help="Format output as JSON")
@@ -247,7 +231,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Query observability status: run metrics and quality reports",
         parents=[parent],
     )
-    obs_sub = p_obs.add_subparsers(dest="observability_command")
+    obs_sub = p_obs.add_subparsers(dest="observability_command", metavar="SUBCOMMAND")
     obs_report = obs_sub.add_parser("report", help="Write and display the quality report for the last run")
     obs_report.add_argument("--json", action="store_true", help="Format output as JSON")
     obs_status = obs_sub.add_parser("status", help="Show current status file contents")
@@ -259,11 +243,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedContainer) -> None:
     """Resolve session path for prompt commands using rotation.
 
-    Only runs for prompt-direct / prompt-only / prompt-with-attachment when
-    multiple sessions exist. Picks a healthy session and overrides cfg.session_path.
+    Only runs for the `prompt` command (direct/file/attach) when multiple
+    sessions exist. Picks a healthy session and overrides cfg.session_path.
     """
-    action = getattr(args, "action", None)
-    if action not in ("prompt-direct", "prompt-only", "prompt-with-attachment"):
+    if getattr(args, "action", None) != "prompt":
         return
 
     pool = container.session_manager.load_pool()
@@ -286,11 +269,8 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
 def _build_config(args: argparse.Namespace) -> AppConfig:
     """Build AppConfig from parsed subcommand args using hardcoded defaults."""
     action = args.action
+    prompt_command = getattr(args, "prompt_command", None)
     headless = bool(getattr(args, "headless", False))
-    # Login always runs in a visible browser: the user must complete the sign-in
-    # and CAPTCHA manually, so a headless launch can never satisfy it.
-    if action == "login":
-        headless = False
     verbose = bool(getattr(args, "verbose", False))
     dummy_path = Path(os.devnull)
 
@@ -302,12 +282,12 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     # Reject an empty direct prompt here rather than deep in dispatch: building
     # the config and initialising observability first wastes the whole setup
     # path before surfacing a generic message.
-    if action == "prompt-direct" and not (text or "").strip():
+    if action == "prompt" and prompt_command == "direct" and not (text or "").strip():
         raise ValueError(
-            "Empty prompt text for prompt-direct.\n"
+            "Empty prompt text for prompt direct.\n"
             "Why: --text/-t must carry non-empty content to send to Qwen.\n"
             "How to fix: supply a prompt, e.g.\n"
-            '  qwen-web-arwaky prompt-direct -t "Summarize this document"'
+            '  qwen-web-arwaky prompt direct -t "Summarize this document"'
         )
 
     raw_prompt = getattr(args, "prompt_path", None)
@@ -351,29 +331,24 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         else:
             out_p = base_dir
 
-    mode_map = {
-        "login": "login",
-        "prompt-direct": "direct",
-        "prompt-only": "single",
-        "prompt-with-attachment": "single",
-        "init": "init",
-        "mcp": "mcp",
-        "jobs": "direct",
-        "swarm": "single",
-        "observability": "direct",
-    }
-
-    # Check for session path override from rotation
-    session_name = getattr(args, "session", None)
-    if action == "login" and session_name:
-        # login: resolve --session NAME to SESSIONS_DIR/NAME
-        effective_session = SESSIONS_DIR / session_name
+    # `prompt` is the only command group whose subcommand selects the runtime
+    # mode; every other action maps to a fixed mode (or the default).
+    if action == "prompt":
+        mode = "direct" if prompt_command == "direct" else "single"
     else:
-        effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
+        mode = {
+            "init": "init",
+            "mcp": "mcp",
+            "job": "direct",
+            "swarm": "single",
+            "observability": "direct",
+        }.get(action, "direct")
+
+    effective_session = Path(getattr(args, "_session_override", DEFAULT_SESSION))
     model = str(getattr(args, "model", None) or "").strip()
 
     return AppConfig(
-        mode=mode_map.get(action, "direct"),
+        mode=mode,
         input_path=prompt_p or dummy_path,
         output_path=out_p,
         session_path=effective_session,
@@ -383,8 +358,8 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
         prompt_file=prompt_p,
         prompt_path=prompt_p,
         file_path=file_p,
-        inline_prompt=action == "prompt-direct",
-        inline_prompt_text=text if action == "prompt-direct" else None,
+        inline_prompt=action == "prompt" and prompt_command == "direct",
+        inline_prompt_text=text if (action == "prompt" and prompt_command == "direct") else None,
         model=model,
     )
 
@@ -431,8 +406,8 @@ def _dispatch(
                 f"{_ERROR_PREFIX} Interactive TUI mode requires a terminal (TTY).\n\n"
                 "If you are running in a non-interactive environment, use a subcommand instead:\n"
                 "  qwen-web-arwaky doctor\n"
-                '  qwen-web-arwaky prompt-direct -t "Your prompt"\n'
-                "  qwen-web-arwaky prompt-only -i input/prompt.md\n\n"
+                '  qwen-web-arwaky prompt direct -t "Your prompt"\n'
+                "  qwen-web-arwaky prompt file -i input/prompt.md\n\n"
                 "Run `qwen-web-arwaky --help` to see all available commands.",
                 file=sys.stderr,
             )
@@ -475,12 +450,6 @@ def _dispatch(
             session_manager=container.session_manager,
         )
 
-    if action == "login":
-        if cfg is None:
-            print(f"{_ERROR_PREFIX} Missing login configuration.", file=sys.stderr)
-            return 1
-        return _run_manual_login(cfg, container, json_output=json_output)
-
     if action == "init":
         result = handle_init_command(args, container.workspace)
         return _result_exit_code(result, json_output=json_output)
@@ -491,7 +460,7 @@ def _dispatch(
         result = handle_update_command(args, container.updater)
         return _result_exit_code(result, json_output=json_output)
 
-    if action == "jobs":
+    if action == "job":
         return handle_jobs_command(args, container.agent_job_orchestrator, container.job_storage)
 
     if action == "swarm":
@@ -500,7 +469,7 @@ def _dispatch(
     if action == "observability":
         return handle_observability_command(args, container.agent_logging_orchestrator, container.metrics)
 
-    if action == "sessions":
+    if action == "session":
         return handle_sessions(args)
 
     if cfg is None:
@@ -546,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     if args is not None:
         action = getattr(args, "action", None)
         # actions that do not need an AppConfig (no prompt path, no browser run)
-        no_cfg_actions = ("init", "jobs", "swarm", "observability", "sessions")
+        no_cfg_actions = ("init", "job", "swarm", "observability", "session")
         if action not in no_cfg_actions:
             try:
                 cfg = _build_config(args)
@@ -561,19 +530,6 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"{_ERROR_PREFIX} {exc}", file=sys.stderr)
         return exit_code_for(exc)
-
-
-def _run_manual_login(cfg: AppConfig, container: SharedContainer | None = None, json_output: bool = False) -> int:
-    """Launch visible browser for interactive login."""
-    if container is None:
-        container = _default_container()
-    result = handle_login_command(
-        None,
-        container.agent_session_orchestrator,
-        container.agent_setup_orchestrator,
-        cfg,
-    )
-    return _result_exit_code(result, json_output=json_output)
 
 
 if __name__ == "__main__":

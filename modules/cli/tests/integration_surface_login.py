@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.cli.src.surface_cli_login_command import handle
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.shared.src import AppConfig
-from modules.shared.src.taxonomy_setup_vo import SetupResponse
 
 
 class _BrowserHarness:
@@ -137,30 +134,6 @@ def _assert_context_closed(browser: _BrowserHarness) -> None:
 def _assert_browser_active(browser: _BrowserHarness) -> None:
     """Assert that a callback was invoked inside the context manager."""
     assert browser.active is True
-
-
-def test_cli_login_passes_confirmation_callback_to_core(tmp_path: Path) -> None:
-    """The CLI calls setup_session without wait_for_confirmation (browser close triggers check)."""
-    cfg = AppConfig(
-        mode="login",
-        input_path=tmp_path / "input",
-        output_path=tmp_path / "output",
-        session_path=tmp_path / "session",
-    )
-    session = MagicMock()
-    setup = MagicMock()
-    setup.execute_setup.return_value = SetupResponse(
-        success=True,
-        profile_path=str(cfg.session_path),
-        message="Manual login completed successfully.",
-    )
-
-    with patch("sys.stdin"):
-        result = handle(None, session, setup, cfg)
-
-    assert result == {"success": True, "message": "Manual login completed successfully."}
-    setup.execute_setup.assert_called_once()
-    assert setup.execute_setup.call_args.args[0].profile_path == cfg.session_path
 
 
 def test_browser_check_session_requires_authenticated_chat_ui() -> None:

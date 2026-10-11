@@ -2,7 +2,7 @@
 
 ## Status ter-verify (manual, non-headless, attachment 16KB = swarm input)
 
-| Versi | Bot-verification (captcha) | Hasil pipeline prompt-with-attachment |
+| Versi | Bot-verification (captcha) | Hasil pipeline prompt attach |
 | --- | --- | --- |
 | **v6.3.0** | tidak muncul | **BERHASI end-to-end** — menunggu sabar sampai parsing selesai, send, ACK, output ter-copy |
 | **v6.3.1** | tidak muncul | **gagal `SendDispatchError`** — tidak menunggu parsing selesai dengan benar |
@@ -10,7 +10,7 @@
 
 Catatan:
 - v6.3.0 dan v6.3.1 sama-sama bebas bot-verification (kode send-path keduanya identik).
-- Hanya v6.3.0 yang terverifikasi sukses end-to-end di pipeline prompt-with-attachment.
+- Hanya v6.3.0 yang terverifikasi sukses end-to-end di pipeline prompt attach.
 - Bot-verification hanya muncul di main **saat swarm 10-parallel** (user memantau 10 tab
   non-headless); saat attachment tunggal main kadang sukses (38s) dan kadang gagal —
   transien, bergantung kondisi parse-rate Qwen.

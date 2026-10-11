@@ -3,10 +3,11 @@
 # Products used:
 #   Merge Queue     — serializes merges on main so CI checks always run on
 #                     the final cumulative state before merge.
-#   Workflow Automation — auto-labels PRs so merge protections and queue
-#                     rules can branch on label, keeping the human
-#                     responsible for deciding *what* gets queued, Mergify
-#                     responsible for *whether* it's safe to land.
+#   Workflow Automation — auto-merges PRs when CI is green. GitHub's
+#                     ruleset (protect-main) is the merge gate: it requires
+#                     1 review approval and the required status checks.
+#                     Mergify only automates *when* the merge happens, not
+#                     *whether* it is allowed.
 #
 # Validate before pushing:
 #   mergify config validate
@@ -17,6 +18,12 @@
 # .github/workflows/ci.yml: the "Tests (pytest) (3.13)" matrix check run
 # (the single, latest-supported Python interpreter) and the "Self-Lint
 # (lint-arwaky-cli)" job (AD-05 template hygiene).
+#
+# In-place checks: the protect-main ruleset sets
+# strict_required_status_checks_policy: true, which means checks must run
+# on the final merge commit. Mergify supports this via in-place checks:
+# merge_queue.max_parallel_checks: 1, every queue rule batch_size: 1, and
+# merge_conditions identical to queue_conditions (no two-step CI).
 
 # ── Merge Queue ───────────────────────────────────────────────────────────────
 # main is the only protected branch; the queue serializes merges through
@@ -30,29 +37,35 @@ queue_rules:
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
     merge_conditions:
+      - base=main
+      - -draft
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
-      - "label~=(ci|docs)"
     merge_method: squash
     batch_size: 1
     checks_timeout: 45m
 
 merge_queue:
+  max_parallel_checks: 1
   queued_label: queued
   dequeued_label: dequeued
   checking_label: queue-checking
   status_comments: outcomes
 
 # ── Pull Request Rules (Workflow Automation) ─────────────────────────────────
-# These rules auto-label PRs on open and update; merge_protections then
-# gates the merge on the right labels + green checks.
+# These rules auto-queue and auto-merge PRs on open and update once CI is
+# green. GitHub's ruleset (protect-main) is the merge gate: it requires 1
+# review approval and the required status checks. Mergify only automates
+# *when* the merge happens, not *whether* it is allowed. No label condition:
+# the labeler assigns python/cli/core/mcp/tests/fixtures/deployment/
+# configuration to most PRs, so a label gate would block auto-merge on
+# the majority of PRs.
 
 pull_request_rules:
-  # Auto-queue low-risk PRs once CI passes.
-  - name: auto-queue-ci-and-docs
-    description: Queue PRs labelled ci or docs when the checks are green
+  # Auto-queue any PR targeting main once CI passes.
+  - name: auto-queue-on-ci-green
+    description: Queue a PR to main when checks are green
     conditions:
-      - "label~=(ci|docs)"
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
       - -draft
@@ -70,7 +83,6 @@ pull_request_rules:
       - -draft
       - check-success=Tests (pytest) (3.13)
       - check-success=Self-Lint (lint-arwaky-cli)
-      - "label~=(ci|docs)"
     actions:
       merge:
         method: squash

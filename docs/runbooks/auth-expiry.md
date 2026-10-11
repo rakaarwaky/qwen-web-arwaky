@@ -27,7 +27,7 @@
    If no backup is retained, the only recovery is an interactive CAPTCHA re-login.
 4. Re-authenticate interactively:
    ```bash
-   qwen-web-arwaky login
+   qwen-web-arwaky session login --name <name>
    ```
    A headed browser opens at chat.qwen.ai; finish any CAPTCHA challenge. The resulting
    profile is backed up automatically on success.
@@ -43,5 +43,5 @@ owner. Do not attempt programmatic CAPTCHA solving.
 
 ## Prevention
 
-- Run `qwen-web-arwaky login` proactively before every long unattended batch.
+- Run `qwen-web-arwaky session login --name <name>` proactively before every long unattended batch.
 - Keep a backup generation in place; doctor warns when none exist.

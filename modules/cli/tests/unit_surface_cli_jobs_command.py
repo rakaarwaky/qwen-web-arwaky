@@ -50,7 +50,7 @@ class TestJobsSubmit:
         assert rc == 0
         out = capsys.readouterr().out
         assert "job-1" in out
-        assert "jobs status" in out
+        assert "job status" in out
 
     def test_submit_with_attachment_uses_the_attachment_verb(self, tmp_path) -> None:
         os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)

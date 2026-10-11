@@ -30,7 +30,7 @@
    re-login with CAPTCHA:
    ```bash
    rm -rf ~/.local/share/qwen-web-arwaky/qwen_session
-   qwen-web-arwaky login
+   qwen-web-arwaky session login --name <name>
    ```
    A successful login takes an automatic backup.
 4. After restore or re-login, run `qwen-web-arwaky doctor` to confirm both checks

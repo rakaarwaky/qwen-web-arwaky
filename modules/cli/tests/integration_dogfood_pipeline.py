@@ -1,9 +1,8 @@
 """Dogfood pipeline tests — structure validation for CLI commands.
 
 These tests verify the CLI command structure and help output:
-1. prompt-direct command exists
-2. prompt-only command exists
-3. prompt-with-attachment command exists
+1. The `prompt` group exists with direct/file/attach subcommands
+2. The `session` and `job` groups exist
 
 NEVER RUNS API CALLS — structure tests only.
 Real API validation: run pytest --run-dogfood with live Qwen session.
@@ -29,23 +28,25 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
 class TestPipelineStructure:
     """Test that all pipeline entry points are discoverable."""
 
-    def test_prompt_direct_exists(self):
-        """Verify prompt-direct command is registered."""
+    def test_prompt_group_exists(self):
+        """Verify the prompt command group is registered."""
         result = _run_cli(["--help"])
         assert result.returncode == 0
-        assert "prompt-direct" in result.stdout
+        assert "prompt" in result.stdout
 
-    def test_prompt_only_exists(self):
-        """Verify prompt-only command is registered."""
-        result = _run_cli(["--help"])
+    def test_prompt_subcommands_exist(self):
+        """Verify the prompt direct/file/attach subcommands are registered."""
+        result = _run_cli(["prompt", "--help"])
         assert result.returncode == 0
-        assert "prompt-only" in result.stdout
+        for subcommand in ("direct", "file", "attach"):
+            assert subcommand in result.stdout
 
-    def test_prompt_with_attachment_exists(self):
-        """Verify prompt-with-attachment command is registered."""
+    def test_session_and_job_groups_exist(self):
+        """Verify the session and job command groups are registered."""
         result = _run_cli(["--help"])
         assert result.returncode == 0
-        assert "prompt-with-attachment" in result.stdout
+        assert "session" in result.stdout
+        assert "job" in result.stdout
 
 
 if __name__ == "__main__":

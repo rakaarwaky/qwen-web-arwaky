@@ -154,13 +154,14 @@ interactive element carries a contour radius so it reads as pressable.
 | Entry point | Caller | Returns |
 |---|---|---|
 | `init` | operator shell | workspace creation envelope |
-| `login` | operator shell, TUI login screen | authentication outcome |
 | `doctor` | operator shell, TUI diagnostics tab | health rows, optionally with a smoke gate |
-| `sessions` | operator shell, TUI sessions tab | session pool listing |
-| `prompt-direct` | operator shell | saved response path |
-| `prompt-only` | operator shell | saved response path |
-| `prompt-with-attachment` | operator shell | saved response path |
+| `session` | operator shell, TUI login/sessions screens | session pool listing, authentication outcome |
+| `prompt` | operator shell | saved response path |
+| `job` | operator shell | job admission and status envelope |
+| `swarm` | operator shell | swarm progress snapshot |
+| `observability` | operator shell | quality report and status snapshot |
 | `update` | operator shell, TUI update action | update report envelope |
+| `mcp` | MCP client over stdio | MCP server lifecycle |
 | no subcommand on a TTY | operator TTY | interactive dashboard |
 | no subcommand without a TTY | operator shell | usage error naming the subcommands |
 
@@ -229,11 +230,15 @@ The CLI root entry point owns the CLI lifecycle: parse arguments, build `AppConf
 | Subcommand | Signal | Result | Validation |
 |---|---|---|---|
 | `doctor` | `qwen-web-arwaky doctor [--json] [--smoke]` | System health diagnostic | Checks Python, Playwright, workspace, session, permissions; `--smoke` adds a headless browser round-trip (FR-CLI-004). |
-| `login` | `qwen-web-arwaky login [--headless]` | `mode="login"` | Forces headed browser for manual authentication unless overridden. |
 | `init` | `qwen-web-arwaky init [--dir]` | Workspace initialization | Creates XDG storage directories and root `.qwen-web` symlinks. |
-| `prompt-direct` | `qwen-web-arwaky prompt-direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
-| `prompt-only` | `qwen-web-arwaky prompt-only -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
-| `prompt-with-attachment` | `qwen-web-arwaky prompt-with-attachment -i FILE -a ATT [--json]` | `mode="single"` + attachment | Prompt file and attachment file must exist on disk. |
+| `session login` | `qwen-web-arwaky session login --name NAME` | `mode="login"` | Runs a headed browser for manual authentication and registers the profile in the session pool. |
+| `session {list,health,remove,status}` | `qwen-web-arwaky session list` | Session pool management | Operates on the stored session pool and Chromium profiles. |
+| `prompt direct` | `qwen-web-arwaky prompt direct -t "..." [--json]` | Inline text prompt | Direct text string is injected directly. |
+| `prompt file` | `qwen-web-arwaky prompt file -i FILE [--json]` | `mode="single"` | Prompt file must exist on disk. |
+| `prompt attach` | `qwen-web-arwaky prompt attach -i FILE -a ATT [--json]` | `mode="single"` + attachment | Prompt file and attachment file must exist on disk. |
+| `job {submit,status,list,cleanup}` | `qwen-web-arwaky job submit -i FILE` | Background job management | Prompt file must exist on disk. |
+| `swarm {start,status,cancel}` | `qwen-web-arwaky swarm start INPUT` | Swarm fan-out management | Input path must exist on disk. |
+| `observability {report,status}` | `qwen-web-arwaky observability status` | Run metrics and quality reports | Status file must stay inside the workspace root. |
 | `update` | `qwen-web-arwaky update [--check] [--force]` | Self-update management | Discovers latest release, upgrades package, synchronizes Playwright binaries (FR-CLI-005). |
 | `mcp` | `qwen-web-arwaky mcp` | MCP server entry point | Launches the MCP server entry point in-process via uvicorn. |
 
@@ -312,8 +317,8 @@ Requirements:
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| run-command `handle(args, cfg, direct, file_only, attachment)` | parsed args, `AppConfig`, prompt protocols | response envelope | a Core failure surfaces as a structured error | prompt lifecycle events | Subcommands `prompt-direct`, `prompt-only`, `prompt-with-attachment`. |
-| login-command `handle(args, session, setup, cfg)` | parsed args, session/setup aggregates, `AppConfig` | response envelope | login not completed | login complete | Subcommand `login`. |
+| run-command `handle(args, cfg, direct, file_only, attachment)` | parsed args, `AppConfig`, prompt protocols | response envelope | a Core failure surfaces as a structured error | prompt lifecycle events | Subcommands `prompt direct`, `prompt file`, `prompt attach`. |
+| sessions-command `handle_sessions(args)` | parsed args | process exit code | an unknown subcommand prints usage and returns 1 | session pool events | Subcommands `session {list,login,health,remove,status}`. |
 | init-command `handle(args, workspace)` | parsed args, workspace protocol | response envelope | unwritable workspace | — | Subcommand `init`. |
 | update-command `handle(args, updater)` | parsed args, update protocol | staged update report | stage failure with remedy | update stages | Subcommand `update`. |
 | doctor-command `run_doctor(json_output, smoke, session)` | doctor flags, optional session aggregate | process exit code | — | — | Subcommand `doctor`. |

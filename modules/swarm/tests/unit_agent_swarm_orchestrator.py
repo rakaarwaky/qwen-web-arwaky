@@ -179,7 +179,7 @@ def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_pat
         remaining = aggregate.failures.get(role, 0)
         if remaining > 0:
             aggregate.failures[role] = remaining - 1
-            return ResponseText("ERROR [auth] Login session expired — run qwa login")
+            return ResponseText("ERROR [auth] Login session expired — run qwa session login")
         return ResponseText(f"Successfully processed {role}")
 
     aggregate.process_prompt_with_attachment = process_with_auth_error

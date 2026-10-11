@@ -129,7 +129,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
                     "created_at": record.created_at,
                     "input_file": record.input_file,
                     "output_file": record.output_file,
-                    "message": "Job submitted. Poll with 'qwen-web-arwaky jobs status <job_id>'.",
+                    "message": "Job submitted. Poll with 'qwen-web-arwaky job status <job_id>'.",
                 },
                 indent=2,
                 default=str,
@@ -140,7 +140,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
         print(f"   Input:    {record.input_file}")
         print(f"   Output:   {record.output_file or '(default)'}")
         print(f"   Status:   {record.latest_event or 'QUEUED'}")
-        print(f"   Poll with: qwen-web-arwaky jobs status {record.job_id}")
+        print(f"   Poll with: qwen-web-arwaky job status {record.job_id}")
     return 0
 
 
@@ -238,7 +238,7 @@ def _cmd_list(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
         )
     else:
         if not records:
-            print("No jobs found. Submit one with 'qwen-web-arwaky jobs submit -i <prompt.md>'.")
+            print("No jobs found. Submit one with 'qwen-web-arwaky job submit -i <prompt.md>'.")
             return 0
         print(f"📊 Recent Jobs ({len(records)})")
         print("─" * 110)
@@ -287,7 +287,7 @@ def handle(args: argparse.Namespace, jobs: IJobManagerAggregate, storage: IJobSt
             print("[ERROR] Job storage not available for cleanup.", file=sys.stderr)
             return 1
         return _cmd_cleanup(args, storage)
-    print("Use 'qwen-web-arwaky jobs --help' for usage")
+    print("Use 'qwen-web-arwaky job --help' for usage")
     return 1
 
 

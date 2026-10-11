@@ -27,7 +27,8 @@ Success looks like this:
 
 - `pip` ends with `Successfully installed ... qwen-web-arwaky`.
 - Playwright reports that Chromium was downloaded or is already installed.
-- The final command prints `Automate chat.qwen.ai without an API key.` and lists actions such as `doctor`, `init`, and `login`.
+- The final command prints `Automate chat.qwen.ai without an API key.` and lists
+actions such as `doctor`, `init`, and `session login`.
 
 On Windows PowerShell, create and activate the environment with:
 
@@ -42,10 +43,12 @@ Provision a working directory and authenticate once before sending prompts:
 
 ```bash
 qwen-web-arwaky init
-qwen-web-arwaky login
+qwen-web-arwaky session login --name personal
 ```
 
-`init` succeeds when it reports the workspace paths it created. `login` succeeds after the browser opens, authentication completes, and the CLI confirms that the persistent session was saved.
+`init` succeeds when it reports the workspace paths it created. `session login`
+succeeds after the browser opens, authentication completes, and the CLI confirms
+that the persistent session was saved.
 
 To verify the saved session and local environment:
 
@@ -83,13 +86,23 @@ Run application commands inside the activated virtual environment.
 | Command | Purpose | How to confirm success |
 | --- | --- | --- |
 | `qwen-web-arwaky` | Open the terminal dashboard. | The Textual dashboard renders. |
-| `qwen-web-arwaky --help` | List the supported CLI actions. | Help includes `doctor`, `init`, and `login`. |
+| `qwen-web-arwaky --help` | List the supported CLI actions. | Help includes `doctor`, `init`, and `session login`. |
 | `qwen-web-arwaky doctor` | Check browser, session, and environment health. | Diagnostics print and the process exits with status 0. |
 | `qwen-web-arwaky init` | Create workspace skills and runtime links. | Created or existing workspace paths are reported. |
-| `qwen-web-arwaky login` | Open the interactive one-time Qwen login. | The CLI confirms that the session was saved. |
-| `qwen-web-arwaky prompt-direct -t "Explain this repository" -o output.md` | Send an inline prompt and save the response. | `output.md` contains the Qwen response. |
-| `qwen-web-arwaky prompt-only -i prompt.md -o output.md` | Send a Markdown prompt file. | `output.md` contains the Qwen response. |
-| `qwen-web-arwaky prompt-with-attachment -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky session login --name personal` | Open the interactive one-time Qwen login. | The CLI confirms that the session was saved. |
+| `qwen-web-arwaky session list` | List registered sessions with health state. | The session pool table prints. |
+| `qwen-web-arwaky session health` | Ping every session with a live headless probe. | Each session reports healthy or limited. |
+| `qwen-web-arwaky session remove <id-or-name>` | Drop a session entry and its Chromium profile. | The pool entry and profile are removed. |
+| `qwen-web-arwaky prompt direct -t "Explain this repository" -o output.md` | Send an inline prompt and save the response. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky prompt file -i prompt.md -o output.md` | Send a Markdown prompt file. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky prompt attach -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
+| `qwen-web-arwaky job submit -i prompt.md` | Queue a background prompt job. | The job ID prints with a poll hint. |
+| `qwen-web-arwaky job status <job-id>` | Query one background job. | The job record prints. |
+| `qwen-web-arwaky job list` | List recent background jobs. | The recent-jobs table prints. |
+| `qwen-web-arwaky swarm start <path>` | Fan a file or folder out across role templates. | The Swarm snapshot prints with a poll hint. |
+| `qwen-web-arwaky observability status` | Show the status file and metrics snapshot. | The status table prints. |
+| `qwen-web-arwaky observability report` | Write the quality report for the last run. | The report path prints. |
+| `qwen-web-arwaky update --check` | Compare current and latest versions without installing. | The version verdict prints. |
 | `qwen-web-mcp` | Start the MCP server over standard input/output. | An MCP client can initialize the server; silence while waiting for input is normal. |
 | `python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v` | Run the same test selection as CI. | Pytest ends with a passed summary and status 0. |
 | `bash scripts/ci.sh` | Run local lint, type, security, architecture, and test gates. | The script ends with `All 7 gates passed`. |

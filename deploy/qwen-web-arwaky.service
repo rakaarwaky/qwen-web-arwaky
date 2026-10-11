@@ -8,6 +8,10 @@
 # Replace the ExecStart path and WorkingDirectory with the paths of the
 # virtualenv on the target host before enabling.
 #
+# One unit invocation submits one prompt job, so the prompt path must be a
+# prompt *file* — there is no directory-watch mode. Fan out across many prompts
+# with a systemd template unit, or use `swarm start <folder>`.
+#
 # MemoryMax / TasksMax bound the browser fleet (issue #291). Each Chromium
 # worker is budgeted at ~700 MiB, so MemoryMax below defaults to 6 workers
 # worth of RAM; raise it in step with QWEN_WEB_MAX_WORKERS / QWEN_SWARM_CONCURRENCY.
@@ -15,7 +19,7 @@
 # cannot exhaust the host's PID table.
 
 [Unit]
-Description=qwen-web-arwaky prompt watcher
+Description=qwen-web-arwaky prompt job submitter
 Documentation=https://github.com/rakaarwaky/qwen-web-arwaky
 After=network-online.target
 Wants=network-online.target
@@ -32,7 +36,7 @@ Environment=QWEN_SWARM_CONCURRENCY=4
 # Error tracking stays off until SENTRY_DSN is provisioned; doctor reports the
 # degraded telemetry mode as a WARNING while ENVIRONMENT=production (issue #297).
 # EnvironmentFile=/etc/qwen-web-arwaky/env
-ExecStart=/opt/qwen-web-arwaky/.venv/bin/qwen-web-arwaky prompt-only --watch -i /opt/qwen-web-arwaky/prompts
+ExecStart=/opt/qwen-web-arwaky/.venv/bin/qwen-web-arwaky job submit -i /opt/qwen-web-arwaky/prompts/prompt.md
 Restart=on-failure
 RestartSec=30
 TimeoutStopSec=60

@@ -121,7 +121,7 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         valid, then opens a headed browser, navigates to chat.qwen.ai, and
         waits for the browser to close or the confirmation callback to fire.
         On success the profile is snapshotted and registered in the session
-        pool so rotation and ``sessions list`` see it.
+        pool so rotation and ``session list`` see it.
         """
         profile_path = request.profile_path
         if profile_path is None:
@@ -177,7 +177,7 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
                     "session_backup_failed", error=str(exc), session_path=str(cfg.session_path)
                 )
             # Register the profile in the session pool so rotation and
-            # `sessions list` can see it. add_session is idempotent: when
+            # `session list` can see it. add_session is idempotent: when
             # the profile is already in the pool the existing entry is
             # updated in place rather than duplicated.
             if self._sessions is not None:
