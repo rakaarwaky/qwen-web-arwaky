@@ -30,39 +30,52 @@ def test_directory_output_names_are_unique_across_rapid_calls(tmp_path: Path) ->
     assert len(first_out.stem.rsplit("_", 1)[-1]) == 4
 
 
-def test_explicit_output_file_path_is_honored_in_place(tmp_path: Path) -> None:
-    """A user-supplied -o file path (with an extension) writes to that exact path.
+def test_explicit_output_file_path_is_honored_exactly(tmp_path: Path) -> None:
+    """A user-supplied -o file path writes to that exact path, extension or not.
 
-    Issue #280 AC-1 guarantees *default* filenames never collide, but an
-    explicit ``-o`` argument names the destination the operator wants, so it
-    is honored exactly (overwritten on a repeat run) rather than renamed.
+    Issue #280 AC-1 guarantees that *auto-generated* default filenames never
+    collide under concurrent slot runs. When the operator explicitly names a
+    destination with ``-o`` they own the collision risk: a path with an
+    extension and a path without one are both honored in place, overwriting
+    the file on a repeat run rather than being renamed.
+
+    A directory argument still auto-completes inside it, because a directory
+    cannot name a single file by itself.
     """
     prompt = tmp_path / "prompt.md"
     prompt.write_text("# x", encoding="utf-8")
-    target = tmp_path / "answer.md"
-    target.write_text("previous run", encoding="utf-8")
 
-    _, out_path = resolve_pipeline_output_path(prompt, output_file=target)
+    # Extension path → exact file
+    target_ext = tmp_path / "answer.md"
+    target_ext.write_text("previous run", encoding="utf-8")
+    _, out_path = resolve_pipeline_output_path(prompt, output_file=target_ext)
+    assert out_path == target_ext
 
-    assert out_path == target
+    # Extension-less path → exact file, no timestamp or hex suffix
+    target_noext = tmp_path / "answer"
+    _, out_path = resolve_pipeline_output_path(prompt, output_file=target_noext)
+    assert out_path == target_noext
     assert out_path.parent == tmp_path
 
 
-def test_explicit_extensionless_output_path_gets_a_unique_name(tmp_path: Path) -> None:
-    """An explicit -o path without an extension still auto-completes the name.
+def test_directory_output_gets_a_unique_name_inside(tmp_path: Path) -> None:
+    """A directory ``-o`` argument auto-completes a unique filename inside it.
 
-    A directory-like or extensionless argument is not a precise file target,
-    so a timestamp + hex suffix is appended to keep concurrent runs distinct.
+    A directory cannot name a single file by itself, so the resolver
+    appends the prompt stem, a timestamp, and a 4-hex-digit suffix to keep
+    concurrent slot runs distinct within the operator's chosen folder.
     """
     prompt = tmp_path / "prompt.md"
     prompt.write_text("# x", encoding="utf-8")
-    target = tmp_path / "answer"
+    out_dir = tmp_path / "out_dir"
+    out_dir.mkdir()
 
-    _, out_path = resolve_pipeline_output_path(prompt, output_file=target)
+    _, out_path = resolve_pipeline_output_path(prompt, output_file=out_dir)
 
-    assert out_path != target
-    assert out_path.parent == tmp_path
-    assert out_path.stem.startswith("answer_")
+    assert out_path.parent == out_dir
+    assert out_path.suffix == ".md"
+    assert out_path.name.startswith(f"{prompt.stem}_")
+    assert len(out_path.stem.rsplit("_", 1)[-1]) == 4
 
 
 def test_unicode_and_space_containing_stems_survive_resolution(tmp_path: Path) -> None:
