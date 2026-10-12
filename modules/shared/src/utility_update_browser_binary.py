@@ -110,8 +110,8 @@ def _is_trusted_binary(path: str) -> bool:
     return info.st_uid in (0, getuid())
 
 
-def _playwright_managed_binary() -> str:
-    """Return the Playwright-cached Chromium executable, or '' when absent.
+def _playwright_browser_root() -> Path | None:
+    """Return the Playwright browser cache root, or None when it is absent.
 
     Playwright's own download directory is created by the package installer and
     is not influenced by the caller's ``PATH``, so it is preferred over any
@@ -128,24 +128,55 @@ def _playwright_managed_binary() -> str:
         root = Path.home() / "Library" / "Caches" / "ms-playwright"
     else:
         root = Path.home() / ".cache/ms-playwright"
-    if not root.is_dir():
+    return root if root.is_dir() else None
+
+
+def _playwright_managed_binary(prefer_gui: bool = True) -> str:
+    """Return the Playwright-cached Chromium executable, or '' when absent.
+
+    The full ``chromium`` GUI build is always probed first. When
+    ``prefer_gui`` is True (a headful launch) and only a
+    ``chromium_headless_shell`` build is cached, '' is returned so the
+    caller can fall back to a system channel such as ``channel="chrome"``.
+    For a headless launch the headless-shell build is returned when the
+    full GUI build is missing.
+    """
+    root = _playwright_browser_root()
+    if root is None:
         return ""
-    for browser_dir, relative_candidates in _PLAYWRIGHT_BROWSER_DIRS:
-        for entry in sorted(root.glob(f"{browser_dir}-*"), reverse=True):
-            for relative in relative_candidates:
-                candidate = entry / relative
-                if candidate.is_file() and _is_trusted_binary(str(candidate)):
-                    return str(candidate)
+    gui_candidate = ""
+    for entry in sorted(root.glob("chromium-*"), reverse=True):
+        for relative in _PLAYWRIGHT_BROWSER_DIRS[0][1]:
+            candidate = entry / relative
+            if candidate.is_file() and _is_trusted_binary(str(candidate)):
+                gui_candidate = str(candidate)
+                break
+        if gui_candidate:
+            break
+    if gui_candidate:
+        return gui_candidate
+    if prefer_gui:
+        return ""
+    for entry in sorted(root.glob("chromium_headless_shell-*"), reverse=True):
+        for relative in _PLAYWRIGHT_BROWSER_DIRS[1][1]:
+            candidate = entry / relative
+            if candidate.is_file() and _is_trusted_binary(str(candidate)):
+                return str(candidate)
     return ""
 
 
-def find_chrome_binary() -> str:
+def find_chrome_binary(headless: bool = True) -> str:
     """Return the path of a trusted Chrome/Chromium binary, or ''.
 
     The Playwright-managed build is preferred. ``PATH`` candidates and the
     well-known system locations are accepted only when
     :func:`_is_trusted_binary` clears them; each rejection is logged so an
     operator can see why the chosen binary was skipped.
+
+    When ``headless`` is False (a visible window is required, e.g. manual
+    login) and the Playwright cache holds only a headless-shell build, an
+    empty string is returned so the caller falls back to a system channel
+    such as ``channel="chrome"``.
 
     Returns
     -------
@@ -154,7 +185,7 @@ def find_chrome_binary() -> str:
         trusted candidate is available.
 
     """
-    managed = _playwright_managed_binary()
+    managed = _playwright_managed_binary(prefer_gui=not headless)
     if managed:
         return managed
 
@@ -180,4 +211,22 @@ def find_chrome_binary() -> str:
     return ""
 
 
-__all__ = ["CHROME_CANDIDATES", "EXTRA_PATHS", "find_chrome_binary"]
+def is_headless_shell_binary(path: str) -> bool:
+    """Return True when *path* is a Playwright headless-shell executable.
+
+    The headless shell has no GUI toolkit: launching it with
+    ``headless=False`` either crashes or renders no visible window, which is
+    the "login opens no browser" bug. Callers use it to decide when to drop
+    ``executable_path`` and let Playwright fall back to a system channel
+    such as ``channel="chrome"``.
+    """
+    parent_names = [part.casefold() for part in Path(path).parts]
+    return any("headless_shell" in part or "headless-shell" in part for part in parent_names[:-1])
+
+
+__all__ = [
+    "CHROME_CANDIDATES",
+    "EXTRA_PATHS",
+    "find_chrome_binary",
+    "is_headless_shell_binary",
+]

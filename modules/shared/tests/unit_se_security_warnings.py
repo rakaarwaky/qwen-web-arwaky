@@ -311,7 +311,7 @@ def test_world_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) 
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
         "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
-        lambda: "",
+        lambda prefer_gui=True: "",
     )
     monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
@@ -327,7 +327,7 @@ def test_group_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) 
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
         "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
-        lambda: "",
+        lambda prefer_gui=True: "",
     )
     monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
@@ -343,7 +343,7 @@ def test_owned_non_shared_binary_is_accepted(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
         "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
-        lambda: "",
+        lambda prefer_gui=True: "",
     )
     monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
 
