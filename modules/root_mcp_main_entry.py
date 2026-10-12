@@ -1,4 +1,4 @@
-"""qwen-web MCP server entry point (MCP 2.0.0 API).
+"""qwen-web-arwaky MCP server entry point (MCP 2.0.0 API).
 
 Root layer: bootstraps the MCP server over stdio using mcp.server.Server.
 Tools are registered and delegate to the shared core aggregate.
@@ -105,7 +105,7 @@ _RESULT_TRUST_NOTICE = (
 TOOLS: list[Tool] = [
     Tool(
         name="init",
-        description="Initialize workspace directory structure, .agents/skills/qwen-web/SKILL.md guide, sample prompt/file, and .gitignore.",
+        description="Initialize workspace directory structure, .agents/skills/qwen-web-arwaky/SKILL.md guide, sample prompt/file, and .gitignore.",
         input_schema={
             "type": "object",
             "properties": {
@@ -367,7 +367,7 @@ def run_mcp_server() -> None:
 
 
 def main() -> None:
-    """Entry point for the qwen-web MCP server."""
+    """Entry point for the qwen-web-arwaky MCP server."""
     run_mcp_server()
 
 

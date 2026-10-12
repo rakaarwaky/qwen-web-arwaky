@@ -1,4 +1,4 @@
-"""qwen-web TUI surface — Textual app, screens, and widgets.
+"""qwen-web-arwaky TUI surface — Textual app, screens, and widgets.
 
 Barrel re-export of the TUI surfaces. The TUI layer depends on the CLI
 surface (doctor checks, command dispatch) but never the reverse: no file

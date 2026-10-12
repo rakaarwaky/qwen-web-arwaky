@@ -115,7 +115,9 @@ def _sweep_once() -> None:
             return
         _startup_sweep_done = True
     for stale in sweep_stale_clones():
-        logging.getLogger("qwen-web.session_cloner").info("stale_session_clone_removed", extra={"path": str(stale)})
+        logging.getLogger("qwen-web-arwaky.session_cloner").info(
+            "stale_session_clone_removed", extra={"path": str(stale)}
+        )
 
 
 def session_profile_age_days(master_session: Path) -> float | None:

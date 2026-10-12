@@ -6,7 +6,7 @@ Domain taxonomy constant layer for embedded SKILL.md template content.
 from __future__ import annotations
 
 EMBEDDED_SKILL_MD: str = r"""---
-name: qwen-web-arwaky-arwaky-arwaky
+name: qwen-web-arwaky
 description: >
   Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max intelligence model —
   zero API keys, persistent browser sessions. Use when an AI agent needs to send

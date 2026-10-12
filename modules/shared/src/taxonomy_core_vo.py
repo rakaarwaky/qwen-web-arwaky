@@ -1,4 +1,4 @@
-"""Core qwen-web domain value objects: brand (NewType) types, run context,
+"""Core qwen-web-arwaky domain value objects: brand (NewType) types, run context,
 Core value objects only.
 
 Taxonomy layer (taxonomy(vo)): immutable value contracts and brand aliases — no I/O.

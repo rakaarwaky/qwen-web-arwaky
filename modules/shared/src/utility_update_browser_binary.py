@@ -19,7 +19,7 @@ import stat
 import sys
 from pathlib import Path
 
-log = logging.getLogger("qwen-web.browser_binary")
+log = logging.getLogger("qwen-web-arwaky.browser_binary")
 
 CHROME_CANDIDATES = (
     "google-chrome",

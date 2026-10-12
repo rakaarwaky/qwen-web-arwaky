@@ -208,7 +208,9 @@ class ObservabilitySetup(IObservabilityProtocol):
             )
             return
         try:
-            resource = OTelResource.create({"service.name": os.getenv("OTEL_SERVICE_NAME", ServiceName("qwen-web"))})
+            resource = OTelResource.create(
+                {"service.name": os.getenv("OTEL_SERVICE_NAME", ServiceName("qwen-web-arwaky"))}
+            )
             provider = OTelTracerProvider(resource=resource)
             endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
             otlp_exporter: Any = None
@@ -308,7 +310,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         except OSError:
             pass
 
-    def get_logger(self, name: str = "qwen-web") -> Any:
+    def get_logger(self, name: str = "qwen-web-arwaky") -> Any:
         """Return a bound structlog logger."""
         return _get_logger(name)
 
@@ -488,14 +490,14 @@ def _category_from_record(payload: dict[str, Any]) -> str:
     return "other"
 
 
-def _get_logger(name: str = "qwen-web") -> Any:
+def _get_logger(name: str = "qwen-web-arwaky") -> Any:
     """Return a structlog bound logger, falling back to stdlib logging."""
     if structlog is not None:
         return structlog.get_logger(name)
     return logging.getLogger(name)
 
 
-def _get_tracer(name: str = "qwen-web") -> Any:
+def _get_tracer(name: str = "qwen-web-arwaky") -> Any:
     """Return an OpenTelemetry tracer, or None when tracing unavailable."""
     if otel_trace is not None:
         return otel_trace.get_tracer(name)
@@ -592,7 +594,7 @@ def _clear_run_context() -> None:
 
 
 def _excepthook(exc_type: type[BaseException], exc_value: BaseException, _exc_tb: Any) -> None:
-    logger = _get_logger("qwen-web")
+    logger = _get_logger("qwen-web-arwaky")
     if issubclass(exc_type, KeyboardInterrupt):
         logger.warning("interrupted")
         sys.exit(130)
@@ -601,7 +603,7 @@ def _excepthook(exc_type: type[BaseException], exc_value: BaseException, _exc_tb
 
 
 def _thread_excepthook(args: Any) -> None:
-    logger = _get_logger("qwen-web")
+    logger = _get_logger("qwen-web-arwaky")
     _report_critical(logger, args.exc_value, "unhandled_exception_in_thread")
 
 

@@ -1,4 +1,4 @@
-"""CLI surface: init command — initialize workspace (.agents/skills + .qwen-web).
+"""CLI surface: init command — initialize workspace (.agents/skills + .qwen-web-arwaky).
 
 Smart surface: delegates to the workspace provisioner capability, zero business logic.
 """

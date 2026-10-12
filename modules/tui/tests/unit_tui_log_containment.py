@@ -340,7 +340,7 @@ def test_tui_log_handler_ignores_third_party_records() -> None:
         rec = logging.LogRecord(noisy, logging.INFO, "p.py", 1, "noise", (), None)
         assert handler.filter(rec) is False, f"{noisy} must be filtered out"
 
-    for allowed in ("", "qwen-web", "modules.browser.src.capabilities_browser_adapter", "browser"):
+    for allowed in ("", "qwen-web-arwaky", "modules.browser.src.capabilities_browser_adapter", "browser"):
         rec = logging.LogRecord(allowed, logging.INFO, "p.py", 1, "keep", (), None)
         assert handler.filter(rec) is True, f"{allowed!r} must be allowed"
 

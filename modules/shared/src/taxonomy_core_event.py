@@ -1,4 +1,4 @@
-"""Taxonomy definitions for qwen-web lifecycle events.
+"""Taxonomy definitions for qwen-web-arwaky lifecycle events.
 
 This module contains only event values and immutable event payload contracts.
 Stateful event emission and lifecycle state live in ``taxonomy_core_entity``.
@@ -28,7 +28,7 @@ EventOrderMap: TypeAlias = EventOrderMapping
 
 
 class QwenEventType(str, Enum):
-    """Ordered lifecycle events emitted by the qwen-web pipeline."""
+    """Ordered lifecycle events emitted by the qwen-web-arwaky pipeline."""
 
     def __str__(self) -> str:
         """Return the wire name of the event."""

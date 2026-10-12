@@ -1,1 +1,1 @@
-"""qwen-web MCP surface — tool handlers."""
+"""qwen-web-arwaky MCP surface — tool handlers."""

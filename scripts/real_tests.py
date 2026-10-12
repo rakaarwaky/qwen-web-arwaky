@@ -51,7 +51,7 @@ class TestArgs:
 def parse_args() -> TestArgs:
     """Parse CLI flags into a typed TestArgs."""
     parser = argparse.ArgumentParser(
-        description="Run real end-to-end tests for qwen-web pipelines using test fixtures."
+        description="Run real end-to-end tests for qwen-web-arwaky pipelines using test fixtures."
     )
     parser.add_argument(
         "--headless",

@@ -1,4 +1,4 @@
-"""qwen-web CLI surface — commands and controllers.
+"""qwen-web-arwaky CLI surface — commands and controllers.
 
 Barrel re-export of the CLI surfaces so the entry point reaches every command
 module through one import. Each surface keeps its own name in this module's

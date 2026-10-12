@@ -1,4 +1,4 @@
-"""qwen-web shared domain — taxonomy + contract + utility layers.
+"""qwen-web-arwaky shared domain — taxonomy + contract + utility layers.
 
 Barrel re-export of all shared types. Layers identified by filename prefix
 (AES101), not directory path.

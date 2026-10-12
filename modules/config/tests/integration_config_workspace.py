@@ -14,7 +14,7 @@ from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvi
 def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:
     WorkspaceProvisioner().init_workspace(tmp_path)
 
-    assert (tmp_path / ".agents" / "skills" / "qwen-web" / "SKILL.md").is_file()
+    assert (tmp_path / ".agents" / "skills" / "qwen-web-arwaky" / "SKILL.md").is_file()
 
 
 def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> None:

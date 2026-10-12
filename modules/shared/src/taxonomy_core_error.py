@@ -1,4 +1,4 @@
-"""Taxonomy definitions for qwen-web domain errors and error categories."""
+"""Taxonomy definitions for qwen-web-arwaky domain errors and error categories."""
 
 from __future__ import annotations
 
