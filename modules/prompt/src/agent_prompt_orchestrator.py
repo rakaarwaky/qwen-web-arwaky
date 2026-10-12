@@ -16,8 +16,8 @@ from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
     IPromptFileProtocol,
+    IRunCancelProtocol,
 )
-from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
 

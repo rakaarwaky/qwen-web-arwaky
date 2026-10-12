@@ -21,6 +21,7 @@ from modules.shared.src.contract_prompt_protocol import (
     IDirectPromptProtocol,
     IPromptFileProtocol,
     IPromptFlowProtocol,
+    IRunCancelProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (
@@ -30,6 +31,7 @@ _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     IDirectPromptProtocol,
     IAttachmentPromptProtocol,
     IPromptFileProtocol,
+    IRunCancelProtocol,
 )
 
 

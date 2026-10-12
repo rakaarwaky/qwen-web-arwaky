@@ -1,4 +1,4 @@
-"""Capability layer (run cancel registry): thread-safe targeted cancel for concurrent runs.
+"""Prompt-domain capability layer: thread-safe targeted cancel for concurrent runs.
 
 Implements IRunCancelProtocol.  Owns the shared bookkeeping that the prompt
 file, attachment, and swarm orchestrators need to stop one in-flight run's
@@ -15,7 +15,7 @@ from __future__ import annotations
 import contextlib
 import threading
 
-from modules.shared.src.contract_session_protocol import IRunCancelProtocol
+from modules.shared.src.contract_prompt_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_vo import RunId, RunState
 
 

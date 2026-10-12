@@ -7,27 +7,21 @@
 
 ## System Overview
 
-The session feature owns the saved browser sessions: initializing the
-workspace they live in, keeping the pool that tracks them, checking which
-are still signed in, rotating to the next healthy one when one is rate
-limited, and deleting one safely. It owns two orchestrators: the session
-aggregate the surfaces call, and the setup aggregate that runs the manual
-login sequence.
+The session feature owns the saved browser sessions: keeping the pool that
+tracks them, checking which are still signed in, rotating to the next
+healthy one when one is rate limited, and deleting one safely. It owns two
+orchestrators: the session aggregate the surfaces call, and the setup
+aggregate that runs the manual login sequence.
+
+Workspace initialization (XDG directories, `.qwen-web` symlinks, SKILL.md
+provisioning, `.gitignore` management) moved to the config feature
+(`modules/config`), and the targeted run-cancel registry moved to the prompt
+feature (`modules/prompt`). The session module now holds only the session
+pool, health checking, rotation, renewal, deletion, and login.
 
 ## Functional Requirements
 
-### FR-SESSION-001: Initialize the session workspace
-
-- **Description**: Create the XDG storage directories and the workspace links a run needs.
-- **Input**: The target directory the operator named, or the working directory.
-- **Output**: The created workspace, or the paths that could not be created.
-- **Business Rules**:
-  - Session directories are created with owner-only permissions because they hold live login cookies.
-  - An existing directory is reused rather than recreated, so an initialized workspace survives re-initialization.
-- **Edge Cases**: A directory the host refuses to create surfaces a file error naming the path.
-- **Error Handling**: A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location.
-
-### FR-SESSION-002: Validate a saved session
+### FR-SESSION-001: Validate a saved session
 
 - **Description**: Report whether a saved session is still signed in.
 - **Input**: A session request naming the session path.
@@ -37,7 +31,7 @@ login sequence.
 - **Edge Cases**: A session path that does not exist is reported invalid, not an error.
 - **Error Handling**: An inspection that cannot complete surfaces an error naming the path.
 
-### FR-SESSION-003: Keep and rotate the session pool
+### FR-SESSION-002: Keep and rotate the session pool
 
 - **Description**: Track the known sessions and pick the next one a run should use.
 - **Input**: A rotation request naming the current session and the pool's health verdicts.
@@ -48,7 +42,7 @@ login sequence.
 - **Edge Cases**: A pool with one session rotates to that session rather than failing.
 - **Error Handling**: A pool that cannot be read surfaces an error naming the pool path.
 
-### FR-SESSION-004: Delete a session safely
+### FR-SESSION-003: Delete a session safely
 
 - **Description**: Remove a saved session after taking a backup.
 - **Input**: A session request naming the session path and whether to bypass the backup guard.
@@ -59,7 +53,7 @@ login sequence.
 - **Edge Cases**: A session that is already absent is reported as deleted rather than an error.
 - **Error Handling**: A backup that cannot be written refuses the deletion rather than removing the profile unprotected.
 
-### FR-SESSION-005: Run the manual login sequence
+### FR-SESSION-004: Run the manual login sequence
 
 - **Description**: Launch a browser, navigate to the login, wait for the operator, and validate the resulting session.
 - **Input**: A setup request naming the profile path, the headless flag, and an optional confirmation wait.
@@ -76,7 +70,6 @@ login sequence.
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `init_workspace` | target directory | created workspace | file error | none | Create the storage directories a run needs. |
 | `load_pool` | pool path | session pool | file error | none | Read the tracked session pool. |
 | `save_pool` | session pool | saved pool | file error | none | Persist the tracked session pool. |
 | `list_sessions` | none | session list | none | none | List the tracked sessions. |
@@ -89,9 +82,6 @@ login sequence.
 | `check_session` | session path | health verdict | file error | none | Report whether one session is still signed in. |
 | `check_all_sessions` | pool | health report | file error | none | Report which tracked sessions are usable. |
 | `rotate` | rotator request | rotation response | no-healthy-session error | none | Pick the next session a run should use. |
-| `register` | run-scoped cancel state | registered verdict | none | none | Register a run's cancel state. |
-| `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. |
-| `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run. |
 
 ### Aggregate API
 
@@ -118,12 +108,10 @@ login sequence.
 
 ## Test Scenarios
 
-- A workspace init creates owner-only directories and reuses an existing workspace.
 - A session whose profile no longer authenticates is reported invalid rather than repaired.
 - A pool with one rate-limited and one healthy session rotates to the healthy one.
 - A master profile deletion is refused unless the operator forces it.
 - A backup write failure refuses the deletion and leaves the profile in place.
-- A cancel on a run with no active pipeline is a no-op.
 
 ## Assumptions & Constraints
 

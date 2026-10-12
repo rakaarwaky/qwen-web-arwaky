@@ -1,4 +1,4 @@
-"""Capabilities: workspace provisioner (AES403).
+"""Config-domain capability layer: workspace provisioning (AES403).
 
 Implements IWorkspaceProtocol — workspace initialization with XDG directories,
 SKILL.md provisioning, .qwen-web symlinks, and .gitignore management.
@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_session_protocol import IWorkspaceProtocol
+from modules.shared.src.contract_config_protocol import IWorkspaceProtocol
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
