@@ -79,4 +79,5 @@ def test_check_session_is_unhealthy_when_the_profile_no_longer_authenticates() -
 
 
 def test_check_session_without_a_browser_seam_is_unhealthy() -> None:
+    """An inert checker (no browser injected) must report unhealthy, not crash."""
     assert asyncio.run(SessionHealthChecker().check_session(_session())) is False
