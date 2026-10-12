@@ -192,7 +192,13 @@ def cmd_health_check(manager: SessionManager) -> int:
     print("\n🏥 Running health checks...")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    checker = SessionHealthChecker(timeout_seconds=10)
+    # No root container here (Surface layer, AES205): construct the browser
+    # seam in-process and pass it to the checker. Without this, check_session
+    # would short-circuit to False for every session and the command would
+    # mark them all rate-limited.
+    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+
+    checker = SessionHealthChecker(browser=BrowserAdapter(), timeout_seconds=10)
 
     async def _run_checks() -> list[tuple[SessionInfo, bool]]:
         results: list[tuple[SessionInfo, bool]] = []
