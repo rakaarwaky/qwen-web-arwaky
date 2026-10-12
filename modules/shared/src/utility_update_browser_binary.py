@@ -187,7 +187,17 @@ def find_chrome_binary(headless: bool = True) -> str:
     """
     managed = _playwright_managed_binary(prefer_gui=not headless)
     if managed:
-        return managed
+        # A headful launch must never fall back to a headless-shell build,
+        # which renders no visible window ("login opens no browser" bug).
+        # Drop it and continue to the system candidates so the operator
+        # gets a real GUI binary (or the Playwright system channel).
+        if not headless and is_headless_shell_binary(managed):
+            log.warning(
+                "browser_headful_rejected_headless_shell",
+                extra={"path": managed},
+            )
+        else:
+            return managed
 
     for candidate in CHROME_CANDIDATES:
         path = shutil.which(candidate)
