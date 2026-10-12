@@ -52,7 +52,7 @@ from modules.shared.src.taxonomy_core_event import (
 from modules.shared.src.utility_browser_async_loop import isolate_thread_event_loop
 from modules.shared.src.utility_dom_helper import click_first_visible_enabled, is_any_visible
 from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_session_cloner import create_ephemeral_session
+from modules.shared.src.utility_session_cloner import clean_stale_locks, create_ephemeral_session
 from modules.shared.src.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
 
 log = get_logger("browser")
@@ -608,51 +608,10 @@ class BrowserAdapter(IBrowserProtocol):
                 form, or the refresh token itself is dead (manual re-login
                 is the only path left).
         """
-        master_session = cfg.session_path
         # Login mode: create_ephemeral_session yields the master path directly,
         # so any cookie the browser writes persists to the master profile.
-        with create_ephemeral_session(master_session, mode="login") as session_dir:
-            chrome_bin = find_chrome_binary(headless=bool(getattr(cfg, "headless", False)))
-            chrome_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-session-crashed-bubble",
-                "--disable-infobars",
-            ]
-            if getattr(cfg, "disable_sandbox", False):
-                chrome_args.append("--no-sandbox")
-            if getattr(cfg, "headless", False):
-                chrome_args.extend(
-                    [
-                        "--disable-gpu",
-                        "--disable-software-compositing",
-                    ]
-                )
-
-            kwargs: dict[str, Any] = {
-                "user_data_dir": str(session_dir),
-                "channel": None,
-                "headless": bool(getattr(cfg, "headless", False)),
-                "args": chrome_args,
-                "viewport": {"width": 1280, "height": 800},
-            }
-            if chrome_bin and Path(chrome_bin).exists():
-                if getattr(cfg, "headless", False) or not is_headless_shell_binary(chrome_bin):
-                    kwargs["executable_path"] = chrome_bin
-                else:
-                    # Headful launch but only a headless-shell build is
-                    # available: drop executable_path and let Playwright use
-                    # the system Chrome channel so a visible window opens.
-                    kwargs["channel"] = "chrome"
-                    log.info("browser_headful_fallback_system_chrome")
-
-            with sync_playwright() as p:
-                ctx = self._launch_context(p, kwargs)
-                try:
-                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    _assert_on_chat_page(page)
-                finally:
-                    ctx.close()
+        with self._open_chat_page(cfg, mode="login", strict_auth=True):
+            pass
 
     @contextmanager
     def health_probe_page(self, cfg: Any) -> Iterator[Page]:
@@ -668,9 +627,31 @@ class BrowserAdapter(IBrowserProtocol):
             AuthRequiredError: When the page lands on a login or guest
                 view, or shows a login form.
         """
-        master_session = cfg.session_path
-        mode = getattr(cfg, "mode", "")
+        with self._open_chat_page(cfg, mode="", strict_auth=False) as page:
+            yield page
 
+    @contextmanager
+    def _open_chat_page(
+        self,
+        cfg: Any,
+        *,
+        mode: str,
+        strict_auth: bool,
+    ) -> Iterator[Page]:
+        """The shared launch → navigate → auth-assert sequence for one profile.
+
+        ``renew_session`` and ``health_probe_page`` are the only two callers
+        that needed exactly this: an ephemeral profile clone (or the master
+        itself in login mode), the standard Chromium launch arguments, a fresh
+        context, a chat navigation, and one authentication assertion. Keeping
+        the sequence here means the launch args, the headless-shell fallback,
+        and the tear-down rule live in one place instead of two.
+
+        ``strict_auth`` mirrors the two consumers: renewal asserts on the
+        chat page (strict), the health probe tolerates a page that is still
+        hydrating (non-strict).
+        """
+        master_session = cfg.session_path
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
             headless = bool(getattr(cfg, "headless", False))
             chrome_bin = find_chrome_binary(headless=headless)
@@ -711,21 +692,19 @@ class BrowserAdapter(IBrowserProtocol):
                 try:
                     page = ctx.pages[0] if ctx.pages else ctx.new_page()
                     self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    _assert_on_chat_page(page, strict=False)
+                    _assert_on_chat_page(page, strict=strict_auth)
                     yield page
                 finally:
                     ctx.close()
 
     def _clean_stale_locks(self, user_data_dir: str) -> None:
-        """Clean up stale Chromium lock files if process crashed or before launch."""
-        session_path = Path(user_data_dir)
-        for fname in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
-            lock_path = session_path / fname
-            try:
-                if lock_path.is_symlink() or lock_path.exists():
-                    lock_path.unlink(missing_ok=True)
-            except OSError as e:
-                log.warning("stale_lock_delete_failed %s %s", lock_path, str(e))
+        """Clean up stale Chromium lock files if process crashed or before launch.
+
+        Delegates to the shared utility so every launcher (the ephemeral
+        session clone, the cloner's own sweep) removes exactly the same lock
+        set — one source of truth for "what counts as a stale lock".
+        """
+        clean_stale_locks(Path(user_data_dir))
 
     def _launch_context(self, p: Playwright, kwargs: dict[str, Any]) -> BrowserContext:
         """Launch the persistent context with tenacity retry for transient crashes.
