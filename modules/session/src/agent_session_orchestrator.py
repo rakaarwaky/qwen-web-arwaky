@@ -25,11 +25,7 @@ from modules.shared.src.contract_session_protocol import (
     ISessionRenewalProtocol,
 )
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
-from modules.shared.src.taxonomy_core_constant import (
-    CHAT_URL,
-    DEFAULT_OUTPUT,
-    SESSIONS_DIR,
-)
+from modules.shared.src.taxonomy_core_constant import CHAT_URL, DEFAULT_OUTPUT, SESSIONS_DIR
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_core_vo import AppConfig
@@ -222,85 +218,22 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
     ) -> dict[str, object]:
         """Run the login flow from a ``login`` session verb.
 
-        Resolves the profile from ``session_path`` when set, otherwise from
-        ``SESSIONS_DIR / name``, and returns a dict with ``success``,
-        ``message``, ``error``, and ``profile_path``.
+        Same interactive flow as the setup entry point, returning the
+        result in the dict shape the session-verb route in
+        :meth:`execute` wraps into a ``SessionResponse``.
         """
-        profile_path = session_path
-        if profile_path is None:
-            profile_path = SESSIONS_DIR / name
-
-        cfg = build_app_config(
-            mode="login",
-            input_path=DEFAULT_OUTPUT,
-            output_path=DEFAULT_OUTPUT,
-            session_path=profile_path,
-            # Manual login requires a visible browser window (AES205:
-            # the user types credentials, so a hidden browser makes no
-            # sense). Force headless=False unconditionally regardless of
-            # the flag value passed by the caller.
-            headless=False,
+        response = self._login_from_setup_request(
+            SetupRequest(
+                profile_path=session_path,
+                name=name,
+                wait_for_confirmation=wait_for_confirmation,
+            )
         )
-
-        if cfg.session_path.is_dir() and self._validate_saved_session(cfg):
-            return {
-                "success": True,
-                "message": "Session already valid.",
-                "error": None,
-                "profile_path": str(cfg.session_path),
-            }
-
-        with self._browser.browser_session(cfg) as bctx:
-            page = bctx.pages[0] if bctx.pages else bctx.new_page()
-            page.goto(CHAT_URL, wait_until="domcontentloaded")
-
-            deadline = time.monotonic() + cfg.timeout
-            while True:
-                try:
-                    if page.is_closed():
-                        break
-                except Exception:
-                    break
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break
-                try:
-                    if wait_for_confirmation is not None and wait_for_confirmation():
-                        break
-                    sleep_ms = min(500, max(100, int(remaining * 1000)))
-                    page.wait_for_timeout(sleep_ms)
-                except Exception:
-                    break
-
-        if self._validate_saved_session(cfg):
-            try:
-                take_snapshot(cfg.session_path)
-            except Exception as exc:
-                self._observability.get_logger().warning(
-                    "session_backup_failed", error=str(exc), session_path=str(cfg.session_path)
-                )
-            if self._sessions is not None:
-                try:
-                    self._sessions.add_session(name, cfg.session_path)
-                except Exception as exc:
-                    self._observability.get_logger().warning(
-                        "session_pool_register_failed", error=str(exc), session_path=str(cfg.session_path)
-                    )
-            return {
-                "success": True,
-                "message": "Manual login completed successfully.",
-                "error": None,
-                "profile_path": str(cfg.session_path),
-            }
-
         return {
-            "success": False,
-            "message": "",
-            "error": (
-                "Manual login did not produce a valid Qwen session. "
-                "Please run 'qwen-web-arwaky --login' again and finish the login or CAPTCHA."
-            ),
-            "profile_path": str(cfg.session_path),
+            "success": response.success,
+            "message": str(response.message or ""),
+            "error": response.error,
+            "profile_path": str(response.profile_path or ""),
         }
 
     def _validate(self, session_path: Path | None) -> tuple[bool, str]:
