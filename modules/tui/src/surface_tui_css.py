@@ -1,7 +1,7 @@
 """Obsidian Terminal design tokens and Textual CSS for the Qwen TUI application.
 
 Surface layer (surface_cli): design-system colors and stylesheet string
-consumed by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+consumed by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 
 Token names and hex values derive from the canonical material-spec map in
 ``design/obsidian_terminal/DESIGN.md`` (the "Obsidian Terminal" system

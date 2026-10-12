@@ -33,12 +33,12 @@ from typing import Any
 import pytest
 from textual.widgets import RichLog
 
-from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
-from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.shared.src.utility_core_status import status_path_for
+from modules.tui.src.surface_tui_app import NUM_SLOTS, QwenTuiApp
+from modules.tui.src.surface_tui_components import QwenTuiLogHandler
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -362,7 +362,7 @@ def test_tui_app_contains_browser_logs_in_panels() -> None:
         async with app.run_test(size=(100, 30)) as pilot:
             await pilot.pause()
             # Attach exactly like _deferred_startup does.
-            from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+            from modules.tui.src.surface_tui_components import QwenTuiLogHandler
 
             handler = QwenTuiLogHandler(app)
             logging.getLogger().addHandler(handler)

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 from textual.widgets import TabbedContent
 from textual.worker import WorkerFailed
 
-from modules.cli.src.surface_cli_tui_app import QwenTuiApp
-from modules.cli.src.surface_cli_tui_handlers import _noop
+from modules.tui.src.surface_tui_app import QwenTuiApp
+from modules.tui.src.surface_tui_handlers import _noop
 
 
 def _make_app() -> QwenTuiApp:

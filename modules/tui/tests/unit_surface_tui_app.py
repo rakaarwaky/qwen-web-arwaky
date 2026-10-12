@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 from textual.widgets import Label, RichLog, TabbedContent
 
-from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
-from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
-from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
+from modules.tui.src.surface_tui_app import NUM_SLOTS, QwenTuiApp
+from modules.tui.src.surface_tui_components import QwenTuiLogHandler
+from modules.tui.src.surface_tui_workers import _TuiWorkersMixin
 
 
 def _make_app() -> QwenTuiApp:
@@ -195,7 +195,7 @@ def test_session_check_reports_verdict_without_a_badge_widget() -> None:
 
 def test_rich_log_copy_text_returns_all_lines() -> None:
     """QwenTuiRichLog.copy_text returns every line's plain text joined by newlines."""
-    from modules.cli.src.surface_cli_tui_components import QwenTuiRichLog
+    from modules.tui.src.surface_tui_components import QwenTuiRichLog
 
     log = QwenTuiRichLog()
     log.write("line one")
@@ -209,7 +209,7 @@ def test_rich_log_copy_text_returns_all_lines() -> None:
 
 def test_rich_log_copy_plain_truncates_to_limit() -> None:
     """QwenTuiRichLog.copy_plain(limit) returns only the last `limit` lines when truncated."""
-    from modules.cli.src.surface_cli_tui_components import QwenTuiRichLog
+    from modules.tui.src.surface_tui_components import QwenTuiRichLog
 
     log = QwenTuiRichLog()
     for i in range(5):

@@ -17,8 +17,8 @@ from unittest.mock import MagicMock
 
 from textual.timer import Timer
 
-from modules.cli.src.surface_cli_tui_app import QwenTuiApp
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
+from modules.tui.src.surface_tui_app import QwenTuiApp
 
 
 class _ValidSession:

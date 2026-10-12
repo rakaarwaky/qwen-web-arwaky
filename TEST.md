@@ -105,7 +105,7 @@ module layer sits at 0%. Representative numbers:
 | `capabilities_update_manager.py` | ~62% | Uncovered: real pip/git subprocess paths (mocked in unit tests) |
 | `agent_swarm_orchestrator.py` | ~76% | Uncovered: shutdown/executor races |
 | `agent_shared_flow_orchestrator.py` | ~29% | Lowest agent layer — dispatch retry matrix needs browser fakes |
-| TUI surface (`surface_cli_tui_*`) | 38–100% | Handlers/workers below compose/app — see strategy §7.5 |
+| TUI surface (`surface_tui_*`) | 38–100% | Handlers/workers below compose/app — see strategy §7.5 |
 | MCP surface | ~70% | Tool handlers covered via `unit_mcp_hardening.py` |
 
 The uncovered percentages are `except PlaywrightError`, `start_new_chat`
@@ -225,7 +225,7 @@ and a preferred harness; when adding code, extend the matching pattern.
 | Taxonomy / contracts | `tests/unit_taxonomy_*.py`, `tests/contract_*.py` | pure pytest, no browser | New VO/error/event: constructor + invariant tests; contract changes: method-presence checks (see `TestCancelContract`). |
 | Core capabilities | `tests/unit_capability_*.py`, `tests/unit_browser_adapter.py`, `tests/unit_folder_compiler.py` | pytest + `unittest.mock` Playwright fakes (`MagicMock` page/locator, patched DOM helpers and `time`) | New branch/edge: fake the signals (selector visibility, `time` side-effects) — never sleep real seconds. |
 | Agent orchestrators | `tests/unit_agent_*.py` | mocked capability protocols; thread-level races via `threading.Event` registries | State transitions (retry/partial/failed/cancelled) as snapshot assertions; cancellation isolation checks. |
-| TUI surface | `tests/unit_surface_cli_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
+| TUI surface | `modules/tui/tests/unit_surface_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
 | MCP surface | `tests/integration_surface_mcp.py`, `tests/unit_mcp_hardening.py`, `tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
 | CLI surface | `tests/integration_surface_*.py`, `tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
 | Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/update/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
@@ -276,7 +276,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.widgets import DataTable, Label
 
-from modules.cli.src.surface_cli_tui_app import NUM_SLOTS, QwenTuiApp
+from modules.tui.src.surface_tui_app import NUM_SLOTS, QwenTuiApp
 
 
 def _make_app() -> QwenTuiApp:
@@ -318,7 +318,7 @@ def test_my_tui_feature() -> None:
    so the handler runs synchronously against a spy.
 3. **Drive slot state directly** rather than racing a real `@work(thread=True)`
    worker: write `app._slot_workers`, `app._slot_stats`, and
-   `app._slot_generation`. `unit_surface_cli_tui_app.py` uses this to test
+   `app._slot_generation`. `unit_surface_tui_app.py` uses this to test
    double-escape quit guards and stale-cancel isolation.
 4. **`await pilot.pause()` after any state mutation.** Textual processes
    messages on the event loop; asserting before the loop drains reads stale
@@ -332,8 +332,8 @@ def test_my_tui_feature() -> None:
 
 ### Files
 
-- `modules/cli/tests/unit_surface_cli_tui_app.py` — mount/compose, tab switching, quit guard, stale-cancel isolation
-- `modules/cli/tests/unit_tui_log_containment.py` — log-leak and layout-squeeze regressions
+- `modules/cli/modules/tui/tests/unit_surface_tui_app.py` — mount/compose, tab switching, quit guard, stale-cancel isolation
+- `modules/tui/tests/unit_tui_log_containment.py` — log-leak and layout-squeeze regressions
 - `modules/cli/tests/unit_surface_cli_update_command.py` — non-TUI CLI surface
 
 ---

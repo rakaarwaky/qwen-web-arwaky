@@ -2,7 +2,7 @@
 
 Surface layer (surface_cli): Mixin providing the ``compose`` UI tree and
 lifecycle hooks (``on_mount``, ``on_unmount``, ``_deferred_startup``).
-Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ from textual.widgets import (
     TabPane,
 )
 
-from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler, QwenTuiRichLog
-from modules.cli.src.surface_cli_tui_css import THEME
-from modules.cli.src.surface_cli_tui_utils import _empty_cluster_bar_markup
 from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.utility_core_version import get_package_version
+from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
+from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_utils import _empty_cluster_bar_markup
 
 
 class _TuiComposeMixin:

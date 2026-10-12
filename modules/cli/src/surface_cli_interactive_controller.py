@@ -1,7 +1,7 @@
 """CLI surface: interactive controller — TUI entry wrapper.
 
 Smart surface: presentation only. Interactive mode is owned by the Textual
-TUI app (surface_cli_tui_app.QwenTuiApp); this wrapper injects the specialized
+TUI app (modules.tui surface_tui_app.QwenTuiApp); this wrapper injects the specialized
 pipeline orchestrators, workspace provisioner, and setup orchestrator, and also
 supports headless single-file execution when a config is supplied.
 """
@@ -86,7 +86,7 @@ class InteractiveController:
             )
 
         if prompt:
-            from modules.cli.src.surface_cli_tui_app import QwenTuiApp
+            from modules.tui.src.surface_tui_app import QwenTuiApp
 
             app = QwenTuiApp(
                 self._workspace,

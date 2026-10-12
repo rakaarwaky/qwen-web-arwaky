@@ -1,21 +1,26 @@
-# BACKLOG — CLI and Textual TUI
+# BACKLOG — CLI Surface
 
-Feature prefix: `CLI-`. Last Updated: **2026-09-24**.
+Feature prefix: `CLIC-`. Last Updated: **2026-10-12**.
 
-State and Health vocabulary, verification requirements, ownership rules, and ID policy are defined only in the root [ROADMAP](../../ROADMAP.md#state-definitions) and [Status Policy](../../ROADMAP.md#status-policy).
+State and Health vocabulary, verification requirements, ownership rules, and ID
+policy are defined only in the root [ROADMAP](../../ROADMAP.md#state-definitions)
+and [Status Policy](../../ROADMAP.md#status-policy).
 
 ## Current Condition
 
-- Done: `git show d8a9b60:modules/cli/FRD.md` returns the shipped CLI/TUI specification at commit `d8a9b60`.
+- Done: CLI commands and controllers ship under `modules/cli/src`; the TUI
+  layer is isolated in `modules/tui` and depends on this surface, never the
+  reverse.
 - In Progress: None.
 - Blocked: None.
-- Next: `CLI-01`, `CLI-02`, `CLI-03`, `CLI-04`.
+- Next: `CLIC-01`.
 
 ## Scenario Evidence
 
 | Scenario | Evidence | Status |
 |---|---|---|
-| CLI/MCP feature flows | Test runs in CI | Pass |
+| Non-interactive command flows | `modules/cli/tests/` unit + integration runs in CI | Pass |
+| CLI never imports TUI at module load | Deferred import in `surface_cli_interactive_controller.run()`; `grep modules.tui modules/cli/src` shows only that site | Pass |
 
 ## Blockers
 
@@ -23,7 +28,7 @@ None.
 
 ## Release Readiness
 
-Feature is release-ready pending the items in the Backlog section above.
+Feature is release-ready pending the items in the Backlog section below.
 
 ## Deferred
 
@@ -33,20 +38,17 @@ None.
 
 | Date | Change |
 |---|---|
-| 2026-10-05 | Added required BACKLOG template sections |
+| 2026-10-12 | Split TUI layer into `modules/tui`; CLI keeps command controllers and doctor/sessions/jobs/swarm/update surfaces |
 
 ## Backlog
 
 | ID | Item | Priority | State | Health | Owner | Actual Condition | Next | Updated |
 |---|---|---|---|---|---|---|---|---|
-| CLI-01 | Unify output-destination behavior and filesystem-edge acceptance | P1 | Ready | At Risk | — | Open findings [#373](https://github.com/rakaarwaky/qwen-web-arwaky/issues/373) and [#280](https://github.com/rakaarwaky/qwen-web-arwaky/issues/280) report divergent destination rules and missing acceptance cases. No current-commit reproduction is attached to this row. | Build a path-resolution matrix for direct, file, attachment, and TUI runs; reproduce on `d8a9b60`; specify one rule before changing code. | 2026-09-24 |
-| CLI-02 | Complete update/rollback contract, tests, and cross-platform behavior | P1 | Refinement | At Risk | — | Findings [#379](https://github.com/rakaarwaky/qwen-web-arwaky/issues/379), [#367](https://github.com/rakaarwaky/qwen-web-arwaky/issues/367), [#334](https://github.com/rakaarwaky/qwen-web-arwaky/issues/334), [#294](https://github.com/rakaarwaky/qwen-web-arwaky/issues/294), [#293](https://github.com/rakaarwaky/qwen-web-arwaky/issues/293), and [#279](https://github.com/rakaarwaky/qwen-web-arwaky/issues/279) span protocol drift, POSIX assumptions, subprocess coverage, smoke checks, and rollback acceptance. The FRD now lists `update`, so stale portions require revalidation. | Revalidate each claim, define rollback acceptance, and split only confirmed implementation work. | 2026-09-24 |
-| CLI-03 | Remove redundant login validation and add a functional doctor smoke gate | P1 | Refinement | On Track | — | Findings [#381](https://github.com/rakaarwaky/qwen-web-arwaky/issues/381) and [#322](https://github.com/rakaarwaky/qwen-web-arwaky/issues/322) remain open; neither has verification evidence against the current baseline in this backlog. | Trace the login lifecycle and define a non-destructive doctor smoke scenario with unit-testable boundaries. | 2026-09-24 |
-| CLI-04 | Lock TUI filesystem and async interaction behavior in documented tests | P2 | Ready | On Track | — | Finding [#335](https://github.com/rakaarwaky/qwen-web-arwaky/issues/335) reports missing Textual async-runner guidance; existing TUI unit tests are present but their required workflow is not documented in `TEST.md`. | Document the test runner and add acceptance coverage identified by `CLI-01`. | 2026-09-24 |
+| CLIC-01 | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md` | P2 | Ready | On Track | — | TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-12 |
 
 ## Dependencies and Exit Evidence
 
-- `CLI-01` depends on the Core output/path contracts remaining explicit.
-- `CLI-02` depends on the shared update protocol and release infrastructure.
-- Authenticated browser acceptance contributes to workspace gate `WS-03`; it is not duplicated as a CLI row.
-- A row can become Done only with the exact verification command, its result, and the implementing commit recorded in `Actual Condition`.
+- CLI surface depends on Root containers (`modules/root_core_container.py`,
+  `modules/root_cli_main_entry.py`) for orchestrator wiring.
+- A row can become Done only with the exact verification command, its result,
+  and the implementing commit recorded in `Actual Condition`.

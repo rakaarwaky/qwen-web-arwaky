@@ -4,9 +4,9 @@ Surface layer (surface_cli): Mixin providing the Textual ``on_*`` callbacks
 that translate widget events into slot, session, and navigation work. The
 button press router lives here because it is one flat decision table over
 every control on all four screens; keeping it apart from the ``action_*``
-methods in :class:`~modules.cli.src.surface_cli_tui_handlers._TuiHandlersMixin`
+methods in :class:`~modules.tui.src.surface_tui_handlers._TuiHandlersMixin`
 keeps each file readable and inside the AES surface complexity budget.
-Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 """
 
 from __future__ import annotations
