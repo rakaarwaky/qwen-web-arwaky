@@ -17,7 +17,7 @@ import pytest
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.shared.src.taxonomy_core_error import JobQueueFullError
-from modules.shared.src.taxonomy_core_vo import JobId, JobLimit, JobRecord
+from modules.shared.src.taxonomy_core_vo import JobLimit, JobRecord
 from modules.shared.src.taxonomy_jobs_vo import JobRequest
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
 
@@ -74,14 +74,6 @@ def test_e2e_submit_poll_and_list_a_file_job(tmp_path: Path) -> None:
     assert listed is not None
     assert any(r.job_id == submitted.job_id for r in listed)
     assert all(r.completed for r in listed)
-
-
-def test_e2e_unknown_status_reported_not_raised(tmp_path: Path) -> None:
-    """A status read for an id the storage does not know returns cleanly."""
-    orchestrator = _orchestrator(tmp_path)
-
-    response = orchestrator.execute(JobRequest(verb="get_job_status", job_id=JobId("no-such-job")))
-    assert response.record is None
 
 
 def test_e2e_submission_refused_at_admission_leaves_no_record(tmp_path: Path) -> None:

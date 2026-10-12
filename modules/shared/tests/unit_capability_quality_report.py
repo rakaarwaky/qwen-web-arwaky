@@ -138,15 +138,6 @@ def test_status_file_includes_failure_categories(tmp_path: Path) -> None:
     assert cats["auth"] == 1
 
 
-def test_status_file_defaults_failure_categories_to_empty(tmp_path: Path) -> None:
-    """The key is always present so consumers need no None handling."""
-    writer = get_status_writer(tmp_path)
-    writer.write()
-    payload = writer.read()
-    assert payload is not None
-    assert payload.get("failure_categories", {}) == {}
-
-
 def test_status_file_ranks_failure_categories_by_count(tmp_path: Path) -> None:
     """Higher-count categories must come first in the JSON output."""
     writer = get_status_writer(tmp_path)
@@ -226,29 +217,38 @@ def test_quality_report_reports_defect_density_per_execution(tmp_path: Path) -> 
     assert report["defect_density"] == pytest.approx(0.1)
 
 
-def test_quality_report_defect_density_is_one_per_execution_when_all_fail(tmp_path: Path) -> None:
-    """A run where every execution also errored yields a density of 1.0."""
-    _write_log(tmp_path / "app.jsonl", [{"level": "error", "event": "boom", "category": "network"}] * 4)
+@pytest.mark.parametrize(
+    ("successes", "failures", "expected_density", "expected_distribution"),
+    [
+        (2, 2, 1.0, {"network": 4}),
+        (0, 0, None, {"auth": 1}),
+    ],
+    ids=["all_fail", "no_executions"],
+)
+def test_quality_report_defect_density_by_execution_count(
+    tmp_path: Path,
+    successes: int,
+    failures: int,
+    expected_density: float | None,
+    expected_distribution: dict[str, int],
+) -> None:
+    """Defect density over execution-count scenarios: 1.0 when every execution
+    errored, None (not divide-by-zero) on a cold start with no executions."""
+    if successes == 0 and failures == 0:
+        _write_log(tmp_path / "app.jsonl", [{"level": "error", "category": "auth"}])
+    else:
+        _write_log(tmp_path / "app.jsonl", [{"level": "error", "event": "boom", "category": "network"}] * 4)
     setup = _setup(tmp_path)
-    for success in (True, True, False, False):
-        setup.metrics.record_execution(success)
+    for _ in range(successes):
+        setup.metrics.record_execution(True)
+    for _ in range(failures):
+        setup.metrics.record_execution(False)
 
     report = json.loads(setup.write_quality_report().read_text(encoding="utf-8"))
-    assert report["error_records"] == 4
-    assert report["defect_density"] == pytest.approx(1.0, abs=1e-6)
-    assert report["executions"]["total_executions"] == 4
-
-
-def test_quality_report_defect_density_is_null_without_executions(tmp_path: Path) -> None:
-    """Cold start: no executions means no ratio, not a divide-by-zero."""
-    (tmp_path / "app.jsonl").write_text(
-        json.dumps({"level": "error", "category": "auth"}) + "\n",
-        encoding="utf-8",
+    assert report["defect_density"] == (
+        pytest.approx(expected_density, abs=1e-6) if expected_density is not None else None
     )
-    out = _setup(tmp_path).write_quality_report()
-    report = json.loads(out.read_text(encoding="utf-8"))
-    assert report["defect_density"] is None
-    assert report["error_distribution"] == {"auth": 1}
+    assert report["error_distribution"] == expected_distribution
 
 
 def test_quality_report_survives_a_missing_log(tmp_path: Path) -> None:

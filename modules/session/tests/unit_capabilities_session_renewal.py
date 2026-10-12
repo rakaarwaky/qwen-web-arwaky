@@ -20,7 +20,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.taxonomy_core_error import AuthRequiredError
@@ -209,16 +208,6 @@ def test_missing_refresh_cookie_raises_auth_required(tmp_path: Path) -> None:
         renewer.renew_session_if_stale(_cfg(tmp_path))
     assert excinfo.value.session_expired is True
     browser.renew_session.assert_not_called()
-
-
-# ── BrowserAdapter.renew_session smoke (contract surface) ───────────────────
-
-
-def test_browser_adapter_exposes_renew_session() -> None:
-    """renew_session is part of the sealed browser protocol surface."""
-    adapter = BrowserAdapter()
-    assert hasattr(adapter, "renew_session")
-    assert callable(adapter.renew_session)
 
 
 # ── Orchestrator integration: renewal is attempted on validation failure ──

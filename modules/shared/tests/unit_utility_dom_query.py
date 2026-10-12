@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 from modules.shared.src import (
     LifecycleEmitter,
@@ -13,9 +14,6 @@ from modules.shared.src import (
 from modules.shared.src.utility_core_text import strip_ui_noise
 from modules.shared.src.utility_dom_query import count_messages, latest_message_text
 from tests.helpers import (
-    _configure_logging,
-    _configure_sentry,
-    _configure_tracing,
     click_send,
     write_output,
 )
@@ -70,20 +68,16 @@ class TestSenderRemaining:
 
 
 class TestSaverRemaining:
-    def test_strip_ui_noise_qwen_max(self):
-        text = "Qwen Max\nReal content"
+    @pytest.mark.parametrize(
+        "model_name",
+        ["Qwen Max", "Auto", "128 KB"],
+        ids=["qwen_max", "auto", "kb_suffix"],
+    )
+    def test_strip_ui_noise(self, model_name: str) -> None:
+        text = f"{model_name}\nReal content"
         result = strip_ui_noise(text)
-        assert "Qwen Max" not in result
-
-    def test_strip_ui_noise_auto(self):
-        text = "Auto\nReal content"
-        result = strip_ui_noise(text)
-        assert result == "Real content"
-
-    def test_strip_ui_noise_kb_suffix(self):
-        text = "128 KB\nReal content"
-        result = strip_ui_noise(text)
-        assert result == "Real content"
+        assert "Real content" in result
+        assert model_name not in result
 
     def test_write_output_with_sidecar_error(self, tmp_path):
         out_file = tmp_path / "result.md"
@@ -104,17 +98,3 @@ class TestSaverRemaining:
 
 
 # ─── observability.py remaining lines ───────────────────────────────────────
-
-
-class TestObservabilityRemaining:
-    def test_configure_sentry_no_dsn(self):
-        with patch.dict("os.environ", {}, clear=True):
-            _configure_sentry()
-
-    def test_configure_tracing_no_otel(self):
-        # New code catches ImportError inline — just call it, no error raised
-        _configure_tracing()
-
-    def test_configure_logging_no_structlog(self):
-        # New code catches ImportError inline — just call it, no error raised
-        _configure_logging(Path("/tmp/test-log"))

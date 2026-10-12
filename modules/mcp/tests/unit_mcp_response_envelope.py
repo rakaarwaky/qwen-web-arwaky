@@ -62,12 +62,22 @@ def _prompt(tmp_path: Path) -> Path:
     return path
 
 
-def test_async_submission_carries_accepted_status(tools_and_mocks, tmp_path) -> None:
-    """The default async path must expose the FR-002 status discriminator."""
-    tools, _, jobs = tools_and_mocks
-    jobs.execute.return_value = JobResponse(record=_job_record())
+@pytest.mark.parametrize("submission", ["file-only", "attachment"])
+def test_async_submission_carries_accepted_status(tools_and_mocks, tmp_path, submission: str) -> None:
+    """Async submissions must expose the FR-002 status discriminator.
 
-    payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
+    ``submission`` selects the submission verb; the envelope is identical
+    either way.
+    """
+    tools, _, jobs = tools_and_mocks
+    attachment = tmp_path / "doc.pdf"
+    attachment.write_text("data", encoding="utf-8")
+    if submission == "attachment":
+        jobs.execute.return_value = JobResponse(record=_job_record(attachment_file="/ws/doc.pdf"))
+        payload = json.loads(tools.process_prompt_with_attachment(str(_prompt(tmp_path)), str(attachment)))
+    else:
+        jobs.execute.return_value = JobResponse(record=_job_record())
+        payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
 
     assert payload["success"] is True
     assert payload["status"] == STATUS_ACCEPTED
@@ -98,18 +108,6 @@ def test_sync_and_async_envelopes_share_a_discriminator(tools_and_mocks, tmp_pat
     for payload in (async_payload, sync_payload):
         assert {"success", "status"} <= payload.keys()
         assert ("result" in payload) or ("job_id" in payload)
-
-
-def test_attachment_async_submission_carries_accepted_status(tools_and_mocks, tmp_path) -> None:
-    """Attachment submissions follow the same envelope as file-only ones."""
-    tools, _, jobs = tools_and_mocks
-    jobs.execute.return_value = JobResponse(record=_job_record(attachment_file="/ws/doc.pdf"))
-    attachment = tmp_path / "doc.pdf"
-    attachment.write_text("data", encoding="utf-8")
-
-    payload = json.loads(tools.process_prompt_with_attachment(str(_prompt(tmp_path)), str(attachment)))
-
-    assert payload["status"] == STATUS_ACCEPTED
 
 
 @pytest.mark.parametrize(

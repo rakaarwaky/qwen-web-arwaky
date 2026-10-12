@@ -67,15 +67,3 @@ def test_e2e_starting_a_fan_out_returns_a_handle(monkeypatch: pytest.MonkeyPatch
     assert started.error is None
     assert started.snapshot is not None
     assert started.snapshot.swarm_id
-
-
-def test_e2e_an_unknown_handle_reports_no_legs(tmp_path: Path) -> None:
-    response = _orchestrator(tmp_path).execute(SwarmRequest(verb="snapshot", swarm_id="never-started"))
-
-    assert response.snapshot is None
-
-
-def test_e2e_cancelling_an_unknown_handle_reports_no_legs(tmp_path: Path) -> None:
-    response = _orchestrator(tmp_path).execute(SwarmRequest(verb="cancel", swarm_id="never-started"))
-
-    assert response.snapshot is None

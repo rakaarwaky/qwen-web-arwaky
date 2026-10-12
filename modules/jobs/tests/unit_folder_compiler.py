@@ -374,28 +374,39 @@ class TestImportBoundaryConfinement:
         helper = next(f for f in files if f.name == "helper.py")
         assert origins[helper] == ("a.py",)
 
-    def test_env_workspace_root_confines_imports(self, tmp_path: Path, monkeypatch) -> None:
+    @pytest.mark.parametrize(
+        ("env_root", "escape_module", "secret_name"),
+        [
+            pytest.param(None, "evil", "evil.py", id="default-parent-boundary"),
+            pytest.param("workspace", "secrets.cfg", "cfg.py", id="env-workspace-root"),
+        ],
+    )
+    def test_import_escape_refused_by_boundary(
+        self, tmp_path: Path, monkeypatch, env_root: str | None, escape_module: str, secret_name: str
+    ) -> None:
+        """A ../.. import escape is refused under the boundary configuration in effect.
+
+        The ``env-workspace-root`` case confines imports to ``QWEN_WORKSPACE_ROOT``;
+        the ``default-parent-boundary`` case falls back to ``folder.parent`` when no
+        env/param is set.
+        """
+        if env_root is None:
+            monkeypatch.delenv("QWEN_WORKSPACE_ROOT", raising=False)
+        else:
+            monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path / "ws"))
+
         ws = tmp_path / "ws"
         target = ws / "target"
-        _write(target / "a.py", "from ...secrets.cfg import KEY\n")
-        _write(tmp_path / "secrets" / "cfg.py", "KEY = 'hunter2'\n")
-        monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(ws))
-
-        files, _ = collect_folder_files_with_imports(target)
-        assert {f.name for f in files} == {"a.py"}
-
-    def test_default_parent_boundary_blocks_far_escape(self, tmp_path: Path, monkeypatch) -> None:
-        """Without env/param the boundary is folder.parent: ../.. escapes are refused."""
-        monkeypatch.delenv("QWEN_WORKSPACE_ROOT", raising=False)
-        ws = tmp_path / "ws"
-        target = ws / "target"
-        _write(target / "a.py", "from ...evil import payload\n")  # resolves to tmp_path/evil.py
-        _write(tmp_path / "evil.py", "payload = 1\n")
+        _write(target / "a.py", f"from ...{escape_module} import payload\n")
+        if env_root is None:
+            _write(tmp_path / f"{escape_module}.py", "payload = 1\n")
+        else:
+            _write(tmp_path / "secrets" / "cfg.py", "KEY = 'hunter2'\n")
 
         skipped: list[Path] = []
         files, _ = collect_folder_files_with_imports(target, skipped=skipped)
         assert {f.name for f in files} == {"a.py"}
-        assert [p.name for p in skipped] == ["evil.py"]
+        assert [p.name for p in skipped] == [secret_name]
 
     def test_markdown_exfiltration_link_refused(self, tmp_path: Path) -> None:
         ws = tmp_path / "ws"

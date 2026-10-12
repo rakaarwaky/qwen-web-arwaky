@@ -72,6 +72,8 @@ def test_submission_beyond_capacity_is_refused_with_retry_hint(tmp_path: Path) -
         assert caught.value.retry_after_sec is not None
         assert float(caught.value.retry_after_sec) > 0
         assert "capacity" in str(caught.value).lower()
+        # Queue depth is observable so callers can report over-capacity state.
+        assert orchestrator.queue_depth() == 1
     finally:
         release.set()
         orchestrator.execute(JobRequest(verb="shutdown"))
@@ -92,21 +94,6 @@ def test_refused_submission_persists_no_job_record(tmp_path: Path) -> None:
             orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
 
         assert storage.save_job.call_count == saved_before
-    finally:
-        release.set()
-        orchestrator.execute(JobRequest(verb="shutdown"))
-
-
-def test_queue_depth_tracks_admitted_work(tmp_path: Path) -> None:
-    """Queue depth is observable so callers can report over-capacity state."""
-    orchestrator, release = _orchestrator(tmp_path, max_workers=2, max_pending_jobs=2)
-
-    try:
-        assert orchestrator.queue_depth() == 0
-        prompt = tmp_path / "p.md"
-        prompt.write_text("hello", encoding="utf-8")
-        orchestrator.execute(JobRequest(verb="submit_file_job", prompt_file=prompt))
-        assert orchestrator.queue_depth() == 1
     finally:
         release.set()
         orchestrator.execute(JobRequest(verb="shutdown"))

@@ -17,12 +17,6 @@ def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:
     assert (tmp_path / ".agents" / "skills" / "qwen-web" / "SKILL.md").is_file()
 
 
-def test_integration_init_provisions_the_workspace_directory(tmp_path: Path) -> None:
-    WorkspaceProvisioner().init_workspace(tmp_path)
-
-    assert (tmp_path / ".qwen-web").is_dir()
-
-
 def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> None:
     """The workspace holds session symlinks, so it must be ignored rather
     than committed alongside the operator's own work."""

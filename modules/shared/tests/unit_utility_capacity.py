@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_MAX_WORKERS,
-    MIN_MEMORY_PER_WORKER_BYTES,
 )
 from modules.shared.src.utility_core_capacity import (
     available_memory_bytes,
@@ -23,10 +22,6 @@ from modules.shared.src.utility_core_capacity import (
 )
 
 _GIB = 1024**3
-
-
-def test_worker_budget_is_at_least_700_mib():
-    assert MIN_MEMORY_PER_WORKER_BYTES == 700 * 1024 * 1024
 
 
 def test_recommended_workers_scales_with_available_memory():

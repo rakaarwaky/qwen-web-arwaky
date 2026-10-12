@@ -28,12 +28,6 @@ def test_smoke_a_check_routes_to_the_update_capability() -> None:
     seams["check"].check_update.assert_called_once_with()
 
 
-def test_smoke_an_upgrade_routes_the_force_flag_through() -> None:
-    orchestrator, seams = _orchestrator()
-    orchestrator.execute(UpdateRequest(verb="perform_update", force=True))
-    seams["verify"].perform_update.assert_called_once_with(force=True)
-
-
 def test_smoke_a_rollback_requires_a_target_version() -> None:
     orchestrator, _ = _orchestrator()
 

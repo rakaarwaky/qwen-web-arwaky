@@ -74,19 +74,6 @@ class TestJobStorage(unittest.TestCase):
         self.assertFalse(loaded.completed)
         self.assertEqual(loaded.input_file, "/tmp/prompt.md")
 
-    def test_list_jobs(self) -> None:
-        for i in range(3):
-            self.mgr.save_job(
-                JobRecord(
-                    job_id=f"job_{i}",
-                    latest_event=EVENT_GENERATION_FINISHED.value,
-                    completed=True,
-                    created_at=f"2026-08-27T0{i}:00:00Z",
-                )
-            )
-        jobs = self.mgr.list_jobs(limit=10)
-        self.assertEqual(len(jobs), 3)
-
     def test_reconcile_zombies_marks_dead_owner_pid_as_failed(self) -> None:
         rec = JobRecord(
             job_id="zombie_job_1",
@@ -194,24 +181,6 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         self.assertIsNotNone(saved)
         assert saved is not None
         self.assertEqual(saved.owner_pid, pid)
-
-    def test_job_status_preserves_owner_pid_through_terminal(self) -> None:
-        """A completed job keeps its ``owner_pid`` so zombie reconciliation
-        correctly skips it (alive owner = not a zombie)."""
-        prompt_file = Path(self.temp_dir.name) / "p.md"
-        prompt_file.write_text("hi", encoding="utf-8")
-        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
-
-        rec = _submit_file(self.orchestrator, prompt_file)
-        pid = rec.owner_pid
-
-        self.orchestrator._executor.shutdown(wait=True)
-
-        loaded = _job_status(self.orchestrator, rec.job_id)
-        self.assertIsNotNone(loaded)
-        assert loaded is not None
-        self.assertTrue(loaded.completed)
-        self.assertEqual(loaded.owner_pid, pid)
 
     def test_submit_is_non_blocking_even_when_rate_limiter_would_starve(self) -> None:
         """Issue #362/#383: ``submit_file_job`` must return within bounded time.

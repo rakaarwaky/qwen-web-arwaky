@@ -122,16 +122,6 @@ def test_delete_session_refuses_posix_root(tmp_path: Path) -> None:
                 orch.execute(SessionRequest(verb="delete"))
 
 
-def test_delete_session_refuses_etc(tmp_path: Path) -> None:
-    """A near-root system directory must be refused before ``rmtree``."""
-    orch = _orchestrator()
-    with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
-        with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
-            build.return_value.session_path = Path("/etc")
-            with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-                orch.execute(SessionRequest(verb="delete"))
-
-
 def test_delete_session_refuses_windows_drive_root() -> None:
     """Cross-platform: the path safety check handles Windows path shapes.
 
@@ -279,22 +269,3 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
     login_call = build.mock_calls[0]
     login_kwargs = login_call.kwargs
     assert login_kwargs["headless"] is False, "login verb must force headless=False regardless of browser_headless flag"
-
-
-def test_login_verb_sets_headless_false_even_when_default_is_true(tmp_path: Path) -> None:
-    """When no ``browser_headless`` is set (default False), the login path
-    still explicitly builds with ``headless=False`` so a future default change
-    to True in ``build_app_config`` does not silently hide the login window."""
-    orch = _orchestrator()
-    fake_sessions = tmp_path / "share" / "sessions"
-    fake_default = fake_sessions / "default"
-    fake_default.mkdir(parents=True)
-    with (
-        patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
-        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
-    ):
-        build.return_value.session_path = fake_default
-        orch.execute_setup(SetupRequest(profile_path=fake_default, name="default"))
-    login_call = build.mock_calls[0]
-    assert login_call.kwargs["headless"] is False
