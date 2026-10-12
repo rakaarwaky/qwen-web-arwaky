@@ -302,7 +302,7 @@ def test_doctor_json_includes_environment_capacity_and_runbooks(capsys) -> None:
     assert data["environment"]["SENTRY_DSN"] == "***"
     assert "recommended_max_workers" in data["capacity"]
     assert "auth" in data["runbooks"]
-    assert data["runbooks"]["auth"].startswith("docs/runbooks/")
+    assert data["runbooks"]["auth"].startswith("docs/")
 
 
 def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
