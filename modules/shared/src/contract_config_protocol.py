@@ -11,7 +11,7 @@ self-inspection that the CLI surface used to perform inline:
 - ``IConfigSlotPlanProtocol``     — what a slot's raw widget values resolve
   to as an executable run plan
 - ``IWorkspaceProtocol``          — how the run workspace is initialized
-  (XDG dirs, SKILL.md, .qwen-web symlinks, .gitignore)
+  (XDG dirs, SKILL.md, .qwen-web-arwaky symlinks, .gitignore)
 
 ``IConfigAggregate`` in ``contract_config_aggregate.py`` is the outward
 export surface for outer layers: the CLI and the sibling orchestrators
@@ -186,7 +186,7 @@ class IWorkspaceProtocol(ABC):
 
     @abstractmethod
     def init_workspace(self, target_dir: FilePath) -> None:
-        """Initialize XDG directories, SKILL.md, .qwen-web symlinks, and .gitignore."""
+        """Initialize XDG directories, SKILL.md, .qwen-web-arwaky symlinks, and .gitignore."""
         ...
 
 

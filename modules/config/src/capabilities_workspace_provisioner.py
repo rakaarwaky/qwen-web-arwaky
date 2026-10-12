@@ -1,7 +1,7 @@
 """Config-domain capability layer: workspace provisioning (AES403).
 
 Implements IWorkspaceProtocol — workspace initialization with XDG directories,
-SKILL.md provisioning, .qwen-web symlinks, and .gitignore management.
+SKILL.md provisioning, .qwen-web-arwaky symlinks, and .gitignore management.
 All file system I/O for workspace setup lives here.
 """
 
@@ -19,6 +19,7 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
+    LOCAL_WS_DIR,
     SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.taxonomy_core_vo import FilePath
@@ -40,8 +41,8 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
 
         Step 1: Ensure XDG directories exist
         Step 2: Provision .agents/skills/qwen-web/SKILL.md from embedded constant
-        Step 3: Provision .qwen-web directory with symlinks
-        Step 4: Update .gitignore with .qwen-web/ entry
+        Step 3: Provision .qwen-web-arwaky directory with symlinks
+        Step 4: Update .gitignore with .qwen-web-arwaky/ entry
         """
         target_path = Path(str(target_dir)).resolve()
 
@@ -56,9 +57,17 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         skill_md_dest = skills_dir / "SKILL.md"
         skill_md_dest.write_text(EMBEDDED_SKILL_MD, encoding="utf-8")
 
-        # Step 3: Create .qwen-web directory with symlinks to XDG paths
-        dot_qwen = target_path / ".qwen-web"
+        # Step 3: Create .qwen-web-arwaky directory with symlinks to XDG paths
+        dot_qwen = target_path / LOCAL_WS_DIR
         dot_qwen.mkdir(parents=True, exist_ok=True)
+
+        # Migration: retire the legacy .qwen-web dot-directory when present,
+        # keeping any real files the operator dropped in it.
+        legacy = target_path / ".qwen-web"
+        if legacy.is_symlink():
+            legacy.unlink()
+        elif legacy.is_dir():
+            legacy.rename(target_path / f"{LOCAL_WS_DIR}.legacy")
 
         links: dict[str, Any] = {
             "jobs": DEFAULT_JOBS_DIR,
@@ -86,12 +95,16 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
                 except OSError:
                     link_path.mkdir(parents=True, exist_ok=True)
 
-        # Step 4: Add .qwen-web/ to .gitignore
+        # Step 4: Add .qwen-web-arwaky/ to .gitignore
         git_ignore = target_path / ".gitignore"
-        entry = ".qwen-web/"
+        entry = f"{LOCAL_WS_DIR}/"
+        legacy_entry = ".qwen-web/"
         if git_ignore.exists():
             content = git_ignore.read_text(encoding="utf-8")
-            if entry not in content and ".qwen-web" not in content:
+            # Drop the retired legacy entry so old workspaces converge too.
+            if legacy_entry in content:
+                content = content.replace(legacy_entry + "\n", "")
+            if entry not in content and LOCAL_WS_DIR not in content:
                 if content and not content.endswith("\n"):
                     content += "\n"
                 content += f"{entry}\n"
@@ -104,3 +117,6 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
     def __repr__(self) -> str:
         """Return string representation of WorkspaceProvisioner."""
         return "WorkspaceProvisioner()"
+
+
+__all__ = ["WorkspaceProvisioner"]

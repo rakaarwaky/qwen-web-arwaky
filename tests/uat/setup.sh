@@ -2,7 +2,7 @@
 # Prepare an isolated, deterministic UAT workspace without requiring a live Qwen session.
 set -euo pipefail
 
-ROOT_DIR="${QWEN_UAT_ROOT:-.qwen-web/output/uat}"
+ROOT_DIR="${QWEN_UAT_ROOT:-.qwen-web-arwaky/output/uat}"
 mkdir -p "$ROOT_DIR" "$ROOT_DIR/input"
 : "${QWEN_UAT_SESSION_DIR:=$ROOT_DIR/session}"
 mkdir -p "$QWEN_UAT_SESSION_DIR"

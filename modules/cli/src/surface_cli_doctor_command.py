@@ -27,6 +27,7 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
+    LOCAL_WS_DIR,
     SESSIONS_DIR,
 )
 from modules.shared.src.utility_core_capacity import describe_capacity, recommended_max_workers
@@ -176,7 +177,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
 
 def _check_workspace() -> dict[str, Any]:
     """Report whether ``qwa init`` created the per-directory XDG symlinks."""
-    dot_qwen = Path.cwd() / ".qwen-web"
+    dot_qwen = Path.cwd() / LOCAL_WS_DIR
     ok = dot_qwen.exists() and any((dot_qwen / link).exists() for link in ("log", "output"))
     return _check(
         "Workspace Initialization",

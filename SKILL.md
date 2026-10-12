@@ -1,5 +1,5 @@
 ---
-name: qwen-web
+name: qwen-web-arwaky-arwaky-arwaky
 description: >
   Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max model by default —
   zero API keys, persistent browser sessions. The model is configurable via the
@@ -38,7 +38,7 @@ Use this skill when an AI agent needs to send prompts or document files to **Qwe
 | Reset session | `delete_session` | — |
 | Initialize workspace | `init` | `qwa init` |
 
-> **File conventions:** Place inputs under `.qwen-web/input/` and outputs under `.qwen-web/output/`. Always append a timestamp to output filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or `YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous runs.
+> **File conventions:** Place inputs under `.qwen-web-arwaky/input/` and outputs under `.qwen-web-arwaky/output/`. Always append a timestamp to output filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or `YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous runs.
 
 ---
 
@@ -57,7 +57,7 @@ Use for fast queries, factual explanations, or one-off code generation where no 
 
 **CLI:**
 ```bash
-qwa prompt direct -t "Explain optimistic vs pessimistic locking" -o .qwen-web/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt direct -t "Explain optimistic vs pessimistic locking" -o .qwen-web-arwaky/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -68,15 +68,15 @@ Use for multi-step instructions, complex refactor specs, or long prompts authore
 **MCP:**
 ```json
 {
-  "input_file": ".qwen-web/input/refactor_task.md",
-  "output_file": ".qwen-web/output/refactor_result_20260911_133000.md",
+  "input_file": ".qwen-web-arwaky/input/refactor_task.md",
+  "output_file": ".qwen-web-arwaky/output/refactor_result_20260911_133000.md",
   "headless": true
 }
 ```
 
 **CLI:**
 ```bash
-qwa prompt file -i .qwen-web/input/refactor_task.md -o .qwen-web/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt file -i .qwen-web-arwaky/input/refactor_task.md -o .qwen-web-arwaky/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -87,16 +87,16 @@ Use when the prompt requires analyzing a codebase export, technical document, lo
 **MCP:**
 ```json
 {
-  "prompt_file": ".qwen-web/input/audit_spec.md",
-  "attachment_file": ".qwen-web/input/codebase_export.md",
-  "output_file": ".qwen-web/output/audit_findings_20260911_133000.md",
+  "prompt_file": ".qwen-web-arwaky/input/audit_spec.md",
+  "attachment_file": ".qwen-web-arwaky/input/codebase_export.md",
+  "output_file": ".qwen-web-arwaky/output/audit_findings_20260911_133000.md",
   "headless": true
 }
 ```
 
 **CLI:**
 ```bash
-qwa prompt attach -i .qwen-web/input/audit_spec.md -a .qwen-web/input/codebase_export.md -o .qwen-web/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i .qwen-web-arwaky/input/audit_spec.md -a .qwen-web-arwaky/input/codebase_export.md -o .qwen-web-arwaky/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -113,14 +113,14 @@ Instead of writing a custom prompt file, you can pass a built-in role template n
 {
   "prompt_file": "backend",
   "attachment_file": "src/api/auth.py",
-  "output_file": ".qwen-web/output/auth_review_20260911_133000.md"
+  "output_file": ".qwen-web-arwaky/output/auth_review_20260911_133000.md"
 }
 ```
 
 **CLI:**
 ```bash
-qwa prompt attach -i backend -a src/api/auth.py -o .qwen-web/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
-qwa prompt attach -i architect -a README.md -o .qwen-web/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i backend -a src/api/auth.py -o .qwen-web-arwaky/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i architect -a README.md -o .qwen-web-arwaky/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
@@ -140,7 +140,7 @@ Use to verify login status or authenticate a new browser session when cookies ex
 ---
 
 ### Use Case 6: Workspace Initialization
-Use when provisioning `.qwen-web/` workspace directories in a new project.
+Use when provisioning `.qwen-web-arwaky/` workspace directories in a new project.
 
 **MCP:**
 ```json

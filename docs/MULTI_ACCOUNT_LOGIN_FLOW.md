@@ -28,7 +28,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
                           ▼
               ┌───────────────────────┐
               │  3. Save session      │
-              │     ~/.qwen-web/      │
+              │     ~/.local/share/qwen-web-arwaky/      │
               │     qwen_session/     │
               └───────────────────────┘
                           │
@@ -59,7 +59,7 @@ User can login multiple Qwen accounts and store them as separate sessions. Each 
               ┌───────────────────────┐
               │  2. Create new profile│
               │                       │
-              │  ~/.qwen-web/         │
+              │  ~/.local/share/qwen-web-arwaky/         │
               │  sessions/session_1/  │
               └───────────────────────┘
                           │
@@ -180,7 +180,7 @@ Opening chat.qwen.ai...
 Waiting for login... (press Ctrl+C to cancel)
 
 ✅ Session 'work' saved!
-   Path: ~/.qwen-web/sessions/session_4/
+   Path: ~/.local/share/qwen-web-arwaky/sessions/session_4/
 ```
 
 ### Step 3: Health Check
@@ -235,7 +235,7 @@ Response: Hi there! What can I do for you?
 ### Chromium Profile Per Session
 
 ```
-~/.qwen-web/
+~/.local/share/qwen-web-arwaky/
 ├── sessions/
 │   ├── session_1/
 │   │   ├── Default/
@@ -262,7 +262,7 @@ browser = await launch_chromium(
         "--profile-directory=Default",
         "--no-first-run",
         "--no-default-browser-check",
-    ]
+    ],
 )
 ```
 

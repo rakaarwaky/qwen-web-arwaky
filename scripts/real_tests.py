@@ -8,7 +8,7 @@ to execute 3 end-to-end pipelines using v5.0.0 release fixtures from `tests/fixt
 2. Pipeline 2: prompt file (prompt file: tests/fixtures/sample_prompt_v5.md)
 3. Pipeline 3: prompt attach (prompt file + attachment: tests/fixtures/sample_attachment_v5.md)
 
-Outputs are saved in the default qwen-web output directory (~/.local/share/qwen-web/output).
+Outputs are saved in the default qwen-web-arwaky output directory (~/.local/share/qwen-web-arwaky/output).
 
 Usage:
   python3 scripts/real_tests.py               # Runs all pipelines in headful mode (default)
@@ -30,7 +30,7 @@ from pathlib import Path
 
 # Repository root path
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "qwen-web" / "output"
+DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "qwen-web-arwaky" / "output"
 PROMPT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_prompt_v5.md"
 ATTACHMENT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_attachment_v5.md"
 SIMPLE_PROMPT_FIXTURE = ROOT_DIR / "tests" / "fixtures" / "sample_simple_prompt.md"

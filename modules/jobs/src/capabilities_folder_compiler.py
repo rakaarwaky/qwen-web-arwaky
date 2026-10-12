@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
-from modules.shared.src.taxonomy_core_constant import MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
+from modules.shared.src.taxonomy_core_constant import LOCAL_WS_DIR, MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
 from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
 from modules.shared.src.utility_folder_compiler import (
     collect_folder_files_with_imports,
@@ -29,12 +29,12 @@ class FolderCompiler(IFolderCompileProtocol):
         """Initialize folder compiler.
 
         Args:
-            input_dir: Directory to store compiled output. Defaults to .qwen-web/input/
+            input_dir: Directory to store compiled output. Defaults to .qwen-web-arwaky/input/
         """
         if input_dir is not None:
             self.input_dir = input_dir
         else:
-            self.input_dir = Path.cwd() / ".qwen-web" / "input"
+            self.input_dir = Path.cwd() / LOCAL_WS_DIR / "input"
 
     # Block 2: Protocol Method Implementation
     def compile_folder(
@@ -144,7 +144,7 @@ class FolderCompiler(IFolderCompileProtocol):
 
     # Block 3: Dunder Methods, Factories, Helpers
     def _generate_output_path(self, folder_path: Path) -> Path:
-        """Generate output path with timestamp: .qwen-web/input/{folder_name}_{timestamp}.md"""
+        """Generate output path with timestamp: .qwen-web-arwaky/input/{folder_name}_{timestamp}.md"""
         timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
         folder_name = folder_path.name
         filename = f"{folder_name}_{timestamp}.md"
