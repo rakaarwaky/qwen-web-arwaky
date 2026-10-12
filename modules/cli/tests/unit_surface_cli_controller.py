@@ -83,6 +83,7 @@ class TestQwenTuiLogHandler:
         assert "Test error message" in call_args[1]
         assert "ERROR" in call_args[1]
 
+
 def test_doctor_command(capsys):
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
