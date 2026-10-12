@@ -160,19 +160,19 @@ def runbook_index() -> dict[str, str]:
     deep-links (issue #299).
     """
     return {
-        "auth": "docs/runbooks/auth-expiry.md",
-        "browser": "docs/runbooks/browser-launch.md",
-        "network": "docs/runbooks/network.md",
-        "rate_limit": "docs/runbooks/rate-limit.md",
-        "response_timeout": "docs/runbooks/response-timeout.md",
-        "stuck": "docs/runbooks/stuck.md",
-        "file_io": "docs/runbooks/disk-exhaustion.md",
-        "session": "docs/runbooks/session-corruption.md",
-        "update": "docs/runbooks/update-failure.md",
-        "injection": "docs/runbooks/injection.md",
-        "parsing": "docs/runbooks/parsing.md",
-        "model": "docs/runbooks/model-switch.md",
-        "other": "docs/runbooks/other.md",
+        "auth": "docs/auth-expiry.md",
+        "browser": "docs/browser-launch.md",
+        "network": "docs/network.md",
+        "rate_limit": "docs/rate-limit.md",
+        "response_timeout": "docs/response-timeout.md",
+        "stuck": "docs/stuck.md",
+        "file_io": "docs/disk-exhaustion.md",
+        "session": "docs/session-corruption.md",
+        "update": "docs/update-failure.md",
+        "injection": "docs/injection.md",
+        "parsing": "docs/parsing.md",
+        "model": "docs/model-switch.md",
+        "other": "docs/other.md",
     }
 
 

@@ -147,7 +147,7 @@ Behaviour switches worth knowing:
 - `QWEN_WEB_GITHUB_REPO` — GitHub repo the self-update checks against.
 - `QWEN_DOCTOR_DEEP` — enable the slow Playwright cold-start probe in `doctor`.
 
-Operator runbooks for each `ErrorCategory` live in [`docs/runbooks/`](docs/runbooks/);
+Operator runbooks for each `ErrorCategory` live in [`docs/`](docs/);
 `doctor` failure messages link to them.
 
 A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker count is in

@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
-RUNBOOK_ROOT = "docs/runbooks/"
+RUNBOOK_ROOT = "docs/"
 
 
 def _env(name: str) -> str:
@@ -228,7 +228,7 @@ def _check_session(session_manager: ISessionManagerProtocol | None = None) -> di
             "Session Authentication Token",
             True,
             f"{detail}; NO BACKUP retained — losing it forces an interactive CAPTCHA re-login "
-            "(runbook: docs/runbooks/session-corruption.md)",
+            "(runbook: docs/session-corruption.md)",
             severity="warning",
         )
     result = _check("Session Authentication Token", True, f"{detail}; {retained} backup generation(s) retained")
@@ -249,7 +249,7 @@ def _check_output_writable() -> dict[str, Any]:
         return _check(
             "Output Storage Permission",
             False,
-            f"Output directory not writable ({DEFAULT_OUTPUT}): {exc} (runbook: docs/runbooks/disk-exhaustion.md)",
+            f"Output directory not writable ({DEFAULT_OUTPUT}): {exc} (runbook: docs/disk-exhaustion.md)",
         )
     return _check("Output Storage Permission", True, f"Output directory writable ({DEFAULT_OUTPUT})")
 
@@ -332,7 +332,7 @@ def _check_observability() -> dict[str, Any]:
             "Observability Backends",
             True,
             "ENVIRONMENT=production with SENTRY_DSN and OTEL_EXPORTER_OTLP_ENDPOINT both unset — "
-            "errors reach the local file log only (runbook: docs/runbooks/other.md)",
+            "errors reach the local file log only (runbook: docs/other.md)",
             severity="warning",
         )
     mode = "Sentry + OTLP" if sentry and otlp else ("Sentry" if sentry else ("OTLP" if otlp else "file log only"))

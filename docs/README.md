@@ -2,7 +2,7 @@
 
 One procedure per `ErrorCategory`, so an alert deep-links to the recovery
 procedure. Each runbook states the detection signal, mitigation commands, and
-the escalation path. `qwen-web-arwaky doctor` prints `docs/runbooks/` when a
+the escalation path. `qwen-web-arwaky doctor` prints `docs/` when a
 check fails, and `deploy/sentry-alerts.yaml` names the matching file on every
 alert rule.
 
