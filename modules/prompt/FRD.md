@@ -58,7 +58,19 @@ surfaces and job runners see one pipeline.
 - **Edge Cases**: A cancel on a run with no active pipeline reports zero.
 - **Error Handling**: A cancel whose event is not registered surfaces no error; the pipeline was already terminal.
 
-### FR-PROMPT-005: Monitor the response stream
+### FR-PROMPT-005: Targeted run cancellation
+
+- **Description**: Maintain a thread-safe registry of in-flight runs so a cancel stops exactly one run's browser context without touching sibling runs on the same instance.
+- **Input**: A run-scoped ``RunState`` carrying the stable ``run_id`` and an optional ``cancel_event``.
+- **Output**: The registered verdict, the released verdict, or the cancelled verdict.
+- **Business Rules**:
+  - Entries are keyed by the stable ``run_id``, never by the object identity of a ``threading.Event``, so a cancel targets one specific run even when events are recreated across threads.
+  - A private event index supports the ``request_cancel`` convenience path used by surfaces that hold only the original ``threading.Event``.
+  - Cancelling a run sets its ``cancel_event`` so any in-progress flow check observes the new state, and closes its live browser context so the underlying browser process stops.
+- **Edge Cases**: A cancel for a run that already finished is a no-op; a run whose browser context is already gone still sets the event.
+- **Error Handling**: No error is raised; a missing run is a silent no-op.
+
+### FR-PROMPT-006: Monitor the response stream
 
 - **Description**: Follow the response stream until a terminal state is reached or the stall detector fires.
 - **Input**: The live page, the stream's selectors, and the configured ceilings.
@@ -81,6 +93,10 @@ surfaces and job runners see one pipeline.
 | `request_cancel` | run cancel event | stopped-pipelines count | none | none | Stop the file and attachment pipelines a run owns. |
 | `execute` | prompt request | prompt response | verb error | dispatch acknowledged | Single entry point over the prompt verb. |
 | `dispatch_and_wait_for_response` | dispatch input, stream configuration | extraction verdict | stream error | generation finished | Drive one send and follow its stream. |
+| `register` | run-scoped cancel state | registered verdict | none | none | Register a run's cancel state. |
+| `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. |
+| `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run and close its browser context. |
+| `cancel_by_event` | original ``threading.Event`` | cancelled verdict | none | none | Cancel the run registered with the original event. |
 
 ### Aggregate API
 
@@ -112,6 +128,7 @@ surfaces and job runners see one pipeline.
 - A cancel on a file pipeline reports one stopped pipeline.
 - An attachment exceeding the upload limit is rejected with the limit named.
 - A response file survives a mid-stream extraction failure so an operator can inspect it.
+- A cancel for a run with no active pipeline is a no-op and does not affect sibling runs.
 
 ## Assumptions & Constraints
 

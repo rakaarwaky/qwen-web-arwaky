@@ -1,4 +1,4 @@
-"""Integration tests for the session workspace against a real filesystem.
+"""Integration tests for the config workspace against a real filesystem.
 
 These create real directories and symlinks in a temporary tree, so the
 provisioning steps are exercised against the filesystem rather than a stub.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 
 
 def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:

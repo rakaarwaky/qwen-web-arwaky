@@ -1,6 +1,6 @@
 """Config-domain capability contract (AES102 `_protocol`).
 
-Five capability seams back the config feature, each owning one kind of
+Six capability seams back the config feature, each owning one kind of
 self-inspection that the CLI surface used to perform inline:
 
 - ``IConfigEnvironmentProtocol`` — what the host's environment resolves to
@@ -10,6 +10,8 @@ self-inspection that the CLI surface used to perform inline:
 - ``IConfigCapacityProtocol``     — how many browsers the host can carry
 - ``IConfigSlotPlanProtocol``     — what a slot's raw widget values resolve
   to as an executable run plan
+- ``IWorkspaceProtocol``          — how the run workspace is initialized
+  (XDG dirs, SKILL.md, .qwen-web symlinks, .gitignore)
 
 ``IConfigAggregate`` in ``contract_config_aggregate.py`` is the outward
 export surface for outer layers: the CLI and the sibling orchestrators
@@ -179,12 +181,22 @@ class IConfigSlotPlanProtocol(ABC):
         ...
 
 
+class IWorkspaceProtocol(ABC):
+    """Workspace directory provisioning contract."""
+
+    @abstractmethod
+    def init_workspace(self, target_dir: FilePath) -> None:
+        """Initialize XDG directories, SKILL.md, .qwen-web symlinks, and .gitignore."""
+        ...
+
+
 __all__ = [
     "IConfigCapacityProtocol",
     "IConfigEnvironmentProtocol",
     "IConfigPathResolverProtocol",
     "IConfigSlotPlanProtocol",
     "IConfigValidatorProtocol",
+    "IWorkspaceProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -194,4 +206,5 @@ _layer_symbols: dict[str, object] = {
     "IConfigPathResolverProtocol": IConfigPathResolverProtocol,
     "IConfigSlotPlanProtocol": IConfigSlotPlanProtocol,
     "IConfigValidatorProtocol": IConfigValidatorProtocol,
+    "IWorkspaceProtocol": IWorkspaceProtocol,
 }

@@ -12,6 +12,7 @@ from .contract_browser_aggregate import IBrowserAggregate
 # ─── Contract: protocols ──────────────────────────────────────
 from .contract_browser_protocol import IBrowserProtocol
 from .contract_config_aggregate import IConfigAggregate
+from .contract_config_protocol import IWorkspaceProtocol
 from .contract_core_protocol import (
     IInjectionProtocol,
     ISaverProtocol,
@@ -24,11 +25,11 @@ from .contract_jobs_protocol import IJobStorageProtocol
 from .contract_logging_aggregate import IObservabilityAggregate
 from .contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 from .contract_prompt_aggregate import IPromptAggregate
+from .contract_prompt_protocol import IRunCancelProtocol
 from .contract_session_aggregate import ISessionAggregate
 from .contract_session_protocol import (
     ISessionRenewalProtocol,
     ISessionRotatorProtocol,
-    IWorkspaceProtocol,
 )
 from .contract_setup_aggregate import ISetupAggregate
 from .contract_swarm_aggregate import ISwarmAggregate
@@ -434,6 +435,7 @@ __all__ = [
     "IMetricsProtocol",
     "ISessionRenewalProtocol",
     "ISessionRotatorProtocol",
+    "IRunCancelProtocol",
     "IWorkspaceProtocol",
     "IBrowserAggregate",
     "IConfigAggregate",
