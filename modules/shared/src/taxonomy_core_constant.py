@@ -615,7 +615,7 @@ RATE_LIMIT_PATTERNS: list[str] = [
 
 
 # ─── Prompt templates (role-based built-in templates) ─────────────────────
-# Role templates now live as Markdown files under ``modules/templates/{role}.md``
+# Role templates now live as Markdown files under ``modules/shared/templates/{role}.md``
 # and are discovered dynamically at runtime by
 # ``modules/shared/src/utility_core_prompt_template.py``. No hardcoded manifest
 # remains in this module.

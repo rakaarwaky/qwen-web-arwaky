@@ -251,7 +251,7 @@ class TemplatePickerModal(ModalScreen[str | None]):
         with Vertical(id="template-picker-container"):
             yield Label(f"[ {self._title} ]", id="template-picker-title")
             if not self._options:
-                yield Label("[dim]No templates discovered under modules/templates/.[/]\n")
+                yield Label("[dim]No templates discovered under modules/shared/templates/.[/]\n")
             for display, role in self._options:
                 if role in seen_roles:
                     continue

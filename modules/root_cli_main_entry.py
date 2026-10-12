@@ -143,7 +143,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/shared/templates/)",
     )
     p_file.add_argument("-o", "--output-path", default=None, help="Output file path")
     p_file.add_argument(
@@ -161,7 +161,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/shared/templates/)",
     )
     p_attach.add_argument("-a", "--attachment-path", required=True, help="Path to file to attach")
     p_attach.add_argument("-o", "--output-path", default=None, help="Output file path")
@@ -189,7 +189,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-p",
         "--prompt-path",
         required=True,
-        help="Path to prompt file OR built-in role template (any .md file in modules/templates/)",
+        help="Path to prompt file OR built-in role template (any .md file in modules/shared/templates/)",
     )
     jobs_submit.add_argument("-a", "--attachment-path", default=None, help="Optional file to attach")
     jobs_submit.add_argument("-o", "--output-path", default=None, help="Output file path")

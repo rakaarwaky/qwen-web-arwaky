@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Role registry — mirrors the templates in modules/templates/*.md.
+# Role registry — mirrors the templates in modules/shared/templates/*.md.
 # ---------------------------------------------------------------------------
 
 ROLE_PREFIX = {

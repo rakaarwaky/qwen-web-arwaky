@@ -44,7 +44,7 @@ def test_list_prompt_templates_returns_bundled_roles() -> None:
     discovered = list_prompt_templates()
     for role in BUNDLED_ROLES:
         assert role in discovered
-    # Discovery is file-driven: every .md in modules/templates shows up.
+    # Discovery is file-driven: every .md in modules/shared/templates shows up.
     assert len(discovered) >= len(BUNDLED_ROLES)
 
 

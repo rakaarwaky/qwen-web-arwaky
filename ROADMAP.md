@@ -83,7 +83,7 @@ Only work spanning multiple features or repository infrastructure belongs here.
 
 ## Feature Roll-up
 
-Every feature directory is indexed here; implementation detail remains in its backlog. Per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and `modules/templates` is package data, so neither is a feature directory.
+Every feature directory is indexed here; implementation detail remains in its backlog. Per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and its `modules/shared/templates` role-template package data, so neither is a feature directory.
 
 | ID | Item | Priority | Spec | Backlog | State | Health | Owner | Next | Updated |
 |---|---|---|---|---|---|---|---|---|---|
