@@ -56,7 +56,7 @@ This blocks:
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Session Storage Layer                           │
-│  ~/.qwen-web/sessions/                                      │
+│  ~/.local/share/qwen-web-arwaky/sessions/                                      │
 │  ├── session_1/  ( Chromium profile )                       │
 │  ├── session_2/  ( Chromium profile )                       │
 │  └── session_3/  ( Chromium profile )                       │
@@ -68,31 +68,33 @@ This blocks:
 ```python
 @dataclass
 class SessionInfo:
-    session_id: str           # "session_1", "session_2", etc.
-    path: Path                # ~/.qwen-web/sessions/session_1/
-    status: SessionStatus     # active, limited, unknown
+    session_id: str  # "session_1", "session_2", etc.
+    path: Path  # ~/.local/share/qwen-web-arwaky/sessions/session_1/
+    status: SessionStatus  # active, limited, unknown
     last_used: datetime | None
     total_requests: int = 0
     failed_requests: int = 0
 
+
 class SessionStatus(str, Enum):
-    ACTIVE = "active"       # Healthy, can send requests
-    LIMITED = "limited"     # Hit rate limit
-    UNKNOWN = "unknown"     # Not tested yet
+    ACTIVE = "active"  # Healthy, can send requests
+    LIMITED = "limited"  # Hit rate limit
+    UNKNOWN = "unknown"  # Not tested yet
+
 
 @dataclass
 class SessionPool:
     sessions: list[SessionInfo]
     current_index: int = 0
-    
+
     def get_next_session(self) -> SessionInfo:
         """Round-robin with fallback to healthy sessions."""
         ...
-    
+
     def mark_limited(self, session_id: str) -> None:
         """Mark session as rate-limited."""
         ...
-    
+
     def mark_healthy(self, session_id: str) -> None:
         """Mark session as healthy after successful request."""
         ...
@@ -161,26 +163,22 @@ class SessionHealthChecker:
 ```python
 class SessionRotator:
     """Transparent session rotation for API calls."""
-    
+
     def __init__(self, session_pool: SessionPool):
         self.pool = session_pool
         self.failed_sessions: set[str] = set()
-    
-    async def execute_with_rotation(
-        self, 
-        prompt: str, 
-        attachment: Path | None = None
-    ) -> ExecutionResult:
+
+    async def execute_with_rotation(self, prompt: str, attachment: Path | None = None) -> ExecutionResult:
         """Try sessions in order until success or all exhausted."""
         sessions_to_try = self.pool.get_ordered_sessions()
-        
+
         for session in sessions_to_try:
             # First, run health check
             if not await self.health_checker.check_session(session):
                 self.pool.mark_limited(session.session_id)
                 self.failed_sessions.add(session.session_id)
                 continue
-            
+
             # Session is healthy, try the actual request
             try:
                 result = await self._execute(prompt, attachment, session)
@@ -193,11 +191,10 @@ class SessionRotator:
                     self.failed_sessions.add(session.session_id)
                     continue
                 raise
-        
+
         # All sessions exhausted
         raise AllSessionsLimitedError(
-            f"All {len(sessions_to_try)} sessions are rate-limited. "
-            f"Wait until tomorrow or add more sessions."
+            f"All {len(sessions_to_try)} sessions are rate-limited. Wait until tomorrow or add more sessions."
         )
 ```
 
@@ -210,17 +207,14 @@ rotator = SessionRotator(pool)
 
 # For each role in swarm:
 for role in roles:
-    result = await rotator.execute_with_rotation(
-        prompt=f"Act as {role}. {instructions}",
-        attachment=attachment_file
-    )
+    result = await rotator.execute_with_rotation(prompt=f"Act as {role}. {instructions}", attachment=attachment_file)
     outputs[role] = result
 ```
 
 ### Session Storage Layout
 
 ```
-~/.qwen-web/
+~/.local/share/qwen-web-arwaky/
 ├── sessions/
 │   ├── session_1/
 │   │   ├── Default/              # Chromium profile
@@ -292,10 +286,12 @@ def test_ping_detects_rate_limit():
     checker = SessionHealthChecker()
     assert checker.check_session(session) == False
 
+
 def test_ping_detects_healthy():
     session = create_fake_session(limited=False)
     checker = SessionHealthChecker()
     assert checker.check_session(session) == True
+
 
 # Test rotation
 def test_rotation_fallback():
@@ -304,6 +300,7 @@ def test_rotation_fallback():
     rotator = SessionRotator(pool)
     result = rotator.execute_with_rotation("ping")
     assert result.used_session == "session_2"
+
 
 # Test all limited
 def test_all_sessions_limited():

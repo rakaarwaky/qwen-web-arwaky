@@ -13,7 +13,7 @@ healthy one when one is rate limited, and deleting one safely. It owns two
 orchestrators: the session aggregate the surfaces call, and the setup
 aggregate that runs the manual login sequence.
 
-Workspace initialization (XDG directories, `.qwen-web` symlinks, SKILL.md
+Workspace initialization (XDG directories, `.qwen-web-arwaky` symlinks, SKILL.md
 provisioning, `.gitignore` management) moved to the config feature
 (`modules/config`), and the targeted run-cancel registry moved to the prompt
 feature (`modules/prompt`). The session module now holds only the session

@@ -22,7 +22,7 @@ def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> 
     than committed alongside the operator's own work."""
     WorkspaceProvisioner().init_workspace(tmp_path)
 
-    assert ".qwen-web/" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    assert ".qwen-web-arwaky/" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_integration_reinitializing_preserves_an_existing_workspace(tmp_path: Path) -> None:
@@ -30,7 +30,7 @@ def test_integration_reinitializing_preserves_an_existing_workspace(tmp_path: Pa
     sign the operator out of every saved session at once."""
     provisioner = WorkspaceProvisioner()
     provisioner.init_workspace(tmp_path)
-    marker = tmp_path / ".qwen-web" / "marker.txt"
+    marker = tmp_path / ".qwen-web-arwaky" / "marker.txt"
     marker.write_text("keep me", encoding="utf-8")
 
     provisioner.init_workspace(tmp_path)

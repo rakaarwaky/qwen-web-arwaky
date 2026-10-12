@@ -388,7 +388,7 @@ the following automated and manual drill scenarios:
    - **Expected Invariant**: Exactly upon reaching the 5s cutoff without a terminal DOM event, `ResponseDetectionTimeoutError` is raised, releasing the worker immediately.
 4. **Post-Mortem Documentation Process**:
    - In the event of an unhandled browser crash or hung job in production:
-     1. Collect per-run forensic logs from `.qwen-web/jobs/<job_id>.json`.
+     1. Collect per-run forensic logs from `.qwen-web-arwaky/jobs/<job_id>.json`.
      2. Collect metrics snapshot from `capabilities_observability_setup.py` (`metrics.json`).
      3. Document the sequence of events, root cause (e.g. DOM selector mutation vs network cutoff), and create a reproduction test in `tests/unit_concurrency_guards.py` or `tests/unit_capability_stream_monitor.py`.
 

@@ -26,7 +26,7 @@ COPY . /build
 RUN pip install --no-cache-dir . && rm -rf /build
 
 # Create standard XDG directories and set workdir to /root
-RUN mkdir -p /root/.local/share/qwen-web /root/.local/state/qwen-web /root/.config/qwen-web
+RUN mkdir -p /root/.local/share/qwen-web-arwaky /root/.local/state/qwen-web-arwaky /root/.config/qwen-web-arwaky
 WORKDIR /root
 
 # Default entrypoint to qwa (qwen-web-arwaky)

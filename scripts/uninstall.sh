@@ -2,7 +2,7 @@
 # scripts/uninstall.sh — Clean uninstaller for qwen-web-arwaky (XDG Base Directory)
 set -euo pipefail
 
-TOOL_NAME="qwen-web"
+TOOL_NAME="qwen-web-arwaky"
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/$TOOL_NAME"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$TOOL_NAME"

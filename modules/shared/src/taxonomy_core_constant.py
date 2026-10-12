@@ -481,6 +481,7 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
         "dist",
         ".eggs",
         ".qwen-web",
+        ".qwen-web-arwaky",
         "target",
         ".cache",
     }
@@ -533,6 +534,10 @@ FALSE_VALUES: frozenset[str] = frozenset({"0", "false", "no"})
 
 # ─── Update domain ───────────────────────────────────────────────────────────
 #: Package name the self-update pipeline checks and installs.
+#: Per-project workspace mirror, standardized on the product name so the XDG
+#: state directory and the local dot-directory can never diverge.
+LOCAL_WS_DIR: str = ".qwen-web-arwaky"
+
 DEFAULT_PACKAGE_NAME: str = "qwen-web-arwaky"
 
 #: Upstream GitHub repository for release discovery and git updates.

@@ -24,13 +24,13 @@ def log(msg: str) -> None:
 def get_venv_dir() -> Path:
     """Return the XDG/platform-conventional directory for the managed venv."""
     if os.environ.get("XDG_DATA_HOME"):
-        return Path(os.environ["XDG_DATA_HOME"]) / "qwen-web" / "venv"
+        return Path(os.environ["XDG_DATA_HOME"]) / "qwen-web-arwaky" / "venv"
     if sys.platform == "win32":
         local_app_data = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-        return Path(local_app_data) / "qwen-web" / "venv"
+        return Path(local_app_data) / "qwen-web-arwaky" / "venv"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "qwen-web" / "venv"
-    return Path.home() / ".local/share/qwen-web/venv"
+        return Path.home() / "Library" / "Application Support" / "qwen-web-arwaky" / "venv"
+    return Path.home() / ".local/share/qwen-web-arwaky/venv"
 
 
 def get_venv_python(venv_dir: Path) -> Path:
@@ -106,7 +106,7 @@ def setup_project_venv_symlink(venv_dir: Path) -> None:
 
 def uninstall_previous(python_bin: Path) -> None:
     """Remove earlier package installs, entry-point links, and venv symlinks."""
-    log("🧹 [install] Removing any previous qwen-web installation...")
+    log("🧹 [install] Removing any previous qwen-web-arwaky installation...")
     subprocess.run(
         [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli", "qwen-web-arwaky"],
         capture_output=True,
@@ -165,18 +165,19 @@ def setup_xdg_directories(python_bin: Path) -> None:
 
     xdg_data = (
         Path(os.environ.get("XDG_DATA_HOME", Path.home() / ("AppData/Local" if is_win else ".local/share")))
-        / "qwen-web"
+        / "qwen-web-arwaky"
     )
     xdg_state = (
         Path(os.environ.get("XDG_STATE_HOME", Path.home() / ("AppData/Local" if is_win else ".local/state")))
-        / "qwen-web"
+        / "qwen-web-arwaky"
     )
     xdg_cache = (
         Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ("AppData/Local/Temp" if is_win else ".cache")))
-        / "qwen-web"
+        / "qwen-web-arwaky"
     )
     xdg_config = (
-        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config"))) / "qwen-web"
+        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ("AppData/Roaming" if is_win else ".config")))
+        / "qwen-web-arwaky"
     )
 
     roles = ["role-architect", "role-business-analyst", "role-tech-lead"]

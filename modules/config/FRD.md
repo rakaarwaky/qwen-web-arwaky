@@ -70,7 +70,7 @@ config the other features read.
 
 ### FR-CONFIG-006: Initialize the run workspace
 
-- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web` symlinks, and update `.gitignore` so a run has the local paths it expects.
+- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web-arwaky` symlinks, and update `.gitignore` so a run has the local paths it expects.
 - **Input**: The target directory the operator named, or the working directory.
 - **Output**: The created workspace, or the paths that could not be created.
 - **Business Rules**:
@@ -96,7 +96,7 @@ config the other features read.
 | `report` | host characteristics | capacity report | none | none | Report the host's browser capacity. |
 | `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
 | `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
-| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web` symlinks, and `.gitignore` entry. |
+| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and `.gitignore` entry. |
 
 ### Aggregate API
 

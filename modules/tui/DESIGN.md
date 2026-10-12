@@ -279,7 +279,7 @@ Requirements:
 - **Input**: `--json` and `--smoke` flags; optional session aggregate.
 - **Output**: exit code `0` when no `FAIL` rows, `1` otherwise; JSON rows with `--json`.
 - **Business Rules**:
-  - The five checks are Python runtime (>= 3.10), Playwright Chromium binary presence, local `.qwen-web/` initialization, session token directory, and output-directory write permissions.
+  - The five checks are Python runtime (>= 3.10), Playwright Chromium binary presence, local `.qwen-web-arwaky/` initialization, session token directory, and output-directory write permissions.
   - `--smoke` adds a sixth check: launch Chromium with the saved session, navigate to the chat UI, confirm `textarea.message-input-textarea` is present, close, and report pass/fail.
   - `--smoke` reuses the Core session-validation path without new capability code.
 - **Edge Cases**: every `FAIL` row carries a remediation hint naming the remedy.
@@ -341,7 +341,7 @@ Change propagation for a new TUI slot field: contract protocol (the slot-run-pla
 | `chat.qwen.ai` | outbound | The single external endpoint every prompt path targets. | Headed login required first; network or auth failure surfaces as a structured error envelope. |
 | Core aggregate (prompt, session, setup, update, config, jobs) | outbound | The CLI delegates all prompt execution, session management, setup, and self-update to the Core aggregate. | A Core error envelope is re-emitted as a structured CLI error with a remediation hint. |
 | Playwright Chromium | outbound | Headed and headless browser lifecycle owned by the Core; the surface only supplies flags. | Missing Chromium or a sandbox blocker is reported by `doctor`; the surface refuses to run with an actionable hint. |
-| XDG storage and root `.qwen-web` symlinks | read/write | Persistent session, job state, and generated output live here. | Unwritable storage is reported by `doctor` and `init`. |
+| XDG storage and root `.qwen-web-arwaky` symlinks | read/write | Persistent session, job state, and generated output live here. | Unwritable storage is reported by `doctor` and `init`. |
 | GitHub Releases API | outbound | Release discovery and immutable commit SHA resolution for `update`. | An unverified target is refused and reported; no install is attempted. |
 
 ### Non-functional Requirements

@@ -169,7 +169,7 @@ class TestDirectPromptSessionResolver:
 
     def test_resolver_session_reaches_the_browser_session(self) -> None:
         orch, mocks = _make_direct_orchestrator()
-        pool_path = Path("/home/raka/.qwen-web/sessions/session_1")
+        pool_path = Path("/home/raka/.qwen-web-arwaky/sessions/session_1")
 
         def flow_stub(*, active_cfg, **_kwargs):
             assert active_cfg.session_path == pool_path

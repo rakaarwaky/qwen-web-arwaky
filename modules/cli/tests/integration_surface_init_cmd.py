@@ -23,10 +23,10 @@ class TestQwaInit(unittest.TestCase):
             skill_md = target_path / ".agents" / "skills" / "qwen-web" / "SKILL.md"
             self.assertTrue(skill_md.exists())
             content = skill_md.read_text(encoding="utf-8")
-            self.assertIn("name: qwen-web", content)
+            self.assertIn("name: qwen-web-arwaky", content)
 
-            # 2. Verify all five .qwen-web symlinks (issue #319)
-            dot_qwen = target_path / ".qwen-web"
+            # 2. Verify all five .qwen-web-arwaky symlinks (issue #319)
+            dot_qwen = target_path / ".qwen-web-arwaky"
             self.assertTrue(dot_qwen.exists())
 
             link_targets = {
@@ -38,14 +38,14 @@ class TestQwaInit(unittest.TestCase):
             }
             for name, target in link_targets.items():
                 link = dot_qwen / name
-                self.assertTrue(link.is_symlink() or link.exists(), f".qwen-web/{name} missing")
-                self.assertEqual(link.resolve(), target.resolve(), f".qwen-web/{name} target mismatch")
+                self.assertTrue(link.is_symlink() or link.exists(), f".qwen-web-arwaky/{name} missing")
+                self.assertEqual(link.resolve(), target.resolve(), f".qwen-web-arwaky/{name} target mismatch")
 
             # 3. Verify .gitignore
             gitignore = target_path / ".gitignore"
             self.assertTrue(gitignore.exists())
             gi_content = gitignore.read_text(encoding="utf-8")
-            self.assertIn(".qwen-web/", gi_content)
+            self.assertIn(".qwen-web-arwaky/", gi_content)
 
     def test_run_init_idempotent_and_existing_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -58,12 +58,12 @@ class TestQwaInit(unittest.TestCase):
             container.workspace.init_workspace(target_path)
             gi_content = gitignore.read_text(encoding="utf-8")
             self.assertIn("existing_file.txt", gi_content)
-            self.assertIn(".qwen-web/", gi_content)
+            self.assertIn(".qwen-web-arwaky/", gi_content)
 
             # Second run (idempotency check)
             container.workspace.init_workspace(target_path)
             gi_content_2 = gitignore.read_text(encoding="utf-8")
-            self.assertEqual(gi_content_2.count(".qwen-web/"), 1)
+            self.assertEqual(gi_content_2.count(".qwen-web-arwaky/"), 1)
 
 
 if __name__ == "__main__":
