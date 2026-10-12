@@ -62,6 +62,7 @@ from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
+from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
@@ -76,7 +77,11 @@ from modules.shared.src.contract_prompt_protocol import (
     IPromptFlowProtocol,
 )
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, ISessionRotatorProtocol
+from modules.shared.src.contract_session_protocol import (
+    ISessionManagerProtocol,
+    ISessionRenewalProtocol,
+    ISessionRotatorProtocol,
+)
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_update_aggregate import IUpdateAggregate
@@ -226,10 +231,15 @@ class SharedContainer:
         )
         # Session rotation infrastructure
         self.session_health_checker = SessionHealthChecker(browser=self.browser)
+        self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
+            browser=self.browser,
+            observability=self.observability,
+        )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
             observability=self.observability,
             sessions=self.session_manager,
+            renewer=self.session_renewer,
         )
 
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
