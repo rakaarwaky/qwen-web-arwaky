@@ -28,11 +28,12 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
 class TestPipelineStructure:
     """Test that all pipeline entry points are discoverable."""
 
-    def test_prompt_group_exists(self):
-        """Verify the prompt command group is registered."""
+    @pytest.mark.parametrize("group", ["prompt", "session", "job"])
+    def test_command_group_exists(self, group: str):
+        """Verify each pipeline command group is registered."""
         result = _run_cli(["--help"])
         assert result.returncode == 0
-        assert "prompt" in result.stdout
+        assert group in result.stdout
 
     def test_prompt_subcommands_exist(self):
         """Verify the prompt direct/file/attach subcommands are registered."""
@@ -40,13 +41,6 @@ class TestPipelineStructure:
         assert result.returncode == 0
         for subcommand in ("direct", "file", "attach"):
             assert subcommand in result.stdout
-
-    def test_session_and_job_groups_exist(self):
-        """Verify the session and job command groups are registered."""
-        result = _run_cli(["--help"])
-        assert result.returncode == 0
-        assert "session" in result.stdout
-        assert "job" in result.stdout
 
 
 if __name__ == "__main__":

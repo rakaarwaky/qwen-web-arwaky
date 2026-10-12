@@ -86,10 +86,6 @@ def test_unknown_env_vars_ignores_non_qwen_names():
     assert unknown_env_vars({"HOME": "/root", "OTEL_SERVICE_NAME": "qwen-web"}) == ()
 
 
-def test_unknown_env_vars_is_empty_for_a_clean_environment():
-    assert unknown_env_vars({}) == ()
-
-
 def test_validate_env_accepts_a_clean_environment():
     assert validate_env({}) == ()
 

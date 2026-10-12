@@ -10,7 +10,6 @@ from textual.widgets import TabbedContent
 from textual.worker import WorkerFailed
 
 from modules.tui.src.surface_tui_app import QwenTuiApp
-from modules.tui.src.surface_tui_handlers import _noop
 
 
 def _make_app() -> QwenTuiApp:
@@ -78,14 +77,6 @@ class TestSystemActionRouting:
                     assert mock_log.called
 
         asyncio.run(_run())
-
-
-class TestNoopFunction:
-    def test_noop_callable_with_no_args(self) -> None:
-        # _noop is used as a router fallback; call it directly to verify
-        # it is a callable that takes no arguments.
-        callable = _noop
-        callable()
 
 
 class TestSettingsPaneWidgets:

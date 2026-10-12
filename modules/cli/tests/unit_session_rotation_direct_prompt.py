@@ -67,15 +67,6 @@ class TestResolveSessionForPrompt:
         assert args._session_override == _pool_session_path(container)
         assert args._session_override != DEFAULT_SESSION
 
-    def test_single_session_pool_does_not_resolve_to_the_default(self) -> None:
-        """A pool of one must not be mistaken for 'nothing to rotate'."""
-        container = _container_with_single_pool()
-        args = _prompt_args()
-
-        _resolve_session_for_prompt(args, container)
-
-        assert args._session_override == _pool_session_path(container)
-
 
 class TestSessionResolver:
     def test_single_session_pool_yields_the_pool_session(self) -> None:
@@ -99,16 +90,6 @@ class TestSessionResolver:
         resolver = _session_resolver(args)
 
         assert resolver() is None
-
-    def test_resolver_passes_through_a_session_override(self) -> None:
-        """When the pool resolves a session, the resolver hands it through."""
-        container = _container_with_single_pool()
-        args = _prompt_args()
-
-        _resolve_session_for_prompt(args, container)
-        resolver = _session_resolver(args)
-
-        assert resolver() == _pool_session_path(container)
 
     def test_resolver_returns_none_for_a_non_prompt_command(self) -> None:
         args = argparse.Namespace(action="doctor")

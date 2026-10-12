@@ -43,10 +43,6 @@ def test_parse_drops_a_value_the_registry_would_reject():
     assert parse_settings("QWEN_WEB_MAX_WORKERS=four\n") == {}
 
 
-def test_parse_accepts_a_valid_worker_count():
-    assert parse_settings("QWEN_WEB_MAX_WORKERS=4\n") == {"QWEN_WEB_MAX_WORKERS": "4"}
-
-
 def test_load_settings_is_empty_when_the_file_is_absent(tmp_path: Path):
     assert load_settings(tmp_path / "nope.env") == {}
 

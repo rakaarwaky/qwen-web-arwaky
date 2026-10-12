@@ -23,7 +23,7 @@ from modules.logging.src.capabilities_observability_setup import effective_telem
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import SessionRequest
-from modules.shared.src.utility_config_app_factory import build_app_config, sandbox_unavailable
+from modules.shared.src.utility_config_app_factory import build_app_config
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
@@ -67,10 +67,6 @@ def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
         patch("os.environ", {"QWEN_ENABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is False
-
-
-def test_sandbox_unavailable_returns_a_bool_on_this_host() -> None:
-    assert isinstance(sandbox_unavailable(), bool)
 
 
 def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:

@@ -6,6 +6,8 @@ import inspect
 import threading
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.prompt.src.capabilities_attachment_prompt_adapter import (
     AttachmentPromptAdapter,
 )
@@ -24,31 +26,16 @@ def _make_attachment_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> Atta
     return AttachmentPromptAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
 
 
-def test_file_orchestrator_cancel_only_closes_target_context() -> None:
-    """Cancelling one file run does not set or close its sibling run."""
+@pytest.mark.parametrize(
+    "orchestrator_factory",
+    [_make_file_orchestrator, _make_attachment_orchestrator],
+    ids=["file", "attachment"],
+)
+def test_orchestrator_cancel_only_closes_target_context(orchestrator_factory) -> None:
+    """Cancelling one run does not set or close its sibling run, for the
+    file and attachment adapters alike."""
     cancel = CapabilitiesRunCancelRegistry()
-    orchestrator = _make_file_orchestrator(cancel)
-    first_event = threading.Event()
-    second_event = threading.Event()
-    first_context = MagicMock()
-    second_context = MagicMock()
-    first_state = RunState(cancel_event=first_event, active_bctx=first_context)
-    second_state = RunState(cancel_event=second_event, active_bctx=second_context)
-    cancel.register(first_state)
-    cancel.register(second_state)
-
-    orchestrator.request_cancel(first_event)
-
-    assert first_event.is_set()
-    assert not second_event.is_set()
-    first_context.close.assert_called_once_with()
-    second_context.close.assert_not_called()
-
-
-def test_attachment_orchestrator_cancel_only_closes_target_context() -> None:
-    """Cancelling one attachment run does not set or close its sibling run."""
-    cancel = CapabilitiesRunCancelRegistry()
-    orchestrator = _make_attachment_orchestrator(cancel)
+    orchestrator = orchestrator_factory(cancel)
     first_event = threading.Event()
     second_event = threading.Event()
     first_context = MagicMock()
@@ -96,12 +83,6 @@ def test_release_drops_the_event_index_entry() -> None:
 
 class TestCancelContract:
     """Issue #360: request_cancel is a first-class contract operation."""
-
-    def test_file_orchestrator_implements_request_cancel(self) -> None:
-        assert callable(getattr(PromptFileAdapter, "request_cancel", None))
-
-    def test_attachment_orchestrator_implements_request_cancel(self) -> None:
-        assert callable(getattr(AttachmentPromptAdapter, "request_cancel", None))
 
     def test_swarm_calls_request_cancel_without_getattr_hack(self) -> None:
 

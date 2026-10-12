@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_cli_main_entry import main
 
@@ -84,26 +82,6 @@ class TestQwenTuiLogHandler:
         call_args = mock_app.call_from_thread.call_args[0]
         assert "Test error message" in call_args[1]
         assert "ERROR" in call_args[1]
-
-    @pytest.mark.xfail(reason="pre-existing: creates QwenTuiApp without running event loop")
-    def test_on_mount_and_unmount_hooks_handler(self):
-        import logging
-
-        from modules.tui.src.surface_tui_app import QwenTuiApp
-        from modules.tui.src.surface_tui_components import QwenTuiLogHandler
-
-        app = QwenTuiApp(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
-        with patch.object(app, "query_one") as mock_query, patch.object(app, "set_timer"):
-            mock_log = MagicMock()
-            mock_query.return_value = mock_log
-            app._deferred_startup()
-
-            root_logger = logging.getLogger()
-            assert any(isinstance(h, QwenTuiLogHandler) for h in root_logger.handlers)
-
-            app.on_unmount()
-            assert not any(isinstance(h, QwenTuiLogHandler) for h in root_logger.handlers)
-
 
 def test_doctor_command(capsys):
     from modules.cli.src.surface_cli_doctor_command import run_doctor

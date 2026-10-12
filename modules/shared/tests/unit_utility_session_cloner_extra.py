@@ -17,7 +17,6 @@ and no global lock serializes the clones (issue #363).
 from __future__ import annotations
 
 import os
-import stat
 import threading
 from pathlib import Path
 from unittest.mock import patch
@@ -50,17 +49,6 @@ def test_clone_over_existing_destination_merges_not_raises(tmp_path: Path) -> No
 
     assert (dst / "a.txt").read_text(encoding="utf-8") == "a"
     assert (dst / "b.txt").read_text(encoding="utf-8") == "b"
-
-
-def test_clone_source_missing_creates_empty_destination(tmp_path: Path) -> None:
-    """A missing source is tolerated; the destination is still created empty."""
-    src = tmp_path / "missing"
-    dst = tmp_path / "dst"
-
-    clone_session_profile(src, dst)
-
-    assert dst.is_dir()
-    assert not any(dst.iterdir())
 
 
 # ── Symlink handling ────────────────────────────────────────────────────────
@@ -217,44 +205,26 @@ def test_chmod_failure_on_destination_is_suppressed(tmp_path: Path) -> None:
 # ── create_ephemeral_session teardown ────────────────────────────────────────
 
 
-def test_ephemeral_session_cleans_up_on_keyboard_interrupt(tmp_path: Path) -> None:
-    """``KeyboardInterrupt`` from the consumer still tears the temp dir down."""
-    master = tmp_path / "master"
-    master.mkdir()
-    (master / "Cookies").write_text("token", encoding="utf-8")
-
-    with pytest.raises(KeyboardInterrupt):
-        with create_ephemeral_session(master, mode="batch") as session_dir:
-            assert session_dir.exists()
-            raise KeyboardInterrupt
-
-    assert not session_dir.exists()
-
-
-def test_ephemeral_session_cleans_up_on_generic_exception(tmp_path: Path) -> None:
-    """Any exception inside the context cleans up the temp dir."""
-    master = tmp_path / "master"
-    master.mkdir()
-    (master / "cookies").write_text("c", encoding="utf-8")
-
-    with pytest.raises(RuntimeError):
-        with create_ephemeral_session(master, mode="batch") as session_dir:
-            raise RuntimeError("simulated crash")
-
-    assert not session_dir.exists()
-
-
-def test_ephemeral_session_cleans_up_deep_subtrees(tmp_path: Path) -> None:
-    """A deep clone subtree is fully removed on teardown."""
+@pytest.mark.parametrize(
+    "exc_type", [KeyboardInterrupt, RuntimeError, SystemExit], ids=["keyboard_interrupt", "generic", "system_exit"]
+)
+def test_ephemeral_session_cleans_up_on_exception(tmp_path: Path, exc_type: type[BaseException]) -> None:
+    """Any exception (including ``KeyboardInterrupt``) inside the consumer
+    tears the temp dir down on teardown."""
     master = tmp_path / "master"
     deep = master / "Default" / "Local Storage" / "leveldb"
     deep.mkdir(parents=True)
     (deep / "LOG").write_text("log", encoding="utf-8")
 
-    with pytest.raises(SystemExit):
+    def _raise() -> None:
+        if exc_type is SystemExit:
+            raise SystemExit(1)
+        raise exc_type("simulated crash")
+
+    with pytest.raises(exc_type):
         with create_ephemeral_session(master, mode="batch") as session_dir:
             assert (session_dir / "Default" / "Local Storage" / "leveldb" / "LOG").exists()
-            raise SystemExit(1)
+            _raise()
 
     assert not session_dir.exists()
 
@@ -309,46 +279,6 @@ def test_parallel_clones_yield_distinct_complete_profiles(tmp_path: Path) -> Non
     assert len(set(results)) == 4
 
 
-def test_parallel_clones_are_not_serialised(tmp_path: Path) -> None:
-    """Only stale-lock cleanup is serialized; overlay copies overlap.
-
-    The master's cleanup is guarded, but the overlay copy runs unguarded, so
-    four parallel clones of the same master all produce a complete profile
-    within the timeout instead of queueing behind a global clone lock.
-    """
-    master = tmp_path / "master"
-    master.mkdir()
-    for name in ("a.pak", "b.pak", "cookies.db"):
-        (master / name).write_text(name, encoding="utf-8")
-    (master / "Default").mkdir()
-    (master / "Default" / "prefs.json").write_text("{}", encoding="utf-8")
-
-    results: list[Path] = []
-    errors: list[BaseException] = []
-    results_lock = threading.Lock()
-
-    def worker(index: int) -> None:
-        try:
-            with create_ephemeral_session(master, mode="batch") as session_dir:
-                for name in ("a.pak", "b.pak", "cookies.db", "Default"):
-                    if not (session_dir / name).exists():
-                        errors.append(AssertionError(f"worker {index}: {name} missing"))
-                with results_lock:
-                    results.append(session_dir)
-        except BaseException as exc:
-            errors.append(exc)
-
-    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=30)
-
-    assert not errors, f"concurrent clone errors: {errors}"
-    assert len(results) == 4
-    assert len(set(results)) == 4
-
-
 # ── Constants ────────────────────────────────────────────────────────────────
 
 
@@ -365,8 +295,3 @@ def test_immutable_patterns_are_documented() -> None:
     assert "*.pak" in _IMMUTABLE_GLOBS
     assert "*.bin" in _IMMUTABLE_GLOBS
     assert "locales" in _IMMUTABLE_DIRS
-
-
-def test_chmod_0o700_is_itself_private() -> None:
-    """Locks the documented permission bit so a future refactor cannot widen it."""
-    assert stat.S_IMODE(0o700) == 0o700

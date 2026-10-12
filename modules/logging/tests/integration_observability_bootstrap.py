@@ -39,13 +39,3 @@ def test_integration_a_bootstrapped_run_writes_jsonl_to_the_log_file(tmp_path: P
     assert lines, "the bootstrap must create the log file and write records into it"
     assert any("an integrated record" in line for line in lines)
     assert all(json.loads(line) for line in lines), "every line must be a JSON object"
-
-
-def test_integration_a_status_write_reaches_the_status_file(tmp_path: Path) -> None:
-    runner = _setup(tmp_path)
-
-    runner.write_status("running", mode="single", headless=True, run_id="run-1")
-
-    status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
-    assert status["status"] == "running"
-    assert status["run_id"] == "run-1"

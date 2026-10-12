@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.shared.src.contract_jobs_protocol import IStatusProtocol
@@ -17,12 +19,16 @@ from modules.shared.src.contract_logging_protocol import IMetricsProtocol, IObse
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (IObservabilityProtocol, IMetricsProtocol)
 
 
-def test_observability_implements_the_observability_protocol() -> None:
-    assert IObservabilityProtocol in inspect.getmro(ObservabilitySetup)
-
-
-def test_metrics_counter_implements_the_metrics_protocol() -> None:
-    assert IMetricsProtocol in inspect.getmro(MetricsCounter)
+@pytest.mark.parametrize(
+    ("impl", "protocol"),
+    [
+        (ObservabilitySetup, IObservabilityProtocol),
+        (MetricsCounter, IMetricsProtocol),
+    ],
+    ids=["observability_protocol", "metrics_protocol"],
+)
+def test_capability_implements_its_protocol(impl: type, protocol: type) -> None:
+    assert protocol in inspect.getmro(impl)
 
 
 def test_aggregate_declares_only_the_execute_door() -> None:

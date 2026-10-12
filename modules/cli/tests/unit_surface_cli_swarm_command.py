@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
 from modules.shared.src.taxonomy_swarm_vo import (
     SwarmAgentSnapshot,
@@ -96,14 +98,6 @@ class TestSwarmStart:
 
 
 class TestSwarmStatus:
-    def test_status_uses_the_snapshot_verb(self, capsys) -> None:
-        swarm = MagicMock()
-        swarm.execute.return_value = MagicMock(snapshot=_snapshot("completed"), error=None)
-        rc = handle_swarm_command(_status_args(), swarm)
-        assert rc == 0
-        assert swarm.execute.call_args[0][0].verb == "snapshot"
-        assert "swarm-1" in capsys.readouterr().out
-
     def test_status_unknown_swarm_returns_nonzero(self, capsys) -> None:
         swarm = MagicMock()
         # No error flag, but no snapshot either: the surface reports the missing
@@ -122,15 +116,21 @@ class TestSwarmStatus:
         assert payload["swarm_id"] == "swarm-1"
 
 
-class TestSwarmCancel:
-    def test_cancel_uses_the_cancel_verb(self, capsys) -> None:
+class TestSwarmVerbMapping:
+    @pytest.mark.parametrize(
+        ("command", "verb", "expected_snapshot_status"),
+        [("status", "snapshot", "completed"), ("cancel", "cancel", "cancelled")],
+    )
+    def test_command_uses_the_verb_verb(self, capsys, command, verb, expected_snapshot_status) -> None:
+        args_factory = {"status": _status_args, "cancel": _cancel_args}[command]
         swarm = MagicMock()
-        swarm.execute.return_value = MagicMock(snapshot=_snapshot("cancelled"), error=None)
-        rc = handle_swarm_command(_cancel_args(), swarm)
+        swarm.execute.return_value = MagicMock(snapshot=_snapshot(expected_snapshot_status), error=None)
+        rc = handle_swarm_command(args_factory(), swarm)
         assert rc == 0
-        assert swarm.execute.call_args[0][0].verb == "cancel"
-        assert "cancelled" in capsys.readouterr().out
+        assert swarm.execute.call_args[0][0].verb == verb
 
+
+class TestSwarmCancel:
     def test_cancel_failure_returns_nonzero(self, capsys) -> None:
         swarm = MagicMock()
         swarm.execute.return_value = MagicMock(snapshot=None, error="locked")

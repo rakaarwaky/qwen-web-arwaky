@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
 from modules.shared.src.taxonomy_core_vo import JobRecord
 
@@ -52,30 +54,24 @@ class TestJobsSubmit:
         assert "job-1" in out
         assert "job status" in out
 
-    def test_submit_with_attachment_uses_the_attachment_verb(self, tmp_path) -> None:
+    @pytest.mark.parametrize(
+        ("input_kind", "expected_verb"),
+        [("file", "submit_file_job"), ("attachment", "submit_attachment_job")],
+    )
+    def test_submit_uses_the_input_kind_verb(self, tmp_path, input_kind: str, expected_verb: str) -> None:
         os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
         prompt_file = tmp_path / "task.md"
         prompt_file.write_text("test prompt")
-        attachment_file = tmp_path / "att.pdf"
-        attachment_file.write_text("attachment")
         jobs = MagicMock()
         jobs.execute.return_value = MagicMock(record=_record(), error=None)
         args = _submit_args(str(prompt_file))
-        args.attachment_path = str(attachment_file)
+        if input_kind == "attachment":
+            attachment_file = tmp_path / "att.pdf"
+            attachment_file.write_text("attachment")
+            args.attachment_path = str(attachment_file)
         rc = handle_jobs_command(args, jobs)
         assert rc == 0
-        verb = jobs.execute.call_args[0][0].verb
-        assert verb == "submit_attachment_job"
-
-    def test_submit_file_only_uses_the_file_verb(self, tmp_path) -> None:
-        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
-        prompt_file = tmp_path / "task.md"
-        prompt_file.write_text("test prompt")
-        jobs = MagicMock()
-        jobs.execute.return_value = MagicMock(record=_record(), error=None)
-        rc = handle_jobs_command(_submit_args(str(prompt_file)), jobs)
-        assert rc == 0
-        assert jobs.execute.call_args[0][0].verb == "submit_file_job"
+        assert jobs.execute.call_args[0][0].verb == expected_verb
 
     def test_submit_json_envelope(self, tmp_path, capsys) -> None:
         os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
