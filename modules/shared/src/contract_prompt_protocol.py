@@ -99,6 +99,7 @@ class IPromptFileProtocol(ABC):
         headless: HeadlessFlag | bool = True,
         cancel_event: Event | None = None,
         event_observer: LifecycleObserver | None = None,
+        session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
         """Process a prompt file from disk without attachment.
 
@@ -106,6 +107,11 @@ class IPromptFileProtocol(ABC):
         jobs. ``event_observer`` optionally receives every emitted lifecycle
         event so a surface can render event-level status (thinking /
         streaming / prompting) for the run.
+
+        ``session_resolver`` optionally returns the session pool path chosen
+        by session rotation; the pipeline builds its own AppConfig, so
+        without the resolver a pool selection made upstream by the surface
+        is silently dropped and the default session is used.
         """
         ...
 
@@ -138,6 +144,7 @@ class IAttachmentPromptProtocol(ABC):
         headless: HeadlessFlag | bool = True,
         cancel_event: Event | None = None,
         event_observer: LifecycleObserver | None = None,
+        session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
         """Process a prompt file from disk with document attachment.
 

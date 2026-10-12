@@ -67,12 +67,14 @@ def dispatch_run(
                 attachment_file=cfg.file_path,
                 output_file=cfg.output_path,
                 headless=HeadlessFlag(cfg.headless),
+                session_resolver=session_resolver,
             )
         else:
             result = file_only.process_prompt_file_only(
                 prompt_file=prompt_file,
                 output_file=cfg.output_path,
                 headless=HeadlessFlag(cfg.headless),
+                session_resolver=session_resolver,
             )
     else:
         return error_response(RuntimeError(f"Unsupported CLI mode: {mode}"), "validation_error", "cli-400")
