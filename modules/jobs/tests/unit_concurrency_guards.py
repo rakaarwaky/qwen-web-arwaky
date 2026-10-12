@@ -106,28 +106,38 @@ def test_circuit_breaker_trip_reports_dominant_error_category() -> None:
     assert breaker.failure_categories == {"network": 3}
 
 
-def test_circuit_breaker_trip_category_is_none_for_mixed_failures() -> None:
-    """A mixed window has no single cause, so no single cause is reported."""
-    breaker = CircuitBreaker(FailureThreshold(4), WindowSec(30))
+@pytest.mark.parametrize(
+    ("threshold", "categories", "expected_counts"),
+    [
+        pytest.param(
+            4, ("network", "network", "auth", "browser"), {"auth": 1, "browser": 1, "network": 2}, id="mixed-failures"
+        ),
+        pytest.param(2, None, {}, id="without-categories"),
+    ],
+)
+def test_circuit_breaker_trip_category_is_none(
+    threshold: int,
+    categories: tuple[str, ...] | None,
+    expected_counts: dict[str, int],
+) -> None:
+    """A window without a single dominant cause claims no category.
 
-    for category in ("network", "network", "auth", "browser"):
-        breaker.record_failure(category)
+    A mixed window has no single cause; uncategorised failures keep the old
+    behaviour. Either way the trip must not report a spurious category.
+    ``categories=None`` records ``threshold`` bare (uncategorised) failures.
+    """
+    breaker = CircuitBreaker(FailureThreshold(threshold), WindowSec(30))
+
+    if categories is None:
+        for _ in range(threshold):
+            breaker.record_failure()
+    else:
+        for category in categories:
+            breaker.record_failure(category)
 
     assert breaker.is_tripped
-    assert breaker.trip_category is None, "a mixed window must not claim a single cause"
-    assert breaker.failure_categories == {"auth": 1, "browser": 1, "network": 2}
-
-
-def test_circuit_breaker_trip_category_is_none_without_categories() -> None:
-    """Uncategorised failures keep the old behaviour: no category claimed."""
-    breaker = CircuitBreaker(FailureThreshold(2), WindowSec(30))
-
-    breaker.record_failure()
-    breaker.record_failure()
-
-    assert breaker.is_tripped
-    assert breaker.trip_category is None
-    assert breaker.failure_categories == {}
+    assert breaker.trip_category is None, "a window without a single cause must not claim one"
+    assert breaker.failure_categories == expected_counts
 
 
 def test_circuit_breaker_success_clears_recorded_categories() -> None:
