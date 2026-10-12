@@ -27,8 +27,8 @@ from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IPromptFlowProtocol,
+    IRunCancelProtocol,
 )
-from modules.shared.src.contract_session_protocol import IRunCancelProtocol
 from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.taxonomy_core_error import RunCancelledError, UploadFailureError
 from modules.shared.src.taxonomy_core_event import (

@@ -11,6 +11,7 @@ Seams:
 - ``IPromptFileProtocol``       → ``PromptFileAdapter``
 - ``IAttachmentPromptProtocol`` → ``AttachmentPromptAdapter``
 - ``IPromptFlowProtocol``       → ``PromptFlowDispatcher``
+- ``IRunCancelProtocol``        → ``RunCancelRegistry``  (targeted browser-context cancel)
 
 The outward entry point, ``IPromptAggregate``, is in
 ``contract_prompt_aggregate.py``.
@@ -23,6 +24,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
 from threading import Event
+from typing import Any
 
 from playwright.sync_api import Page
 
@@ -43,6 +45,8 @@ from modules.shared.src.taxonomy_core_vo import (
     PromptPath,
     PromptText,
     ResponseText,
+    RunId,
+    RunState,
     SenderConfig,
     TimeoutSec,
 )
@@ -202,11 +206,59 @@ class IPromptFlowProtocol(ABC):
         ...
 
 
+class IRunCancelProtocol(ABC):
+    """Contract for the shared targeted-cancel registry of in-flight runs.
+
+    Implemented by ``capabilities_run_cancel_registry.CapabilitiesRunCancelRegistry``
+    and injected into the prompt file / attachment / swarm orchestrators so
+    that a cancel can stop one run's browser context without touching sibling
+    runs.  Runs are addressed by their stable ``RunId`` — never by object
+    identity of a ``threading.Event`` — so the handle cannot be invalidated
+    by a collected or recycled event object.
+    """
+
+    @abstractmethod
+    def register(self, run_state: RunState) -> None:
+        """Track a newly started in-flight run."""
+        ...
+
+    @abstractmethod
+    def release(self, run_state: RunState) -> None:
+        """Drop the entry for a finished run."""
+        ...
+
+    @abstractmethod
+    def cancel_run(self, run_id: RunId) -> None:
+        """Stop the run identified by ``run_id`` and close its browser context."""
+        ...
+
+    @abstractmethod
+    def cancel_by_event(self, cancel_event: threading.Event) -> None:
+        """Cancel the run that was registered with this cancel event.
+
+        Convenience for surface callers that only hold the original
+        ``threading.Event``.  Delegates to the stable ``run_id`` lookup
+        internally; safe no-op when the run has already finished.
+        """
+        ...
+
+    @abstractmethod
+    def set_active_bctx(self, run_id: RunId, bctx: Any) -> None:
+        """Update the live browser context for a registered run (None clears it)."""
+        ...
+
+    @abstractmethod
+    def active_bctx(self, run_id: RunId) -> Any:
+        """Return the live browser context for ``run_id``, or None."""
+        ...
+
+
 __all__ = [
     "IAttachmentPromptProtocol",
     "IDirectPromptProtocol",
     "IPromptFileProtocol",
     "IPromptFlowProtocol",
+    "IRunCancelProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -215,4 +267,5 @@ _layer_symbols = {
     "IDirectPromptProtocol": IDirectPromptProtocol,
     "IPromptFileProtocol": IPromptFileProtocol,
     "IPromptFlowProtocol": IPromptFlowProtocol,
+    "IRunCancelProtocol": IRunCancelProtocol,
 }

@@ -1,4 +1,4 @@
-"""Smoke tests for the session run-cancel registry.
+"""Smoke tests for the prompt run-cancel registry.
 
 The registry is what makes a fan-out leg cancelable without cancelling its
 siblings, so the smoke path is "register, cancel, release, and confirm the
@@ -7,7 +7,7 @@ registry is empty afterwards".
 
 from __future__ import annotations
 
-from modules.session.src.capabilities_run_cancel_registry import RunCancelRegistry
+from modules.prompt.src.capabilities_run_cancel_registry import RunCancelRegistry
 from modules.shared.src.taxonomy_core_vo import RunState
 
 

@@ -9,7 +9,7 @@ from playwright.sync_api import Error
 
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
+from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.shared.src import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,

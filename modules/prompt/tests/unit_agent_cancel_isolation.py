@@ -12,7 +12,7 @@ from modules.prompt.src.capabilities_attachment_prompt_adapter import (
 from modules.prompt.src.capabilities_prompt_file_adapter import (
     PromptFileAdapter,
 )
-from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
+from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.shared.src.taxonomy_core_vo import RunState
 
 

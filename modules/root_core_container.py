@@ -26,6 +26,13 @@ from modules.config.src.capabilities_config_path_resolver import ConfigPathResol
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
 
+# agent_session_orchestrator
+# SessionOrchestrator is the single agent in the session feature folder; it
+# implements both ISessionAggregate (validate/delete) and ISetupAggregate
+# (login). The ``agent_setup_orchestrator`` attribute below reuses the same
+# class so the setup-labelled surfaces keep a stable container attribute.
+from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+
 # agent_job_orchestrator
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
@@ -50,20 +57,13 @@ from modules.prompt.src.capabilities_output_saver import Saver
 from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
-
-# agent_session_orchestrator
-# SessionOrchestrator is the single agent in the session feature folder; it
-# implements both ISessionAggregate (validate/delete) and ISetupAggregate
-# (login). The ``agent_setup_orchestrator`` attribute below reuses the same
-# class so the setup-labelled surfaces keep a stable container attribute.
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.session.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_renewal import SessionRenewer
-from modules.session.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 
-from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
+from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
 from modules.shared.src.contract_prompt_protocol import (
@@ -22,7 +22,6 @@ from modules.shared.src.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.contract_session_protocol import (
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
-    IWorkspaceProtocol,
 )
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate

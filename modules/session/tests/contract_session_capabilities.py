@@ -14,14 +14,12 @@ from modules.shared.src.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
-    IWorkspaceProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     ISessionManagerProtocol,
     ISessionHealthCheckerProtocol,
     ISessionRotatorProtocol,
-    IWorkspaceProtocol,
 )
 
 

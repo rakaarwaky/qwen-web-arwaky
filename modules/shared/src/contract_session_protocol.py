@@ -10,8 +10,6 @@ Seams:
 - ``ISessionManagerProtocol``       → ``SessionManager``        (pool CRUD, status marking)
 - ``ISessionHealthCheckerProtocol`` → ``SessionHealthChecker``  (async ping, bulk health)
 - ``ISessionRotatorProtocol``       → ``SessionRotationAdapter`` (round-robin selection)
-- ``IRunCancelProtocol``            → ``RunCancelRegistry``      (targeted browser-context cancel)
-- ``IWorkspaceProtocol``            → ``WorkspaceProvisioner`` (XDG dirs, symlinks, SKILL.md)
 - ``ISessionRenewalProtocol``       → ``SessionRenewer``        (token renewal, self-heal)
 
 The outward export surface for outer layers is ``ISessionAggregate``
@@ -22,12 +20,10 @@ aggregate: the consumer that picks the next session calls
 
 from __future__ import annotations
 
-import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
 
-from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, RunId, RunState
+from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import (
     RotatorRequest,
     RotatorResponse,
@@ -144,62 +140,6 @@ class ISessionRotatorProtocol(ABC):
         ...
 
 
-class IRunCancelProtocol(ABC):
-    """Contract for the shared targeted-cancel registry of in-flight runs.
-
-    Implemented by ``capabilities_run_cancel_registry.CapabilitiesRunCancelRegistry``
-    and injected into the prompt file / attachment / swarm orchestrators so
-    that a cancel can stop one run's browser context without touching sibling
-    runs.  Runs are addressed by their stable ``RunId`` — never by object
-    identity of a ``threading.Event`` — so the handle cannot be invalidated
-    by a collected or recycled event object.
-    """
-
-    @abstractmethod
-    def register(self, run_state: RunState) -> None:
-        """Track a newly started in-flight run."""
-        ...
-
-    @abstractmethod
-    def release(self, run_state: RunState) -> None:
-        """Drop the entry for a finished run."""
-        ...
-
-    @abstractmethod
-    def cancel_run(self, run_id: RunId) -> None:
-        """Stop the run identified by ``run_id`` and close its browser context."""
-        ...
-
-    @abstractmethod
-    def cancel_by_event(self, cancel_event: threading.Event) -> None:
-        """Cancel the run that was registered with this cancel event.
-
-        Convenience for surface callers that only hold the original
-        ``threading.Event``.  Delegates to the stable ``run_id`` lookup
-        internally; safe no-op when the run has already finished.
-        """
-        ...
-
-    @abstractmethod
-    def set_active_bctx(self, run_id: RunId, bctx: Any) -> None:
-        """Update the live browser context for a registered run (None clears it)."""
-        ...
-
-    @abstractmethod
-    def active_bctx(self, run_id: RunId) -> Any:
-        """Return the live browser context for ``run_id``, or None."""
-        ...
-
-
-class IWorkspaceProtocol(ABC):
-    """Workspace directory provisioning contract."""
-
-    @abstractmethod
-    def init_workspace(self, target_dir: FilePath) -> None:
-        """Initialize XDG directories, SKILL.md, .qwen-web symlinks, and .gitignore."""
-        ...
-
-
 class ISessionRenewalProtocol(ABC):
     """Session renewal contract: detect a stale auth session and renew it.
 
@@ -239,8 +179,6 @@ __all__ = [
     "ISessionManagerProtocol",
     "ISessionHealthCheckerProtocol",
     "ISessionRotatorProtocol",
-    "IRunCancelProtocol",
-    "IWorkspaceProtocol",
     "ISessionRenewalProtocol",
 ]
 
@@ -249,7 +187,5 @@ _layer_symbols = {
     "ISessionManagerProtocol": ISessionManagerProtocol,
     "ISessionHealthCheckerProtocol": ISessionHealthCheckerProtocol,
     "ISessionRotatorProtocol": ISessionRotatorProtocol,
-    "IRunCancelProtocol": IRunCancelProtocol,
-    "IWorkspaceProtocol": IWorkspaceProtocol,
     "ISessionRenewalProtocol": ISessionRenewalProtocol,
 }

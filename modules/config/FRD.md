@@ -68,6 +68,17 @@ config the other features read.
 - **Edge Cases**: A folder holding no prompts yields an empty list rather than an error; a depth violation is reported against the file that caused it.
 - **Error Handling**: A folder that cannot be read surfaces a file error naming the path.
 
+### FR-CONFIG-006: Initialize the run workspace
+
+- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web` symlinks, and update `.gitignore` so a run has the local paths it expects.
+- **Input**: The target directory the operator named, or the working directory.
+- **Output**: The created workspace, or the paths that could not be created.
+- **Business Rules**:
+  - Session directories are created with owner-only permissions because they hold live login cookies.
+  - An existing directory is reused rather than recreated, so an initialized workspace survives re-initialization.
+- **Edge Cases**: A directory the host refuses to create surfaces a file error naming the path.
+- **Error Handling**: A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location.
+
 ## API Contract
 
 ### Protocol API
@@ -85,6 +96,7 @@ config the other features read.
 | `report` | host characteristics | capacity report | none | none | Report the host's browser capacity. |
 | `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
 | `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
+| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web` symlinks, and `.gitignore` entry. |
 
 ### Aggregate API
 
@@ -116,6 +128,7 @@ config the other features read.
 - A config whose output directory does not exist yet is accepted when its nearest existing ancestor accepts a write.
 - A config with several invalid fields reports every one of them in one call.
 - A folder input holding three prompts discovers them in a deterministic order.
+- A workspace init creates owner-only directories, provisions SKILL.md and symlinks, and reuses an existing workspace.
 
 ## Assumptions & Constraints
 

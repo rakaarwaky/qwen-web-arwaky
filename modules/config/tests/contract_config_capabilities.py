@@ -12,17 +12,20 @@ from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
+from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.contract_config_protocol import (
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IConfigValidatorProtocol,
+    IWorkspaceProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     IConfigValidatorProtocol,
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
+    IWorkspaceProtocol,
 )
 
 
@@ -40,6 +43,10 @@ def test_path_resolver_implements_the_path_resolver_protocol() -> None:
 
 def test_slot_resolver_implements_the_slot_plan_protocol() -> None:
     assert IConfigSlotPlanProtocol in inspect.getmro(SlotRunPlanResolver)
+
+
+def test_workspace_provisioner_implements_the_workspace_protocol() -> None:
+    assert IWorkspaceProtocol in inspect.getmro(WorkspaceProvisioner)
 
 
 def test_aggregate_declares_only_the_execute_door() -> None:

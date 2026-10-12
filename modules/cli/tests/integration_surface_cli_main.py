@@ -36,8 +36,8 @@ class TestRunInit:
         for d in (xdg_input, xdg_output, xdg_log):
             d.mkdir(parents=True, exist_ok=True)
         with (
-            patch("modules.session.src.capabilities_workspace_provisioner.DEFAULT_OUTPUT", xdg_output),
-            patch("modules.session.src.capabilities_workspace_provisioner.DEFAULT_LOG", xdg_log),
+            patch("modules.config.src.capabilities_workspace_provisioner.DEFAULT_OUTPUT", xdg_output),
+            patch("modules.config.src.capabilities_workspace_provisioner.DEFAULT_LOG", xdg_log),
         ):
             SharedContainer().workspace.init_workspace(tmp_path)
             dot_qwen = tmp_path / ".qwen-web"
