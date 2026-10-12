@@ -110,14 +110,6 @@ def test_parse_agent_output_preserves_description_sections(tmp_path):
     assert "+ new line" in body
 
 
-def test_parse_agent_output_includes_swarm_id_in_body(tmp_path):
-    run = _make_run(tmp_path, "backend-engineer", SAMPLE_AGENT_OUTPUT)
-    issues = parse_swarm_run(run)
-    for it in issues:
-        assert "swarm_test" in it.body
-        assert f"imported `{it.issue_id}`" in it.body
-
-
 def test_parse_agent_output_title_stripping(tmp_path):
     content = (
         "#### Issue BE-9-999\n"

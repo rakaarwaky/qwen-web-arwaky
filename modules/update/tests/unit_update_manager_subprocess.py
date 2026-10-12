@@ -20,10 +20,10 @@ def test_forbidden_characters_are_rejected() -> None:
         assert "shell metacharacters" in err
 
 
-def test_unsupported_command_is_rejected() -> None:
-    rc, _out, err = run_subprocess([sys.executable, "-m", "os", "system"])
-    assert rc == 1
-    assert "Unsupported update command" in err
+@pytest.mark.parametrize("module", ["os", "subprocess"])
+def test_unsupported_python_module_is_rejected(module: str) -> None:
+    with pytest.raises(ValueError, match="Unsupported update command"):
+        approved_spawn_command([sys.executable, "-m", module, "system"])
 
 
 def test_pip_command_is_allowlisted() -> None:

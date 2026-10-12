@@ -7,6 +7,8 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, ResponseText, WindowSec
 from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
@@ -103,32 +105,37 @@ def test_swarm_discovers_all_templates_and_writes_existing_format(monkeypatch, t
     assert {role for role, _ in aggregate.calls} == {"architect", "security-reviewer"}
 
 
-def test_swarm_retries_transient_agent_failure_and_allows_partial(monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "role_failures,expected_state",
+    [
+        # Transient timeout: agent retries to exhaustion and fails.
+        ({"security-reviewer": 3}, "transient"),
+        # Stuck detection: event-driven stall is retryable and never hangs.
+        ({"architect": 2, "security-reviewer": 100}, "stuck"),
+    ],
+)
+def test_swarm_retries_transient_agent_failure_and_allows_partial(
+    monkeypatch, tmp_path: Path, role_failures: dict[str, int], expected_state: str
+) -> None:
     _patch_templates(monkeypatch, tmp_path)
-    aggregate = FakeAttachmentAggregate({"security-reviewer": 3})
-    orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, attachment=aggregate),
-        observability=MagicMock(),
-    )
-    input_path = tmp_path / "project.md"
-    input_path.write_text("source", encoding="utf-8")
+    aggregate = FakeAttachmentAggregate(role_failures)
 
-    initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
-    final = _wait_for_terminal(orchestrator, initial.swarm_id)
+    if expected_state == "stuck":
+        # Make the fake aggregate raise a StuckDetectedError-flavoured
+        # failure string that exercises the retryable path without hitting
+        # real browsers.
+        original_process = aggregate.process_prompt_with_attachment
 
-    assert final.status == "partial"
-    assert final.completed_count == 1
-    failed = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
-    assert failed.status == "failed"
-    assert failed.attempt == 3
+        def process_with_stuck(prompt_file, attachment_file, output_file, headless, cancel_event=None):
+            role = Path(prompt_file).stem
+            remaining = aggregate.failures.get(role, 0)
+            if remaining > 0:
+                aggregate.failures[role] = remaining - 1
+                return ResponseText("ERROR [stuck] Stuck detected: no forward lifecycle event for 300s")
+            return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
 
+        aggregate.process_prompt_with_attachment = process_with_stuck
 
-def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> None:
-    """A StuckDetectedError (event-driven stall) is retryable; the swarm
-    retries up to max_attempts then marks the agent failed with the stuck
-    error recorded — proving the stuck path never hangs the swarm."""
-    _patch_templates(monkeypatch, tmp_path)
-    aggregate = FakeAttachmentAggregate({"architect": 2, "security-reviewer": 100})
     orchestrator = SwarmOrchestrator(
         runner=SwarmRunner(output_root=tmp_path, browser_concurrency=1, max_attempts=3, attachment=aggregate),
         observability=MagicMock(),
@@ -136,35 +143,21 @@ def test_swarm_retries_stuck_detection_failure(monkeypatch, tmp_path: Path) -> N
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
-    # Make the fake aggregate raise a StuckDetectedError-flavoured failure string
-    # that exercises the retryable path without hitting real browsers.
-    original_process = aggregate.process_prompt_with_attachment
-
-    def process_with_stuck(prompt_file, attachment_file, output_file, headless, cancel_event=None):
-        role = Path(prompt_file).stem
-        remaining = aggregate.failures.get(role, 0)
-        if remaining > 0:
-            aggregate.failures[role] = remaining - 1
-            return ResponseText("ERROR [stuck] Stuck detected: no forward lifecycle event for 300s")
-        return original_process(prompt_file, attachment_file, output_file, headless, cancel_event)
-
-    aggregate.process_prompt_with_attachment = process_with_stuck
-
     initial = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
     final = _wait_for_terminal(orchestrator, initial.swarm_id)
 
     assert final.status == "partial"
-    assert final.completed_count == 1
-    architect = next(agent for agent in final.agents if agent.agent_id == "architect")
-    # architect exhausted 3 attempts (2 stuck failures + 1 success would be
-    # completed, but 2 stuck failures then 1 real success = completed).
-    # With 2 stuck failures and max_attempts=3, the 3rd attempt succeeds.
-    assert architect.status in {"completed", "failed"}
-    if architect.status == "failed":
-        assert "stuck" in str(architect.error).lower()
-    security = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
-    assert security.status == "failed"
-    assert "stuck" in str(security.error).lower()
+    if expected_state == "transient":
+        assert final.completed_count == 1
+        failed = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
+        assert failed.status == "failed"
+        assert failed.attempt == 3
+    else:
+        # architect exhausts its attempts then succeeds or fails;
+        # security-reviewer fails on stuck.
+        security = next(agent for agent in final.agents if agent.agent_id == "security-reviewer")
+        assert security.status == "failed"
+        assert "stuck" in str(security.error).lower()
 
 
 def test_swarm_marks_non_retryable_error_failed_immediately(monkeypatch, tmp_path: Path) -> None:

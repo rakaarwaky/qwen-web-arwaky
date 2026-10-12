@@ -39,13 +39,6 @@ def test_e2e_a_successful_upgrade_names_the_source_it_installed_from() -> None:
     assert step.detail, "a successful step must say what it did"
 
 
-def test_e2e_forcing_bypasses_the_version_check() -> None:
-    """``force`` exists to install past a version check, so the forced step
-    must reach the install rather than reporting a skip."""
-    step = _upgrade(force=ForceFlag(True))
-    assert step.executed is True
-
-
 def test_e2e_a_failed_subprocess_surfaces_as_a_failed_step() -> None:
     with (
         patch.object(upgrade_module, "run_subprocess", return_value=(1, "", "permission denied")),

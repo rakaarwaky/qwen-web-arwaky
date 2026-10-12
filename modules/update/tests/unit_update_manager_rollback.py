@@ -27,23 +27,17 @@ def _rollback(
     return rollback
 
 
-def test_rollback_unknown_previous_version_returns_skipped_message() -> None:
-    """AC: an unresolvable previous version is 'skipped', not silently ignored."""
-    steps = _rollback().rollback_to(VersionString("unknown"))
+@pytest.mark.parametrize("version", ["", "unknown"])
+def test_rollback_unresolvable_previous_version_returns_skipped_message(version: str) -> None:
+    """AC: an unresolvable previous version (blank or unknown) is 'skipped',
+    not silently ignored."""
+    steps = _rollback().rollback_to(VersionString(version))
 
     assert len(steps) == 1
     assert steps[0].executed is False
     assert "Reinstall manually" in steps[0].detail
-    assert "Cannot determine previous version" in steps[0].detail
-
-
-def test_rollback_blank_previous_version_returns_skipped_message() -> None:
-    """An empty version is the same unresolvable case as 'unknown'."""
-    steps = _rollback().rollback_to(VersionString(""))
-
-    assert len(steps) == 1
-    assert steps[0].executed is False
-    assert "Reinstall manually" in steps[0].detail
+    if version == "unknown":
+        assert "Cannot determine previous version" in steps[0].detail
 
 
 def test_rollback_editable_install_returns_skipped_message(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
