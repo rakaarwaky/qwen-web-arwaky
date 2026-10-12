@@ -35,7 +35,7 @@ where = ["."]
 include = ["modules*"]
 
 [tool.setuptools.package-data]
-"modules.templates" = ["*.md"]
+"modules.shared.templates" = ["*.md"]
 
 [tool.ruff]
 line-length = 120

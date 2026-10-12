@@ -1,7 +1,8 @@
 """Prompt template resolution: dynamic discovery of role templates on disk.
 
 Utility layer (utility(prompt_template)): stateless helpers that read built-in
-prompt templates from the ``modules/templates/`` folder. A role name may be
+prompt templates from the ``modules/shared/templates/`` folder (bundled
+package data of the shared member). A role name may be
 passed anywhere a prompt file path is accepted; this module resolves it to the
 bundled template without substitution.
 
@@ -16,8 +17,9 @@ import re
 import threading
 from pathlib import Path
 
-# ``modules/shared/src`` -> ``modules`` (parents[2]) -> ``modules/templates``
-_TEMPLATE_DIR: Path = Path(__file__).resolve().parents[2] / "templates"
+# ``modules/shared/src`` -> ``modules/shared`` (parents[1]) ->
+# ``modules/shared/templates`` — bundled role-template package data
+_TEMPLATE_DIR: Path = Path(__file__).resolve().parents[1] / "templates"
 
 _HEADING_RE = re.compile(r"^##\s+(?P<title>.+)$")
 

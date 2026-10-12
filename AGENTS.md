@@ -59,7 +59,7 @@ modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
 modules/update/src/   agent_update_orchestrator, capabilities_update_manager
 modules/cli/src/      surface_cli_*, root_cli_container
 modules/mcp/src/      surface_mcp_*, root_mcp_container
-modules/templates/    role templates, free of HTML-escaped tokens
+modules/shared/templates/ role templates (package data of the shared member), free of HTML-escaped tokens
 root_cli_main_entry.py, root_mcp_main_entry.py
 tests/                unit, integration, e2e, fixtures/, conftest.py
 benches/              benchmark suite, marker: benchmark
@@ -103,7 +103,7 @@ uv run python -m pytest tests/ -m e2e -v
 uv run python -m pytest benches/ -m benchmark -v
 ```
 
-CI also fails when `modules/templates/` contains HTML-escaped tokens
+CI also fails when `modules/shared/templates/` contains HTML-escaped tokens
 (`&lt;`, `&gt;`, escaped `[`), which would leak into the TUI file picker, the
 MCP role-template path, and `--prompt-role`.
 

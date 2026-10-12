@@ -153,7 +153,7 @@ class QwenTuiApp(
             s: {"status": "IDLE", "file": "-", "duration": 0.0} for s in range(1, NUM_SLOTS + 1)
         }
         # C5: build template options / roles once instead of per-compose.
-        # Roles are discovered dynamically from modules/templates/*.md, so a
+        # Roles are discovered dynamically from modules/shared/templates/*.md, so a
         # new template file added to that folder shows up here with no code change.
         manifest = prompt_template_manifest()
         self._template_options: list[tuple[str, str]] = [(meta["title"], role) for role, meta in manifest.items()]

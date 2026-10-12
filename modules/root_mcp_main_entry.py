@@ -158,7 +158,7 @@ TOOLS: list[Tool] = [
             "properties": {
                 "input_file": {
                     "type": "string",
-                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/templates/).",
+                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/shared/templates/).",
                     "examples": ["/home/user/prompts/analysis.md", "backend-engineer", "software-architect"],
                 },
                 "output_file": {
@@ -190,7 +190,7 @@ TOOLS: list[Tool] = [
             "properties": {
                 "prompt_file": {
                     "type": "string",
-                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/templates/).",
+                    "description": "Absolute or relative path to the Markdown prompt file, or a built-in role template name (any .md file in modules/shared/templates/).",
                     "examples": ["/home/user/prompts/analyze_doc.md", "software-architect", "backend-engineer"],
                 },
                 "attachment_file": {

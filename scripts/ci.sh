@@ -152,8 +152,8 @@ fi
 
 # ─── Gate 6: AD-05 template hygiene ─────────────────────────────────────────
 # mirrors ci.yml 'Check template files are not HTML-escaped'
-if grep -rEl '&lt;|&gt;|\\[' modules/templates/ 2>/dev/null; then
-    warn "AD-05: HTML-escaped tokens found in modules/templates/"
+if grep -rEl '&lt;|&gt;|\\[' modules/shared/templates/ 2>/dev/null; then
+    warn "AD-05: HTML-escaped tokens found in modules/shared/templates/"
     FAILURES=$((FAILURES + 1))
 else
     ok "AD-05 template hygiene clean"
