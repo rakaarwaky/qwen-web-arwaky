@@ -310,9 +310,15 @@ class _TuiSessionsWorkerMixin:
             self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
             return
         try:
+            from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
             from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 
-            results = SessionHealthChecker(timeout_seconds=10).check_pool_sync(
+            # No Root container in the TUI worker: construct the browser seam
+            # in-process (AES205) so the probe runs against real Chromium.
+            # Without this, check_session short-circuits to False for every
+            # session and the TUI reports 0 healthy even on a live pool.
+            checker = SessionHealthChecker(browser=BrowserAdapter(), timeout_seconds=10)
+            results = checker.check_pool_sync(
                 self._session_manager.load_pool(),
                 self._session_manager,
             )
