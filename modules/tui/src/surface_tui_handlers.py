@@ -4,8 +4,8 @@ Surface layer (surface_cli): Mixin providing the ``action_*`` methods
 (keyboard bindings, tab navigation, copy, quit) plus the screen-level button
 helpers for the swarm, auth, account, and chat-console controls. The widget
 ``on_*`` callbacks that route those controls live in
-:class:`~modules.cli.src.surface_cli_tui_events._TuiEventsMixin`.
-Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+:class:`~modules.tui.src.surface_tui_events._TuiEventsMixin`.
+Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input, TabbedContent
 
-from modules.cli.src.surface_cli_session_setup import SessionSetupScreen
-from modules.cli.src.surface_cli_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
-from modules.cli.src.surface_cli_tui_css import THEME
+from modules.tui.src.surface_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
+from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_session_setup import SessionSetupScreen
 
 # The dock's active marker: a short accent bar centred over the active
 # section, the way the mockup draws it.

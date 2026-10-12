@@ -3,10 +3,10 @@
 Surface layer (surface_cli): Mixin providing the ``@work(thread=True)``
 workers that validate the stored session, load the account pool into the
 Sessions screen, and run health checks. Splitting them from
-:class:`~modules.cli.src.surface_cli_tui_workers._TuiWorkersMixin` keeps that
+:class:`~modules.tui.src.surface_tui_workers._TuiWorkersMixin` keeps that
 file on slot/swarm execution and both files inside the AES surface complexity
 budget.
-Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import DataTable, Label
 
-from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
+from modules.tui.src.surface_tui_css import THEME
 
 
 class _TuiSessionsWorkerMixin:

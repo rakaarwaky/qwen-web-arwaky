@@ -65,8 +65,8 @@ class TestQwenTuiLogHandler:
     def test_emit_info_and_error_levels(self):
         import logging
 
-        from modules.cli.src.surface_cli_tui_app import QwenTuiApp
-        from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_components import QwenTuiLogHandler
 
         mock_app = MagicMock(spec=QwenTuiApp)
         handler = QwenTuiLogHandler(mock_app)
@@ -89,8 +89,8 @@ class TestQwenTuiLogHandler:
     def test_on_mount_and_unmount_hooks_handler(self):
         import logging
 
-        from modules.cli.src.surface_cli_tui_app import QwenTuiApp
-        from modules.cli.src.surface_cli_tui_components import QwenTuiLogHandler
+        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_components import QwenTuiLogHandler
 
         app = QwenTuiApp(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
         with patch.object(app, "query_one") as mock_query, patch.object(app, "set_timer"):

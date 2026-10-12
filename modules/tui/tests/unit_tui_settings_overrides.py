@@ -16,10 +16,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.cli.src import surface_cli_tui_settings as settings_mixin
-from modules.cli.src.surface_cli_tui_app import QwenTuiApp
 from modules.shared.src import utility_core_env as env_module
 from modules.shared.src.utility_core_env import REGISTERED_ENV, SENTRY_DSN, load_settings
+from modules.tui.src import surface_tui_settings as settings_mixin
+from modules.tui.src.surface_tui_app import QwenTuiApp
 
 # Names this module mutates through the screen, so the host environment is
 # restored no matter how a test ends.

@@ -58,6 +58,7 @@ modules/session/src/  agent_session_orchestrator, capabilities_session_*
 modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
 modules/update/src/   agent_update_orchestrator, capabilities_update_manager
 modules/cli/src/      surface_cli_*, root_cli_container
+modules/tui/src/     surface_tui_* (Textual TUI layer; depends on cli, never vice versa)
 modules/mcp/src/      surface_mcp_*, root_mcp_container
 modules/shared/templates/ role templates (package data of the shared member), free of HTML-escaped tokens
 root_cli_main_entry.py, root_mcp_main_entry.py
@@ -77,7 +78,7 @@ Every command must match the exact CI gate.
 
 ```bash
 # Tests
-uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ \
+uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ \
   modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ \
   modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ \
   modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ \

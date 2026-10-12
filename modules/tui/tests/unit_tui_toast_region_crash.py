@@ -24,7 +24,7 @@ from textual.events import MouseDown
 from textual.widgets import Button, Label
 from textual.widgets._toast import Toast
 
-from modules.cli.src.surface_cli_tui_components import FilePickerModal, HelpScreen
+from modules.tui.src.surface_tui_components import FilePickerModal, HelpScreen
 
 
 def test_file_picker_modal_disables_text_selection() -> None:
