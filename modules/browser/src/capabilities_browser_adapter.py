@@ -592,6 +592,61 @@ class BrowserAdapter(IBrowserProtocol):
         """
         return _in_page_expiry_banner_visible(page)
 
+    def renew_session(self, cfg: Any) -> None:
+        """Attempt to renew the session credentials on *cfg*'s master profile in place.
+
+        Opens the chat page on the master profile (login mode, no ephemeral
+        clone) so that when the ``auth-session`` cookie has expired but the
+        long-lived ``refresh_token`` is still valid, the site's own JS can
+        exchange the refresh token for a fresh session cookie while the page
+        loads. The renewed cookies are persisted to the master profile on
+        context close.
+
+        Raises:
+            AuthRequiredError: When the session could not be renewed — either
+                the page still lands on a login/guest view, shows a login
+                form, or the refresh token itself is dead (manual re-login
+                is the only path left).
+        """
+        master_session = cfg.session_path
+        # Login mode: create_ephemeral_session yields the master path directly,
+        # so any cookie the browser writes persists to the master profile.
+        with create_ephemeral_session(master_session, mode="login") as session_dir:
+            chrome_bin = find_chrome_binary()
+            chrome_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-session-crashed-bubble",
+                "--disable-infobars",
+            ]
+            if getattr(cfg, "disable_sandbox", False):
+                chrome_args.append("--no-sandbox")
+            if getattr(cfg, "headless", False):
+                chrome_args.extend(
+                    [
+                        "--disable-gpu",
+                        "--disable-software-compositing",
+                    ]
+                )
+
+            kwargs: dict[str, Any] = {
+                "user_data_dir": str(session_dir),
+                "channel": None,
+                "headless": bool(getattr(cfg, "headless", False)),
+                "args": chrome_args,
+                "viewport": {"width": 1280, "height": 800},
+            }
+            if chrome_bin and Path(chrome_bin).exists():
+                kwargs["executable_path"] = chrome_bin
+
+            with sync_playwright() as p:
+                ctx = self._launch_context(p, kwargs)
+                try:
+                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
+                    _assert_on_chat_page(page)
+                finally:
+                    ctx.close()
+
     @contextmanager
     def health_probe_page(self, cfg: Any) -> Iterator[Page]:
         """Open one ready, authenticated chat page on ``cfg``'s session profile.

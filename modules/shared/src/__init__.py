@@ -25,7 +25,11 @@ from .contract_logging_aggregate import IObservabilityAggregate
 from .contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 from .contract_prompt_aggregate import IPromptAggregate
 from .contract_session_aggregate import ISessionAggregate
-from .contract_session_protocol import ISessionRotatorProtocol, IWorkspaceProtocol
+from .contract_session_protocol import (
+    ISessionRenewalProtocol,
+    ISessionRotatorProtocol,
+    IWorkspaceProtocol,
+)
 from .contract_setup_aggregate import ISetupAggregate
 from .contract_swarm_aggregate import ISwarmAggregate
 from .contract_update_aggregate import IUpdateAggregate
@@ -120,6 +124,7 @@ from .taxonomy_core_event import (
     EVENT_PROMPT_INJECTED,
     EVENT_SEND_CLICKED,
     EVENT_SESSION_EXPIRED,
+    EVENT_SESSION_RENEWED,
     EVENT_STREAMING_GENERATION,
     EVENT_THINKING_STARTED,
     EVENT_WEB_LOADED,
@@ -244,6 +249,16 @@ from .utility_response_normalizer import (
 # ─── Utility: session guard ───────────────────────────────────
 from .utility_session_guard import is_filesystem_root, is_safe_session_target
 
+# ─── Utility: session renewal cookie probe ────────────────────
+from .utility_session_renewal_cookie_probe import (
+    AUTH_SESSION_COOKIE,
+    REFRESH_TOKEN_COOKIE,
+    find_cookie_db,
+    is_auth_session_expired,
+    is_refresh_token_valid,
+    renewal_is_possible,
+)
+
 __all__ = [
     # VOs
     "AsyncRunFlag",
@@ -311,6 +326,7 @@ __all__ = [
     "EVENT_LOGIN_VERIFIED",
     "EVENT_MODEL_VERIFIED",
     "EVENT_SESSION_EXPIRED",
+    "EVENT_SESSION_RENEWED",
     "EVENT_OUTPUT_COPIED",
     "PIPELINE_EVENT_SEQUENCE",
     "EVENT_ORDER",
@@ -416,6 +432,8 @@ __all__ = [
     "ISmokeGate",
     "IObservabilityProtocol",
     "IMetricsProtocol",
+    "ISessionRenewalProtocol",
+    "ISessionRotatorProtocol",
     "IWorkspaceProtocol",
     "IBrowserAggregate",
     "IConfigAggregate",
@@ -426,7 +444,6 @@ __all__ = [
     "IUpdateAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
-    "ISessionRotatorProtocol",
     "ISetupAggregate",
     "ISwarmAggregate",
     # Swarm VOs
@@ -455,6 +472,12 @@ __all__ = [
     "exit_code_for",
     "should_treat_as_new_response",
     "is_stability_satisfied",
+    "AUTH_SESSION_COOKIE",
+    "REFRESH_TOKEN_COOKIE",
+    "find_cookie_db",
+    "is_auth_session_expired",
     "is_filesystem_root",
+    "is_refresh_token_valid",
     "is_safe_session_target",
+    "renewal_is_possible",
 ]

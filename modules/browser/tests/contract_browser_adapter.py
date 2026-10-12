@@ -20,6 +20,7 @@ _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
         "detect_session_expired",
         "health_probe_page",
         "navigate_to_chat",
+        "renew_session",
         "reset_page",
     }
 )

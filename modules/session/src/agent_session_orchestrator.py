@@ -4,6 +4,11 @@ Orchestrates session validation, deletion, and interactive manual login
 using browser protocol. The single agent in the session feature folder;
 it implements both the session aggregate (validate/delete) and the setup
 aggregate (login) so a surface holds one object for the whole feature.
+
+When session validation fails, the orchestrator attempts a transparent
+renewal via :class:`SessionRenewer` before reporting the session as
+invalid, so operators do not need to re-login while the refresh token
+is still valid.
 """
 
 from __future__ import annotations
@@ -15,7 +20,10 @@ from pathlib import Path
 from modules.shared.src.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.contract_session_protocol import (
+    ISessionManagerProtocol,
+    ISessionRenewalProtocol,
+)
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.taxonomy_core_constant import (
     CHAT_URL,
@@ -48,10 +56,12 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         browser: IBrowserProtocol,
         observability: IObservabilityProtocol,
         sessions: ISessionManagerProtocol | None = None,
+        renewer: ISessionRenewalProtocol | None = None,
     ) -> None:
         self._browser = browser
         self._observability = observability
         self._sessions = sessions
+        self._renewer = renewer
 
     # Block 2: Protocol Method Implementation
 
@@ -294,7 +304,14 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         }
 
     def _validate(self, session_path: Path | None) -> tuple[bool, str]:
-        """Validate an existing saved Qwen browser session in headless mode."""
+        """Validate an existing saved Qwen browser session in headless mode.
+
+        Runs the browser check first; on failure attempts a transparent
+        token renewal so the user does not have to re-login while the
+        ``refresh_token`` is still valid. When both the session and the
+        refresh token are dead, raises ``AuthRequiredError`` so the
+        caller can surface the actionable message.
+        """
         cfg = build_app_config(
             mode="session-check",
             input_path=DEFAULT_OUTPUT,
@@ -332,7 +349,11 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         return "Session deleted successfully."
 
     def _validate_saved_session(self, cfg: AppConfig) -> bool:
-        """Check an existing profile without opening a visible login window."""
+        """Check an existing profile without opening a visible login window.
+
+        When the initial browser probe fails, attempts a transparent token
+        renewal via the browser self-heal path before giving up.
+        """
         validation_cfg = build_app_config(
             mode="session-check",
             input_path=DEFAULT_OUTPUT,
@@ -345,11 +366,32 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
                 page = bctx.pages[0] if bctx.pages else bctx.new_page()
                 emitter = LifecycleEmitter(self._observability.get_logger())
                 self._browser.navigate_to_chat(page, emitter)
-                return self._browser.check_session(page)
+                if self._browser.check_session(page):
+                    return True
         except Exception as exc:
             log_debug = self._observability.get_logger().debug
             log_debug("saved_session_validation_failed", error=str(exc))
-            return False
+
+        # Initial check failed — attempt a transparent renewal before reporting
+        # the session as invalid.
+        if self._renewer is not None:
+            try:
+                self._renewer.renew_session_if_stale(validation_cfg)
+                # Re-validate after renewal succeeded
+                with self._browser.browser_session(validation_cfg) as bctx:
+                    page = bctx.pages[0] if bctx.pages else bctx.new_page()
+                    emitter = LifecycleEmitter(self._observability.get_logger())
+                    self._browser.navigate_to_chat(page, emitter)
+                    if self._browser.check_session(page):
+                        return True
+            except QwenCliError:
+                # AuthRequiredError or other auth failures: renewal impossible,
+                # fall through to report the session as invalid.
+                pass
+            except Exception:
+                # Any other failure during renewal: report invalid, don't crash.
+                pass
+        return False
 
 
 __all__ = ["SessionOrchestrator"]

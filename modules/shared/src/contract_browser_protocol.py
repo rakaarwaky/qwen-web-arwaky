@@ -108,6 +108,25 @@ class IBrowserProtocol(ABC):
         ...
 
     @abstractmethod
+    def renew_session(self, cfg: AppConfig) -> None:
+        """Attempt to renew the session credentials on *cfg*'s profile in place.
+
+        Opens the chat page on the MASTER profile (login mode, no ephemeral
+        clone) so that when the ``auth-session`` cookie has expired but the
+        long-lived ``refresh_token`` is still valid, the site's own JS can
+        exchange the refresh token for a fresh session cookie while the page
+        loads. The renewed cookies are persisted to the master profile on
+        context close.
+
+        Raises:
+            AuthRequiredError: When the session could not be renewed — either
+                the page still lands on a login/guest view, shows a login
+                form, or the refresh token itself is dead (manual re-login
+                is the only path left).
+        """
+        ...
+
+    @abstractmethod
     def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Reset *page* to a clean chat state.
 

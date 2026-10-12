@@ -48,6 +48,7 @@ class QwenEventType(str, Enum):
     LOGIN_VERIFIED = "EVENT_LOGIN_VERIFIED"
     MODEL_VERIFIED = "EVENT_MODEL_VERIFIED"
     SESSION_EXPIRED = "EVENT_SESSION_EXPIRED"
+    SESSION_RENEWED = "EVENT_SESSION_RENEWED"
     FAILED = "EVENT_FAILED"
 
 
@@ -65,6 +66,7 @@ EVENT_OUTPUT_COPIED = QwenEventType.OUTPUT_COPIED
 EVENT_LOGIN_VERIFIED = QwenEventType.LOGIN_VERIFIED
 EVENT_MODEL_VERIFIED = QwenEventType.MODEL_VERIFIED
 EVENT_SESSION_EXPIRED = QwenEventType.SESSION_EXPIRED
+EVENT_SESSION_RENEWED = QwenEventType.SESSION_RENEWED
 EVENT_FAILED = QwenEventType.FAILED
 
 
@@ -134,6 +136,7 @@ EVENT_DESCRIPTIONS: dict[QwenEventType, str] = {
     QwenEventType.LOGIN_VERIFIED: "Login session verified",
     QwenEventType.MODEL_VERIFIED: "Default model verified",
     QwenEventType.SESSION_EXPIRED: "Session expired — login re-verification required",
+    QwenEventType.SESSION_RENEWED: "Session renewed — refresh token exchanged for new auth session",
 }
 
 __all__ = [
@@ -161,5 +164,6 @@ __all__ = [
     "EVENT_LOGIN_VERIFIED",
     "EVENT_MODEL_VERIFIED",
     "EVENT_SESSION_EXPIRED",
+    "EVENT_SESSION_RENEWED",
     "EVENT_FAILED",
 ]
