@@ -728,7 +728,14 @@ class BrowserAdapter(IBrowserProtocol):
                 log.warning("stale_lock_delete_failed %s %s", lock_path, str(e))
 
     def _launch_context(self, p: Playwright, kwargs: dict[str, Any]) -> BrowserContext:
-        """Launch the persistent context with tenacity retry for transient crashes."""
+        """Launch the persistent context with tenacity retry for transient crashes.
+
+        Launch failures are logged at DEBUG rather than WARNING: a
+        best-effort validation probe (``mode="session-check"``) that
+        cannot launch because the browser binary is missing or crashed
+        must not flood the operator log — the manual login that follows
+        is the path that matters to the user.
+        """
         user_data_dir = kwargs.get("user_data_dir", "")
         if user_data_dir:
             self._clean_stale_locks(user_data_dir)
@@ -737,7 +744,7 @@ class BrowserAdapter(IBrowserProtocol):
             sleep_val = retry_state.next_action.sleep if retry_state.next_action else 2
             if user_data_dir:
                 self._clean_stale_locks(user_data_dir)
-            log.warning(
+            log.debug(
                 "browser_launch_failed_retrying %s %s %s",
                 retry_state.attempt_number,
                 sleep_val,

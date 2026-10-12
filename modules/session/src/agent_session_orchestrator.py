@@ -368,9 +368,14 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
                 self._browser.navigate_to_chat(page, emitter)
                 if self._browser.check_session(page):
                     return True
-        except Exception as exc:
+        except Exception:
+            # Validation is a best-effort fast path: when the headless
+            # probe cannot launch (missing browser binary, sandbox failure,
+            # or CDP crash), it must not poison the manual login that
+            # follows.  Log the detail and fall through so the caller can
+            # still open the visible login window.
             log_debug = self._observability.get_logger().debug
-            log_debug("saved_session_validation_failed", error=str(exc))
+            log_debug("saved_session_validation_failed")
 
         # Initial check failed — attempt a transparent renewal before reporting
         # the session as invalid.
