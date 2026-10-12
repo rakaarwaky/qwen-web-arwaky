@@ -93,11 +93,21 @@ def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
     return SessionOrchestrator(browser=browser, observability=observability)
 
 
-def test_existing_valid_session_skips_visible_login(tmp_path: Path) -> None:
-    """A valid profile reports its state without opening a headed context."""
+def test_existing_valid_session_still_opens_headed_browser(tmp_path: Path) -> None:
+    """A valid profile still opens the headed browser for the login verb.
+
+    The ``login`` verb is the explicit (re)authentication flow: even when a
+    warm ``auth-session`` cookie is present, the orchestrator must enter the
+    headed ``browser_session`` loop so the user can re-authenticate or switch
+    accounts.  The headless "already valid" fast-path belongs to
+    ``validate``/``check``/``health`` verbs, not to ``login``.
+
+    ``context_configs`` therefore contains two entries: the headed login
+    context and the headless post-login validation context.
+    """
     session_path = tmp_path / "session"
     session_path.mkdir()
-    _seed_cookie_db(session_path, future=True)  # live cookie → fast-path may run
+    _seed_cookie_db(session_path, future=True)  # live cookie — but login still opens the browser
     browser = _BrowserHarness([True])
     confirmation = MagicMock()
 
@@ -106,12 +116,12 @@ def test_existing_valid_session_skips_visible_login(tmp_path: Path) -> None:
         session_path=session_path,
     )
 
-    assert "already valid" in result
-    confirmation.assert_not_called()
-    assert len(browser.context_configs) == 1
-    validation_cfg = browser.context_configs[0]
-    assert validation_cfg.mode == "session-check"
-    assert validation_cfg.headless is True
+    assert "completed successfully" in result
+    # Two contexts: headed login + headless post-login validation.
+    assert len(browser.context_configs) == 2
+    assert [cfg.mode for cfg in browser.context_configs] == ["login", "session-check"]
+    assert browser.context_configs[0].headless is False  # login context is headed
+    assert browser.context_configs[1].headless is True  # validation context is headless
 
 
 def test_manual_login_keeps_browser_open_until_confirmation(tmp_path: Path) -> None:
@@ -131,16 +141,16 @@ def test_manual_login_keeps_browser_open_until_confirmation(tmp_path: Path) -> N
 
 
 def test_invalid_saved_session_falls_back_to_manual_login(tmp_path: Path) -> None:
-    """An expired profile is checked first, then replaced through manual login.
+    """An expired profile opens the headed login browser.
     After user closes browser, session-check runs again to validate the new session.
 
-    The cookie gate blocks the fast-path (expired cookie), so the headed login
-    browser opens and the post-login session-check validates the new session.
+    The login verb always opens the headed browser (there is no headless
+    fast-path).  The post-login session-check validates the new session.
     ``check_session`` is called exactly once — after the manual login.
     """
     session_path = tmp_path / "session"
     session_path.mkdir()
-    _seed_cookie_db(session_path, future=False)  # expired cookie → fast-path blocked
+    _seed_cookie_db(session_path, future=False)  # expired cookie
     browser = _BrowserHarness([True])  # post-login check returns True
     confirmation = MagicMock(side_effect=lambda: _assert_browser_active(browser))
 
