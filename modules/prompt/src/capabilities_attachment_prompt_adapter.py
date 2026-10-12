@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -110,6 +111,16 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         """
         self._cancel.cancel_by_event(cancel_event)
 
+    @staticmethod
+    def _resolve_session_path(session_resolver: Callable[[], Path | None] | None) -> Path | None:
+        """Return the pool session path chosen by rotation, or None for default."""
+        if session_resolver is None:
+            return None
+        try:
+            return session_resolver()
+        except Exception:
+            return None
+
     def process_prompt_with_attachment(
         self,
         prompt_file: Path | PromptPath | str,
@@ -118,6 +129,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         headless: HeadlessFlag | bool = True,
         cancel_event: threading.Event | None = None,
         event_observer: LifecycleObserver | None = None,
+        session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
         """Pipeline 3: Process a prompt file from disk with document attachment.
 
@@ -154,6 +166,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                 file_path=att_path,
                 output_path=out_path,
                 headless=headless,
+                session_path=self._resolve_session_path(session_resolver),
             )
             emitter, state = setup_lifecycle_state(self._observability.get_logger(), PIPELINE_EVENT_SEQUENCE)
             if event_observer is not None:
