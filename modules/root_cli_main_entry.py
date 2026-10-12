@@ -457,6 +457,7 @@ def _dispatch(
             container.session_manager,
             container.updater_check,
             container.job_storage,
+            container.session_rotator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 

@@ -44,7 +44,11 @@ from modules.shared.src.contract_prompt_protocol import (
     IPromptFileProtocol,
 )
 from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import ISessionManagerProtocol, IWorkspaceProtocol
+from modules.shared.src.contract_session_protocol import (
+    ISessionManagerProtocol,
+    ISessionRotatorProtocol,
+    IWorkspaceProtocol,
+)
 from modules.shared.src.contract_setup_aggregate import ISetupAggregate
 from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol
@@ -122,6 +126,7 @@ class QwenTuiApp(
         session_manager: ISessionManagerProtocol | None = None,
         updater: IUpdateCheckProtocol | None = None,
         job_storage: IJobStorageProtocol | None = None,
+        session_rotator: ISessionRotatorProtocol | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -135,6 +140,7 @@ class QwenTuiApp(
         self._session_manager = session_manager
         self._updater = updater
         self._job_storage = job_storage
+        self._session_rotator = session_rotator
         self._swarm_id: SwarmId | None = None
         # AR-1: TUI slot config is injected from the Root container, never
         # imported from Capabilities directly.

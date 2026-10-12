@@ -7,9 +7,11 @@ Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +23,7 @@ from textual.widgets import Input, LoadingIndicator
 
 from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
+from modules.shared.src.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 from modules.shared.src.utility_response_normalizer import detect_processing_failure
 
@@ -80,6 +83,28 @@ class _TuiWorkersMixin:
     push_screen: Any
     _session_check_timer: Any
     _log_swarm_msg: Any
+    _session_rotator: Any
+
+    def _session_resolver(self) -> Callable[[], Path | None]:
+        """Pool-session resolver for the TUI prompt pipelines.
+
+        The TUI slot workers build their own AppConfig (via the slot-plan
+        resolver), which would drop any pool selection made upstream and
+        fall back to an empty default session. This resolver asks the
+        session rotator for a healthy pool session on demand; an empty or
+        absent pool yields None so the pipeline keeps its default session.
+        """
+        if self._session_rotator is None:
+            return lambda: None
+
+        def _pick() -> Path | None:
+            try:
+                response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
+                return response.session.path if response.session else None
+            except Exception:
+                return None
+
+        return _pick
 
     # ── Slot run / cancel ────────────────────────────────────────────────
 
@@ -452,6 +477,7 @@ class _TuiWorkersMixin:
                     headless=HeadlessFlag(cfg.headless),
                     cancel_event=slot_cancel_event,
                     event_observer=_on_event,
+                    session_resolver=self._session_resolver(),
                 )
             else:
                 res = self._file_only.process_prompt_file_only(
@@ -460,6 +486,7 @@ class _TuiWorkersMixin:
                     headless=HeadlessFlag(cfg.headless),
                     cancel_event=slot_cancel_event,
                     event_observer=_on_event,
+                    session_resolver=self._session_resolver(),
                 )
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
@@ -528,6 +555,7 @@ class _TuiWorkersMixin:
                 output_file=Path(output_val) if output_val.strip() else None,
                 headless=HeadlessFlag(headless),
                 event_observer=_on_event,
+                session_resolver=self._session_resolver(),
             )
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
