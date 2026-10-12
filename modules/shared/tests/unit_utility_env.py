@@ -83,7 +83,7 @@ def test_unknown_env_vars_reports_a_typo():
 
 
 def test_unknown_env_vars_ignores_non_qwen_names():
-    assert unknown_env_vars({"HOME": "/root", "OTEL_SERVICE_NAME": "qwen-web"}) == ()
+    assert unknown_env_vars({"HOME": "/root", "OTEL_SERVICE_NAME": "qwen-web-arwaky"}) == ()
 
 
 def test_validate_env_accepts_a_clean_environment():

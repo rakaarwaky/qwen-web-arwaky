@@ -40,7 +40,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         """Initialize workspace in 4 sequential steps:
 
         Step 1: Ensure XDG directories exist
-        Step 2: Provision .agents/skills/qwen-web/SKILL.md from embedded constant
+        Step 2: Provision .agents/skills/qwen-web-arwaky/SKILL.md from embedded constant
         Step 3: Provision .qwen-web-arwaky directory with symlinks
         Step 4: Update .gitignore with .qwen-web-arwaky/ entry
         """
@@ -51,8 +51,8 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         DEFAULT_OUTPUT.mkdir(parents=True, exist_ok=True)
         DEFAULT_LOG.mkdir(parents=True, exist_ok=True)
 
-        # Step 2: Create .agents/skills/qwen-web/SKILL.md from embedded constant
-        skills_dir = target_path / ".agents" / "skills" / "qwen-web"
+        # Step 2: Create .agents/skills/qwen-web-arwaky/SKILL.md from embedded constant
+        skills_dir = target_path / ".agents" / "skills" / "qwen-web-arwaky"
         skills_dir.mkdir(parents=True, exist_ok=True)
         skill_md_dest = skills_dir / "SKILL.md"
         skill_md_dest.write_text(EMBEDDED_SKILL_MD, encoding="utf-8")

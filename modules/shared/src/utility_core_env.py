@@ -69,7 +69,7 @@ SENTRY_DSN = "SENTRY_DSN"
 REGISTERED_ENV: tuple[tuple[str, str, str, bool], ...] = (
     (ENVIRONMENT, "deployment mode; switches log rendering between console and JSON", "production", False),
     (OTEL_EXPORTER_OTLP_ENDPOINT, "OTLP HTTP endpoint for trace export; empty leaves tracing on no-op", "", False),
-    (OTEL_SERVICE_NAME, "service name reported to OpenTelemetry resources", "qwen-web", False),
+    (OTEL_SERVICE_NAME, "service name reported to OpenTelemetry resources", "qwen-web-arwaky", False),
     (PLAYWRIGHT_BROWSERS_PATH, "override the Playwright browser cache directory", "platform default", False),
     (QWA_SWARM_HEADLESS, "force Swarm browsers headed when '0' or 'false' (default: headless)", "headless", False),
     (QWEN_DEFAULT_MODEL, "model pinned at chat start; empty falls back to Qwen3.8-Max", "Qwen3.8-Max", False),

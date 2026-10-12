@@ -1,5 +1,5 @@
 ---
-name: qwen-web-arwaky-arwaky-arwaky
+name: qwen-web-arwaky
 description: >
   Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max model by default —
   zero API keys, persistent browser sessions. The model is configurable via the

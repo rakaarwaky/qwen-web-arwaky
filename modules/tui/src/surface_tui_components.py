@@ -314,7 +314,7 @@ class QwenTuiRichLog(RichLog):
 class QwenTuiLogHandler(logging.Handler):
     """Logging handler streaming stdlib and structlog records to Textual RichLog per slot."""
 
-    # P2: only surface records from the qwen-web stack. Third-party libraries
+    # P2: only surface records from the qwen-web-arwaky stack. Third-party libraries
     # (urllib3, PIL, playwright, httpx, asyncio, ...) also emit through the
     # root logger and must not flood the TUI log views. Records on the root
     # logger itself (empty name) are kept.
@@ -337,7 +337,7 @@ class QwenTuiLogHandler(logging.Handler):
         self._app = app
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """Keep only records from the qwen-web stack or the root logger."""
+        """Keep only records from the qwen-web-arwaky stack or the root logger."""
         name = record.name or ""
         return not name or name.startswith(self._APP_PREFIXES)
 

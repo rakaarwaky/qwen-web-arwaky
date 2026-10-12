@@ -44,6 +44,7 @@ from modules.shared.src.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
+    LOCAL_WS_DIR,
 )
 from modules.shared.src.taxonomy_core_vo import AppConfig
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
@@ -84,7 +85,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     # ── init ──────────────────────────────────────────────────────────────────
-    p_init = sub.add_parser("init", help="Initialize workspace (.agents/skills + .qwen-web symlinks)", parents=[parent])
+    p_init = sub.add_parser(
+        "init", help="Initialize workspace (.agents/skills + .qwen-web-arwaky symlinks)", parents=[parent]
+    )
     p_init.add_argument("--dir", dest="target_dir", default=None, help="Target directory (default: cwd)")
 
     # ── update ────────────────────────────────────────────────────────────────
@@ -335,11 +338,12 @@ def _build_config(args: argparse.Namespace) -> AppConfig:
     if raw_output:
         out_p = Path(raw_output)
     else:
-        # Prefer the project-local .qwen-web/output when it is a symlink to the
-        # XDG DEFAULT_OUTPUT (i.e. `qwa init` was run). Otherwise fall back to
-        # the XDG DEFAULT_OUTPUT directly so output always lands in the
-        # standardized location even if the local dir is missing or stale.
-        local_out = Path.cwd() / ".qwen-web" / "output"
+        # Prefer the project-local .qwen-web-arwaky/output when it is a
+        # symlink to the XDG DEFAULT_OUTPUT (i.e. `qwa init` was run).
+        # Otherwise fall back to the XDG DEFAULT_OUTPUT directly so output
+        # always lands in the standardized location even if the local dir is
+        # missing or stale.
+        local_out = Path.cwd() / LOCAL_WS_DIR / "output"
         if local_out.is_dir() and not local_out.is_symlink():
             # A real directory means `qwa init` was not run; use XDG.
             base_dir = DEFAULT_OUTPUT

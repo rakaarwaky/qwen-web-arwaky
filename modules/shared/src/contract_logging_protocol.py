@@ -48,7 +48,7 @@ class IObservabilityProtocol(ABC):
         ...
 
     @abstractmethod
-    def get_logger(self, name: LoggerName = LoggerName("qwen-web")) -> Any:
+    def get_logger(self, name: LoggerName = LoggerName("qwen-web-arwaky")) -> Any:
         """Return a bound logger."""
         ...
 

@@ -19,8 +19,8 @@ class TestQwaInit(unittest.TestCase):
             container = SharedContainer()
             container.workspace.init_workspace(target_path)
 
-            # 1. Verify .agents/skills/qwen-web/SKILL.md
-            skill_md = target_path / ".agents" / "skills" / "qwen-web" / "SKILL.md"
+            # 1. Verify .agents/skills/qwen-web-arwaky/SKILL.md
+            skill_md = target_path / ".agents" / "skills" / "qwen-web-arwaky" / "SKILL.md"
             self.assertTrue(skill_md.exists())
             content = skill_md.read_text(encoding="utf-8")
             self.assertIn("name: qwen-web-arwaky", content)

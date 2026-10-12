@@ -94,12 +94,12 @@ def clear_run_context() -> None:
     _obs_clear()
 
 
-def get_logger(name="qwen-web"):
+def get_logger(name="qwen-web-arwaky"):
     """Standalone wrapper for private module function."""
     return _obs_get_logger(name)
 
 
-def get_tracer(name="qwen-web"):
+def get_tracer(name="qwen-web-arwaky"):
     """Standalone wrapper for private module function."""
     return _obs_get_tracer(name)
 

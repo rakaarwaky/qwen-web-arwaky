@@ -25,7 +25,7 @@ def _container_with_single_pool() -> MagicMock:
             SessionInfo(
                 session_id="session_1",
                 name="session_1",
-                path=Path("/home/raka/.qwen-web/sessions/session_1"),
+                path=Path("/home/raka/.qwen-web-arwaky/sessions/session_1"),
                 status=SessionStatus.ACTIVE,
                 created_at=datetime(2026, 1, 1),
             ),

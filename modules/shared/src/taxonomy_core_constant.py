@@ -1,4 +1,4 @@
-"""Core domain + cross-cutting constants for qwen-web: chat URL,
+"""Core domain + cross-cutting constants for qwen-web-arwaky: chat URL,
 service name, DOM selectors, and auth/challenge keywords.
 
 Taxonomy layer (taxonomy(constant)): pure literals and constant values only.
@@ -149,7 +149,7 @@ RATE_LIMIT_KEYWORDS: tuple[str, ...] = (
     "there was an issue connecting to",
 )
 
-SERVICE_NAME = "qwen-web"
+SERVICE_NAME = "qwen-web-arwaky"
 
 SD_NOTIFY_READY = "READY=1"
 SD_NOTIFY_STOPPING = "STOPPING=1"
