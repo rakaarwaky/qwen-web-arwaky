@@ -137,9 +137,25 @@ def install_package(python_bin: Path) -> None:
 
 
 def install_playwright(python_bin: Path) -> None:
-    """Download the Playwright Chromium binary into the venv cache."""
+    """Download the Playwright Chromium binary into the venv cache.
+
+    A network-restricted host may fail this step while the package install
+    itself has already succeeded.  Log a clear, actionable hint instead of
+    aborting the whole install, so the operator can still use a pre-cached
+    browser binary or run the download manually (longer timeout / mirror).
+    The CLI remains usable either way.
+    """
     log("🌐 [install] Installing Playwright Chromium browser binary...")
-    subprocess.run([str(python_bin), "-m", "playwright", "install", "chromium"], check=True)
+    try:
+        subprocess.run(
+            [str(python_bin), "-m", "playwright", "install", "chromium"],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        log("⚠ [install] Playwright Chromium download failed (network restricted?).")
+        log("  The CLI is still installed; use a cached browser binary, or run:")
+        log(f"    {python_bin} -m playwright install chromium")
+        log("  and retry once the network allows it.")
 
 
 def setup_xdg_directories(python_bin: Path) -> None:
