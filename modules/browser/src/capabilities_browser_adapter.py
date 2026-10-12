@@ -53,7 +53,7 @@ from modules.shared.src.utility_browser_async_loop import isolate_thread_event_l
 from modules.shared.src.utility_dom_helper import click_first_visible_enabled, is_any_visible
 from modules.shared.src.utility_logger_factory import get_logger
 from modules.shared.src.utility_session_cloner import create_ephemeral_session
-from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+from modules.shared.src.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
 
 log = get_logger("browser")
 
@@ -612,7 +612,7 @@ class BrowserAdapter(IBrowserProtocol):
         # Login mode: create_ephemeral_session yields the master path directly,
         # so any cookie the browser writes persists to the master profile.
         with create_ephemeral_session(master_session, mode="login") as session_dir:
-            chrome_bin = find_chrome_binary()
+            chrome_bin = find_chrome_binary(headless=bool(getattr(cfg, "headless", False)))
             chrome_args = [
                 "--disable-blink-features=AutomationControlled",
                 "--disable-session-crashed-bubble",
@@ -636,7 +636,14 @@ class BrowserAdapter(IBrowserProtocol):
                 "viewport": {"width": 1280, "height": 800},
             }
             if chrome_bin and Path(chrome_bin).exists():
-                kwargs["executable_path"] = chrome_bin
+                if getattr(cfg, "headless", False) or not is_headless_shell_binary(chrome_bin):
+                    kwargs["executable_path"] = chrome_bin
+                else:
+                    # Headful launch but only a headless-shell build is
+                    # available: drop executable_path and let Playwright use
+                    # the system Chrome channel so a visible window opens.
+                    kwargs["channel"] = "chrome"
+                    log.info("browser_headful_fallback_system_chrome")
 
             with sync_playwright() as p:
                 ctx = self._launch_context(p, kwargs)
@@ -665,7 +672,8 @@ class BrowserAdapter(IBrowserProtocol):
         mode = getattr(cfg, "mode", "")
 
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            chrome_bin = find_chrome_binary()
+            headless = bool(getattr(cfg, "headless", False))
+            chrome_bin = find_chrome_binary(headless=headless)
             chrome_args = [
                 "--disable-blink-features=AutomationControlled",
                 "--disable-session-crashed-bubble",
@@ -673,7 +681,7 @@ class BrowserAdapter(IBrowserProtocol):
             ]
             if getattr(cfg, "disable_sandbox", False):
                 chrome_args.append("--no-sandbox")
-            if getattr(cfg, "headless", False):
+            if headless:
                 chrome_args.extend(
                     [
                         "--disable-gpu",
@@ -684,12 +692,19 @@ class BrowserAdapter(IBrowserProtocol):
             kwargs: dict[str, Any] = {
                 "user_data_dir": str(session_dir),
                 "channel": None,
-                "headless": bool(getattr(cfg, "headless", False)),
+                "headless": headless,
                 "args": chrome_args,
                 "viewport": {"width": 1280, "height": 800},
             }
             if chrome_bin and Path(chrome_bin).exists():
-                kwargs["executable_path"] = chrome_bin
+                if headless or not is_headless_shell_binary(chrome_bin):
+                    kwargs["executable_path"] = chrome_bin
+                else:
+                    # Headful launch but only a headless-shell build is
+                    # available: drop executable_path and let Playwright use
+                    # the system Chrome channel so a visible window opens.
+                    kwargs["channel"] = "chrome"
+                    log.info("browser_headful_fallback_system_chrome")
 
             with sync_playwright() as p:
                 ctx = self._launch_context(p, kwargs)
@@ -762,7 +777,7 @@ class BrowserAdapter(IBrowserProtocol):
             _TARGET_MODEL.set(override.strip())
 
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            chrome_bin = find_chrome_binary()
+            chrome_bin = find_chrome_binary(headless=cfg.headless)
 
             chrome_args = [
                 "--disable-blink-features=AutomationControlled",
@@ -789,7 +804,14 @@ class BrowserAdapter(IBrowserProtocol):
             }
 
             if chrome_bin and Path(chrome_bin).exists():
-                kwargs["executable_path"] = chrome_bin
+                if cfg.headless or not is_headless_shell_binary(chrome_bin):
+                    kwargs["executable_path"] = chrome_bin
+                else:
+                    # Headful launch but only a headless-shell build is
+                    # available: drop executable_path and let Playwright use
+                    # the system Chrome channel so a visible window opens.
+                    kwargs["channel"] = "chrome"
+                    log.info("browser_headful_fallback_system_chrome")
 
             isolate_thread_event_loop()
 

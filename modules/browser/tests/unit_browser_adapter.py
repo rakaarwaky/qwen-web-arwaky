@@ -15,6 +15,21 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
+from modules.shared.src.taxonomy_core_vo import AppConfig
+
+
+def _make_cfg(tmp_path: Path, mode: str, headless: bool, **extra: object) -> AppConfig:
+    """Build a minimal AppConfig for launch-path tests."""
+    session = tmp_path / f"session_{mode or 'default'}"
+    session.mkdir(parents=True, exist_ok=True)
+    return AppConfig(
+        mode=mode,
+        input_path=tmp_path / "in",
+        output_path=tmp_path / "out",
+        session_path=session,
+        headless=headless,
+        **extra,
+    )
 
 
 def _make_page_mock(body_text: str = "", banner_shell_visible: bool = False):
