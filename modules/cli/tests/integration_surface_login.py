@@ -2,12 +2,45 @@
 
 from __future__ import annotations
 
+import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+
+#: Seconds added to the Chromium epoch to produce a future expiry.
+_FUTURE_EXPIRY_OFFSET_SEC: int = 3600
+
+
+def _seed_cookie_db(profile_dir: Path, *, cookie: str = "auth-session", future: bool = True) -> None:
+    """Write a minimal Chromium ``Default/Cookies`` SQLite DB into *profile_dir*.
+
+    Seeds the cookie the orchestrator's cookie gate reads before allowing the
+    fast-path to skip the visible login window.  ``future=True`` gives the
+    cookie an expiry one hour from now so the profile looks valid.
+    """
+    cookie_dir = profile_dir / "Default"
+    cookie_dir.mkdir(parents=True, exist_ok=True)
+    db = cookie_dir / "Cookies"
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cookies ("
+            " id INTEGER PRIMARY KEY, host_key TEXT, name TEXT, "
+            " value TEXT, expires_utc INTEGER, is_persistent INTEGER)"
+        )
+        now = datetime.now(timezone.utc)
+        expires = int((now.timestamp() + _FUTURE_EXPIRY_OFFSET_SEC + 11644473600.0) * 1_000_000) if future else 0
+        conn.execute(
+            "INSERT INTO cookies (host_key, name, value, expires_utc, is_persistent) VALUES (?, ?, ?, ?, ?)",
+            (".qwen.ai", cookie, "test-token", expires, 1),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 class _BrowserHarness:
@@ -64,6 +97,7 @@ def test_existing_valid_session_skips_visible_login(tmp_path: Path) -> None:
     """A valid profile reports its state without opening a headed context."""
     session_path = tmp_path / "session"
     session_path.mkdir()
+    _seed_cookie_db(session_path, future=True)  # live cookie → fast-path may run
     browser = _BrowserHarness([True])
     confirmation = MagicMock()
 
@@ -98,10 +132,16 @@ def test_manual_login_keeps_browser_open_until_confirmation(tmp_path: Path) -> N
 
 def test_invalid_saved_session_falls_back_to_manual_login(tmp_path: Path) -> None:
     """An expired profile is checked first, then replaced through manual login.
-    After user closes browser, session-check runs again to validate the new session."""
+    After user closes browser, session-check runs again to validate the new session.
+
+    The cookie gate blocks the fast-path (expired cookie), so the headed login
+    browser opens and the post-login session-check validates the new session.
+    ``check_session`` is called exactly once — after the manual login.
+    """
     session_path = tmp_path / "session"
     session_path.mkdir()
-    browser = _BrowserHarness([False, True])
+    _seed_cookie_db(session_path, future=False)  # expired cookie → fast-path blocked
+    browser = _BrowserHarness([True])  # post-login check returns True
     confirmation = MagicMock(side_effect=lambda: _assert_browser_active(browser))
 
     result = _orchestrator(browser).setup_session(
@@ -110,7 +150,7 @@ def test_invalid_saved_session_falls_back_to_manual_login(tmp_path: Path) -> Non
     )
 
     assert "completed successfully" in result
-    assert [cfg.mode for cfg in browser.context_configs] == ["session-check", "login", "session-check"]
+    assert [cfg.mode for cfg in browser.context_configs] == ["login", "session-check"]
 
 
 def test_manual_login_reports_invalid_final_state(tmp_path: Path) -> None:

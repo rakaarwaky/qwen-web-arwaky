@@ -250,12 +250,13 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
     fake_sessions = tmp_path / "share" / "sessions"
     fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
-    # Stub out the validation helper so the orchestrator proceeds past
-    # the fast-path without a real browser.
+    # Stub out the validation helper and the cookie gate so the orchestrator
+    # proceeds past the fast-path without a real browser.
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
         patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.is_auth_session_expired", return_value=False),
     ):
         build.return_value.session_path = fake_default
         # browser_headless=True is explicitly passed by the caller — the
@@ -269,3 +270,38 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
     login_call = build.mock_calls[0]
     login_kwargs = login_call.kwargs
     assert login_kwargs["headless"] is False, "login verb must force headless=False regardless of browser_headless flag"
+
+
+# ── Regression: empty profile must not fast-path to "Session already valid" ──
+
+
+def test_empty_profile_dir_does_not_fast_path_to_valid(tmp_path: Path) -> None:
+    """An empty or guest-only profile dir must not claim the session is valid.
+
+    ``cmd_login`` creates the profile dir before calling the orchestrator.
+    Without a live ``auth-session`` cookie the browser liveness probe still
+    succeeds (the chat UI renders in guest mode), so the old fast-path
+    skipped the headed login window and reported "Session already valid" for
+    a profile that had never been logged in.  The fix gates the fast-path on
+    ``is_auth_session_expired`` returning False (i.e. a live cookie exists).
+    """
+    orch = _orchestrator()
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
+    fake_default.mkdir(parents=True)
+    # No cookie DB is seeded, so is_auth_session_expired returns True
+    # (empty profile) and the fast-path must be skipped.
+    with (
+        patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.is_auth_session_expired") as probe,
+    ):
+        build.return_value.session_path = fake_default
+        probe.return_value = True  # no live cookie → fast-path must not run
+        response = orch.execute_setup(SetupRequest(profile_path=fake_default, name="default"))
+
+    # The fast-path "Session already valid." must NOT have been returned.
+    assert response.message != "Session already valid.", "empty profile must not fast-path to 'Session already valid'"
+    # The cookie probe must have been consulted before the fast-path.
+    probe.assert_called_once_with(fake_default)
