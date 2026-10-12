@@ -1298,13 +1298,18 @@ HelpScreen {
     color: $status_err;
 }
 
+/* The card foot's two per-account action buttons: ⚗ (flask) triggers the
+   pool health check (same probe as 'qwa session health'); 🗑 (trash)
+   deletes the pool entry + profile (same logic as 'qwa session remove').
+   Both are icon-only, 4 cells wide (was 6 for the 4-char text labels). */
 .account-btn {
-    width: 6;
-    min-width: 6;
+    width: 4;
+    min-width: 4;
     height: 2;
     border: none;
     background: $bg_hover;
     text-style: bold;
+    content-align: center middle;
 }
 
 .account-btn-test {
@@ -1312,8 +1317,14 @@ HelpScreen {
     margin-right: 1;
 }
 
-.account-btn-disconnect {
-    color: $status_err;
+.account-btn-delete {
+    color: $danger_fg;
+    background: $danger_bg;
+}
+
+.account-btn-delete:hover {
+    background: $status_err;
+    color: $bg_base;
 }
 
 .account-btn:hover {

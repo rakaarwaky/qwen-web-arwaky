@@ -66,10 +66,10 @@ class _TuiEventsMixin:
             if position.isdigit():
                 self._account_button_pressed("test", int(position))
             return
-        if button_name.startswith("account-disconnect-"):
-            position = button_name.removeprefix("account-disconnect-")
+        if button_name.startswith("account-delete-"):
+            position = button_name.removeprefix("account-delete-")
             if position.isdigit():
-                self._account_button_pressed("disconnect", int(position))
+                self._account_button_pressed("delete", int(position))
             return
         if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
             self._swarm_button_pressed(button_id)
