@@ -118,7 +118,7 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
 
         Resolves the profile path (``profile_path`` when set, otherwise
         ``SESSIONS_DIR / name``), fast-paths when the saved session is still
-        valid, then opens a headed browser, navigates to chat.qwen.ai, and
+        valid, then opens a **headed browser**, navigates to chat.qwen.ai, and
         waits for the browser to close or the confirmation callback to fire.
         On success the profile is snapshotted and registered in the session
         pool so rotation and ``session list`` see it.
@@ -132,7 +132,11 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
             input_path=DEFAULT_OUTPUT,
             output_path=DEFAULT_OUTPUT,
             session_path=profile_path,
-            headless=request.browser_headless,
+            # Manual login requires a visible browser window (AES205:
+            # the user types credentials, so a hidden browser makes no
+            # sense). Force headless=False unconditionally regardless of
+            # the flag value passed by the caller.
+            headless=False,
         )
 
         if cfg.session_path.is_dir() and self._validate_saved_session(cfg):
@@ -177,7 +181,7 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
                     "session_backup_failed", error=str(exc), session_path=str(cfg.session_path)
                 )
             # Register the profile in the session pool so rotation and
-            # `session list` can see it. add_session is idempotent: when
+            # ``session list`` can see it. add_session is idempotent: when
             # the profile is already in the pool the existing entry is
             # updated in place rather than duplicated.
             if self._sessions is not None:
@@ -221,6 +225,10 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
             input_path=DEFAULT_OUTPUT,
             output_path=DEFAULT_OUTPUT,
             session_path=profile_path,
+            # Manual login requires a visible browser window (AES205:
+            # the user types credentials, so a hidden browser makes no
+            # sense). Force headless=False unconditionally regardless of
+            # the flag value passed by the caller.
             headless=False,
         )
 

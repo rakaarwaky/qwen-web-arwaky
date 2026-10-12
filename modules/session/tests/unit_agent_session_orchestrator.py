@@ -23,6 +23,7 @@ from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.taxonomy_core_error import QwenCliError
 from modules.shared.src.taxonomy_session_vo import SessionRequest
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.shared.src.utility_session_guard import is_filesystem_root, is_safe_session_target
 
 
@@ -242,3 +243,58 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     assert "device busy" in message
     assert str(fake_default) in message
     assert "partial" in message.lower()
+
+
+# ── Regression: login verb must force headless=False ──────────────────────────
+
+
+def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
+    """The login verb must never launch a hidden browser.
+
+    Manual credential entry (typing a CAPTCHA, entering a password) requires a
+    visible window. Even when the caller passes ``browser_headless=True`` via
+    a ``SetupRequest``, the orchestrator must build the login ``AppConfig``
+    with ``headless=False`` so the browser adapter receives a headed launch.
+    """
+    orch = _orchestrator()
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
+    fake_default.mkdir(parents=True)
+    # Stub out the validation helper so the orchestrator proceeds past
+    # the fast-path without a real browser.
+    with (
+        patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+    ):
+        build.return_value.session_path = fake_default
+        # browser_headless=True is explicitly passed by the caller — the
+        # orchestrator must ignore it.
+        orch.execute_setup(SetupRequest(profile_path=fake_default, name="default", browser_headless=True))
+    # The login call must have requested a visible browser (headless=False).
+    # build_app_config is called twice: once for the login config, once for
+    # the post-login validation config. Both must carry headless=False for
+    # the login verb path (the validation helper uses headless=True but that
+    # is the headless session-check path, not the login browser launch).
+    login_call = build.mock_calls[0]
+    login_kwargs = login_call.kwargs
+    assert login_kwargs["headless"] is False, "login verb must force headless=False regardless of browser_headless flag"
+
+
+def test_login_verb_sets_headless_false_even_when_default_is_true(tmp_path: Path) -> None:
+    """When no ``browser_headless`` is set (default False), the login path
+    still explicitly builds with ``headless=False`` so a future default change
+    to True in ``build_app_config`` does not silently hide the login window."""
+    orch = _orchestrator()
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
+    fake_default.mkdir(parents=True)
+    with (
+        patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
+        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+    ):
+        build.return_value.session_path = fake_default
+        orch.execute_setup(SetupRequest(profile_path=fake_default, name="default"))
+    login_call = build.mock_calls[0]
+    assert login_call.kwargs["headless"] is False
