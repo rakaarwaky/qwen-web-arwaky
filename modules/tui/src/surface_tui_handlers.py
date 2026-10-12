@@ -81,6 +81,7 @@ class _TuiHandlersMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
+    _last_delete_name: str
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 
@@ -152,20 +153,79 @@ class _TuiHandlersMixin:
         session = cache[position - 1] if 0 < position <= len(cache) else None
         name = str(getattr(session, "name", "") or f"session {position}")
         if action == "test":
-            # The pool health check is the only real connectivity probe this
-            # build has, so one card's TEST runs it rather than inventing a
-            # single-session result from the last stored state.
+            # The pool health check is the same probe the CLI 'session health'
+            # verb runs, so one card's test icon runs it rather than inventing
+            # a single-session result from the last stored state.
             self._log_msg("[bold {}]TEST:[/] Checking connection for {}.".format(THEME["accent_fg"], escape(name)))
             self._run_session_health_check()
             return
-        # Disconnecting drops the stored auth session. That is an approved-
-        # only operation, so the card points at the CLI command instead of
-        # doing it from the UI.
-        self.notify(
-            f"Run 'qwa session remove {name}' to disconnect.",
-            title="Disconnect",
-            severity="information",
+        # Delete drops the stored auth session and its profile. That is an
+        # approved-only operation: the confirm modal guards it, and the
+        # worker runs the same logic as 'qwa session remove'.
+        self._confirm_delete_session(name)
+
+    def _confirm_delete_session(self, name: str) -> None:
+        """Ask for confirmation before deleting a session from the pool."""
+        self._last_delete_name = name
+        self.push_screen(
+            ConfirmModal(
+                "Delete Session",
+                f"Delete '{name}' from the pool and remove its browser profile?\n"
+                "This cannot be undone without re-logging in.",
+                confirm_label="Delete",
+            ),
+            self._run_delete_session,
         )
+
+    @work(thread=True)
+    def _run_delete_session(self, confirmed: bool) -> None:
+        """Run the session delete in a background thread.
+
+        Mirrors the CLI 'session remove' command: remove the pool entry,
+        then delete the Chromium profile (the profile delete runs through
+        SessionManager.delete_session_profile which carries all the
+        path-safety guards).
+        """
+        if not confirmed:
+            return
+        manager = getattr(self, "_session_manager", None)
+        cache: list[Any] = getattr(self, "_sessions_cache", [])
+        if manager is None or not cache:
+            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
+            return
+        # Resolve the captured name against the current pool so a stale card
+        # (re-rendered while the modal was up) can't delete the wrong session.
+        name = str(getattr(self, "_last_delete_name", ""))
+        session = next((s for s in cache if str(getattr(s, "name", "")) == name), None)
+        if session is None:
+            self.call_from_thread(self._log_msg, "[yellow]Session no longer in pool — nothing to delete.[/]")
+            return
+        try:
+            if not manager.remove_session(session.session_id):
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DELETE:[/] Could not remove '{}' from the pool.".format(THEME["err"], escape(name)),
+                )
+                return
+            try:
+                manager.delete_session_profile(session.path)
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DELETE:[/] Removed '{}' from pool and deleted its profile.".format(
+                        THEME["ok"], escape(name)
+                    ),
+                )
+            except Exception as exc:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DELETE:[/] Pool entry removed, profile kept: {}.".format(THEME["warn"], escape(str(exc))),
+                )
+            self.call_from_thread(self._refresh_sessions_table)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]DELETE ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
 
     def _ensure_sessions_loaded(self) -> None:
         """Fetch the account pool the first time the Sessions pane is opened."""
