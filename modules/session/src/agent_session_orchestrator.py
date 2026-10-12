@@ -36,7 +36,6 @@ from modules.shared.src.taxonomy_session_vo import (
 from modules.shared.src.taxonomy_setup_vo import SetupRequest, SetupResponse
 from modules.shared.src.utility_config_app_factory import build_app_config
 from modules.shared.src.utility_core_session_backup import take_snapshot
-from modules.shared.src.utility_session_renewal_cookie_probe import is_auth_session_expired
 
 
 class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
@@ -124,12 +123,13 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
         """Run the interactive manual-login flow from a ``SetupRequest``.
 
         Resolves the profile path (``profile_path`` when set, otherwise
-        ``SESSIONS_DIR / name``), fast-paths when the saved session still holds
-        a live ``auth-session`` cookie and the browser probe confirms it, then
-        opens a **headed browser**, navigates to chat.qwen.ai, and
-        waits for the browser to close or the confirmation callback to fire.
-        On success the profile is snapshotted and registered in the session
-        pool so rotation and ``session list`` see it.
+        ``SESSIONS_DIR / name``), then opens a **headed browser** (the
+        ``login`` verb is the explicit (re)authentication flow and must always
+        show a window — the headless "already valid" fast-path belongs to the
+        ``validate``/``check``/``health`` verbs, not here), navigates to
+        chat.qwen.ai, and waits for the browser to close or the confirmation
+        callback to fire.  On success the profile is snapshotted and
+        registered in the session pool so rotation and ``session list`` see it.
         """
         profile_path = request.profile_path
         if profile_path is None:
@@ -147,19 +147,16 @@ class SessionOrchestrator(ISessionAggregate, ISetupAggregate):
             headless=False,
         )
 
-        # The fast path may only skip the visible login window when the
-        # profile actually holds a live ``auth-session`` cookie. An empty or
-        # guest-only profile passes the browser liveness probe (the chat UI
-        # renders in guest mode) but has no credentials, so it must fall
-        # through to the headed browser so the user can log in.
-        has_credentials = cfg.session_path.is_dir() and not is_auth_session_expired(cfg.session_path)
-        if has_credentials and self._validate_saved_session(cfg):
-            return SetupResponse(
-                success=True,
-                profile_path=str(cfg.session_path),
-                message="Session already valid.",
-            )
-
+        # The ``login`` verb is the user explicitly asking to (re)authenticate,
+        # so it must always open a visible browser window.  The headless
+        # "Session already valid." fast-path belongs to the ``validate`` /
+        # ``check`` / ``health`` verbs, not to ``login``.  Silently skipping
+        # the browser because a warm cookie is still present would make
+        # ``qwa session login`` unable to switch accounts or re-login — and on
+        # a second run for the same profile name it would never show the
+        # browser window the operator expects.  Drop the fast-path entirely;
+        # the post-login ``_validate_saved_session`` call below still
+        # confirms the result.
         with self._browser.browser_session(cfg) as bctx:
             page = bctx.pages[0] if bctx.pages else bctx.new_page()
             page.goto(CHAT_URL, wait_until="domcontentloaded")
