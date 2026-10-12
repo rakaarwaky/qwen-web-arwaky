@@ -40,7 +40,7 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
 
     with (
         patch("sys.stdin") as mock_stdin,
-        patch("modules.cli.src.surface_cli_tui_app.QwenTuiApp") as mock_app,
+        patch("modules.tui.src.surface_tui_app.QwenTuiApp") as mock_app,
     ):
         mock_stdin.isatty.return_value = True
         result = controller.run()

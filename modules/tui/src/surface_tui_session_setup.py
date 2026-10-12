@@ -18,7 +18,7 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
-from modules.cli.src.surface_cli_tui_components import ConfirmModal
+from modules.tui.src.surface_tui_components import ConfirmModal
 
 
 class SessionSetupScreen(Screen[None]):

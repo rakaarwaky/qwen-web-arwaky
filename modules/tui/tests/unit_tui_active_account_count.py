@@ -12,12 +12,12 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.cli.src.surface_cli_tui_app import QwenTuiApp
 from modules.shared.src.taxonomy_session_vo import (
     SessionInfo,
     SessionPool,
     SessionStatus,
 )
+from modules.tui.src.surface_tui_app import QwenTuiApp
 
 
 def _make_app(session_manager: MagicMock) -> QwenTuiApp:

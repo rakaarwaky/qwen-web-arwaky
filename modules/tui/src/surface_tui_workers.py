@@ -2,7 +2,7 @@
 
 Surface layer (surface_cli): Mixin providing all ``@work(thread=True)``
 workers, slot run/cancel/finalise cycle, session badge refresh, and login.
-Imported by :class:`~modules.cli.src.surface_cli_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -21,11 +21,11 @@ from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.widgets import Input, LoadingIndicator
 
-from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
 from modules.shared.src.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
 from modules.shared.src.utility_response_normalizer import detect_processing_failure
+from modules.tui.src.surface_tui_css import THEME
 
 # A badge write can land while the app is tearing down: the worker thread's
 # ``call_from_thread`` is queued on the event loop and keeps running after the
@@ -233,7 +233,7 @@ class _TuiWorkersMixin:
                 if confirmed and self._slot_workers.get(slot_id) is worker:
                     self._do_cancel_slot(slot_id)
 
-            from modules.cli.src.surface_cli_tui_components import ConfirmModal
+            from modules.tui.src.surface_tui_components import ConfirmModal
 
             self.push_screen(
                 ConfirmModal(

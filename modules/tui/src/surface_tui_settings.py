@@ -21,7 +21,6 @@ from typing import Any
 from rich.markup import escape
 from textual.widgets import Input, Static
 
-from modules.cli.src.surface_cli_tui_css import THEME
 from modules.shared.src.utility_core_env import (
     REGISTERED_ENV,
     clear_settings,
@@ -31,6 +30,7 @@ from modules.shared.src.utility_core_env import (
     settings_path,
     validate_env,
 )
+from modules.tui.src.surface_tui_css import THEME
 
 #: Override records go to the Overview event log (slot 0), not to a slot's
 #: event log: a change to a process-wide value belongs to no single slot.

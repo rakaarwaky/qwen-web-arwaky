@@ -23,18 +23,6 @@ from textual.binding import Binding
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input
 
-from modules.cli.src.surface_cli_tui_components import (
-    ConfirmModal,
-    TemplatePickerModal,
-)
-from modules.cli.src.surface_cli_tui_compose import _TuiComposeMixin
-from modules.cli.src.surface_cli_tui_css import THEME, TUI_CSS
-from modules.cli.src.surface_cli_tui_events import _TuiEventsMixin
-from modules.cli.src.surface_cli_tui_handlers import _TuiHandlersMixin
-from modules.cli.src.surface_cli_tui_sessions_worker import _TuiSessionsWorkerMixin
-from modules.cli.src.surface_cli_tui_settings import _TuiSettingsMixin
-from modules.cli.src.surface_cli_tui_utils import _TuiUtilsMixin
-from modules.cli.src.surface_cli_tui_workers import _TuiWorkersMixin
 from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
 from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
@@ -55,6 +43,18 @@ from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.taxonomy_swarm_vo import SwarmId
 from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.utility_core_version import get_package_version
+from modules.tui.src.surface_tui_components import (
+    ConfirmModal,
+    TemplatePickerModal,
+)
+from modules.tui.src.surface_tui_compose import _TuiComposeMixin
+from modules.tui.src.surface_tui_css import THEME, TUI_CSS
+from modules.tui.src.surface_tui_events import _TuiEventsMixin
+from modules.tui.src.surface_tui_handlers import _TuiHandlersMixin
+from modules.tui.src.surface_tui_sessions_worker import _TuiSessionsWorkerMixin
+from modules.tui.src.surface_tui_settings import _TuiSettingsMixin
+from modules.tui.src.surface_tui_utils import _TuiUtilsMixin
+from modules.tui.src.surface_tui_workers import _TuiWorkersMixin
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
 

@@ -281,7 +281,7 @@ for role in roles:
 - `modules/core/src/agent_direct_prompt_orchestrator.py` — Use rotator
 - `modules/core/src/agent_attachment_prompt_orchestrator.py` — Use rotator
 - `modules/cli/src/surface_cli_main_entry.py` — Add sessions subcommand
-- `modules/cli/src/surface_cli_tui_app.py` — Show session status
+- `modules/tui/src/surface_tui_app.py` — Show session status
 
 ### Testing Strategy
 
