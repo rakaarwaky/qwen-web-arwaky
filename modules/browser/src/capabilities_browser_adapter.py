@@ -653,40 +653,7 @@ class BrowserAdapter(IBrowserProtocol):
         """
         master_session = cfg.session_path
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            headless = bool(getattr(cfg, "headless", False))
-            chrome_bin = find_chrome_binary(headless=headless)
-            chrome_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-session-crashed-bubble",
-                "--disable-infobars",
-            ]
-            if getattr(cfg, "disable_sandbox", False):
-                chrome_args.append("--no-sandbox")
-            if headless:
-                chrome_args.extend(
-                    [
-                        "--disable-gpu",
-                        "--disable-software-compositing",
-                    ]
-                )
-
-            kwargs: dict[str, Any] = {
-                "user_data_dir": str(session_dir),
-                "channel": None,
-                "headless": headless,
-                "args": chrome_args,
-                "viewport": {"width": 1280, "height": 800},
-            }
-            if chrome_bin and Path(chrome_bin).exists():
-                if headless or not is_headless_shell_binary(chrome_bin):
-                    kwargs["executable_path"] = chrome_bin
-                else:
-                    # Headful launch but only a headless-shell build is
-                    # available: drop executable_path and let Playwright use
-                    # the system Chrome channel so a visible window opens.
-                    kwargs["channel"] = "chrome"
-                    log.info("browser_headful_fallback_system_chrome")
-
+            kwargs = self._launch_kwargs(session_dir, cfg)
             with sync_playwright() as p:
                 ctx = self._launch_context(p, kwargs)
                 try:
@@ -696,6 +663,51 @@ class BrowserAdapter(IBrowserProtocol):
                     yield page
                 finally:
                     ctx.close()
+
+    def _launch_kwargs(self, session_dir: Path, cfg: Any) -> dict[str, Any]:
+        """Build the persistent-context launch arguments for *cfg*.
+
+        The one place that owns the Chromium flag set, the sandbox/headless
+        extras, and the headless-shell → system-Chrome fallback, so
+        ``browser_session``, ``renew_session`` (via ``_open_chat_page``), and
+        ``health_probe_page`` (via ``_open_chat_page``) all launch with the
+        same arguments. Callers that need extras (permissions, model
+        scoping) layer them onto the returned dict.
+        """
+        headless = bool(getattr(cfg, "headless", False))
+        chrome_bin = find_chrome_binary(headless=headless)
+        chrome_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-session-crashed-bubble",
+            "--disable-infobars",
+        ]
+        if getattr(cfg, "disable_sandbox", False):
+            chrome_args.append("--no-sandbox")
+        if headless:
+            chrome_args.extend(
+                [
+                    "--disable-gpu",
+                    "--disable-software-compositing",
+                ]
+            )
+
+        kwargs: dict[str, Any] = {
+            "user_data_dir": str(session_dir),
+            "channel": None,
+            "headless": headless,
+            "args": chrome_args,
+            "viewport": {"width": 1280, "height": 800},
+        }
+        if chrome_bin and Path(chrome_bin).exists():
+            if headless or not is_headless_shell_binary(chrome_bin):
+                kwargs["executable_path"] = chrome_bin
+            else:
+                # Headful launch but only a headless-shell build is
+                # available: drop executable_path and let Playwright use
+                # the system Chrome channel so a visible window opens.
+                kwargs["channel"] = "chrome"
+                log.info("browser_headful_fallback_system_chrome")
+        return kwargs
 
     def _clean_stale_locks(self, user_data_dir: str) -> None:
         """Clean up stale Chromium lock files if process crashed or before launch.
@@ -763,41 +775,11 @@ class BrowserAdapter(IBrowserProtocol):
             _TARGET_MODEL.set(override.strip())
 
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            chrome_bin = find_chrome_binary(headless=cfg.headless)
-
-            chrome_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-session-crashed-bubble",
-                "--disable-infobars",
-            ]
-            if cfg.disable_sandbox:
-                chrome_args.append("--no-sandbox")
-
-            if cfg.headless:
-                chrome_args.extend(
-                    [
-                        "--disable-gpu",
-                        "--disable-software-compositing",
-                    ]
-                )
-
-            kwargs: dict[str, Any] = {
-                "user_data_dir": str(session_dir),
-                "headless": cfg.headless,
-                "permissions": ["clipboard-read", "clipboard-write"],
-                "args": chrome_args,
-                "viewport": {"width": 1280, "height": 800},
-            }
-
-            if chrome_bin and Path(chrome_bin).exists():
-                if cfg.headless or not is_headless_shell_binary(chrome_bin):
-                    kwargs["executable_path"] = chrome_bin
-                else:
-                    # Headful launch but only a headless-shell build is
-                    # available: drop executable_path and let Playwright use
-                    # the system Chrome channel so a visible window opens.
-                    kwargs["channel"] = "chrome"
-                    log.info("browser_headful_fallback_system_chrome")
+            # Shared launch args (flags, sandbox/headless extras, headless-shell
+            # fallback) come from _launch_kwargs; the extras below are the ones
+            # only the prompt pipeline needs (clipboard permissions).
+            kwargs = self._launch_kwargs(session_dir, cfg)
+            kwargs["permissions"] = ["clipboard-read", "clipboard-write"]
 
             isolate_thread_event_loop()
 
