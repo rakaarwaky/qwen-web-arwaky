@@ -80,7 +80,7 @@ def restore_latest(session_path: Path) -> Path:
         raise FileNotFoundError(
             f"No session backup found under {backups_dir(source)}. Recover by running "
             "'qwen-web-arwaky session login --name default' (interactive CAPTCHA). "
-            "See docs/runbooks/session-corruption.md"
+            "See docs/session-corruption.md"
         )
     return restore_generation(source, generations[0])
 
@@ -124,7 +124,7 @@ def refuse_delete_without_backup(session_path: Path, *, force: bool = False) -> 
         f"Refusing to delete {session_path}: no session backup is retained under "
         f"{backups_dir(session_path)}. Recovery would require an interactive CAPTCHA login. "
         "Pass force=true to delete anyway, or restore/re-login first. "
-        "See docs/runbooks/session-corruption.md"
+        "See docs/session-corruption.md"
     )
 
 

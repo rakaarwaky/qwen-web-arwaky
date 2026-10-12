@@ -3,7 +3,7 @@ service: qwen-web-arwaky
 # Alerting contract. Configure notification targets in the Sentry project.
 #
 # Every rule maps to an operator runbook so an alert can be actioned without
-# reading source: `runbook` is the file under docs/runbooks/ that covers the
+# reading source: `runbook` is the file under docs/ that covers the
 # incident. Rules with `error_type` fire on the matching exception; rules with
 # `category` fire on the ErrorCategory emitted with the structured log event.
 #
@@ -16,7 +16,7 @@ service: qwen-web-arwaky
 alerts:
   - name: session-expiry-critical
     error_type: AuthRequiredError
-    runbook: docs/runbooks/auth-expiry.md
+    runbook: docs/auth-expiry.md
     threshold: 2
     window: 10m
     severity: critical
@@ -26,7 +26,7 @@ alerts:
 
   - name: browser-launch-failure
     error_type: BrowserLaunchError
-    runbook: docs/runbooks/browser-launch.md
+    runbook: docs/browser-launch.md
     threshold: 3
     window: 5m
     severity: critical
@@ -36,7 +36,7 @@ alerts:
 
   - name: rate-limit-warning
     error_type: RateLimitError
-    runbook: docs/runbooks/rate-limit.md
+    runbook: docs/rate-limit.md
     threshold: 10
     window: 15m
     severity: warning
@@ -46,7 +46,7 @@ alerts:
 
   - name: categorized-error-backlog
     category: other
-    runbook: docs/runbooks/other.md
+    runbook: docs/other.md
     threshold: 5
     window: 15m
     severity: warning
@@ -56,7 +56,7 @@ alerts:
 
   - name: network-failures
     category: network
-    runbook: docs/runbooks/network.md
+    runbook: docs/network.md
     threshold: 5
     window: 10m
     severity: warning
@@ -64,7 +64,7 @@ alerts:
 
   - name: response-timeouts
     category: response_timeout
-    runbook: docs/runbooks/response-timeout.md
+    runbook: docs/response-timeout.md
     threshold: 3
     window: 15m
     severity: warning
@@ -74,7 +74,7 @@ alerts:
 
   - name: stuck-runs
     category: stuck
-    runbook: docs/runbooks/stuck.md
+    runbook: docs/stuck.md
     threshold: 3
     window: 15m
     severity: warning
@@ -84,7 +84,7 @@ alerts:
 
   - name: disk-pressure
     category: file_io
-    runbook: docs/runbooks/disk-exhaustion.md
+    runbook: docs/disk-exhaustion.md
     threshold: 3
     window: 10m
     severity: critical
@@ -94,7 +94,7 @@ alerts:
 
   - name: session-corruption
     category: session
-    runbook: docs/runbooks/session-corruption.md
+    runbook: docs/session-corruption.md
     threshold: 1
     window: 60m
     severity: critical
@@ -104,7 +104,7 @@ alerts:
 
   - name: update-failure
     category: update
-    runbook: docs/runbooks/update-failure.md
+    runbook: docs/update-failure.md
     threshold: 1
     window: 24h
     severity: warning

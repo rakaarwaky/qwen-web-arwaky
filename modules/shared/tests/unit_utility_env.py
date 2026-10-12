@@ -132,5 +132,5 @@ def test_validate_env_accepts_valid_overrides():
 def test_runbook_index_covers_the_incident_categories():
     index = runbook_index()
     for category in ("auth", "browser", "file_io", "session", "update"):
-        assert index[category].startswith("docs/runbooks/")
+        assert index[category].startswith("docs/")
         assert index[category].endswith(".md")
