@@ -107,7 +107,7 @@ class QwenTuiApp(
         # tab is active, so they stay harmless on every other screen.
         Binding("up", "sessions_up", "Row Up"),
         Binding("down", "sessions_down", "Row Down"),
-        Binding("a", "session_add", "Add Session"),
+        Binding("a", "session_add_new", "Add Session"),
         Binding("r", "session_refresh", "Refresh"),
         Binding("e", "session_edit", "Edit / Health"),
         Binding("d", "session_delete", "Delete"),

@@ -21,17 +21,17 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input, TabbedContent
 
-from modules.tui.src.surface_tui_components import ConfirmModal, FilePickerModal, HelpScreen, QwenTuiRichLog
+from modules.tui.src.surface_tui_components import (
+    AddSessionModal,
+    ConfirmModal,
+    FilePickerModal,
+    HelpScreen,
+    QwenTuiRichLog,
+)
 from modules.tui.src.surface_tui_css import THEME
 from modules.tui.src.surface_tui_session_setup import SessionSetupScreen
 
-# The dock's active marker: a short accent bar centred over the active
-# section, the way the mockup draws it.
-NAV_ACTIVE_MARKER = "━━━"
-
-
-def _noop() -> None:
-    """No-op handler for unrecognised Settings-pane button IDs."""
+# No-op handler for unrecognised Settings-pane button IDs.
 
 
 class _TuiHandlersMixin:
@@ -74,6 +74,10 @@ class _TuiHandlersMixin:
     _job_storage: Any
     _updater: Any
     _update_orchestrator: Any
+    _setup: Any
+
+    # Stubs for methods provided by _TuiSessionsWorkerMixin.
+    start_add_session_login: Any
 
     _toggle_headless: Any
 
@@ -367,28 +371,6 @@ class _TuiHandlersMixin:
             if active_btn is not None:
                 active_btn.set_class(False, "nav-inactive")
                 active_btn.set_class(True, "nav-active")
-            self._refresh_nav_marker(active)
-
-    def _refresh_nav_marker(self, active_tab: str) -> None:
-        """Move the dock's accent bar over the cell that is now active.
-
-        The mockup marks the active section with a short bar centred above
-        its icon rather than a hairline across the whole cell, so the bar
-        lives in its own strip whose 1fr cells line up with the buttons.
-        """
-        with contextlib.suppress(Exception):
-            bars = {
-                "tab-overview": "#nav-bar-overview",
-                "tab-sessions": "#nav-bar-login",
-                "tab-swarm": "#nav-bar-swarm",
-                "tab-settings": "#nav-bar-settings",
-            }
-            slot_tab = active_tab.startswith("tab-slot-")
-            target = bars.get(active_tab, "#nav-bar-chat" if slot_tab else None)
-            for bar in self.query(".nav-bar"):
-                is_target = f"#{bar.id}" == target
-                bar.set_class(is_target, "nav-bar-active")
-                bar.update(NAV_ACTIVE_MARKER if is_target else "")
 
     def _nav_dock_go(self, button_id: str) -> None:
         with contextlib.suppress(Exception):
@@ -624,7 +606,7 @@ class _TuiHandlersMixin:
         self._init_worker()
 
     def _session_login_action(self) -> None:
-        """Handle session login button click."""
+        """Handle session login button click — legacy flow, kept for back-compat."""
         if not hasattr(self, "_session_manager") or self._session_manager is None:
             self._log_msg("[yellow]Session manager not available.[/]")
             return
@@ -647,6 +629,25 @@ class _TuiHandlersMixin:
         )
         self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
         self._init_worker()
+
+    def action_session_add_new(self) -> None:
+        """a: add a new session — opens name dialog then starts headed browser login."""
+        if not hasattr(self, "_session_manager") or self._session_manager is None:
+            self._log_msg("[yellow]Session manager not available.[/]")
+            return
+        self.push_screen(
+            AddSessionModal(),
+            self._on_add_session_name,
+        )
+
+    def _on_add_session_name(self, session_name: str | None) -> None:
+        """Callback when AddSessionModal returns a session name."""
+        if not session_name:
+            self._log_msg("[dim]Add session cancelled.[/]")
+            return
+        self._log_msg("[bold {}]>>> Starting login for session '{}'...[/]".format(THEME["accent_fg"], session_name))
+        # Delegate to the sessions worker mixin
+        self.start_add_session_login(session_name)
 
     @work(thread=True)
     def _init_worker(self) -> None:

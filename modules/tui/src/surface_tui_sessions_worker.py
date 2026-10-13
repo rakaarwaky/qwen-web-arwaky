@@ -21,6 +21,8 @@ from textual.css.query import NoMatches
 from textual.widgets import Label
 
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
+from modules.shared.src.taxonomy_core_constant import SESSIONS_DIR
+from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.tui.src.surface_tui_css import THEME
 
 
@@ -326,6 +328,66 @@ class _TuiSessionsWorkerMixin:
                 self._log_msg,
                 "[bold {}]HEALTH CHECK ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
+
+    # ── Add Session Worker ──────────────────────────────────────────────
+
+    def start_add_session_login(self, session_name: str) -> None:
+        """Start the background worker to run headed browser login for a new session.
+
+        Creates the profile directory, builds a SetupRequest, and runs the
+        login in a background thread. Logs the outcome to the event log and
+        shows a success/error toast when the worker completes.
+        """
+        if not hasattr(self, "_setup") or self._setup is None:
+            self._log_msg("[bold {}]ERROR:[/] Session setup orchestrator not available.".format(THEME["err"]))
+            return
+
+        profile_path = SESSIONS_DIR / session_name
+        profile_path.mkdir(parents=True, exist_ok=True)
+
+        setup_request = SetupRequest(profile_path=profile_path, name=session_name, browser_headless=False)
+
+        self._log_msg(
+            "[bold {}]LAUNCHING BROWSER:[/] Please log in at chat.qwen.ai, then close the window.".format(
+                THEME["accent_fg"]
+            )
+        )
+        self.notify(
+            "Browser opened for login. Complete sign-in at chat.qwen.ai, then close the window.",
+            title="Add Session",
+            severity="information",
+            timeout=10,
+        )
+
+        self._run_add_session_worker(setup_request)
+
+    @work(thread=True)
+    def _run_add_session_worker(self, setup_request: SetupRequest) -> None:
+        """Background worker that runs the headed browser login and validates the session."""
+        try:
+            response = self._setup.execute_setup(setup_request)
+            if response.success:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]SUCCESS:[/] Session '{}' saved at {}".format(
+                        THEME["ok"], escape(setup_request.name), escape(str(response.profile_path))
+                    ),
+                )
+                self.call_from_thread(self.notify, f"Session '{setup_request.name}' added successfully!", "success", 5)
+                self.call_from_thread(self._refresh_sessions_table)
+            else:
+                error_msg = response.error or response.message or "Login failed"
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(error_msg))),
+                )
+                self.call_from_thread(self.notify, f"Login failed: {error_msg}", "error", 8)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]LOGIN ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
+            self.call_from_thread(self.notify, f"Login error: {exc}", "error", 8)
 
 
 __all__ = ["_TuiSessionsWorkerMixin"]

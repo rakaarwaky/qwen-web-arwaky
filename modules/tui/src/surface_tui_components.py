@@ -22,7 +22,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, DirectoryTree, Label, RichLog, Static
+from textual.widgets import Button, DirectoryTree, Input, Label, RichLog, Static
 
 from modules.tui.src.surface_tui_css import THEME
 
@@ -226,6 +226,53 @@ class ConfirmModal(ModalScreen[bool]):
     def action_dismiss_yes(self) -> None:
         """Dismiss answering yes."""
         self.dismiss(True)
+
+
+class AddSessionModal(ModalScreen[str | None]):
+    """Modal screen for adding a new session.
+
+    User provides a session name, then clicks "Start Login" which opens
+    a headed browser for manual authentication at chat.qwen.ai.
+    When the browser closes, the session is validated and registered.
+    """
+
+    BINDINGS = [
+        Binding("escape", "dismiss_cancel", "Cancel"),
+    ]
+
+    def __init__(self, title: str = "Add New Session") -> None:
+        super().__init__()
+        self._title = title
+
+    def compose(self) -> ComposeResult:
+        """Build the name input field and action buttons."""
+        with Vertical(id="add-session-container"):
+            yield Label(f"[ {self._title} ]", id="add-session-title")
+            yield Static("\nSession name:")
+            yield Input(placeholder="e.g., personal, work, dev", id="input-session-name")
+            with Horizontal(id="add-session-btn-row"):
+                yield Button("Start Login", id="btn-start-login", variant="primary")
+                yield Button("Cancel (Esc)", id="btn-cancel", variant="default")
+
+    def on_mount(self) -> None:
+        """Focus the session name input on open."""
+        self.query_one("#input-session-name").focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dismiss with session name on Start Login, None on Cancel."""
+        if event.button.id == "btn-start-login":
+            name_input = self.query_one("#input-session-name", Input)
+            name = name_input.value.strip()
+            if not name:
+                self.notify("Session name cannot be empty", severity="error")
+                return
+            self.dismiss(name)
+        elif event.button.id == "btn-cancel":
+            self.dismiss(None)
+
+    def action_dismiss_cancel(self) -> None:
+        """Cancel the modal without a selection."""
+        self.dismiss(None)
 
 
 class TemplatePickerModal(ModalScreen[str | None]):

@@ -94,7 +94,7 @@ class _TuiComposeMixin:
                     with Vertical(classes="screen-card metric-card"), Horizontal(classes="metric-tiles"):
                         with Vertical(classes="metric-tile"):
                             yield Label(
-                                "● ACTIVE ACCOUNTS",
+                                f"{_TuiUtilsMixin._glyph('active')} ACTIVE ACCOUNTS",
                                 id="metric-active-label",
                                 classes="metric-tile-label",
                             )
@@ -102,7 +102,11 @@ class _TuiComposeMixin:
                                 yield Label("0", id="metric-active", classes="metric-tile-number")
                                 yield Label("Active", classes="metric-tile-unit")
                         with Vertical(classes="metric-tile metric-tile-model"):
-                            yield Label("⊕ MODEL", id="metric-model-label", classes="metric-tile-label")
+                            yield Label(
+                                f"{_TuiUtilsMixin._glyph('model')} MODEL",
+                                id="metric-model-label",
+                                classes="metric-tile-label",
+                            )
                             yield Label(
                                 DEFAULT_MODEL,
                                 id="metric-model",
