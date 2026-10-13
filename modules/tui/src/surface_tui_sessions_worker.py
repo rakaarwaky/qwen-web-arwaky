@@ -16,8 +16,9 @@ from typing import Any
 
 from rich.markup import escape
 from textual import work
+from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import DataTable, Label
+from textual.widgets import Label
 
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 from modules.tui.src.surface_tui_css import THEME
@@ -37,6 +38,8 @@ class _TuiSessionsWorkerMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
     _render_account_cards: Any
+    _account_card: Any
+    _sessions_cache: list[Any]
     query_one: Any
     notify: Any
     call_from_thread: Any
@@ -172,30 +175,21 @@ class _TuiSessionsWorkerMixin:
             limited = sum(1 for s in sessions if s.is_limited)
 
             def _update() -> None:
-                table = self.query_one("#sessions-table", DataTable)
-                table.clear()
-                table.add_columns("ID", "Name", "Status", "Last Used", "Path")
-                table.add_rows(
-                    (
-                        s.session_id,
-                        s.name,
-                        s.status.value,
-                        s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never",
-                        str(s.path),
-                    )
-                    for s in sessions
-                )
-                self._render_account_cards(list(sessions))
+                rows = self.query_one("#session-rows", Vertical)
+                rows.remove_children()
+                if not sessions:
+                    rows.mount(Label("No accounts registered.", classes="field-label"))
+                else:
+                    self._sessions_cache = list(sessions)
+                    for position, s in enumerate(sessions, start=1):
+                        rows.mount(self._account_card(s, position))
+                # Keep the pane's three counters in step with the pool. The
+                # strip is the pane's whole summary, so a repaint is the only
+                # writer.
                 with contextlib.suppress(NoMatches):
-                    self.query_one("#session-total", Label).update(f"{total}")
-                    self.query_one("#session-healthy", Label).update(f"{healthy}")
-                    self.query_one("#session-limited", Label).update(f"{limited}")
-                # _update runs on the app thread only when _refresh_sessions_table
-                # was called from the main thread; call_from_thread is the no-op
-                # fast path in that case. It must NOT appear inside the callback
-                # itself — calling it from the app thread raises ValueError and
-                # surfaces as a spurious "SESSION LOAD ERROR" even though the
-                # table rendered fine.
+                    self.query_one("#session-metric-registered", Label).update(f"{total}")
+                    self.query_one("#session-metric-active", Label).update(f"{healthy}")
+                    self.query_one("#session-metric-expired", Label).update(f"{limited}")
                 self._log_msg(
                     "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
                         THEME["ok"], total, healthy, limited

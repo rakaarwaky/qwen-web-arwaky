@@ -152,6 +152,11 @@ class HelpScreen(ModalScreen[None]):
             "alt+right        Next slot",
             "escape           Dismiss modal / quit when idle",
             "?                This help screen",
+            "↑ / ↓            Navigate session rows (Sessions tab)",
+            "a                Add a new session",
+            "r                Refresh the session pool",
+            "e                Health-check the selected session",
+            "d                Delete the selected session (guarded)",
         ]
         if self._num_slots > 19:
             lines += [

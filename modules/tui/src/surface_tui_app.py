@@ -102,6 +102,15 @@ class QwenTuiApp(
         Binding("ctrl+q", "request_quit", "Quit"),
         Binding("escape", "request_quit", "Exit"),
         Binding("question_mark", "show_help", "Help"),  # A3
+        # Sessions pane: keyboard-first row navigation + global shortcuts
+        # (problems 4 & 6). The arrows only move the row when the Sessions
+        # tab is active, so they stay harmless on every other screen.
+        Binding("up", "sessions_up", "Row Up"),
+        Binding("down", "sessions_down", "Row Down"),
+        Binding("a", "session_add", "Add Session"),
+        Binding("r", "session_refresh", "Refresh"),
+        Binding("e", "session_edit", "Edit / Health"),
+        Binding("d", "session_delete", "Delete"),
         # A4: sequential tab cycling for slots >= 10 or keyboard convenience
         Binding("alt+left", "prev_slot", "Prev Slot"),
         Binding("alt+right", "next_slot", "Next Slot"),
@@ -189,6 +198,9 @@ class QwenTuiApp(
         self._sessions_loaded_once = False
         # Headless mode toggle: shared across all slot runs and swarm runs.
         self._headless: bool = True
+        # Sessions pane: 0-based index of the row the operator has highlighted
+        # via ↑/↓ (problem 4). -1 = none.
+        self._session_row: int = -1
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406

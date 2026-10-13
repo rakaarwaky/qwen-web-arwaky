@@ -17,7 +17,6 @@ from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
-    DataTable,
     Input,
     Label,
     LoadingIndicator,
@@ -183,96 +182,42 @@ class _TuiComposeMixin:
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
-                # SESSION POOL STATUS card: three stacked metric tiles.
-                with Vertical(classes="screen-card"):
-                    with Horizontal(classes="pane-title"):
-                        yield Label("▤ SESSION POOL STATUS", id="session-pool-title", classes="field-label")
-                    with Horizontal(classes="login-metric-row login-metric-grid"):
-                        for label_text, label_id, value_id, value_cls in (
-                            ("REGISTERED", "session-total-label", "session-total", "login-metric-value"),
-                            ("ACTIVE", "session-healthy-label", "session-healthy", "login-metric-ok"),
-                            ("LIMITED", "session-limited-label", "session-limited", "login-metric-value"),
-                        ):
-                            with Vertical(classes="login-metric-cell"):
-                                yield Label(label_text, id=label_id, classes="login-metric-label")
-                                yield Label("0", id=value_id, classes=value_cls)
+                # Session Pool status row — three equal stat cards
+                # (REGISTERED / ACTIVE / EXPIRED), each stacking a small label
+                # over a large value. The workers keep them in step with the
+                # pool; the ids are locked by the test suite.
+                with Horizontal(classes="screen-card login-metric-row"):
+                    with Vertical(classes="login-metric-cell"):
+                        yield Label("REGISTERED", classes="login-metric-label")
+                        yield Label("0", id="session-metric-registered", classes="login-metric-value")
+                    with Vertical(classes="login-metric-cell"):
+                        yield Label("ACTIVE", classes="login-metric-label")
+                        yield Label("0", id="session-metric-active", classes="login-metric-value")
+                    with Vertical(classes="login-metric-cell"):
+                        yield Label("EXPIRED", classes="login-metric-label")
+                        yield Label("0", id="session-metric-expired", classes="login-metric-value")
 
-                # Full-width ADD ACCOUNT button.
+                # The pane's one and only add control: the full-width primary
+                # action, wired to the real interactive login flow.
                 yield Button(
-                    "⊕ ADD ACCOUNT",
+                    "⊕ ADD SESSION",
                     id="btn-session-add",
                     classes="btn-primary-full",
                 )
 
-                # Hidden expandable auth panel (kept empty — SessionSetupScreen
-                # is pushed via the existing ctrl+l / login_action path).
-                auth_panel = Vertical(id="auth-panel", classes="screen-card")
-                auth_panel.display = False
-                with auth_panel:
-                    yield Label("Fast Auth Panel", classes="field-label")
-                    with Horizontal(classes="toggle-row"):
-                        yield Button("Connect", id="btn-auth-connect", variant="primary")
-                        yield Button("Cancel", id="btn-auth-cancel", classes="btn-ghost")
-
-                # Re-check Tokens row.
-                with Horizontal(classes="toggle-row"):
-                    yield Label("· ·", classes="field-label")
-                    yield Button(
-                        "↻ Re-check Tokens",
-                        id="btn-sessions-refresh",
-                        classes="btn-ghost",
-                        variant="default",
-                    )
-
-                # Named-account login row: pick the account name, then run the
-                # in-process headed login that registers it in the pool.
-                with Horizontal(classes="toggle-row"):
-                    yield Input(
-                        placeholder="account name (e.g. work)",
-                        id="input-sessions-name",
-                        classes="field-label",
-                        max_length=64,
-                    )
-                    yield Button(
-                        "🔐 Add Account",
-                        id="btn-sessions-login",
-                        classes="btn-sessions-login",
-                        variant="primary",
-                    )
-
-                # Account cards container.
-                yield Label("Registered Sessions", classes="field-label")
-                with Vertical(id="account-cards", classes="screen-card"):
-                    yield Label("No accounts registered.", id="account-empty", classes="field-label")
-                yield DataTable(id="sessions-table")
-
-                with Horizontal(classes="toggle-row"):
-                    yield Button(
-                        "🔄 Refresh",
-                        id="btn-sessions-rerefresh",
-                        classes="btn-sessions-refresh",
-                        variant="default",
-                    )
-                    yield Button(
-                        "🔐 Add Session",
-                        id="btn-sessions-login",
-                        classes="btn-sessions-login",
-                        variant="primary",
-                    )
-                    yield Button(
-                        "🏥 Health Check",
-                        id="btn-sessions-health",
-                        classes="btn-sessions-health",
-                        variant="default",
-                    )
-                yield QwenTuiRichLog(
-                    id="log-view-sessions",
-                    highlight=True,
-                    markup=True,
-                    max_lines=500,
-                    auto_scroll=True,
-                    wrap=True,
-                )
+                # The pane's one and only table: name | status | ↻ | 🧪 | 🗑.
+                # The head row is static; every session row is mounted into
+                # #session-rows so a repaint never disturbs the header.
+                with Vertical(id="session-table", classes="screen-card"):
+                    with Horizontal(classes="session-row session-row-head"):
+                        yield Label("NAME", classes="session-cell session-cell-name")
+                        yield Label("STATUS", classes="session-cell session-cell-status")
+                        yield Label("ACTIONS", classes="session-cell session-cell-actions")
+                    with Vertical(id="session-rows"):
+                        yield Label(
+                            "Belum ada session — tekan A untuk menambah",
+                            classes="session-empty",
+                        )
 
             # ─── Screen 3: Chat (per-slot console) ─────────────────
             # The mockup's chat console carries no configuration form: it is a

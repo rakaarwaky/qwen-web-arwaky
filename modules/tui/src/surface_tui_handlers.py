@@ -45,6 +45,7 @@ class _TuiHandlersMixin:
     _cancel_swarm: Any
     _sessions_cache: list[Any]
     _sessions_loaded_once: bool
+    _session_row: int
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
@@ -152,7 +153,12 @@ class _TuiHandlersMixin:
         cache: list[Any] = getattr(self, "_sessions_cache", [])
         session = cache[position - 1] if 0 < position <= len(cache) else None
         name = str(getattr(session, "name", "") or f"session {position}")
-        if action == "test":
+        if action == "refresh":
+            # Refresh re-loads the pool from disk and repaints the row.
+            self._log_msg("[bold {}]REFRESH:[/] Reloading session pool.".format(THEME["accent_fg"]))
+            self._refresh_sessions_table()
+            return
+        if action == "health":
             # The pool health check is the same probe the CLI 'session health'
             # verb runs, so one card's test icon runs it rather than inventing
             # a single-session result from the last stored state.
@@ -234,22 +240,6 @@ class _TuiHandlersMixin:
         self._sessions_loaded_once = True
         self._refresh_sessions_table()
 
-    def _auth_panel_pressed(self, button_id: str) -> None:
-        """Handle the Login screen's auth-panel buttons.
-
-        ``btn-session-add`` toggles the expandable panel;
-        ``btn-auth-connect`` / ``btn-auth-cancel`` close it (and
-        ``btn-auth-connect`` also fires the login flow).
-        """
-        with contextlib.suppress(NoMatches):
-            panel = self.query_one("#auth-panel", Vertical)
-            if button_id == "btn-session-add":
-                panel.display = not panel.display
-            else:
-                panel.display = False
-                if button_id == "btn-auth-connect":
-                    self.action_login_action()
-
     # ── File picker ──────────────────────────────────────────────────────
 
     def _open_picker(self, target_input_id: str, select_directories: bool = False) -> None:
@@ -271,6 +261,72 @@ class _TuiHandlersMixin:
             ),
             _on_picked,
         )
+
+    # ── Sessions pane: keyboard row navigation (problem 4, req C) ──────
+
+    def _sessions_active(self) -> bool:
+        """Whether the Sessions pane is the visible tab."""
+        try:
+            tabs = self.query_one(TabbedContent)
+        except NoMatches:
+            return False
+        return bool(tabs.active == "tab-sessions")
+
+    def _session_row_index(self) -> int:
+        """0-based index of the currently selected row, or -1 when none."""
+        return int(getattr(self, "_session_row", -1))
+
+    def _move_session_row(self, delta: int) -> None:
+        """Move the selected row up/down and highlight it (problem 4)."""
+        with contextlib.suppress(NoMatches):
+            rows = self.query_one("#session-rows", Vertical)
+            row_widgets = [w for w in rows.children if w.has_class("session-row")]
+        if not row_widgets:
+            return
+        n = len(row_widgets)
+        cur = self._session_row_index()
+        new = min(max(cur + delta, 0), n - 1)
+        for i, w in enumerate(row_widgets):
+            w.set_class(new == i, "session-row-selected")
+        self._session_row = new
+        w = row_widgets[new]
+        with contextlib.suppress(NoMatches):
+            first_btn = w.query_one(Button)
+            first_btn.focus()
+
+    def action_sessions_up(self) -> None:
+        """↑: previous session row (only on the Sessions pane)."""
+        if self._sessions_active():
+            self._move_session_row(-1)
+
+    def action_sessions_down(self) -> None:
+        """↓: next session row (only on the Sessions pane)."""
+        if self._sessions_active():
+            self._move_session_row(1)
+
+    def action_session_add(self) -> None:
+        """a: add a new session — same as the ADD SESSION button."""
+        self._session_login_action()
+
+    def action_session_refresh(self) -> None:
+        """r: reload the pool (problem 6 / req C)."""
+        self._refresh_sessions_table()
+
+    def action_session_edit(self) -> None:
+        """e: run the health check on the selected row (or the whole pool)."""
+        idx = self._session_row_index()
+        if idx >= 0:
+            self._account_button_pressed("health", idx + 1)
+        else:
+            self._run_session_health_check()
+
+    def action_session_delete(self) -> None:
+        """d/Delete: delete the selected row's session, guarded by a modal."""
+        idx = self._session_row_index()
+        if idx < 0:
+            self._log_msg("[dim]No session selected — press ↑/↓ first.[/]")
+            return
+        self._account_button_pressed("delete", idx + 1)
 
     # ── Tab navigation helpers ───────────────────────────────────────────
 
@@ -335,13 +391,6 @@ class _TuiHandlersMixin:
                 bar.update(NAV_ACTIVE_MARKER if is_target else "")
 
     def _nav_dock_go(self, button_id: str) -> None:
-        """Switch the tab bar to whichever section a bottom nav item points at.
-
-        CHAT has no single tab of its own: it stands for every per-slot job
-        tab, so it lands on the slot the user is already on (slot 1 when the
-        active tab is not a slot tab). SETTINGS carries no slot of its own —
-        the per-slot form inside it follows the active slot.
-        """
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
             if button_id == "nav-overview":

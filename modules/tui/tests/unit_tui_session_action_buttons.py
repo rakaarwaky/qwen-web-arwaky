@@ -1,8 +1,10 @@
 """Unit tests for the Sessions-pane account card action buttons.
 
-The card foot carries two icon-only buttons:
-- 🧪 (test, ``account-test-<n>``): runs the pool health check — the same
-  probe as ``qwa session health`` (``SessionHealthChecker``).
+The card foot carries three icon-only buttons:
+- ↻ (refresh, ``account-refresh-<n>``): reloads the pool from disk and
+  repaints the row.
+- 🧪 (health, ``account-health-<n>``): runs the pool health check — the
+  same probe as ``qwa session health`` (``SessionHealthChecker``).
 - 🗑 (trash, ``account-delete-<n>``): removes the pool entry and deletes
   the Chromium profile — the same logic as ``qwa session remove``
   (``SessionManager.remove_session`` + ``delete_session_profile``),
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -34,8 +37,6 @@ class TestAccountCardButtons:
         session.status = MagicMock()
         session.status.value = "active"
         session.path = MagicMock()
-
-        card = _TuiUtilsMixin._account_card(session, 1)
 
         # Textual only registers children with the widget tree once mounted,
         # so mount the card under a container in a live app before querying.
@@ -63,15 +64,27 @@ class TestAccountCardButtons:
                 await host.mount(card)
                 buttons = list(card.query(Button))
                 labels = [str(b.label) for b in buttons]
-                # Two buttons: flask (⚗) and trash (🗑)
-                assert len(buttons) == 2, f"expected 2 buttons, got {len(buttons)}"
-                assert "🧪" in labels[0], f"first button should be the flask icon, got {labels!r}"
-                assert "🗑" in labels[1], f"second button should be the trash icon, got {labels!r}"
+                # Three buttons: refresh (↻), health (🧪), and trash (🗑)
+                assert len(buttons) == 3, f"expected 3 buttons, got {len(buttons)}"
+                assert "↻" in labels[0], f"first button should be the refresh icon, got {labels!r}"
+                assert "🧪" in labels[1], f"second button should be the health icon, got {labels!r}"
+                assert "🗑" in labels[2], f"third button should be the trash icon, got {labels!r}"
                 # Names ride on position so a re-check rebuild can't collide ids
-                assert buttons[0].name == "account-test-1"
-                assert buttons[1].name == "account-delete-1"
+                assert buttons[0].name == "account-refresh-1"
+                assert buttons[1].name == "account-health-1"
+                assert buttons[2].name == "account-delete-1"
 
-        asyncio.run(_run())
+        # The glyph resolver honours NO_COLOR / ASCII locale so a real terminal
+        # without a Nerd Font renders the ASCII fallback instead of a tofu box.
+        # The test locks the *wide* glyphs, so it must disable that override
+        # for the duration of the assertion — otherwise a CI box with NO_COLOR
+        # set sees 'r'/'h'/'x' and the test fails even though the code is
+        # correct. The card is built inside the patch so the resolver sees
+        # the cleared env when it resolves the button labels.
+        with patch.dict(os.environ, {"NO_COLOR": "", "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8"}, clear=False):
+            os.environ.pop("NO_COLOR", None)
+            card = _TuiUtilsMixin._account_card(session, 1)
+            asyncio.run(_run())
 
     def test_card_labels_contain_no_text(self) -> None:
         """The buttons are icon-only — no 'TEST'/'EXIT'/'DELETE' text labels."""
@@ -171,7 +184,7 @@ class TestAccountButtonRouting:
                     patch.object(app, "_run_session_health_check") as mock_health,
                     patch.object(app, "_log_msg"),
                 ):
-                    app._account_button_pressed("test", 1)
+                    app._account_button_pressed("health", 1)
                     mock_health.assert_called_once()
 
         asyncio.run(_run())
@@ -196,17 +209,20 @@ class TestDeleteSessionWorker:
             job_storage=MagicMock(),
         )
 
-        # Seed the sessions cache with one entry.
+        mock_manager = MagicMock()
+        mock_manager.remove_session.return_value = True
+        app._session_manager = mock_manager
+
+        # Seed the sessions cache with one entry. The one-shot load guard is
+        # set so the mount-time refresh cannot repaint the cache from the
+        # mock pool and race this seed.
         session_info = MagicMock()
         session_info.name = "arwaky007"
         session_info.session_id = "session_1"
         session_info.path = MagicMock()
         app._sessions_cache = [session_info]
         app._last_delete_name = "arwaky007"
-
-        mock_manager = MagicMock()
-        mock_manager.remove_session.return_value = True
-        app._session_manager = mock_manager
+        app._sessions_loaded_once = True
 
         async def _run() -> None:
             async with app.run_test(size=(150, 44)):
@@ -254,6 +270,136 @@ class TestDeleteSessionWorker:
         asyncio.run(_run())
 
 
+class TestSessionsPaneLayout:
+    """The Sessions pane carries exactly one add control and exactly one
+    table, whose columns are name | status | ↻ | 🧪 | 🗑.
+
+    These lock the simplification request: no second add button, no second
+    table, and no leftover log panel below the table.
+    """
+
+    @staticmethod
+    def _app() -> Any:
+        from modules.tui.src.surface_tui_app import QwenTuiApp
+
+        return QwenTuiApp(
+            workspace=MagicMock(),
+            direct=MagicMock(),
+            file_only=MagicMock(),
+            attachment=MagicMock(),
+            slot_config=MagicMock(),
+            setup=MagicMock(),
+            session=MagicMock(),
+            jobs=MagicMock(),
+            updater=MagicMock(),
+            job_storage=MagicMock(),
+        )
+
+    @staticmethod
+    async def _open_sessions(app: Any, pilot: Any) -> None:
+        """Bring the Sessions pane on screen and let it lay out."""
+        from textual.widgets import TabbedContent
+
+        app.query_one(TabbedContent).active = "tab-sessions"
+        await pilot.pause(0.4)
+        await pilot.pause(0.4)
+
+    def test_exactly_one_add_session_button(self) -> None:
+        """One full-width '⊕ ADD SESSION' control, #btn-session-add."""
+        from textual.widgets import Button
+
+        app = self._app()
+
+        async def _run() -> None:
+            async with app.run_test(size=(150, 44)) as pilot:
+                await self._open_sessions(app, pilot)
+                adds = [b for b in app.query(Button) if "add session" in str(b.label).lower()]
+                assert len(adds) == 1, f"expected 1 Add Session button, got {len(adds)}"
+                add = adds[0]
+                assert add.id == "btn-session-add"
+                # It is the big full-width primary action, not a small row
+                # button: .btn-primary-full spans the pane.
+                assert add.has_class("btn-primary-full"), list(add.classes)
+                assert add.region.width > 20, f"expected a full-width button, got {add.region.width}"
+
+        asyncio.run(_run())
+
+    def test_exactly_one_table_with_the_five_columns(self) -> None:
+        """One #session-table; its head row is NAME | STATUS | ACTIONS and
+        each session row carries the three action buttons."""
+        from textual.containers import Horizontal, Vertical
+        from textual.widgets import Button, Label
+
+        app = self._app()
+        session = MagicMock()
+        session.name = "arwaky007"
+        session.session_id = "session_1"
+        session.is_healthy = True
+        session.is_limited = False
+        session.status = MagicMock()
+        session.status.value = "active"
+        session.path = MagicMock()
+
+        async def _run() -> None:
+            async with app.run_test(size=(150, 44)):
+                tables = list(app.query("#session-table"))
+                assert len(tables) == 1, f"expected 1 table container, got {len(tables)}"
+                assert isinstance(tables[0], Vertical)
+
+                # No DataTable anywhere: the pane has one hand-built table.
+                from textual.widgets import DataTable
+
+                assert len(list(app.query(DataTable))) == 0, "no DataTable may remain on the pane"
+
+                head = tables[0].query_one(".session-row-head", Horizontal)
+                head_cells = [str(c.render()) for c in head.query(Label)]
+                assert head_cells == ["NAME", "STATUS", "ACTIONS"], head_cells
+
+                # Mount one session row and check the five columns line up.
+                rows = app.query_one("#session-rows", Vertical)
+                await rows.mount(app._account_card(session, 1))
+                row = rows.query_one(".session-row", Horizontal)
+                cells = list(row.query(Label))
+                buttons = list(row.query(Button))
+                assert len(cells) == 2, f"expected name+status cells, got {len(cells)}"
+                assert "arwaky007" in str(cells[0].render())
+                assert "ACTIVE" in str(cells[1].render())
+                assert len(buttons) == 3, f"expected 3 action buttons, got {len(buttons)}"
+                assert [b.name for b in buttons] == [
+                    "account-refresh-1",
+                    "account-health-1",
+                    "account-delete-1",
+                ]
+
+        asyncio.run(_run())
+
+    def test_no_log_panel_below_the_table(self) -> None:
+        """The stray 'Registered Sessions' log view is gone."""
+        app = self._app()
+
+        async def _run() -> None:
+            async with app.run_test(size=(150, 44)):
+                assert len(list(app.query("#log-view-sessions"))) == 0
+
+        asyncio.run(_run())
+
+    def test_metric_row_is_registered_active_expired(self) -> None:
+        """The status row reads REGISTERED / ACTIVE / EXPIRED, no LIMITED."""
+        from textual.widgets import Label
+
+        app = self._app()
+
+        async def _run() -> None:
+            async with app.run_test(size=(150, 44)):
+                texts = [
+                    str(app.query_one(f"#session-metric-{key}", Label).render())
+                    for key in ("registered", "active", "expired")
+                ]
+                assert texts == ["0", "0", "0"], texts
+
+        asyncio.run(_run())
+
+
 def _sync_cft(app: Any) -> None:
     """Patch call_from_thread so it invokes the callback synchronously."""
 
@@ -268,4 +414,5 @@ __all__ = [
     "TestAccountCardButtons",
     "TestAccountButtonRouting",
     "TestDeleteSessionWorker",
+    "TestSessionsPaneLayout",
 ]

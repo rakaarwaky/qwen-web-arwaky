@@ -28,7 +28,6 @@ class _TuiEventsMixin:
     query_one: Any
     _account_button_pressed: Any
     _swarm_button_pressed: Any
-    _auth_panel_pressed: Any
     _nav_dock_go: Any
     _switch_to_slot: Any
     _apply_override_from_field: Any
@@ -71,11 +70,18 @@ class _TuiEventsMixin:
             if position.isdigit():
                 self._account_button_pressed("delete", int(position))
             return
+        if button_name.startswith("account-refresh-"):
+            position = button_name.removeprefix("account-refresh-")
+            if position.isdigit():
+                self._account_button_pressed("refresh", int(position))
+            return
+        if button_name.startswith("account-health-"):
+            position = button_name.removeprefix("account-health-")
+            if position.isdigit():
+                self._account_button_pressed("health", int(position))
+            return
         if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
             self._swarm_button_pressed(button_id)
-            return
-        if button_id in ("btn-session-add", "btn-auth-connect", "btn-auth-cancel"):
-            self._auth_panel_pressed(button_id)
             return
         if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm", "nav-settings"):
             self._nav_dock_go(button_id)
@@ -154,14 +160,11 @@ class _TuiEventsMixin:
             slot_id = int(button_id.removeprefix("btn-copy-log-"))
             self._copy_slot_log(slot_id)
             return
-        if button_id in ("btn-sessions-refresh", "btn-sessions-rerefresh"):
-            self._refresh_sessions_table()
-            return
-        if button_id == "btn-sessions-login":
+        if button_id == "btn-session-add":
+            # The full-width ADD SESSION button opens the same session-setup
+            # flow as ctrl+l: SessionSetupScreen gates the destructive
+            # "Delete Session & Login Again" action behind a ConfirmModal.
             self._session_login_action()
-            return
-        if button_id == "btn-sessions-health":
-            self._run_session_health_check()
             return
         # Settings pane: system actions (doctor, update).
         if button_id in ("btn-tui-doctor", "btn-tui-update"):

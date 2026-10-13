@@ -1,53 +1,30 @@
 ---
 name: Obsidian Terminal
 colors:
-  surface: '#0f131c'
-  surface-dim: '#0f131c'
-  surface-bright: '#353942'
-  surface-container-lowest: '#0a0e16'
-  surface-container-low: '#181c24'
-  surface-container: '#1c2028'
-  surface-container-high: '#262a33'
-  surface-container-highest: '#31353e'
-  on-surface: '#dfe2ee'
-  on-surface-variant: '#bdc8d1'
-  inverse-surface: '#dfe2ee'
-  inverse-on-surface: '#2c3039'
-  outline: '#87929a'
-  outline-variant: '#3e484f'
-  surface-tint: '#7bd0ff'
-  primary: '#8ed5ff'
-  on-primary: '#00354a'
-  primary-container: '#38bdf8'
-  on-primary-container: '#004965'
-  inverse-primary: '#00668a'
-  secondary: '#c0c1ff'
-  on-secondary: '#1000a9'
-  secondary-container: '#3131c0'
-  on-secondary-container: '#b0b2ff'
-  tertiary: '#56e5a9'
-  on-tertiary: '#003824'
-  tertiary-container: '#30c88f'
-  on-tertiary-container: '#004e34'
-  error: '#ffb4ab'
-  on-error: '#690005'
-  error-container: '#93000a'
-  on-error-container: '#ffdad6'
-  primary-fixed: '#c4e7ff'
-  primary-fixed-dim: '#7bd0ff'
-  on-primary-fixed: '#001e2c'
-  on-primary-fixed-variant: '#004c69'
-  secondary-fixed: '#e1e0ff'
-  secondary-fixed-dim: '#c0c1ff'
-  on-secondary-fixed: '#07006c'
-  on-secondary-fixed-variant: '#2f2ebe'
-  tertiary-fixed: '#6ffbbe'
-  tertiary-fixed-dim: '#4edea3'
-  on-tertiary-fixed: '#002113'
-  on-tertiary-fixed-variant: '#005236'
-  background: '#0f131c'
-  on-background: '#dfe2ee'
-  surface-variant: '#31353e'
+  bg: '#171A1F'
+  surface: '#22262C'
+  border: '#2E343C'
+  text: '#E5E7EB'
+  text-muted: '#9AA4B2'
+  accent: '#38BDF8'
+  success: '#4ADE80'
+  warning: '#FACC15'
+  danger: '#E5484D'
+  focus-ring: '#38BDF8'
+  bg-surface: '#12151A'
+  bg-overlay: '#1C2026'
+  bg-raised: '#22262C'
+  bg-hover: '#2A2F36'
+  bg-active: '#31373F'
+  fg-primary: '#E5E7EB'
+  fg-muted: '#9AA4B2'
+  fg-accent: '#7DD3FC'
+  fg-on-accent: '#0B1220'
+  primary-fixed: '#BAE6FD'
+  danger-soft-bg: '#3A1214'
+  danger-soft-fg: '#FCA5A5'
+  danger-bg: '#E5484D'
+  danger-fg: '#FFF1F2'
 typography:
   headline-lg:
     fontFamily: Inter
@@ -134,14 +111,48 @@ The visual style blends **cyber-technical minimalism** with refined **tactile te
 
 ## Colors
 
-The palette operates in strict dark mode, anchored by deep carbon and obsidian planes:
+The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
 
-- **Base Surfaces**: `#0B0F17` provides the structural canvas, layered with `#111827` for elevated cards, modals, and navigation shelves. Subtle elevated nodes transition to `#1E293B`.
-- **Primary Accent (`#38BDF8`)**: Electric cyan-blue designated for high-priority interactive states, primary action triggers, stream cursors, and active process markers.
-- **Secondary Accent (`#6366F1`)**: Soft indigo used for secondary branching, parallel agent tags, auxiliary control vectors, and telemetry charts.
-- **Tertiary Accent (`#10B981`)**: Emerald green dedicated to running tasks, operational health, completed inference cycles, and online daemon states.
-- **System Diagnostics**: Warning (`#F59E0B`) and Critical Error (`#EF4444`) are used purely for state divergence, log anomalies, and task interruptions.
-- **Hairlines and Contours**: Ghost borders rely on `rgba(56, 189, 248, 0.12)` to `rgba(255, 255, 255, 0.08)` to maintain structural integrity without excessive contrast.
+| Token | Hex | Approx ANSI | Usage |
+|-------|-----|-------------|-------|
+| `bg` | `#171A1F` | 0 (black) | Screen / canvas background |
+| `surface` | `#22262C` | 237 | Cards, table rows |
+| `border` | `#2E343C` | 238 | Hairline separators, card borders |
+| `text` | `#E5E7EB` | 253 | Primary text |
+| `text-muted` | `#9AA4B2` | 247 | Secondary text, captions, placeholders |
+| `accent` | `#38BDF8` | 81 | Primary action, focus ring, active marker |
+| `success` | `#4ADE80` | 84 | ACTIVE / READY / DONE states |
+| `warning` | `#FACC15` | 220 | LIMITED / WARN / EXPIRED states |
+| `danger` | `#E5484D` | 203 | DELETE, error, FAILED |
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `focus-ring` | `#38BDF8` | 1px focus outline on interactive widgets |
+| `bg-surface` | `#12151A` | Recessed strip (tab bar) |
+| `bg-overlay` | `#1C2026` | Card fill |
+| `bg-raised` | `#22262C` | Raised tile / row hover target |
+| `bg-hover` | `#2A2F36` | Surface hover |
+| `bg-active` | `#31373F` | Surface pressed / selected row |
+| `fg-primary` | `#E5E7EB` | Primary text (alias) |
+| `fg-muted` | `#9AA4B2` | Secondary text (alias) |
+| `fg-accent` | `#7DD3FC` | Accent-tinted text |
+| `fg-on-accent` | `#0B1220` | Text on accent fill |
+| `primary-fixed` | `#BAE6FD` | Tinted monospace value |
+| `danger-soft-bg` | `#3A1214` | Delete button default (subtle) |
+| `danger-soft-fg` | `#FCA5A5` | Delete button text (subtle) |
+| `danger-bg` | `#E5484D` | Delete button focus / confirm modal fill |
+| `danger-fg` | `#FFF1F2` | Text on the strong danger fill |
+
+Legacy aliases — kept in `_COLORS` so existing CSS `$tokens` and `THEME` keys keep resolving:
+
+- `status_ok` → `success` (`#4ADE80`)
+- `status_err` → `danger` (`#E5484D`)
+- `status_warn` → `warning` (`#FACC15`)
+- `status_muted` → `text-muted` (`#9AA4B2`)
+- `status_info` → `accent` (`#38BDF8`)
+- `bright` → `success` (`#4ADE80`)
+
+All text colours clear WCAG AA (4.5:1) against their background.
 
 ## Typography
 
