@@ -1,7 +1,7 @@
 """Unit tests for the Sessions-pane account card action buttons.
 
 The card foot carries two icon-only buttons:
-- ⚗ (flask, ``account-test-<n>``): runs the pool health check — the same
+- 🧪 (test, ``account-test-<n>``): runs the pool health check — the same
   probe as ``qwa session health`` (``SessionHealthChecker``).
 - 🗑 (trash, ``account-delete-<n>``): removes the pool entry and deletes
   the Chromium profile — the same logic as ``qwa session remove``
@@ -65,7 +65,7 @@ class TestAccountCardButtons:
                 labels = [str(b.label) for b in buttons]
                 # Two buttons: flask (⚗) and trash (🗑)
                 assert len(buttons) == 2, f"expected 2 buttons, got {len(buttons)}"
-                assert "⚗" in labels[0], f"first button should be the flask icon, got {labels!r}"
+                assert "🧪" in labels[0], f"first button should be the flask icon, got {labels!r}"
                 assert "🗑" in labels[1], f"second button should be the trash icon, got {labels!r}"
                 # Names ride on position so a re-check rebuild can't collide ids
                 assert buttons[0].name == "account-test-1"

@@ -526,7 +526,7 @@ class _TuiUtilsMixin:
             ),
             Horizontal(
                 Static(f"● {label}", classes=f"account-status {state_class}"),
-                Button("⚗", name=f"account-test-{position}", classes="account-btn account-btn-test"),
+                Button("🧪", name=f"account-test-{position}", classes="account-btn account-btn-test"),
                 Button("🗑", name=f"account-delete-{position}", classes="account-btn account-btn-delete"),
                 classes="account-card-foot",
             ),
