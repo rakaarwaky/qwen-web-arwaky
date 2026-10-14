@@ -62,7 +62,7 @@ modules/tui/src/     surface_tui_* (Textual TUI layer; depends on cli, never vic
 modules/mcp/src/      surface_mcp_*, root_mcp_container
 modules/shared/templates/ role templates (package data of the shared member), free of HTML-escaped tokens
 root_cli_main_entry.py, root_mcp_main_entry.py
-tests/                unit, integration, e2e, fixtures/, conftest.py
+tests/                shared fixtures (conftest, pipeline_fixtures, helpers) — not a pytest root; pytest lives in modules/*/tests/
 benches/              benchmark suite, marker: benchmark
 lint_arwaky.config.yaml, pyproject.toml, uv.lock
 Containerfile         containerized execution, driven by scripts/podman.sh
@@ -78,13 +78,13 @@ Every command must match the exact CI gate.
 
 ```bash
 # Tests
-uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ \
+uv run python -m pytest modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ \
   modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ \
   modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ \
   modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ \
-  --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v   # what it covers
+  -m "not benchmark" -v   # what it covers
 uv run python -m pytest modules/{name}/tests/ -v              # one unit
-uv run python -m pytest tests/test_{name}.py -v               # one file
+uv run python -m pytest modules/{name}/tests/{file}.py -v     # one file
 # Lint / types / architecture
 uv run ruff format --check modules/ tests/                    # matches ci.yml {job name}
 uv run ruff check modules/ tests/                              # matches ci.yml {job name}
@@ -100,7 +100,7 @@ report Total: 0. The e2e and benchmark selections need a live authenticated
 session, so CI never runs them:
 
 ```bash
-uv run python -m pytest tests/ -m e2e -v
+uv run python -m pytest modules/ -m e2e -v
 uv run python -m pytest benches/ -m benchmark -v
 ```
 

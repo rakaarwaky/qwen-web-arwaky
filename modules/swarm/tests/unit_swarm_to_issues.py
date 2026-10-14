@@ -19,7 +19,7 @@ from pathlib import Path
 # Import the script by path (it lives in scripts/, not an installed package)
 # ---------------------------------------------------------------------------
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 _SPEC = importlib.util.spec_from_file_location("swarm_to_issues", _SCRIPTS_DIR / "swarm_to_issues.py")
 s2i = importlib.util.module_from_spec(_SPEC)
 sys.modules["swarm_to_issues"] = s2i
