@@ -44,7 +44,7 @@ class _TuiEventsMixin:
     _copy_log_by_id: Any
     _copy_slot_log: Any
     _refresh_sessions_table: Any
-    _session_login_action: Any
+    action_session_add_new: Any
     _run_session_health_check: Any
     _check_template_roles: Any
     _open_template_picker: Any
@@ -165,10 +165,10 @@ class _TuiEventsMixin:
             self._copy_slot_log(slot_id)
             return
         if button_id == "btn-session-add":
-            # The full-width ADD SESSION button opens the same session-setup
-            # flow as ctrl+l: SessionSetupScreen gates the destructive
-            # "Delete Session & Login Again" action behind a ConfirmModal.
-            self._session_login_action()
+            # The full-width ADD SESSION button asks for the session name
+            # (AddSessionModal) and then runs the headed browser login for
+            # that name. The legacy SessionSetupScreen flow is gone.
+            self.action_session_add_new()
             return
         # Settings pane: system actions (doctor, update).
         if button_id in ("btn-tui-doctor", "btn-tui-update"):

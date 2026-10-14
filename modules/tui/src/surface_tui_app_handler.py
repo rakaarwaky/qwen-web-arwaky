@@ -1,4 +1,4 @@
-"""System actions, workspace init, legacy session setup/login, quit guard.
+"""System actions, workspace init, session setup/login, quit guard.
 
 Split from ``modules/tui/src/surface_tui_main_handlers.py`` so every handler
 file stays on the AES surface complexity budget (AES406, 50 control-flow
@@ -21,7 +21,6 @@ from modules.tui.src.surface_tui_components import (
     ConfirmModal,
 )
 from modules.tui.src.surface_tui_css import THEME
-from modules.tui.src.surface_tui_session_setup import SessionSetupScreen
 
 
 class _TuiAppHandlerMixin:
@@ -51,10 +50,8 @@ class _TuiAppHandlerMixin:
     _log_msg: Any
     copy_to_clipboard: Any
     push_screen: Any
-    _login_worker: Any
     _workspace: Any
     exit: Any
-    _login_in_flight: bool
     call_from_thread: Any
     notify: Any
     _session: Any
@@ -99,71 +96,11 @@ class _TuiAppHandlerMixin:
         handler()
 
     def action_login_action(self) -> None:
-        """Open the session-setup submenu guarding the destructive login flow."""
-        # U3: re-entrancy guard — one login flow at a time.
-        if getattr(self, "_login_in_flight", False):
-            self._log_msg("[bold {}]WARNING:[/] Login already in progress.".format(THEME["warn"]))
-            return
-
-        # SA-1: wire the previously-dead SessionSetupScreen into the TUI login
-        # path.  Show the session-setup submenu; "Delete Session & Login
-        # Again" triggers the blocking setup_session() worker after
-        # confirmation, "Back to Main Menu" dismisses the screen.
-        self._log_msg("[bold {}]>>> Opening session setup menu...[/]".format(THEME["accent_fg"]))
-        self.push_screen(
-            SessionSetupScreen(
-                status_text=f"[bold]Session status: {self._session_badge_text()}[/]",
-                on_login=self._start_login_worker,
-                on_back=lambda: self._log_msg(
-                    "[{}]Session setup cancelled — back to main menu.[/]".format(THEME["muted"])
-                ),
-            )
-        )
-
-    def _session_badge_text(self) -> str:
-        """Return a short session status string for the setup screen."""
-        if self._session is None:
-            return "N/A (no session orchestrator)"
-        last = getattr(self, "_last_session_state", None)
-        if last:
-            return f"{last} — run 'qwen-web-arwaky doctor' for diagnostics"
-        return "CHECKING — run 'qwen-web-arwaky doctor' for diagnostics"
-
-    def _start_login_worker(self, confirmed: bool) -> None:
-        """SA-1: start the blocking login worker after user confirmation."""
-        if not confirmed:
-            return
-        self._login_in_flight = True
-        self._log_msg("[bold {}]>>> Launching interactive session setup...[/]".format(THEME["accent_fg"]))
-        self._login_worker()
+        """Open the session name dialog, then run the headed browser login."""
+        self.action_session_add_new()
 
     def action_init_action(self) -> None:
         """U8: trigger workspace initialization on a background thread."""
-        self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
-        self._init_worker()
-
-    def _session_login_action(self) -> None:
-        """Handle session login button click — legacy flow, kept for back-compat."""
-        if not hasattr(self, "_session_manager") or self._session_manager is None:
-            self._log_msg("[yellow]Session manager not available.[/]")
-            return
-        self.push_screen(
-            SessionSetupScreen(
-                status_text="Session Login",
-                on_login=lambda confirmed: self._run_session_login(confirmed),
-                on_back=lambda: self._log_msg("[dim]Login cancelled.[/]"),
-            )
-        )
-
-    def _run_session_login(self, confirmed: bool) -> None:
-        """Run the session login process."""
-        if not confirmed:
-            return
-        self._log_msg("[bold {}]>>> Starting session login...[/]".format(THEME["accent_fg"]))
-        # This will be handled by the CLI session login command via subprocess
-        self.notify(
-            "Use 'qwen-web-arwaky session login --name <name>' to add a session", title="Info", severity="information"
-        )
         self._log_msg("[bold {}]>>> Initializing workspace...[/]".format(THEME["accent_fg"]))
         self._init_worker()
 

@@ -47,10 +47,8 @@ class _TuiSwarmHandlerMixin:
     _log_msg: Any
     copy_to_clipboard: Any
     push_screen: Any
-    _login_worker: Any
     _workspace: Any
     exit: Any
-    _login_in_flight: bool
     call_from_thread: Any
     notify: Any
     _session: Any

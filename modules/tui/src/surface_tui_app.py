@@ -184,8 +184,6 @@ class QwenTuiApp(
         self._metrics_pending: bool = False
         # A4: timestamp of last Escape press for double-escape quit guard.
         self._last_esc_time: float = 0.0
-        # C4: initialize login guard flag eagerly (was only set in worker finally block).
-        self._login_in_flight: bool = False
         # U7: generation token per-slot to guard _finalize_slot against stale workers.
         self._slot_generation: dict[int, int] = {s: 0 for s in range(1, NUM_SLOTS + 1)}
         # Issue #277: input held while the Swarm resource modal is up.

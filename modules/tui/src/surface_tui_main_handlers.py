@@ -35,7 +35,6 @@ class _TuiHandlersMixin(
     # Declared on the combined class so mypy resolves them without each
     # split file re-declaring the others' members.
     _open_picker: Any
-    _session_login_action: Any
     _ensure_sessions_loaded: Any
 
 

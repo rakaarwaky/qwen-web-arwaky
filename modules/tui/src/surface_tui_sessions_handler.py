@@ -50,13 +50,11 @@ class _TuiSessionsHandlerMixin:
     _log_msg: Any
     copy_to_clipboard: Any
     push_screen: Any
-    _login_worker: Any
     _workspace: Any
     exit: Any
-    _login_in_flight: bool
     call_from_thread: Any
     notify: Any
-    _session_login_action: Any
+    action_session_add_new: Any
     _session: Any
     _session_manager: Any
     _refresh_sessions_table: Any
@@ -218,7 +216,7 @@ class _TuiSessionsHandlerMixin:
 
     def action_session_add(self) -> None:
         """a: add a new session — same as the ADD SESSION button."""
-        self._session_login_action()
+        self.action_session_add_new()
 
     def action_session_refresh(self) -> None:
         """r: reload the pool (problem 6 / req C)."""
