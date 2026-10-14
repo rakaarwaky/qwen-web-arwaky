@@ -422,6 +422,7 @@ def test_swarm_clear_button_empties_the_active_log() -> None:
 # on_button_pressed routes to _swarm_button_pressed, so a plain prefix test
 # silently dropped the press and the chip did nothing.
 
+
 def test_swarm_browse_button_opens_the_file_picker() -> None:
     """Pressing the Swarm Browse chip pushes the file picker screen."""
     from textual.screen import ModalScreen
