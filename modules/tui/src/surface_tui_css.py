@@ -94,12 +94,13 @@ def _css_vars() -> str:
 
 # Build TUI_CSS via plain string concatenation (NOT f-string) to avoid ruff
 # F821 false positives — ruff parses f-string interpolation as Python and
-# flags CSS property names like ``background`` as undefined names.
+# flags CSS property names like ``background`` as undefined names. The body
+# lives in its own constant so the assembly is name + name; a ``+`` directly
+# against a triple-quoted literal makes bandit B608 read the CSS ``Select``
+# rule plus a "from" in a comment as a hardcoded SQL query.
 _CSS_HEADER = "/* ═══ Obsidian Terminal Design Tokens (V2 — auto-generated) ═══ */\n" + _css_vars()
 
-TUI_CSS = (
-    _CSS_HEADER
-    + """
+_CSS_BODY = """
 
 /* --- Base --------------------------------------------------------------- */
 Screen {
@@ -2187,6 +2188,7 @@ HelpScreen {
     margin-right: 1;
 }
 """
-)
+
+TUI_CSS = _CSS_HEADER + _CSS_BODY
 
 __all__ = ["THEME", "TUI_CSS"]
