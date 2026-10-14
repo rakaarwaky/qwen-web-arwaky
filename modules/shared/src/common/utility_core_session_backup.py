@@ -53,6 +53,16 @@ def snapshots_count(session_path: Path) -> int:
     return sum(1 for _ in _snapshots(backups_dir(session_path)))
 
 
+def _generation_stamp() -> str:
+    """Name for a new generation directory, at second resolution.
+
+    Second resolution means snapshots taken inside the same second coalesce
+    into one generation directory. That is deliberate for a login burst, and
+    it is the seam tests patch to mint distinct generations without sleeping.
+    """
+    return time.strftime("%Y%m%dT%H%M%SZ")
+
+
 def take_snapshot(session_path: Path, *, max_generations: int = DEFAULT_MAX_GENERATIONS) -> Path:
     """Copy the master profile into a new ``.backups`` generation and prune old ones.
 
@@ -61,7 +71,7 @@ def take_snapshot(session_path: Path, *, max_generations: int = DEFAULT_MAX_GENE
     known-good copy in place.
     """
     source = Path(session_path)
-    target = backups_dir(source) / time.strftime("%Y%m%dT%H%M%SZ")
+    target = backups_dir(source) / _generation_stamp()
     target.mkdir(mode=SNAPSHOT_MODE, parents=True, exist_ok=True)
     _copy_profile(source, target)
     _prune_old_snapshots(backups_dir(source), max_generations)

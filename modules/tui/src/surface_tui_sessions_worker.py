@@ -16,9 +16,11 @@ from typing import Any
 
 from rich.markup import escape
 from textual import work
+from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import DataTable, Label
+from textual.widgets import Label
 
+from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 from modules.tui.src.surface_tui_css import THEME
 
@@ -37,6 +39,8 @@ class _TuiSessionsWorkerMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
     _render_account_cards: Any
+    _account_card: Any
+    _sessions_cache: list[Any]
     query_one: Any
     notify: Any
     call_from_thread: Any
@@ -104,10 +108,7 @@ class _TuiSessionsWorkerMixin:
         timer = getattr(self, "_session_check_timer", None)
         if timer is not None:
             timer.stop()
-        # The 60s window must exceed the worst-case navigate_to_chat model-
-        # picker verification (up to ~25s of retries) plus page navigation;
-        # a successful check taking ~30s must not trip it.
-        self._session_check_timer = self.set_timer(60.0, self._session_check_timeout)
+        self._session_check_timer = self.set_timer(SESSION_CHECK_TIMEOUT_SEC, self._session_check_timeout)
         self._session_check_worker()
 
     def _session_check_timeout(self) -> None:
@@ -172,30 +173,21 @@ class _TuiSessionsWorkerMixin:
             limited = sum(1 for s in sessions if s.is_limited)
 
             def _update() -> None:
-                table = self.query_one("#sessions-table", DataTable)
-                table.clear()
-                table.add_columns("ID", "Name", "Status", "Last Used", "Path")
-                table.add_rows(
-                    (
-                        s.session_id,
-                        s.name,
-                        s.status.value,
-                        s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never",
-                        str(s.path),
-                    )
-                    for s in sessions
-                )
-                self._render_account_cards(list(sessions))
+                rows = self.query_one("#session-rows", Vertical)
+                rows.remove_children()
+                if not sessions:
+                    rows.mount(Label("No accounts registered.", classes="field-label"))
+                else:
+                    self._sessions_cache = list(sessions)
+                    for position, s in enumerate(sessions, start=1):
+                        rows.mount(self._account_card(s, position))
+                # Keep the pane's three counters in step with the pool. The
+                # strip is the pane's whole summary, so a repaint is the only
+                # writer.
                 with contextlib.suppress(NoMatches):
-                    self.query_one("#session-total", Label).update(f"{total}")
-                    self.query_one("#session-healthy", Label).update(f"{healthy}")
-                    self.query_one("#session-limited", Label).update(f"{limited}")
-                # _update runs on the app thread only when _refresh_sessions_table
-                # was called from the main thread; call_from_thread is the no-op
-                # fast path in that case. It must NOT appear inside the callback
-                # itself — calling it from the app thread raises ValueError and
-                # surfaces as a spurious "SESSION LOAD ERROR" even though the
-                # table rendered fine.
+                    self.query_one("#session-metric-registered", Label).update(f"{total}")
+                    self.query_one("#session-metric-active", Label).update(f"{healthy}")
+                    self.query_one("#session-metric-expired", Label).update(f"{limited}")
                 self._log_msg(
                     "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
                         THEME["ok"], total, healthy, limited
@@ -332,6 +324,62 @@ class _TuiSessionsWorkerMixin:
                 self._log_msg,
                 "[bold {}]HEALTH CHECK ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
             )
+
+    # ── Add Session Worker ──────────────────────────────────────────────
+
+    def start_add_session_login(self, session_name: str) -> None:
+        """Start the background worker to run headed browser login for a new session.
+
+        Registers ``session_name`` in the pool by running the ``login`` session
+        verb, which opens the headed browser and waits for a valid session.
+        Logs the outcome to the event log and shows a success/error toast when
+        the worker completes.
+        """
+        if getattr(self, "_session", None) is None:
+            self._log_msg("[bold {}]ERROR:[/] Session orchestrator not available.".format(THEME["err"]))
+            return
+
+        self._log_msg(
+            "[bold {}]LAUNCHING BROWSER:[/] Please log in at chat.qwen.ai, then close the window.".format(
+                THEME["accent_fg"]
+            )
+        )
+        self.notify(
+            "Browser opened for login. Complete sign-in at chat.qwen.ai, then close the window.",
+            title="Add Session",
+            severity="information",
+            timeout=10,
+        )
+
+        self._run_add_session_worker(session_name)
+
+    @work(thread=True)
+    def _run_add_session_worker(self, session_name: str) -> None:
+        """Background worker that runs the headed browser login and validates the session."""
+        try:
+            response = self._session.execute(SessionRequest(verb="login", name=session_name))
+            if response.valid and not response.error:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]SUCCESS:[/] Session '{}' saved at {}".format(
+                        THEME["ok"], escape(session_name), escape(str(response.profile_path or ""))
+                    ),
+                )
+                self.call_from_thread(self.notify, f"Session '{session_name}' added successfully!", "success", 5)
+                self.call_from_thread(self._refresh_sessions_table)
+            else:
+                error_msg = response.error or response.message or "Login failed"
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(error_msg))),
+                )
+                self.call_from_thread(self.notify, f"Login failed: {error_msg}", "error", 8)
+        except Exception as exc:
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}]LOGIN ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+            )
+            self.call_from_thread(self.notify, f"Login error: {exc}", "error", 8)
 
 
 __all__ = ["_TuiSessionsWorkerMixin"]

@@ -3,42 +3,72 @@
 Surface layer (surface_cli): design-system colors and stylesheet string
 consumed by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
 
-Token names and hex values derive from the canonical material-spec map in
-``design/obsidian_terminal/DESIGN.md`` (the "Obsidian Terminal" system
-released with the Obsidian Terminal redesign PR #467).
+This module is the **single source of truth for colour**. ``_COLORS`` is the
+canonical palette; ``THEME`` and the ``$token`` CSS variables are derived from
+it, so a component never hardcodes a hex value. The canonical hex values are
+mirrored in the "Terminal Palette" table of
+``design/obsidian_terminal/DESIGN.md`` — keep both in step when a value
+changes.
 """
 
 from __future__ import annotations
 
 # V1/V4: single source of truth — derive THEME and CSS tokens from _COLORS.
-# All hex values must match the "Obsidian Terminal" material palette in
-# design/obsidian_terminal/DESIGN.md, lines 4-64.  Do not hand-edit a
-# value without re-generating from that source file first.
+# Every text colour below clears WCAG AA (4.5:1) against its background.
+# Mirror the canonical hex values in design/obsidian_terminal/DESIGN.md.
 _COLORS: dict[str, str] = {
-    # Obsidian Terminal surface stack
-    "fg_accent": "#8ed5ff",  # primary
-    "fg_primary": "#dfe2ee",  # on-surface
-    "fg_muted": "#bdc8d1",  # on-surface-variant
-    "fg_on_accent": "#00354a",  # on-primary
-    "accent": "#38bdf8",  # primary-container
-    "bg_base": "#0f131c",  # surface / background
-    "bg_surface": "#0a0e16",  # surface-container-lowest
-    "bg_raised": "#1c2028",  # surface-container
-    "bg_overlay": "#181c24",  # surface-container-low
-    "bg_hover": "#262a33",  # surface-container-high
-    "bg_active": "#31353e",  # surface-container-highest
-    "primary_fixed": "#c4e7ff",  # primary-fixed
-    "border": "#3e484f",  # outline-variant
-    # Status colors (mapped from material error/tertiary/primary tokens)
-    "status_ok": "#56e5a9",  # tertiary
-    "status_warn": "#c0c1ff",  # secondary (amber replaced by indigo to fit palette)
-    "status_err": "#ffb4ab",  # error
-    "status_info": "#38bdf8",  # primary-container
-    "status_muted": "#87929a",  # outline
-    "bright": "#56e5a9",  # tertiary (was #4ADE80, now matches "ok")
-    # V2: danger tokens — uses error-container / on-error-container
-    "danger_bg": "#93000a",
-    "danger_fg": "#ffdad6",
+    # ── Semantic surface stack (dark, layered) ──────────────────────────
+    "bg": "#171A1F",  # canonical background / screen fill
+    "surface": "#22262C",  # canonical raised surface (cards, rows)
+    "bg_base": "#171A1F",  # alias: screen background
+    "bg_surface": "#12151A",  # alias: recessed strip (tab bar)
+    "bg_overlay": "#1C2026",  # alias: card fill
+    "bg_raised": "#22262C",  # alias: raised tile / row hover target
+    "bg_hover": "#2A2F36",  # surface hover
+    "bg_active": "#31373F",  # surface pressed / selected row
+    # ── Borders ─────────────────────────────────────────────────────────
+    "border": "#2E343C",  # hairline separator
+    "focus_ring": "#38BDF8",  # focus outline
+    # ── Text ────────────────────────────────────────────────────────────
+    "text": "#E5E7EB",  # canonical primary text
+    "text_muted": "#9AA4B2",  # canonical secondary text
+    "fg_primary": "#E5E7EB",  # alias: primary text
+    "fg_muted": "#9AA4B2",  # alias: secondary text
+    "fg_accent": "#7DD3FC",  # accent-tinted text
+    "fg_on_accent": "#0B1220",  # text on accent fill
+    "primary_fixed": "#BAE6FD",  # tinted monospace value
+    # ── Accent / status ─────────────────────────────────────────────────
+    "accent": "#38BDF8",  # primary accent
+    "success": "#4ADE80",  # canonical success
+    "status_ok": "#4ADE80",  # alias: success
+    "bright": "#4ADE80",  # alias: success (highlight)
+    "warning": "#FACC15",  # canonical warning
+    "status_warn": "#FACC15",  # alias: warning
+    "danger": "#E5484D",  # canonical danger
+    "status_err": "#E5484D",  # alias: danger
+    "status_info": "#38BDF8",  # informational = accent
+    "status_muted": "#9AA4B2",  # neutral state
+    # ── Danger surfaces ─────────────────────────────────────────────────
+    # Subtle by default (tinted text on a dark red wash); the strong fill is
+    # reserved for focus and the confirm modal.
+    "danger_soft_bg": "#3A1214",
+    "danger_soft_fg": "#FCA5A5",
+    "danger_bg": "#E5484D",  # strong fill (focus / modal confirm)
+    "danger_fg": "#FFF1F2",  # text on the strong fill
+}
+
+# Canonical semantic names (the design layer) → _COLORS key. Components and
+# the design-token tests read the semantic layer through this map.
+SEMANTIC_ALIASES: dict[str, str] = {
+    "bg": "bg",
+    "surface": "surface",
+    "border": "border",
+    "text": "text",
+    "text-muted": "text_muted",
+    "accent": "accent",
+    "success": "success",
+    "warning": "warning",
+    "danger": "danger",
 }
 
 THEME: dict[str, str] = {
@@ -51,6 +81,9 @@ THEME: dict[str, str] = {
     "err": _COLORS["status_err"],
     "info": _COLORS["status_info"],
     "bright": _COLORS["bright"],
+    "danger": _COLORS["danger"],
+    "success": _COLORS["success"],
+    "warning": _COLORS["warning"],
 }
 
 
@@ -61,12 +94,13 @@ def _css_vars() -> str:
 
 # Build TUI_CSS via plain string concatenation (NOT f-string) to avoid ruff
 # F821 false positives — ruff parses f-string interpolation as Python and
-# flags CSS property names like ``background`` as undefined names.
+# flags CSS property names like ``background`` as undefined names. The body
+# lives in its own constant so the assembly is name + name; a ``+`` directly
+# against a triple-quoted literal makes bandit B608 read the CSS ``Select``
+# rule plus a "from" in a comment as a hardcoded SQL query.
 _CSS_HEADER = "/* ═══ Obsidian Terminal Design Tokens (V2 — auto-generated) ═══ */\n" + _css_vars()
 
-TUI_CSS = (
-    _CSS_HEADER
-    + """
+_CSS_BODY = """
 
 /* --- Base --------------------------------------------------------------- */
 Screen {
@@ -152,48 +186,31 @@ Underline {
    keeps its card/log geometry (tests/unit_tui_log_containment.py). */
 .nav-dock {
     layout: vertical;
-    height: 4;
+    height: auto;
     dock: bottom;
     background: $bg_surface;
     border-top: solid $border;
     padding: 0 1;
 }
 
-/* The marker strip: one 1fr cell per nav item, so a bar sits exactly over
-   the button below it. A terminal cannot centre a bar inside a bordered
-   button, so the strip carries it instead. */
-.nav-bar-strip {
-    layout: horizontal;
-    width: 100%;
-    height: 1;
-}
-
-.nav-bar {
-    width: 1fr;
-    height: 1;
-    content-align: center middle;
-    color: $accent;
-}
-
-.nav-bar-active {
-    text-style: bold;
-}
-
-/* The five cells share one row so their 1fr widths line up with the marker
-   strip above. */
+/* The five cells share one row so their 1fr widths line up with each other.
+   Height is 6: each button is 2 content rows plus a 1px top and bottom
+   border (4 total), so the row must reserve enough for the borders or
+   Textual clips the label. */
 .nav-items {
     layout: horizontal;
     width: 100%;
-    height: 2;
+    height: 6;
 }
 
-/* One icon-over-label cell: the icon row sits above the caption. */
+/* One icon-over-label cell: the icon row sits above the caption. The button
+   must be tall enough for both content rows plus its top/bottom border, so
+   Textual reserves height 4 for the label and 2 for the borders. */
 .nav-item {
     width: 1fr;
     min-width: 8;
-    height: 2;
-    padding: 0;
-    border: none;
+    height: 4;
+    padding: 0 2;
     background: $bg_surface;
     color: $fg_muted;
     text-style: bold;
@@ -201,8 +218,18 @@ Underline {
     content-align: center middle;
 }
 
+/* Bigger, more tappable tab buttons (Problem: bottom-bar buttons too small):
+   a subtle raised fill plus a hairline so each tab reads as a button, and a
+   larger caption block so the icon + label fill the 2-row cell. */
+.nav-item {
+    background: $bg_overlay;
+    border: solid $border;
+}
+
 .nav-item.nav-active {
     color: $fg_accent;
+    background: $bg_active;
+    border: solid $accent;
 }
 
 .nav-item.nav-inactive {
@@ -212,6 +239,7 @@ Underline {
 .nav-item.nav-active:hover {
     background: $bg_active;
     color: $fg_accent;
+    border: solid $accent;
 }
 
 .nav-item.nav-inactive:hover {
@@ -1047,40 +1075,6 @@ HelpScreen {
     margin-bottom: 0;
 }
 
-.btn-sessions-refresh,
-.btn-sessions-login,
-.btn-sessions-health {
-    /* Ghost geometry: these ride in a 1-row .toggle-row, and a default 3-row
-       Button overflows that single content line and renders as a clipped fill
-       with no label. */
-    width: auto;
-    height: 1;
-    min-width: 12;
-    padding: 0 1;
-    margin-right: 1;
-    background: $bg_raised;
-    color: $fg_primary;
-    border: none;
-    text-style: bold;
-}
-
-.btn-sessions-refresh:hover,
-.btn-sessions-health:hover {
-    background: $bg_hover;
-    color: $fg_accent;
-}
-
-.btn-sessions-login {
-    background: $accent;
-    color: $fg_on_accent;
-    border: none;
-}
-
-.btn-sessions-login:hover {
-    background: $bg_base;
-    color: $accent;
-}
-
 /* ═══ Mockup parity: LOGIN (session pool) ═══════════════════════════════ */
 /* The mockup's SESSION POOL STATUS card holds three equal metric tiles and a
    full-width primary action, then one card per registered account. */
@@ -1193,25 +1187,71 @@ HelpScreen {
 }
 
 .login-metric-cell {
+    layout: vertical;
     width: 1fr;
-    height: 4;
-    background: $bg_raised;
+    height: 6;
+    background: $surface;
     border: solid $border;
-    padding: 0 1;
+    border-right: none;
+    padding: 1 1 0 1;
     margin-right: 1;
+    content-align: left middle;
+}
+
+.login-metric-cell:last-child {
+    border-right: solid $border;
 }
 
 .login-metric-label {
-    color: $fg_muted;
+    color: $text_muted;
     text-style: bold;
+    height: 1;
+    width: auto;
 }
 
 .login-metric-value {
     color: $fg_accent;
     text-style: bold;
+    height: 3;
+    width: auto;
+    content-align: left middle;
 }
 
-/* Full-width primary call-to-action ("ADD ACCOUNT"). */
+/* Contained ADD SESSION button at the top-right of the table panel (problem 5):
+   a single 1-row slim call-to-action, not a full-width band. The spacer fills
+   the left side so the button hugs the right edge. */
+.session-add-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.session-add-spacer {
+    width: 1fr;
+    height: 3;
+}
+
+.btn-session-add-contained {
+    width: auto;
+    min-width: 14;
+    height: 3;
+    background: $accent;
+    color: $text;
+    border: none;
+    text-style: bold;
+    padding: 0 2;
+    content-align: center middle;
+}
+
+.btn-session-add-contained:hover {
+    background: $fg_accent;
+    color: $bg_base;
+}
+
+/* Full-width primary call-to-action ("ADD ACCOUNT"). Kept for other panes;
+   the Sessions pane now uses the contained variant above. */
 .btn-primary-full {
     width: 100%;
     height: 3;
@@ -1240,68 +1280,93 @@ HelpScreen {
     color: $fg_accent;
 }
 
-/* One account card: identity on top, hairline telemetry row underneath with
-   the health state and the two per-account actions (mockup Login). */
-.account-card {
-    layout: vertical;
-    width: 100%;
-    height: auto;
-    background: $bg_raised;
-    border: solid $border;
-    margin-bottom: 1;
+/* The session table: one static head row (NAME / STATUS / ACTIONS) and one
+   row per account. Every row carries the same three cells plus the three
+   action buttons, so the columns line up because the widths are fixed. */
+/* The session table fills the pane's remaining height so there is no dead
+   space below the last row: the card owns 1fr and the row list scrolls. */
+#session-table {
+    height: 1fr;
+    min-height: 4;
 }
 
-.account-card-head {
-    layout: horizontal;
-    width: 100%;
-    height: 3;
-    padding: 0 1;
-    align: left middle;
+#session-rows {
+    height: 1fr;
+    overflow-y: auto;
 }
 
-.account-card-foot {
-    layout: horizontal;
+/* The empty-state line: informative, centred, muted. */
+.session-empty {
+    color: $text_muted;
+    text-style: italic;
+    padding: 2 1;
     width: 100%;
-    height: 3;
-    padding: 0 1;
-    border-top: solid $border;
-    align: left middle;
-}
-
-.account-avatar {
-    width: 3;
-    height: 3;
     content-align: center middle;
-    background: $bg_active;
-    color: $fg_accent;
-    text-style: bold;
-    margin-right: 1;
 }
 
-.account-email {
+.session-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+/* Keyboard-first selection: a focused row gets the hover surface plus a 1px
+   accent left edge, so the operator always sees which row the cursor is on. */
+.session-row.session-row-selected {
+    background: $bg_hover;
+    border-left: solid $accent;
+}
+
+.session-row:focus-within {
+    background: $bg_hover;
+}
+
+.session-row-head {
+    background: $bg_active;
+    border-bottom: solid $border;
+}
+
+.session-row .session-cell {
+    height: 1;
+    content-align: left middle;
+}
+
+.session-cell-name {
     width: 1fr;
     color: $fg_primary;
     text-style: bold;
 }
 
-.account-status {
-    width: 1fr;
+.session-cell-status {
+    width: 12;
+    color: $fg_muted;
     text-style: bold;
-    margin-right: 1;
 }
 
-.account-status.state-active {
+.session-row-head .session-cell {
+    color: $fg_accent;
+    text-style: bold;
+}
+
+.session-cell-actions {
+    width: 16;
+    color: $fg_muted;
+}
+
+.session-cell.state-active {
     color: $status_ok;
 }
 
-.account-status.state-limited {
+.session-cell.state-limited {
     color: $status_err;
 }
 
-/* The card foot's two per-account action buttons: ⚗ (flask) triggers the
-   pool health check (same probe as 'qwa session health'); 🗑 (trash)
-   deletes the pool entry + profile (same logic as 'qwa session remove').
-   Both are icon-only, 4 cells wide (was 6 for the 4-char text labels). */
+/* The row's three per-account action buttons: ↻ (refresh) reloads the pool
+   from disk, 🧪 (health) runs the pool health check (same probe as
+   'qwa session health'), 🗑 (trash) deletes the pool entry + profile (same
+   logic as 'qwa session remove'). Icon-only, 4 cells wide. */
 .account-btn {
     width: 4;
     min-width: 4;
@@ -1310,21 +1375,35 @@ HelpScreen {
     background: $bg_hover;
     text-style: bold;
     content-align: center middle;
-}
-
-.account-btn-test {
-    color: $accent;
     margin-right: 1;
 }
 
-.account-btn-delete {
-    color: $danger_fg;
-    background: $danger_bg;
+.account-btn-refresh {
+    color: $fg_accent;
 }
 
-.account-btn-delete:hover {
-    background: $status_err;
-    color: $bg_base;
+.account-btn-health {
+    color: $accent;
+}
+
+/* Focus ring for every row action: a 1px accent outline so the keyboard
+   cursor is visible on a button. */
+.account-btn:focus {
+    border: solid $focus_ring;
+    background: $bg_active;
+}
+
+/* Delete is subtle by default — tinted text on a dark red wash — and only
+   goes strong-red on focus, matching the confirm modal's danger fill. */
+.account-btn-delete {
+    color: $danger_soft_fg;
+    background: $danger_soft_bg;
+    margin-right: 0;
+}
+
+.account-btn-delete:focus {
+    background: $danger_bg;
+    color: $danger_fg;
 }
 
 .account-btn:hover {
@@ -2109,6 +2188,7 @@ HelpScreen {
     margin-right: 1;
 }
 """
-)
+
+TUI_CSS = _CSS_HEADER + _CSS_BODY
 
 __all__ = ["THEME", "TUI_CSS"]

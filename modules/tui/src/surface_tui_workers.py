@@ -396,7 +396,12 @@ class _TuiWorkersMixin:
     def _swarm_worker(self, input_path: Path) -> None:
         try:
             snapshot = self._swarm.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
-            assert snapshot is not None
+            if snapshot is None:
+                self.call_from_thread(
+                    self._log_swarm_msg,
+                    "[bold {}]SWARM ERROR:[/] swarm start returned no snapshot".format(THEME["err"]),
+                )
+                return
             self._swarm_id = snapshot.swarm_id
             # Overview Swarm Status card shows Uptime Elapsed from this stamp.
             self._swarm_started_perf = time.perf_counter()

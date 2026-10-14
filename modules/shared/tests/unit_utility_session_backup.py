@@ -8,12 +8,14 @@ is retained.
 
 from __future__ import annotations
 
+import itertools
 import os
 import time
 from pathlib import Path
 
 import pytest
 
+import modules.shared.src.common.utility_core_session_backup as session_backup
 from modules.shared.src.common.utility_core_session_backup import (
     DEFAULT_MAX_GENERATIONS,
     SNAPSHOT_MODE,
@@ -34,6 +36,21 @@ def _write_profile(session_path: Path) -> None:
     (session_path / "Cookies").write_text("live-credentials", encoding="utf-8")
     (session_path / "Default").mkdir(exist_ok=True)
     (session_path / "Default" / "Preferences").write_text("{}", encoding="utf-8")
+
+
+def _stamp_clock(monkeypatch: pytest.MonkeyPatch, start: int = 0) -> None:
+    """Make each generation stamp distinct without sleeping a second per call.
+
+    ``take_snapshot`` names generations at second resolution, so a real burst
+    of snapshots needs ``time.sleep(1.1)`` between calls to stay distinct.
+    Driving the stamp directly keeps the same coverage at no wall-clock cost.
+    """
+    counter = itertools.count(start)
+
+    def _next_stamp() -> str:
+        return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(1_700_000_000 + next(counter)))
+
+    monkeypatch.setattr(session_backup, "_generation_stamp", _next_stamp)
 
 
 def test_backups_dir_is_hidden_under_the_session(tmp_path: Path):
@@ -58,10 +75,10 @@ def test_take_snapshot_copies_the_profile(tmp_path: Path):
     assert has_session_backup(tmp_path) is True
 
 
-def test_take_snapshot_does_not_nest_a_previous_generation(tmp_path: Path):
+def test_take_snapshot_does_not_nest_a_previous_generation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _write_profile(tmp_path)
+    _stamp_clock(monkeypatch)
     take_snapshot(tmp_path)
-    time.sleep(1.1)
     second = take_snapshot(tmp_path)
 
     assert not (second / ".backups").exists()
@@ -86,11 +103,11 @@ def test_snapshot_is_hardened_because_the_profile_holds_credentials(tmp_path: Pa
     assert os.stat(generation).st_mode & 0o777 == SNAPSHOT_MODE
 
 
-def test_generations_are_pruned_to_the_cap(tmp_path: Path):
+def test_generations_are_pruned_to_the_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _write_profile(tmp_path)
+    _stamp_clock(monkeypatch)
     for _ in range(DEFAULT_MAX_GENERATIONS + 2):
         take_snapshot(tmp_path, max_generations=DEFAULT_MAX_GENERATIONS)
-        time.sleep(1.1)
 
     assert snapshots_count(tmp_path) <= DEFAULT_MAX_GENERATIONS
     assert has_session_backup(tmp_path) is True

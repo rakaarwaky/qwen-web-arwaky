@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -23,6 +24,7 @@ from textual.widgets import Button, Label, Static, TabbedContent
 
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
+from modules.tui.src.surface_tui_css import _COLORS, THEME
 
 if TYPE_CHECKING:
     pass
@@ -45,6 +47,18 @@ _STATUS_TABLE: dict[str, str] = {
     "FAILED": "FAILED ✕",
     "CANCELLED": "CANCELLED ■",
     "CANCELLING": "CANCELLING ⚠",
+}
+
+# Legacy status color alias: old hardcoded hexes from the pre-redesign
+# palette. These are kept here only for the handler's compatibility; they
+# are never used in the layout itself. The actual status colour is derived
+# from the new token map to keep a single source of truth.
+_STATUS_COLORS_ALIASES: dict[str, str] = {
+    "#56e5a9": _COLORS["status_ok"],
+    "#ffb4ab": _COLORS["status_err"],
+    "#c0c1ff": _COLORS["status_warn"],
+    "#87929a": _COLORS["status_muted"],
+    "#0f131c": _COLORS["bg_base"],
 }
 
 # Event-level status: monospace glyphs + short label per pipeline event so the
@@ -86,20 +100,55 @@ def format_event_label(event_name: str) -> str:
 # Redesign v6.5.2: thread-state labels used by the Overview Threads Matrix.
 # The mockup names each cell's state in one short word (Streaming / Ready /
 # Done / Active / Idle) rather than the pipeline event name, so the table
-# stays scannable at a glance. The colours are hex, not Rich names: the state
-# colour reaches the screen twice — as `[on <colour>]` in the cluster bar's
-# markup and as a Rich Text style on the matrix label — and Textual only
-# accepts its own CSS color names, which have no `greyNN` entries. `grey61`
-# silently vanished there, leaving idle cells unstyled. #87929a is the
-# $status_muted token.
+# stays scannable at a glance. Colours now read from the token map so the
+# palette stays the single source of truth (problem 2, req A).
 _THREAD_STATE: dict[str, tuple[str, str]] = {
-    "IDLE": ("Ready", "#87929a"),
-    "RUNNING": ("Streaming", "#38bdf8"),
-    "SUCCESS": ("Done", "#56e5a9"),
-    "FAILED": ("Failed", "#ffb4ab"),
-    "CANCELLED": ("Cancelled", "#87929a"),
-    "CANCELLING": ("Stopping", "#c0c1ff"),
+    "IDLE": ("Ready", THEME["muted"]),
+    "RUNNING": ("Streaming", THEME["accent"]),
+    "SUCCESS": ("Done", THEME["ok"]),
+    "FAILED": ("Failed", THEME["err"]),
+    "CANCELLED": ("Cancelled", THEME["muted"]),
+    "CANCELLING": ("Stopping", THEME["warn"]),
 }
+
+# The row's three per-account actions carry a preferred wide glyph and an
+# ASCII fallback. A terminal without a Nerd Font (or one forced to
+# monochrome) renders the fallback instead of a tofu box. The label is what
+# the button shows; the Button.name keeps its machine key so routing is
+# unaffected.
+_GLYPHS: dict[str, tuple[str, str]] = {
+    "refresh": ("↻", "r"),
+    "health": ("☐", "h"),
+    "delete": ("×", "x"),
+    # Unified glyph set for all UI icons (monochrome, no wide/emoji)
+    "overview": ("■", "O"),
+    "login": ("○", "L"),
+    "chat": ("□", "C"),
+    "swarm": ("◆", "S"),
+    "settings": ("⚙", "S"),
+    "add": ("+", "a"),
+    "active": ("●", "*"),
+    "model": ("M", "M"),
+    "swarm_icon": ("◆", "S"),
+    "chat_icon": ("□", "C"),
+    "live": ("●", "*"),
+    "stream": ("►", ">"),
+    "slot": ("#", "#"),
+}
+_WIDE_GLYPHS = frozenset(
+    {
+        "↻",
+        "☐",
+        "×",
+        "■",
+        "○",
+        "□",
+        "◆",
+        "⚙",
+        "●",
+        "►",
+    }
+)
 
 
 def _thread_state(status: str) -> tuple[str, str]:
@@ -189,6 +238,24 @@ def _attachment_chip(path_str: str) -> str:
 
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
+
+    # ── Glyph helpers (AES406: keep module CF <= 50) ────────────────────
+
+    @staticmethod
+    def _unicode_ok() -> bool:
+        """Whether the terminal can paint the wide action glyphs.
+
+        A forced-ascii locale or NO_COLOR disables the wide set so the ASCII
+        fallback renders instead of a missing-glyph box.
+        """
+        locale = os.environ.get("LC_ALL") or os.environ.get("LANG", "")
+        return not (os.environ.get("NO_COLOR") or (locale and "ascii" in locale.lower()))
+
+    @staticmethod
+    def _glyph(key: str) -> str:
+        """Return the button label for an action key: wide glyph or ASCII fallback."""
+        wide, fallback = _GLYPHS[key]
+        return wide if _TuiUtilsMixin._unicode_ok() and wide in _WIDE_GLYPHS else fallback
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
     _NUM_SLOTS: int
@@ -503,13 +570,14 @@ class _TuiUtilsMixin:
     # ── Sessions: mockup account cards ───────────────────────────────────
 
     @staticmethod
-    def _account_card(session: Any, position: int) -> Vertical:
-        """Build one mockup account card from a stored session record.
+    def _account_card(session: Any, position: int) -> Any:
+        """Build one table row for a stored session record.
 
-        The card mirrors the Login mockup: identity on top, then a hairline
-        row carrying the health state and the two per-account actions. The
-        actions ride on ``Button.name`` rather than ``id`` so a re-check can
-        rebuild the whole list without ever registering a duplicate id.
+        The row matches the pane's column head: the account name, its health
+        status, then the three per-row actions. The actions ride on
+        ``Button.name`` rather than ``id`` so a repaint can rebuild the whole
+        list without ever registering a duplicate id. The method keeps its
+        historical name because callers, tests, and the worker all address it.
         """
         name = str(getattr(session, "name", "") or getattr(session, "session_id", "") or f"session-{position}")
         healthy = bool(getattr(session, "is_healthy", False))
@@ -518,35 +586,33 @@ class _TuiUtilsMixin:
             label, state_class = "ACTIVE", "state-active"
         else:
             label, state_class = str(status).upper() or "LIMITED", "state-limited"
-        return Vertical(
+        glyph = _TuiUtilsMixin._glyph
+        return Horizontal(
+            Label(escape(name), classes="session-cell session-cell-name"),
+            Label(f"● {label}", classes=f"session-cell session-cell-status {state_class}"),
             Horizontal(
-                Static(name[:1].upper() or "◍", classes="account-avatar"),
-                Static(escape(name), classes="account-email"),
-                classes="account-card-head",
+                Button(glyph("refresh"), name=f"account-refresh-{position}", classes="account-btn account-btn-refresh"),
+                Button(glyph("health"), name=f"account-health-{position}", classes="account-btn account-btn-health"),
+                Button(glyph("delete"), name=f"account-delete-{position}", classes="account-btn account-btn-delete"),
+                classes="session-cell session-cell-actions",
             ),
-            Horizontal(
-                Static(f"● {label}", classes=f"account-status {state_class}"),
-                Button("⚗", name=f"account-test-{position}", classes="account-btn account-btn-test"),
-                Button("🗑", name=f"account-delete-{position}", classes="account-btn account-btn-delete"),
-                classes="account-card-foot",
-            ),
-            classes="account-card",
+            classes="session-row",
         )
 
     def _render_account_cards(self, sessions: list[Any]) -> None:
-        """Replace the Sessions pane's card list with one card per session.
+        """Replace the Sessions pane's row list with one row per session.
 
         The list is rebuilt rather than diffed: a token re-check rewrites the
         health state of every account at once, so incremental updates would
         have to reconcile states that all change together anyway.
         """
         with contextlib.suppress(NoMatches):
-            container = self.query_one("#account-cards", Vertical)
+            container = self.query_one("#session-rows", Vertical)
             container.remove_children()
             if not sessions:
                 container.mount(Static("No accounts registered.", classes="field-label"))
                 return
-            # The card actions are addressed by position, so the handler
+            # The row actions are addressed by position, so the handler
             # resolves them against exactly the list on screen.
             self._sessions_cache = list(sessions)
             for position, session in enumerate(sessions, start=1):

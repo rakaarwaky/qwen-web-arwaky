@@ -119,6 +119,12 @@ CHAT_URL = "https://chat.qwen.ai/"
 NAVIGATION_TIMEOUT_MS = 30_000
 NAVIGATION_LOAD_TIMEOUT_MS = 15_000
 
+# Backoff between Chromium launch attempts. A launch that crashes on a missing
+# binary or a corrupted profile cannot be helped by retrying faster, so the
+# delay stays generous. Read at call time so a test can shrink the backoff
+# instead of paying several real seconds per retry case.
+LAUNCH_RETRY_WAIT_SEC: float = 2.0
+
 # Default model. Pipeline forces this on every chat session so the
 # user never has to pick a model manually (idempotent per-session).
 # Overridable via the QWEN_MODEL or QWEN_DEFAULT_MODEL environment variable, or
@@ -645,3 +651,10 @@ RATE_LIMIT_PATTERNS: list[str] = [
 PARSE_FAST_PHASE_SEC: float = 5.0
 PARSE_POLL_FAST_MS: int = 500
 PARSE_POLL_SLOW_MS: int = 1000
+
+# TUI session-check watchdog window. Must exceed the worst-case
+# navigate_to_chat model-picker verification (~25s of retries) plus page
+# navigation, because a successful check taking ~30s must not be reported as a
+# timeout. Read at arm time so a test can shrink the window instead of sleeping
+# the full 60s out.
+SESSION_CHECK_TIMEOUT_SEC: float = 60.0
