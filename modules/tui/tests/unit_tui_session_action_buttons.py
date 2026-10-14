@@ -64,11 +64,11 @@ class TestAccountCardButtons:
                 await host.mount(card)
                 buttons = list(card.query(Button))
                 labels = [str(b.label) for b in buttons]
-                # Three buttons: refresh (↻), health (🧪), and trash (🗑)
+                # Three buttons: refresh (↻), health (☐), and trash (×)
                 assert len(buttons) == 3, f"expected 3 buttons, got {len(buttons)}"
                 assert "↻" in labels[0], f"first button should be the refresh icon, got {labels!r}"
-                assert "🧪" in labels[1], f"second button should be the health icon, got {labels!r}"
-                assert "🗑" in labels[2], f"third button should be the trash icon, got {labels!r}"
+                assert "☐" in labels[1], f"second button should be the health icon, got {labels!r}"
+                assert "×" in labels[2], f"third button should be the delete icon, got {labels!r}"
                 # Names ride on position so a re-check rebuild can't collide ids
                 assert buttons[0].name == "account-refresh-1"
                 assert buttons[1].name == "account-health-1"
@@ -317,10 +317,9 @@ class TestSessionsPaneLayout:
                 assert len(adds) == 1, f"expected 1 Add Session button, got {len(adds)}"
                 add = adds[0]
                 assert add.id == "btn-session-add"
-                # It is the big full-width primary action, not a small row
-                # button: .btn-primary-full spans the pane.
-                assert add.has_class("btn-primary-full"), list(add.classes)
-                assert add.region.width > 20, f"expected a full-width button, got {add.region.width}"
+                # Contained button hugging the table panel's top-right (problem 5),
+                # not a full-width band.
+                assert add.has_class("btn-session-add-contained"), list(add.classes)
 
         asyncio.run(_run())
 

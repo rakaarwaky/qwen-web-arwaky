@@ -118,10 +118,28 @@ _THREAD_STATE: dict[str, tuple[str, str]] = {
 # unaffected.
 _GLYPHS: dict[str, tuple[str, str]] = {
     "refresh": ("↻", "r"),
-    "health": ("🧪", "h"),
-    "delete": ("🗑", "x"),
+    "health": ("☐", "h"),
+    "delete": ("×", "x"),
+    # Unified glyph set for all UI icons (monochrome, no wide/emoji)
+    "overview": ("■", "O"),
+    "login": ("○", "L"),
+    "chat": ("□", "C"),
+    "swarm": ("◆", "S"),
+    "settings": ("⚙", "S"),
+    "add": ("+", "a"),
+    "active": ("●", "*"),
+    "model": ("M", "M"),
+    "swarm_icon": ("◆", "S"),
+    "chat_icon": ("□", "C"),
+    "live": ("●", "*"),
+    "stream": ("►", ">"),
+    "slot": ("#", "#"),
 }
-_WIDE_GLYPHS = frozenset("↻🧪🗑")
+_WIDE_GLYPHS = frozenset({
+    "↻", "☐", "×",
+    "■", "○", "□", "◆", "⚙",
+    "●", "►",
+})
 
 
 def _thread_state(status: str) -> tuple[str, str]:

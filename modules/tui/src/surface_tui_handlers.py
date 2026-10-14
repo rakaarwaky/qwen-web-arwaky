@@ -239,7 +239,9 @@ class _TuiHandlersMixin:
 
     def _ensure_sessions_loaded(self) -> None:
         """Fetch the account pool the first time the Sessions pane is opened."""
-        if getattr(self, "_sessions_loaded_once", False) or getattr(self, "_session_manager", None) is None:
+        if getattr(self, "_sessions_loaded_once", False):
+            return
+        if getattr(self, "_session_manager", None) is None:
             return
         self._sessions_loaded_once = True
         self._refresh_sessions_table()

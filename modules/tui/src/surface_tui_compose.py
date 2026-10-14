@@ -29,7 +29,7 @@ from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.common.utility_core_version import get_package_version
 from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.tui.src.surface_tui_css import THEME
-from modules.tui.src.surface_tui_utils import _empty_cluster_bar_markup
+from modules.tui.src.surface_tui_utils import _TuiUtilsMixin
 
 
 class _TuiComposeMixin:
@@ -113,12 +113,15 @@ class _TuiComposeMixin:
                                 classes="metric-tile-number metric-tile-model-value",
                             )
 
-                    # Swarm Status card: icon chip + title, the inset bento
-                    # (ring, state, uptime) and the per-slot cluster bar.
+                    # Swarm Status card: title, the inset bento
+                    # (ring, state, uptime).
                     with Vertical(classes="screen-card engine-card"):
                         with Horizontal(classes="card-title-row"):
-                            yield Static("⌬", classes="card-icon")
-                            yield Label("Swarm Status", id="metric-swarm-label", classes="card-title")
+                            yield Label(
+                                f"{_TuiUtilsMixin._glyph('swarm_icon')} Swarm Status",
+                                id="metric-swarm-label",
+                                classes="card-title",
+                            )
                         with Horizontal(classes="engine-bento"):
                             yield Label("0/0", id="metric-swarm-ring", classes="engine-ring")
                             yield Label("Idle", id="metric-swarm-detail", classes="engine-detail")
@@ -128,18 +131,15 @@ class _TuiComposeMixin:
                                 id="metric-swarm-uptime",
                                 classes="engine-uptime",
                             )
-                        yield Label(
-                            _empty_cluster_bar_markup(self._NUM_SLOTS),
-                            id="metric-swarm-bar",
-                            classes="cluster-bar",
-                            markup=True,
-                        )
 
                     # Chat / Threads Status card: same shape, no uptime block.
                     with Vertical(classes="screen-card engine-card"):
                         with Horizontal(classes="card-title-row"):
-                            yield Static("💬", classes="card-icon")
-                            yield Label("Chat Status", id="metric-threads-label", classes="card-title")
+                            yield Label(
+                                f"{_TuiUtilsMixin._glyph('chat_icon')} Chat Status",
+                                id="metric-threads-label",
+                                classes="card-title",
+                            )
                         with Horizontal(classes="engine-bento"):
                             yield Label("0/0", id="metric-threads-ring", classes="engine-ring")
                             with Vertical(classes="engine-body"):
@@ -149,22 +149,14 @@ class _TuiComposeMixin:
                                     id="metric-threads-detail",
                                     classes="engine-detail",
                                 )
-                        yield Label(
-                            _empty_cluster_bar_markup(self._NUM_SLOTS),
-                            id="metric-threads-bar",
-                            classes="cluster-bar",
-                            markup=True,
-                        )
 
                     # System Event Log: the mockup's bordered card with a
                     # LIVE STREAM marker. The Copy button stays because
                     # action_copy_active_log is bound to it.
                     with Vertical(classes="screen-card log-card"):
                         with Horizontal(classes="log-card-head"):
-                            yield Static("●", classes="log-pip log-pip-live")
                             yield Label("[ SYSTEM EVENT LOG ]", classes="log-card-title", markup=False)
                             yield Static("", classes="log-head-spacer")
-                            yield Static("●", classes="log-pip log-pip-stream")
                             yield Label("LIVE STREAM", classes="log-live-label")
                             yield Button(
                                 "Copy",
@@ -201,13 +193,15 @@ class _TuiComposeMixin:
                         yield Label("EXPIRED", classes="login-metric-label")
                         yield Label("0", id="session-metric-expired", classes="login-metric-value")
 
-                # The pane's one and only add control: the full-width primary
+                # The pane's one and only add control: the contained primary
                 # action, wired to the real interactive login flow.
-                yield Button(
-                    "⊕ ADD SESSION",
-                    id="btn-session-add",
-                    classes="btn-primary-full",
-                )
+                with Horizontal(classes="session-add-row"):
+                    yield Static("", classes="session-add-spacer")
+                    yield Button(
+                        "+ ADD SESSION",
+                        id="btn-session-add",
+                        classes="btn-session-add-contained",
+                    )
 
                 # The pane's one and only table: name | status | ↻ | 🧪 | 🗑.
                 # The head row is static; every session row is mounted into
@@ -238,7 +232,7 @@ class _TuiComposeMixin:
                     with Horizontal(classes="slot-carousel"):
                         for i in range(1, self._NUM_SLOTS + 1):
                             yield Button(
-                                f"● SLOT {i:02d}",
+                                f"{_TuiUtilsMixin._glyph('slot')} SLOT {i:02d}",
                                 id=f"chat-slot-{s}-{i}",
                                 classes="slot-chip slot-chip-active" if i == s else "slot-chip",
                             )
@@ -254,7 +248,7 @@ class _TuiComposeMixin:
                             id=f"status-badge-{s}",
                             classes="status-badge",
                         )
-                        yield Label("●", id=f"live-beacon-{s}", classes="live-beacon")
+                        yield Label(_TuiUtilsMixin._glyph("live"), id=f"live-beacon-{s}", classes="live-beacon")
 
                     # Transcript: prompts right-aligned, answers left-aligned.
                     with ScrollableContainer(classes="chat-stream", id=f"chat-scroll-{s}"):
@@ -487,23 +481,15 @@ class _TuiComposeMixin:
 
         # ─── Bottom Nav Dock ───────────────────────────────────────────────
         # The mockup docks icon-over-label cells across the full width with no
-        # key-hint line. The strip above them holds the active marker: a short
-        # accent bar centred over the active cell, the way the mockup draws it
-        # instead of a full-width hairline. Each bar cell is 1fr, so it lines
-        # up with the button below it.
+        # key-hint line. Each cell stacks its icon above its caption, with the
+        # active cell carrying a short accent bar centred over its icon.
         with Horizontal(id="nav-dock", classes="nav-dock"):
-            with Horizontal(classes="nav-bar-strip"):
-                yield Static("━━━", id="nav-bar-overview", classes="nav-bar nav-bar-active")
-                yield Static("", id="nav-bar-login", classes="nav-bar")
-                yield Static("", id="nav-bar-chat", classes="nav-bar")
-                yield Static("", id="nav-bar-swarm", classes="nav-bar")
-                yield Static("", id="nav-bar-settings", classes="nav-bar")
             with Horizontal(classes="nav-items"):
-                yield Button("▦\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
-                yield Button("⚿\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
-                yield Button("▣\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
-                yield Button("⚯\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
-                yield Button("⚙\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
+                yield Button(f"{_TuiUtilsMixin._glyph('overview')}\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
+                yield Button(f"{_TuiUtilsMixin._glyph('login')}\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
+                yield Button(f"{_TuiUtilsMixin._glyph('chat')}\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
+                yield Button(f"{_TuiUtilsMixin._glyph('swarm')}\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
+                yield Button(f"{_TuiUtilsMixin._glyph('settings')}\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""
@@ -516,8 +502,6 @@ class _TuiComposeMixin:
         self._metric_swarm_uptime = self.query_one("#metric-swarm-uptime", Label)
         self._metric_threads_ring = self.query_one("#metric-threads-ring", Label)
         self._metric_threads_detail = self.query_one("#metric-threads-detail", Label)
-        self._metric_swarm_bar = self.query_one("#metric-swarm-bar", Label)
-        self._metric_threads_bar = self.query_one("#metric-threads-bar", Label)
 
         # Redesign v6.5.2: seed the engine readouts so the Overview shows real
         # numbers on first paint rather than placeholders.

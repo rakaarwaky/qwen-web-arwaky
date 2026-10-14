@@ -192,47 +192,29 @@ Underline {
     padding: 0 1;
 }
 
-/* The marker strip: one 1fr cell per nav item, so a bar sits exactly over
-   the button below it. A terminal cannot centre a bar inside a bordered
-   button, so the strip carries it instead. */
-.nav-bar-strip {
-    layout: horizontal;
-    width: 100%;
-    height: 1;
-}
-
-.nav-bar {
-    width: 1fr;
-    height: 1;
-    content-align: center middle;
-    color: $accent;
-}
-
-.nav-bar-active {
-    text-style: bold;
-}
-
-/* The five cells share one row so their 1fr widths line up with the marker
-   strip above. Height is 4 (2 content rows + 2 border rows) so the bordered
-   buttons below are never clipped. */
+/* The five cells share one row so their 1fr widths line up with each other.
+   Height is 6: each button is 2 content rows plus a 1px top and bottom
+   border (4 total), so the row must reserve enough for the borders or
+   Textual clips the label. */
 .nav-items {
     layout: horizontal;
     width: 100%;
-    height: 4;
+    height: 6;
 }
 
-/* One icon-over-label cell: the icon row sits above the caption. */
+/* One icon-over-label cell: the icon row sits above the caption. The button
+   must be tall enough for both content rows plus its top/bottom border, so
+   Textual reserves height 4 for the label and 2 for the borders. */
 .nav-item {
     width: 1fr;
     min-width: 8;
-    height: 2;
+    height: 4;
     padding: 0 2;
     background: $bg_surface;
     color: $fg_muted;
     text-style: bold;
     text-align: center;
     content-align: center middle;
-    margin-bottom: 1;
 }
 
 /* Bigger, more tappable tab buttons (Problem: bottom-bar buttons too small):
@@ -1206,7 +1188,7 @@ HelpScreen {
 .login-metric-cell {
     layout: vertical;
     width: 1fr;
-    height: 4;
+    height: 6;
     background: $surface;
     border: solid $border;
     border-right: none;
@@ -1229,12 +1211,45 @@ HelpScreen {
 .login-metric-value {
     color: $fg_accent;
     text-style: bold;
-    height: 2;
+    height: 3;
     width: auto;
     content-align: left middle;
 }
 
-/* Full-width primary call-to-action ("ADD ACCOUNT"). */
+/* Contained ADD SESSION button at the top-right of the table panel (problem 5):
+   a single 1-row slim call-to-action, not a full-width band. The spacer fills
+   the left side so the button hugs the right edge. */
+.session-add-row {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    margin-bottom: 1;
+}
+
+.session-add-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+.btn-session-add-contained {
+    width: auto;
+    min-width: 14;
+    height: 1;
+    background: $accent;
+    color: $text;
+    border: solid $accent;
+    text-style: bold;
+    padding: 0 1;
+}
+
+.btn-session-add-contained:hover {
+    background: $fg_accent;
+    color: $bg_base;
+    border: solid $fg_accent;
+}
+
+/* Full-width primary call-to-action ("ADD ACCOUNT"). Kept for other panes;
+   the Sessions pane now uses the contained variant above. */
 .btn-primary-full {
     width: 100%;
     height: 3;

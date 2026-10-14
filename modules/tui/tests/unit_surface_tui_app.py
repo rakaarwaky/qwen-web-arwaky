@@ -320,10 +320,6 @@ def test_overview_card_ids_exist_on_mount() -> None:
             assert isinstance(app.query_one("#metric-swarm-detail", Label), Label)
             assert isinstance(app.query_one("#metric-threads-ring", Label), Label)
             assert isinstance(app.query_one("#metric-threads-detail", Label), Label)
-            # Per-card segment bars: the mockup draws one under Swarm Status
-            # and one under Chat Status, so the redesign carries two.
-            assert isinstance(app.query_one("#metric-swarm-bar", Label), Label)
-            assert isinstance(app.query_one("#metric-threads-bar", Label), Label)
 
     asyncio.run(_run())
 
