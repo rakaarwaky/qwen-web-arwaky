@@ -46,20 +46,20 @@ with suppress(ImportError):
     OTelBatchSpanProcessor = BatchSpanProcessor
 
 from modules.shared.src import utility_core_exit
-from modules.shared.src.contract_jobs_protocol import IStatusProtocol
-from modules.shared.src.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
-from modules.shared.src.taxonomy_core_error import ErrorCategory
-from modules.shared.src.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
-from modules.shared.src.utility_core_status import status_path_for
-from modules.shared.src.utility_io_writer import atomic_write_json
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_telemetry_scrubber import (
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
+from modules.shared.src.common.taxonomy_core_error import ErrorCategory
+from modules.shared.src.common.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
+from modules.shared.src.common.utility_core_status import status_path_for
+from modules.shared.src.common.utility_io_writer import atomic_write_json
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_telemetry_scrubber import (
     harden_private_dir,
     harden_private_file,
     scrub_span_attributes,
     scrub_telemetry_event,
 )
+from modules.shared.src.jobs.contract_jobs_protocol import IStatusProtocol
+from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
 
 # NOTE (issue #359): ``MetricsCounter`` and ``StatusFileWriter`` were extracted
 # into their own capability modules (``capabilities_metrics_counter`` /
@@ -407,7 +407,7 @@ class ObservabilitySetup(IObservabilityProtocol):
 
         The report answers "which capability is most defective?" without a
         human reading the JSONL log: failures are bucketed by
-        :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` and
+        :class:`~modules.shared.src.common.taxonomy_core_error.ErrorCategory` and
         ranked by count, alongside the rolling-24h execution totals.
 
         Returns the written path. A missing or unparseable log yields an empty
@@ -479,7 +479,7 @@ def _category_from_record(payload: dict[str, Any]) -> str:
 
     Prefers the ``category`` field the crash handler already writes
     (``ErrorCategory.categorize``).  A value outside
-    :meth:`~modules.shared.src.taxonomy_core_error.ErrorCategory.known` is
+    :meth:`~modules.shared.src.common.taxonomy_core_error.ErrorCategory.known` is
     treated as uncategorized, so a hand-written or stale bucket name cannot
     fragment the distribution; records emitted without one fall back to
     ``"other"`` so they still show up rather than being dropped.

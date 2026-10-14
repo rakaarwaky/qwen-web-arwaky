@@ -11,15 +11,15 @@ from modules.shared.src import (
     EVENT_WEB_LOADED,
     PIPELINE_EVENT_SEQUENCE,
 )
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleGate, LifecycleState
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleGate, LifecycleState
+from modules.shared.src.common.taxonomy_core_error import (
     ErrorCategory,
     QwenCliError,
     ResponseDetectionTimeoutError,
     StuckDetectedError,
 )
-from modules.shared.src.taxonomy_core_error import QwenCliError as CANONICAL_QWEN_CLI_ERROR
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_error import QwenCliError as CANONICAL_QWEN_CLI_ERROR
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DESCRIPTIONS,
     EVENT_DOCUMENT_PARSED,
     EVENT_GENERATION_FINISHED,
@@ -33,10 +33,10 @@ from modules.shared.src.taxonomy_core_event import (
     LifecycleEvent,
     QwenEventType,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     EVENT_WEB_LOADED as LEGACY_EVENT_WEB_LOADED,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     EventDetails,
     EventOrderMap,
 )

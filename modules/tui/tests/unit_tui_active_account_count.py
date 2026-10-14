@@ -12,7 +12,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.shared.src.taxonomy_session_vo import (
+from modules.shared.src.session.taxonomy_session_vo import (
     SessionInfo,
     SessionPool,
     SessionStatus,
@@ -27,7 +27,6 @@ def _make_app(session_manager: MagicMock) -> QwenTuiApp:
         file_only=MagicMock(),
         attachment=MagicMock(),
         slot_config=MagicMock(),
-        setup=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),
         session_manager=session_manager,

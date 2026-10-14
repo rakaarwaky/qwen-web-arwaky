@@ -10,15 +10,15 @@ import json
 from urllib import request
 from urllib.parse import urlparse
 
-from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     GITHUB_RELEASE_URL,
     USER_AGENT,
 )
-from modules.shared.src.taxonomy_core_vo import UpdateCheckResult, VersionString
-from modules.shared.src.utility_core_version import get_package_version
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_update_pipeline import (
+from modules.shared.src.common.taxonomy_core_vo import UpdateCheckResult, VersionString
+from modules.shared.src.common.utility_core_version import get_package_version
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol
+from modules.shared.src.update.utility_update_pipeline import (
     compare_versions,
     github_repo_name,
     run_pip_show,

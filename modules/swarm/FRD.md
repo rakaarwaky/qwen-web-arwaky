@@ -37,7 +37,19 @@ snapshot while it runs, and cancel it; they never own a browser or a thread.
 - **Edge Cases**: A snapshot of a fan-out that never started reports no legs.
 - **Error Handling**: A snapshot whose handle is unknown reports no legs rather than raising.
 
-### FR-SWARM-003: Cancel a fan-out
+### FR-SWARM-003: Share one fan-out state across the seams
+
+- **Description**: Keep the snapshots, per-leg cancel events, attachment handle, and executor of every run in one store the start, progress, and cancel seams all read.
+- **Input**: A new run's snapshot with its cancel events and attachment, and every later revision of that snapshot.
+- **Output**: The current snapshot of a run, and the stored runtime bindings it needs.
+- **Business Rules**:
+  - A read-decide-write cycle is applied under one lock, so two legs of the same run cannot lose one another's status update.
+  - Every accepted snapshot is persisted to `manifest.json` before the write returns, so a state a caller reads in memory is also readable on disk.
+  - A run's executor, cancel events, and attachment are released on cancel; its snapshot is kept so the terminal state stays readable.
+- **Edge Cases**: A revision for a run that was never opened is a no-op.
+- **Error Handling**: The store never raises for an unknown run; it reports an absent snapshot and an empty event map.
+
+### FR-SWARM-004: Cancel a fan-out
 
 - **Description**: Stop every leg of a running fan-out.
 - **Input**: The fan-out handle.
@@ -57,6 +69,17 @@ snapshot while it runs, and cancel it; they never own a browser or a thread.
 | `snapshot` | fan-out handle | swarm snapshot | none | none | Report per-leg progress. |
 | `cancel` | fan-out handle | stopped-leg count | none | none | Stop every running leg. |
 | `browser_concurrency` | run configuration | fan-out ceiling | none | none | Report how many fan-out browsers may run at once. |
+| `open_run` | snapshot, per-leg cancel events, attachment | none | none | none | Register a new run and persist it. |
+| `get_snapshot` | fan-out handle | swarm snapshot or none | none | none | Read the latest persisted state of a run. |
+| `revise` | fan-out handle, transform | revised snapshot or none | none | none | Replace a snapshot atomically under one lock and persist it. |
+| `cancel_events` | fan-out handle | per-leg cancel events | none | none | Read the events that stop each leg of a run. |
+| `attachment` | fan-out handle | attachment path or none | none | none | Read the material every leg of a run shares. |
+| `attach_executor` | fan-out handle, executor | none | none | none | Bind the executor running the legs of a run. |
+| `release` | fan-out handle | the released executor or none | none | none | Drop a run's runtime bindings, keeping its snapshot. |
+
+The three consumer seams are separate capabilities and never import one
+another, so the state they share — the rows from `open_run` through `release`
+— is reached through this one store.
 
 ### Aggregate API
 

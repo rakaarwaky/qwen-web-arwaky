@@ -21,10 +21,9 @@ import pytest
 
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_manager import SessionManager
-from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_session_vo import SessionRequest
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
-from modules.shared.src.utility_session_guard import is_filesystem_root, is_safe_session_target
+from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.shared.src.session.utility_session_guard import is_filesystem_root, is_safe_session_target
 
 
 def _orchestrator() -> SessionOrchestrator:
@@ -81,7 +80,7 @@ def test_default_session_directory_is_allowed(tmp_path: Path) -> None:
     fake_sessions = tmp_path / "share" / "qwen-web-arwaky" / "sessions"
     fake_default = fake_sessions / "default"
     fake_default.mkdir(parents=True)
-    with patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions):
+    with patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions):
         assert is_safe_session_target(fake_default) is True
 
 
@@ -91,7 +90,7 @@ def test_child_of_default_session_is_allowed(tmp_path: Path) -> None:
     fake_default = fake_sessions / "default"
     child = fake_default / "Default"
     child.mkdir(parents=True)
-    with patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions):
+    with patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions):
         assert is_safe_session_target(child) is True
 
 
@@ -204,7 +203,7 @@ def test_delete_session_removes_default_session(tmp_path: Path) -> None:
     backups_dir = fake_default / ".backups" / "20250101T000000Z"
     backups_dir.mkdir(parents=True)
     with (
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
@@ -222,7 +221,7 @@ def test_partial_rmtree_failure_is_reported_with_path(tmp_path: Path) -> None:
     # Seed a generation so the no-backup guard does not short-circuit.
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     with (
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
         patch("modules.session.src.capabilities_session_manager.shutil.rmtree", side_effect=OSError("device busy")),
     ):
@@ -243,7 +242,7 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
 
     Manual credential entry (typing a CAPTCHA, entering a password) requires a
     visible window. Even when the caller passes ``browser_headless=True`` via
-    a ``SetupRequest``, the orchestrator must build the login ``AppConfig``
+    a ``SessionRequest``, the orchestrator must build the login ``AppConfig``
     with ``headless=False`` so the browser adapter receives a headed launch.
     """
     orch = _orchestrator()
@@ -255,13 +254,20 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
     # no headless fast-path for ``login``.
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
         # browser_headless=True is explicitly passed by the caller — the
         # orchestrator must ignore it.
-        orch.execute_setup(SetupRequest(profile_path=fake_default, name="default", browser_headless=True))
+        orch.execute(
+            SessionRequest(
+                verb="login",
+                session_path=fake_default,
+                name="default",
+                browser_headless=True,
+            )
+        )
     # The login call must have requested a visible browser (headless=False).
     # build_app_config is called twice: once for the login config, once for
     # the post-login validation config. Both must carry headless=False for
@@ -284,7 +290,7 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
     fast-path belongs to the ``validate``/``check``/``health`` verbs, not to
     ``login`` — silently skipping the browser would make ``login`` unable to
     switch accounts or re-authenticate.  This test locks the invariant:
-    ``execute_setup`` must always enter the headed ``browser_session`` path
+    ``execute`` must always enter the headed ``browser_session`` path
     and must never return "Session already valid."
     """
     orch = _orchestrator()
@@ -293,11 +299,11 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
     fake_default.mkdir(parents=True)
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True) as validate,
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
-        response = orch.execute_setup(SetupRequest(profile_path=fake_default, name="default"))
+        response = orch.execute(SessionRequest(verb="login", session_path=fake_default, name="default"))
 
     # "Session already valid." must NEVER be returned from the login flow.
     assert response.message != "Session already valid.", (

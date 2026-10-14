@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.browser.src.capabilities_browser_adapter import SessionCheck
-from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
+from modules.shared.src.common.taxonomy_core_constant import TEXTAREA_SELECTOR
 
 pytestmark = pytest.mark.benchmark
 

@@ -21,7 +21,7 @@ from textual.content import Content
 from textual.css.query import NoMatches
 from textual.widgets import Button, Label, Static, TabbedContent
 
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 
 if TYPE_CHECKING:

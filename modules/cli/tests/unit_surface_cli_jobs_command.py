@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
-from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
 
 def _record(

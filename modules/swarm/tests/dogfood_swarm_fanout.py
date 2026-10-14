@@ -14,10 +14,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 _TERMINAL = {"completed", "partial", "failed", "cancelled"}
 
@@ -59,8 +62,13 @@ def _start(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, roles: int) -> tuple
     )
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
+    registry = SwarmRegistry()
     orchestrator = SwarmOrchestrator(
-        runner=SwarmRunner(output_root=tmp_path, browser_concurrency=4, attachment=_PromptSeam()),
+        start=SwarmStartRunner(
+            registry=registry, output_root=tmp_path, browser_concurrency=4, attachment=_PromptSeam()
+        ),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=_PromptSeam()),
         observability=MagicMock(),
     )
     started = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path))

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_core_container import SharedContainer
-from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
+from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol
 
 
 def test_container_exposes_slot_config_protocol() -> None:
@@ -31,7 +31,6 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
         container.agent_prompt_file_orchestrator,
         container.agent_attachment_prompt_orchestrator,
         container.slot_plan,
-        container.agent_setup_orchestrator,
         container.agent_session_orchestrator,
         container.agent_job_orchestrator,
         container.agent_swarm_orchestrator,

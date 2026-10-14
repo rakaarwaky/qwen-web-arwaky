@@ -14,10 +14,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 
 class _PromptSeam:
@@ -38,12 +41,17 @@ class _PromptSeam:
 
 
 def _orchestrator(tmp_path: Path, ceiling: int) -> SwarmOrchestrator:
+    registry = SwarmRegistry()
+    attachment = _PromptSeam()
     return SwarmOrchestrator(
-        runner=SwarmRunner(
+        start=SwarmStartRunner(
+            registry=registry,
             output_root=tmp_path,
             browser_concurrency=ceiling,
-            attachment=_PromptSeam(),
+            attachment=attachment,
         ),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=attachment),
         observability=MagicMock(),
     )
 

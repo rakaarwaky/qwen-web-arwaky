@@ -14,10 +14,10 @@ from contextlib import contextmanager
 
 from playwright.sync_api import BrowserContext, Page
 
-from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 
 __all__ = ["BrowserOrchestrator"]
 

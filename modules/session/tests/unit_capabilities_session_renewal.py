@@ -21,10 +21,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.session.src.capabilities_session_renewal import SessionRenewer
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.utility_session_renewal_cookie_probe import (
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.session.utility_session_renewal_cookie_probe import (
     is_auth_session_expired,
     is_refresh_token_valid,
     renewal_is_possible,

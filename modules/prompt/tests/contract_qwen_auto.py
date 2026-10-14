@@ -40,7 +40,7 @@ class TestQwenAutoContract(unittest.TestCase):
             self.assertTrue(hasattr(CoreOrchestrator, m), f"CoreOrchestrator missing method {m}")
 
     def test_update_protocol_contract_methods(self) -> None:
-        from modules.shared.src.contract_update_protocol import (
+        from modules.shared.src.update.contract_update_protocol import (
             IUpdateCheckProtocol,
             IUpdateRollbackProtocol,
             IUpdateUpgradeProtocol,

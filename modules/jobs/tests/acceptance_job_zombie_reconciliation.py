@@ -1,6 +1,6 @@
 """Acceptance tests for the zombie-reconciliation requirement.
 
-The requirement in `modules/jobs/FRD.md` FR-JOBS-003 is that a record whose
+The requirement in `modules/jobs/FRD.md` FR-JOBS-001 is that a record whose
 worker died reaches a terminal state on the next pool start, so a poller
 never waits on a job that will never finish. These seed a record owned by a
 dead process and assert storage construction reconciles it.
@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from modules.jobs.src.capabilities_job_storage import JobStorage
-from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
 
 def _dead_worker_record(job_id: str, age_hours: int) -> JobRecord:

@@ -12,13 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_logging_protocol import IMetricsProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
-from modules.shared.src.taxonomy_core_event import EventMessage
-from modules.shared.src.taxonomy_core_vo import FailureCategory, FailureCategoryCounts, MessageCount
-from modules.shared.src.taxonomy_logging_vo import ExecutionTotal, MetricsSnapshot
-from modules.shared.src.utility_io_writer import atomic_write_json
-from modules.shared.src.utility_telemetry_scrubber import harden_private_file
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG
+from modules.shared.src.common.taxonomy_core_event import EventMessage
+from modules.shared.src.common.taxonomy_core_vo import FailureCategory, FailureCategoryCounts, MessageCount
+from modules.shared.src.common.utility_io_writer import atomic_write_json
+from modules.shared.src.common.utility_telemetry_scrubber import harden_private_file
+from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol
+from modules.shared.src.logging.taxonomy_logging_vo import ExecutionTotal, MetricsSnapshot
 
 # Block 1: Class Definition & Constructor
 
@@ -57,7 +57,7 @@ class MetricsCounter(IMetricsProtocol):
         stored under an ``error.`` prefix so they cannot collide with the plain
         counter names that pipeline stages use (``files_processed`` and friends).
         """
-        from modules.shared.src.taxonomy_core_error import ErrorCategory
+        from modules.shared.src.common.taxonomy_core_error import ErrorCategory
 
         if category not in ErrorCategory.known():
             return

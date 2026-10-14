@@ -17,8 +17,8 @@ from modules.config.src.capabilities_config_environment import ConfigEnvironment
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
-from modules.shared.src.taxonomy_config_vo import ConfigRequest
-from modules.shared.src.taxonomy_core_vo import AppConfig, Mode
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, Mode
+from modules.shared.src.config.taxonomy_config_vo import ConfigRequest
 
 
 def _orchestrator() -> ConfigOrchestrator:

@@ -15,8 +15,8 @@ import pytest
 from playwright.sync_api import Error as PlaywrightError
 
 from modules.browser.src.capabilities_browser_adapter import SessionCheck
-from modules.shared.src.taxonomy_core_constant import TEXTAREA_SELECTOR
-from modules.shared.src.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.common.taxonomy_core_constant import TEXTAREA_SELECTOR
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 
 PLAYWRIGHT_AVAILABLE = pytest.mark.skipif(
     not Path("tests/fixtures/qwen_fixture.html").exists(),

@@ -14,9 +14,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from modules.shared.src.contract_config_protocol import IConfigValidatorProtocol
-from modules.shared.src.taxonomy_config_vo import ConfigCategory, ConfigIssue, ConfigIssues
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.config.contract_config_protocol import IConfigValidatorProtocol
+from modules.shared.src.config.taxonomy_config_vo import ConfigCategory, ConfigIssue, ConfigIssues
 
 # Block 1: Class Definition & Constructor
 

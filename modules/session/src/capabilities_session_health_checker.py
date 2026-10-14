@@ -6,13 +6,13 @@ import asyncio
 import re
 from typing import TYPE_CHECKING, Any
 
-from modules.shared.src.contract_session_protocol import ISessionHealthCheckerProtocol, ISessionManagerProtocol
-from modules.shared.src.taxonomy_core_constant import RATE_LIMIT_PATTERNS
-from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.session.contract_session_protocol import ISessionHealthCheckerProtocol, ISessionManagerProtocol
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 if TYPE_CHECKING:
-    from modules.shared.src.contract_browser_protocol import IBrowserProtocol
+    from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 
 
 # Compiled patterns for performance

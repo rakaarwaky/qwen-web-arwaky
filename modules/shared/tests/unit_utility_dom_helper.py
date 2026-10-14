@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_core_vo import SenderConfig
-from modules.shared.src.utility_dom_helper import click_send
+from modules.shared.src.common.taxonomy_core_vo import SenderConfig
+from modules.shared.src.common.utility_dom_helper import click_send
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from modules.shared.src.taxonomy_update_vo import UpdateRequest
+from modules.shared.src.update.taxonomy_update_vo import UpdateRequest
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 
 pytestmark = pytest.mark.benchmark

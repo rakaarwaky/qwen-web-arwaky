@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import sys
 
-from modules.shared.src.contract_update_protocol import IUpdateUpgradeProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_PACKAGE_NAME
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateStepResult
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_update_pipeline import (
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_PACKAGE_NAME
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateStepResult
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.update.contract_update_protocol import IUpdateUpgradeProtocol
+from modules.shared.src.update.utility_update_pipeline import (
     chromium_present,
     compare_versions,
     purge_chromium_cache,

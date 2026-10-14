@@ -439,8 +439,6 @@ or documentation; no user-facing interface changed except two new capabilities n
 
 - feat(core): implement **Tier-1 React Fiber Extraction** in `JS_GET_RESPONSE_TEXT` (`taxonomy_core_constant.py`) to bypass Monaco Editor virtual scrolling and extract 100% complete, un-truncated code blocks and Markdown text
 - feat(core): enforce default model **`Qwen3.8-Max`** across all chat sessions with automated verification guards
-- feat(taxonomy): add dedicated `taxonomy_skill_constant.py` module storing the complete embedded `EMBEDDED_SKILL_MD` template string
-- feat(core): update `capabilities_workspace_provisioner.py` to write `EMBEDDED_SKILL_MD` directly into `.agents/skills/qwen-web/SKILL.md` during `qwc init`, removing external file path dependencies
 - feat(core): add pre-flight internal extension gatekeeping (`UNSUPPORTED_EXTENSIONS`) to `validate_file()` in `utility_core_validation.py` for 0ms fast-fail rejection of unsupported archive/binary formats (`.zip`, `.tar`, `.gz`, `.exe`)
 - feat(cli): add `qwen-web-cli update` self-update and environment synchronization CLI command and service protocol
 - feat(installer): add unified cross-platform Python installation script (`install.py`)

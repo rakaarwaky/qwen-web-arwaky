@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from modules.shared.src import utility_core_session_backup, utility_session_guard
-from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
-from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
+from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
 
 log = get_logger("session_manager")
 

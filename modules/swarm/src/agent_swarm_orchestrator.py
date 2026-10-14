@@ -10,14 +10,19 @@ live here, so a surface cannot skip either one.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
-from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.contract_swarm_protocol import ISwarmProtocol
-from modules.shared.src.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
-from modules.shared.src.taxonomy_core_vo import FilePath
-from modules.shared.src.taxonomy_swarm_vo import (
+from modules.shared.src.common.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
+from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.prompt.contract_prompt_protocol import IFolderToAttachmentProtocol
+from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.swarm.contract_swarm_protocol import (
+    ISwarmCancelProtocol,
+    ISwarmProgressProtocol,
+    ISwarmStartProtocol,
+)
+from modules.shared.src.swarm.taxonomy_swarm_vo import (
     BrowserCount,
     SwarmId,
     SwarmRequest,
@@ -31,33 +36,40 @@ __all__ = ["SwarmOrchestrator"]
 class SwarmOrchestrator(ISwarmAggregate):
     """Run Swarm fan-outs on behalf of the CLI, TUI, and MCP surfaces.
 
-    Holds the swarm runner as ``ISwarmProtocol`` so this agent depends on
-    the contract, not the concrete ``SwarmRunner``: a test can inject a
-    stub that never launches a browser.
+    Holds the swarm runner as the three capability seams — start, progress,
+    cancel — so this agent depends on the contracts, not the concrete
+    runner classes: a test can inject a stub that only implements the seam
+    it is exercising. All three read the one registry the root container
+    created, so a poll and a cancel talk about the same run.
     """
 
     def __init__(
         self,
-        runner: ISwarmProtocol,
+        start: ISwarmStartProtocol,
+        progress: ISwarmProgressProtocol,
+        cancel: ISwarmCancelProtocol,
         observability: IObservabilityProtocol,
         folder_adapter: IFolderToAttachmentProtocol | None = None,
     ) -> None:
         """Wire the swarm runner to the folder resolver that precedes it.
 
-        ``runner`` performs the fan-out. ``folder_adapter`` compiles a
-        folder input down to the single attachment every role shares;
-        without it a folder input is passed to the roles as-is.
-        ``observability`` records each role's outcome in the run log, so a
-        partial fan-out leaves one place to read what every role returned.
+        ``start`` performs the fan-out, ``progress`` reports its state, and
+        ``cancel`` stops it. ``folder_adapter`` compiles a folder input down
+        to the single attachment every role shares; without it a folder input
+        is passed to the roles as-is. ``observability`` records each role's
+        outcome in the run log, so a partial fan-out leaves one place to read
+        what every role returned.
         """
-        self._runner = runner
+        self._start_seam = start
+        self._progress_seam = progress
+        self._cancel_seam = cancel
         self._folder_adapter = folder_adapter
         self._observability = observability
 
     @property
     def browser_concurrency(self) -> BrowserCount:
         """Configured browser concurrency for a single Swarm run."""
-        return self._runner.browser_concurrency
+        return self._start_seam.browser_concurrency
 
     @property
     def resource_warning(self) -> str | None:
@@ -66,9 +78,9 @@ class SwarmOrchestrator(ISwarmAggregate):
         The TUI Swarm tab presents this as a confirmation modal so a
         resource-intensive fan-out is never started silently (issue #277).
         """
-        if self._runner.browser_concurrency < SWARM_RESOURCE_WARNING_BROWSERS:
+        if self._start_seam.browser_concurrency < SWARM_RESOURCE_WARNING_BROWSERS:
             return None
-        return f"This will launch up to {self._runner.browser_concurrency} browser processes. Continue?"
+        return f"This will launch up to {self._start_seam.browser_concurrency} browser processes. Continue?"
 
     def execute(self, request: SwarmRequest) -> SwarmResponse:
         """Route the swarm verb to the runner and return one response shape.
@@ -84,12 +96,12 @@ class SwarmOrchestrator(ISwarmAggregate):
         if request.verb == "snapshot":
             if request.swarm_id is None:
                 return SwarmResponse(error="snapshot requires swarm_id")
-            return SwarmResponse(snapshot=self._snapshot(SwarmId(request.swarm_id)))
+            return SwarmResponse(snapshot=self._progress(SwarmId(request.swarm_id)))
         if request.verb == "cancel":
             if request.swarm_id is None:
                 return SwarmResponse(error="cancel requires swarm_id")
             self._cancel(SwarmId(request.swarm_id))
-            return SwarmResponse(snapshot=self._snapshot(SwarmId(request.swarm_id)))
+            return SwarmResponse(snapshot=self._progress(SwarmId(request.swarm_id)))
         raise ValueError(f"Unknown swarm verb: {request.verb!r}")
 
     def _start(self, input_path: Path) -> SwarmSnapshot:
@@ -104,13 +116,14 @@ class SwarmOrchestrator(ISwarmAggregate):
         attachment = input_path
         if self._folder_adapter is not None and self._folder_adapter.is_folder(input_path):
             attachment = self._folder_adapter.resolve_to_attachment(input_path)
-        as_filepath = FilePath
-        return self._runner.start(as_filepath(input_path), as_filepath(attachment))
+        # ``FilePath`` is a NewType over ``Path``: this narrows the request
+        # value for the start seam and touches nothing on disk.
+        return self._start_seam.start(cast(FilePath, input_path), cast(FilePath, attachment))
 
-    def _snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
+    def _progress(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""
-        return self._runner.snapshot(swarm_id)
+        return self._progress_seam.snapshot(swarm_id)
 
     def _cancel(self, swarm_id: SwarmId) -> None:
         """Cancel queued and active work for a swarm."""
-        self._runner.cancel(swarm_id)
+        self._cancel_seam.cancel(swarm_id)

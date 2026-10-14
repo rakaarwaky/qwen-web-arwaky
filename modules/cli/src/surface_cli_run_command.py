@@ -9,17 +9,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from modules.shared.src.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
-from modules.shared.src.taxonomy_core_vo import AppConfig, HeadlessFlag
-from modules.shared.src.utility_response_normalizer import (
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, HeadlessFlag
+from modules.shared.src.common.utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,
     success_response,
+)
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
 )
 
 

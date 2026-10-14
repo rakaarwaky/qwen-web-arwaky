@@ -13,9 +13,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from modules.shared.src.contract_config_protocol import IConfigPathResolverProtocol
-from modules.shared.src.taxonomy_config_vo import ConfigIssue, ResolvedConfigPath, ResolvedConfigPaths
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.config.contract_config_protocol import IConfigPathResolverProtocol
+from modules.shared.src.config.taxonomy_config_vo import ConfigIssue, ResolvedConfigPath, ResolvedConfigPaths
 
 #: The config fields that name a filesystem location, paired with whether the
 #: run writes to them. A read-only field only has to exist; a written field

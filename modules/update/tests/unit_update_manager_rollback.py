@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from modules.shared.src.taxonomy_core_vo import VersionString
+from modules.shared.src.common.taxonomy_core_vo import VersionString
 from modules.update.src import capabilities_update_rollback as rollback_module
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability

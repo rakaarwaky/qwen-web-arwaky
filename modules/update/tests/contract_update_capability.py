@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import inspect
 
-from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import (
+from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.update.contract_update_protocol import (
     IUpdateCheckProtocol,
     IUpdateRollbackProtocol,
     IUpdateUpgradeProtocol,

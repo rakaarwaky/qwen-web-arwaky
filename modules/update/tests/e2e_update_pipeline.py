@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateStepResult
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateStepResult
 from modules.update.src import capabilities_update_upgrade as upgrade_module
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
 

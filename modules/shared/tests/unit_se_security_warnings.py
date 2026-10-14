@@ -30,21 +30,12 @@ from modules.mcp.src.surface_mcp_tool_command import (
     SECURITY_NOTICE_CONTENT_NOT_INSTRUCTIONS,
     _format_success_payload,
 )
-from modules.shared.src.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.taxonomy_session_vo import SessionRequest
-from modules.shared.src.utility_folder_compiler import (
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.common.utility_folder_compiler import (
     collect_folder_files,
     compile_files_to_markdown,
 )
-from modules.shared.src.utility_session_cloner import (
-    CLONE_DIR_PREFIX,
-    clone_base_dir,
-    create_ephemeral_session,
-    session_age_warning,
-    session_profile_age_days,
-    sweep_stale_clones,
-)
-from modules.shared.src.utility_telemetry_scrubber import (
+from modules.shared.src.common.utility_telemetry_scrubber import (
     PRIVATE_DIR_MODE,
     PRIVATE_FILE_MODE,
     harden_private_dir,
@@ -52,6 +43,15 @@ from modules.shared.src.utility_telemetry_scrubber import (
     redact_host_paths,
     scrub_span_attributes,
     scrub_telemetry_event,
+)
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.shared.src.session.utility_session_cloner import (
+    CLONE_DIR_PREFIX,
+    clone_base_dir,
+    create_ephemeral_session,
+    session_age_warning,
+    session_profile_age_days,
+    sweep_stale_clones,
 )
 
 # ── #343: MCP success envelopes carry explicit trust marking ────────────────
@@ -77,7 +77,7 @@ def test_trust_markers_survive_optional_fields() -> None:
 def test_async_envelope_paths_are_trust_marked() -> None:
     """The job-status and list payloads must be trust marked too."""
     from modules.mcp.src.surface_mcp_tool_command import STATUS_COMPLETED
-    from modules.shared.src.taxonomy_core_vo import JobRecord
+    from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
     tools = MagicMock()
     from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
@@ -91,7 +91,7 @@ def test_async_envelope_paths_are_trust_marked() -> None:
         workspace=tools,
         jobs=tools,
     )
-    from modules.shared.src.taxonomy_jobs_vo import JobResponse
+    from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 
     status_record = JobRecord(
         job_id="job_1",
@@ -148,7 +148,7 @@ def _orchestrator() -> object:
 
 def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> None:
     """``~/projects/session`` must raise and delete nothing."""
-    from modules.shared.src.taxonomy_core_error import QwenCliError
+    from modules.shared.src.common.taxonomy_core_error import QwenCliError
 
     target = tmp_path / "projects" / "session"
     target.mkdir(parents=True)
@@ -164,7 +164,7 @@ def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> 
 
 def test_delete_session_refuses_qwen_session_named_dir_under_home(tmp_path: Path) -> None:
     """``~/dev/qwen_session`` must also be refused — the name is not a grant."""
-    from modules.shared.src.taxonomy_core_error import QwenCliError
+    from modules.shared.src.common.taxonomy_core_error import QwenCliError
 
     target = tmp_path / "dev" / "qwen_session"
     target.mkdir(parents=True)
@@ -187,7 +187,7 @@ def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
     (fake_default / ".backups" / "20250101T000000Z").mkdir(parents=True)
     orchestrator = _orchestrator()
     with (
-        patch("modules.shared.src.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
@@ -304,55 +304,55 @@ def _fake_browser(dir_path: Path, name: str = "chromium", mode: int = 0o755) -> 
 
 def test_world_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) -> None:
     """A world-writable fake chromium must be skipped, not launched."""
-    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "evil-bin"
     _fake_browser(bindir, mode=0o777)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.update.utility_update_browser_binary._playwright_managed_binary",
         lambda prefer_gui=True: "",
     )
-    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.update.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == ""
 
 
 def test_group_writable_binary_on_path_is_rejected(tmp_path: Path, monkeypatch) -> None:
     """A group-writable binary is equally substitutable."""
-    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "group-bin"
     _fake_browser(bindir, mode=0o775)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.update.utility_update_browser_binary._playwright_managed_binary",
         lambda prefer_gui=True: "",
     )
-    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.update.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == ""
 
 
 def test_owned_non_shared_binary_is_accepted(tmp_path: Path, monkeypatch) -> None:
     """A correctly permissioned binary on PATH is still discovered."""
-    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     bindir = tmp_path / "ok-bin"
     binary = _fake_browser(bindir, mode=0o755)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setattr(
-        "modules.shared.src.utility_update_browser_binary._playwright_managed_binary",
+        "modules.shared.src.update.utility_update_browser_binary._playwright_managed_binary",
         lambda prefer_gui=True: "",
     )
-    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.update.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == str(binary)
 
 
 def test_playwright_managed_binary_is_preferred(tmp_path: Path, monkeypatch) -> None:
     """The Playwright-managed build wins over any PATH candidate."""
-    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     root = tmp_path / "ms-playwright"
     managed = root / "chromium-1" / "chrome-linux" / "chrome"
@@ -365,7 +365,7 @@ def test_playwright_managed_binary_is_preferred(tmp_path: Path, monkeypatch) -> 
     _fake_browser(bindir, mode=0o755)
     monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(root))
-    monkeypatch.setattr("modules.shared.src.utility_update_browser_binary.EXTRA_PATHS", [])
+    monkeypatch.setattr("modules.shared.src.update.utility_update_browser_binary.EXTRA_PATHS", [])
 
     assert find_chrome_binary() == str(managed)
 

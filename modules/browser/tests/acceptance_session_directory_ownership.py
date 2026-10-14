@@ -12,7 +12,7 @@ import os
 import stat
 from pathlib import Path
 
-from modules.shared.src.utility_core_session_backup import has_session_backup, snapshots_count
+from modules.shared.src.common.utility_core_session_backup import has_session_backup, snapshots_count
 
 
 def _seed_session(root: Path) -> Path:

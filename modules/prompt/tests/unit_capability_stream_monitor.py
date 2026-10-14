@@ -19,8 +19,8 @@ from modules.shared.src import (
     LifecycleEmitter,
     OutputValidationError,
 )
-from modules.shared.src.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
+from modules.shared.src.common.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
+from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
 
 # ─── validate_response_content ──────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ class TestWaitForResponseEdgeCases:
         response = "A delayed response that must wait for the explicit completed signal."
 
         with (
-            patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
+            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=1),
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
@@ -270,7 +270,7 @@ class TestWaitForResponseEdgeCases:
         response = "A response whose text is stable while Qwen is still generating."
 
         with (
-            patch("modules.shared.src.utility_dom_query.count_messages", return_value=1),
+            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=1),
             patch(
                 "modules.prompt.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[None, response, response, response],
@@ -300,7 +300,7 @@ class TestWaitForResponseEdgeCases:
         msg_side_effect = [None, first_text, second_text, second_text, second_text]
 
         with (
-            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
@@ -334,7 +334,7 @@ class TestWaitForResponseEdgeCases:
         msg_side_effect = [None] + [stable_text] * 20
 
         with (
-            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
@@ -439,7 +439,7 @@ class TestPreSendBaseline:
         response = "A newly generated response that is already rendered before polling starts."
 
         with (
-            patch("modules.shared.src.utility_dom_query.count_messages", return_value=2),
+            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
             patch(
                 "modules.prompt.src.capabilities_stream_monitor._dom_latest",
                 side_effect=[response, response, response],
@@ -667,31 +667,31 @@ class TestRequestTimeoutBudget:
     default must cover a heavy reasoning model and stay operator-tunable."""
 
     def test_default_covers_a_long_thinking_phase(self):
-        from modules.shared.src.taxonomy_core_vo import AppConfig
+        from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
         cfg = AppConfig(input_path="/tmp/in.md", output_path="/tmp/out.md", session_path="/tmp/session")
         assert cfg.request_timeout >= 600, "a 120s ceiling aborts healthy thinking runs"
 
     def test_env_override_is_honored(self, monkeypatch):
-        from modules.shared.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.config.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "1800")
         assert build_app_config().request_timeout == 1800
 
     def test_invalid_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.shared.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.config.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "not-a-number")
         assert build_app_config().request_timeout == 600
 
     def test_non_positive_env_falls_back_to_the_default(self, monkeypatch):
-        from modules.shared.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.config.utility_config_app_factory import build_app_config
 
         monkeypatch.setenv("QWEN_REQUEST_TIMEOUT_SEC", "0")
         assert build_app_config().request_timeout == 600
 
     def test_absent_env_keeps_the_default(self, monkeypatch):
-        from modules.shared.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.config.utility_config_app_factory import build_app_config
 
         monkeypatch.delenv("QWEN_REQUEST_TIMEOUT_SEC", raising=False)
         assert build_app_config().request_timeout == 600
@@ -702,7 +702,7 @@ class TestRequestTimeoutBudget:
         killed. The default must stay above that with room for a slower host,
         so a future change to 120s (or 300s) fails here instead of in the field.
         """
-        from modules.shared.src.taxonomy_core_vo import AppConfig
+        from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
         measured_thinking_sec = 426
         cfg = AppConfig(input_path="/tmp/in.md", output_path="/tmp/out.md", session_path="/tmp/session")
@@ -715,6 +715,6 @@ class TestRequestTimeoutBudget:
     def test_measured_thinking_phase_is_not_a_duplicate_of_the_marker_default(self):
         """Guard the 600 literal so a silent default change is visible in the
         diff of the two tests above rather than hidden inside a range check."""
-        from modules.shared.src.utility_config_app_factory import build_app_config
+        from modules.shared.src.config.utility_config_app_factory import build_app_config
 
         assert build_app_config().request_timeout == 600

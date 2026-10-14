@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
-from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot
+from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot
 
 
 def _status_args(json_output: bool = False) -> MagicMock:
@@ -69,8 +69,8 @@ class TestObservabilityStatus:
         status_file.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
 
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), None)
         assert rc == 0
@@ -91,8 +91,8 @@ class TestObservabilityStatus:
             success_rate=0.8,
         )
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -109,8 +109,8 @@ class TestObservabilityStatus:
 
         snapshot = MetricsSnapshot(counters={}, total_executions=0, successful_executions=0, success_rate=None)
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(json_output=True), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -126,8 +126,8 @@ class TestObservabilityStatus:
         status_file.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
         snapshot = MetricsSnapshot()
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -143,8 +143,8 @@ class TestObservabilityStatus:
         status_file.write_text("{not valid json", encoding="utf-8")
         snapshot = MetricsSnapshot()
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
         assert rc == 0
@@ -161,8 +161,8 @@ class TestObservabilityStatus:
         status_file = log_dir / "status.json"
         # File doesn't exist
         with (
-            patch("modules.shared.src.utility_core_status.status_path_for", return_value=status_file),
-            patch("modules.shared.src.taxonomy_core_constant.DEFAULT_LOG", log_dir),
+            patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
+            patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
             rc = handle_observability_command(_status_args(), MagicMock(), None)
         assert rc == 0

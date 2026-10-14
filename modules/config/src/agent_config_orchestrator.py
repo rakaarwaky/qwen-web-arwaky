@@ -10,17 +10,17 @@ patching a module global.
 
 from __future__ import annotations
 
-from modules.shared.src.contract_config_aggregate import IConfigAggregate
-from modules.shared.src.contract_config_protocol import (
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, SlotRunPlan
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
+from modules.shared.src.config.contract_config_protocol import (
     IConfigCapacityProtocol,
     IConfigEnvironmentProtocol,
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IConfigValidatorProtocol,
 )
-from modules.shared.src.taxonomy_config_vo import ConfigRequest, ConfigResponse
-from modules.shared.src.taxonomy_core_vo import AppConfig, SlotRunPlan
-from modules.shared.src.utility_config_app_factory import build_app_config
+from modules.shared.src.config.taxonomy_config_vo import ConfigRequest, ConfigResponse
+from modules.shared.src.config.utility_config_app_factory import build_app_config
 
 __all__ = ["ConfigOrchestrator"]
 

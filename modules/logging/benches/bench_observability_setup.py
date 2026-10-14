@@ -14,7 +14,7 @@ import pytest
 
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
 
 pytestmark = pytest.mark.benchmark
 

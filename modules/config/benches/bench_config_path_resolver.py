@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 pytestmark = pytest.mark.benchmark
 

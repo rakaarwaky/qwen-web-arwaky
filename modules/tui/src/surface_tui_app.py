@@ -23,26 +23,25 @@ from textual.binding import Binding
 from textual.css.query import NoMatches
 from textual.widgets import Button, Input
 
-from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.contract_prompt_protocol import (
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MAX_WORKERS
+from modules.shared.src.common.utility_core_prompt_template import prompt_template_manifest
+from modules.shared.src.common.utility_core_version import get_package_version
+from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
+from modules.shared.src.prompt.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
     IPromptFileProtocol,
 )
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import (
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.contract_session_protocol import (
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
 )
-from modules.shared.src.contract_setup_aggregate import ISetupAggregate
-from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MAX_WORKERS
-from modules.shared.src.taxonomy_swarm_vo import SwarmId
-from modules.shared.src.utility_core_prompt_template import prompt_template_manifest
-from modules.shared.src.utility_core_version import get_package_version
+from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmId
+from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol
 from modules.tui.src.surface_tui_components import (
     ConfirmModal,
     TemplatePickerModal,
@@ -118,7 +117,6 @@ class QwenTuiApp(
         file_only: IPromptFileProtocol,
         attachment: IAttachmentPromptProtocol,
         slot_config: IConfigSlotPlanProtocol,
-        setup: ISetupAggregate | None = None,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
@@ -132,7 +130,6 @@ class QwenTuiApp(
         self._direct = direct
         self._file_only = file_only
         self._attachment = attachment
-        self._setup = setup
         self._session = session
         self._jobs = jobs
         self._swarm = swarm

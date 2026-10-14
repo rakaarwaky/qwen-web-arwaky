@@ -21,9 +21,9 @@ import pytest
 
 from modules.logging.src.capabilities_observability_setup import effective_telemetry_mode
 from modules.shared.src import utility_session_guard as session_guard
-from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.taxonomy_session_vo import SessionRequest
-from modules.shared.src.utility_config_app_factory import build_app_config
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.config.utility_config_app_factory import build_app_config
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
@@ -36,7 +36,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
     """No opt-in and a sandbox-capable host means the sandbox stays on."""
     with (
         patch.dict("os.environ", {}, clear=False),
-        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
+        patch("modules.shared.src.config.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -45,7 +45,7 @@ def test_app_config_defaults_to_a_sandboxed_browser() -> None:
 def test_sandbox_dropped_on_explicit_opt_in() -> None:
     """QWEN_DISABLE_SANDBOX is the documented way to drop the sandbox."""
     with (
-        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=False),
+        patch("modules.shared.src.config.utility_config_app_factory.sandbox_unavailable", return_value=False),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -54,7 +54,7 @@ def test_sandbox_dropped_on_explicit_opt_in() -> None:
 def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
     """A container with no seccomp filter and no user namespaces falls back."""
     with (
-        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
+        patch("modules.shared.src.config.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_DISABLE_SANDBOX": "", "QWEN_ENABLE_SANDBOX": ""}),
     ):
         assert build_app_config().disable_sandbox is True
@@ -63,7 +63,7 @@ def test_sandbox_dropped_when_the_host_cannot_provide_one() -> None:
 def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
     """QWEN_ENABLE_SANDBOX overrides the container detection."""
     with (
-        patch("modules.shared.src.utility_config_app_factory.sandbox_unavailable", return_value=True),
+        patch("modules.shared.src.config.utility_config_app_factory.sandbox_unavailable", return_value=True),
         patch("os.environ", {"QWEN_ENABLE_SANDBOX": "1"}),
     ):
         assert build_app_config().disable_sandbox is False
@@ -322,7 +322,7 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:
     """build_smoke_gate(session_manager=…) threads the pool check into the gate triples."""
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
-    from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+    from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 
     # A mock pool with one healthy session so _check_session takes the multi-account path
     pool = MagicMock()

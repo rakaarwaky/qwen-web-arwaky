@@ -23,7 +23,6 @@ def _make_app() -> QwenTuiApp:
         file_only=MagicMock(),
         attachment=MagicMock(),
         slot_config=MagicMock(),
-        setup=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),
     )

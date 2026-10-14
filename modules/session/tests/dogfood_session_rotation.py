@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 
 def _session(index: int) -> SessionInfo:

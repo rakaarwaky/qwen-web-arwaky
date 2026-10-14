@@ -16,10 +16,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError, JobQueueFullError
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
-from modules.shared.src.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.common.taxonomy_core_error import CircuitBreakerOpenError, JobQueueFullError
+from modules.shared.src.common.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
 
 
 def _orchestrator(tmp_path: Path, max_workers: int, **kwargs) -> tuple[AgentJobOrchestrator, threading.Event]:

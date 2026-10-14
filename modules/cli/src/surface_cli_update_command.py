@@ -11,16 +11,16 @@ from __future__ import annotations
 import json
 import sys
 
-from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import IUpdateCheckProtocol, IUpdateVerifyProtocol
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
     UpdateReport,
     UpdateStepResult,
 )
-from modules.shared.src.taxonomy_update_vo import UpdateRequest
-from modules.shared.src.utility_response_normalizer import error_response, safe_handle, success_response
+from modules.shared.src.common.utility_response_normalizer import error_response, safe_handle, success_response
+from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol, IUpdateVerifyProtocol
+from modules.shared.src.update.taxonomy_update_vo import UpdateRequest
 
 _DIVIDER = "─" * 58
 

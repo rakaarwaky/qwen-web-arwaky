@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import Page
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 
 def _cfg() -> AppConfig:

@@ -9,8 +9,8 @@ from __future__ import annotations
 import inspect
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 
 _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
     {

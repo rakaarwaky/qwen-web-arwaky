@@ -15,26 +15,20 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
 
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IPromptFileProtocol,
-)
-from modules.shared.src.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.common.taxonomy_core_error import (
     CircuitBreakerOpenError,
     ErrorCategory,
     JobQueueFullError,
     QwenCliError,
 )
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_FAILED,
     EVENT_GENERATION_FINISHED,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     ErrorReason,
     FailureCategory,
     HeadlessFlag,
@@ -46,10 +40,16 @@ from modules.shared.src.taxonomy_core_vo import (
     ResultText,
     RetryWaitSec,
 )
-from modules.shared.src.taxonomy_jobs_vo import JobRequest, JobResponse
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest
-from modules.shared.src.utility_core_text import utc_now_iso
-from modules.shared.src.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.common.utility_core_text import utc_now_iso
+from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest, JobResponse
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 
 
 class AgentJobOrchestrator(IJobManagerAggregate):

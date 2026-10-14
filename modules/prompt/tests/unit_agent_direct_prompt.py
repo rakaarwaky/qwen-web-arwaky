@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.shared.src.taxonomy_core_error import ResponseDetectionTimeoutError, SendDispatchError
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, SendDispatchError
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
@@ -18,7 +18,7 @@ from modules.shared.src.taxonomy_core_event import (
     EVENT_WEB_LOADED,
     STANDARD_PROMPT_EVENTS,
 )
-from modules.shared.src.taxonomy_core_vo import MessageCount
+from modules.shared.src.common.taxonomy_core_vo import MessageCount
 
 
 def _browser_stub(emitter_events: tuple = ()) -> MagicMock:
@@ -187,7 +187,7 @@ class TestDirectPromptSessionResolver:
         assert cfg_arg.session_path == pool_path
 
     def test_resolver_returning_none_falls_back_to_the_default_session(self) -> None:
-        from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
+        from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION
 
         orch, mocks = _make_direct_orchestrator()
         mocks["flow"].dispatch_and_wait_for_response.side_effect = lambda **_: "ok"
@@ -202,7 +202,7 @@ class TestDirectPromptSessionResolver:
         assert cfg_arg.session_path == DEFAULT_SESSION
 
     def test_resolver_reraising_reports_no_session(self) -> None:
-        from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
+        from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION
 
         orch, mocks = _make_direct_orchestrator()
         mocks["flow"].dispatch_and_wait_for_response.side_effect = lambda **_: "ok"

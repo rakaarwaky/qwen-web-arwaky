@@ -6,7 +6,7 @@ from argparse import Namespace
 from unittest.mock import MagicMock
 
 from modules.cli.src.surface_cli_update_command import handle
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateCheckResult, UpdateReport
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateCheckResult, UpdateReport
 
 
 def _report(*, healthy: bool) -> UpdateReport:

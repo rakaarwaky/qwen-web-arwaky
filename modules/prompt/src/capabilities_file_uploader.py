@@ -12,11 +12,10 @@ from typing import Any, cast
 
 from playwright.sync_api import Error, Page
 
-from modules.shared.src.contract_core_protocol import IUploadProtocol
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import FileValidationError
-from modules.shared.src.taxonomy_core_event import EVENT_DOCUMENT_PARSED, EVENT_FILE_UPLOADED
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import FileValidationError
+from modules.shared.src.common.taxonomy_core_event import EVENT_DOCUMENT_PARSED, EVENT_FILE_UPLOADED
+from modules.shared.src.common.taxonomy_core_vo import (
     DEFAULT_UPLOAD_CONFIG,
     BackoffDelaySec,
     CardRenderTimeoutMs,
@@ -28,9 +27,10 @@ from modules.shared.src.taxonomy_core_vo import (
     OptionTimeoutMs,
     UploadConfig,
 )
-from modules.shared.src.utility_core_validation import validate_file
-from modules.shared.src.utility_dom_helper import first_visible_locator
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_core_validation import validate_file
+from modules.shared.src.common.utility_dom_helper import first_visible_locator
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.prompt.contract_prompt_protocol import IUploadProtocol
 
 log = get_logger("capabilities_file_uploader")
 

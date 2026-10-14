@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.utility_core_path import (
+from modules.shared.src.common.utility_core_path import (
     list_input_files as _list_input_files,
 )
-from modules.shared.src.utility_core_path import (
+from modules.shared.src.common.utility_core_path import (
     should_process_file as _should_process_file,
 )
-from modules.shared.src.utility_core_prompt import (
+from modules.shared.src.common.utility_core_prompt import (
     extract_prompt_text as _extract_prompt_text,
 )
-from modules.shared.src.utility_core_prompt import (
+from modules.shared.src.common.utility_core_prompt import (
     strip_input_from_output as _strip_input_from_output,
 )
 

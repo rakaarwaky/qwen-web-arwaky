@@ -1,6 +1,6 @@
 """Acceptance tests for the flush-completeness requirement.
 
-The requirement in `modules/logging/FRD.md` FR-LOGGING-004 is that a close
+The requirement in `modules/logging/FRD.md` FR-LOGGING-001 is that a close
 flushes the run's records before returning, so a crash cannot lose the
 final records. These bootstrap the observability stack, bind the run id,
 emit records into a per-run log file, detach, and assert every record is on

@@ -23,15 +23,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
     LOCAL_WS_DIR,
     SESSIONS_DIR,
 )
-from modules.shared.src.utility_core_capacity import describe_capacity, recommended_max_workers
-from modules.shared.src.utility_core_env import (
+from modules.shared.src.common.utility_core_capacity import describe_capacity, recommended_max_workers
+from modules.shared.src.common.utility_core_env import (
     ENVIRONMENT,
     SENTRY_DSN,
     effective_config,
@@ -39,13 +39,13 @@ from modules.shared.src.utility_core_env import (
     unknown_env_vars,
     validate_env,
 )
-from modules.shared.src.utility_core_paths import get_playwright_browsers_path
-from modules.shared.src.utility_core_session_backup import has_session_backup, snapshots_count
-from modules.shared.src.utility_session_cloner import session_age_warning
+from modules.shared.src.common.utility_core_paths import get_playwright_browsers_path
+from modules.shared.src.common.utility_core_session_backup import has_session_backup, snapshots_count
+from modules.shared.src.session.utility_session_cloner import session_age_warning
 
 if TYPE_CHECKING:
-    from modules.shared.src.contract_session_aggregate import ISessionAggregate
-    from modules.shared.src.contract_session_protocol import ISessionManagerProtocol
+    from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+    from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -133,7 +133,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     expensive ``sync_playwright`` cold-start probe runs only when
     ``QWEN_DOCTOR_DEEP=1`` so the default report stays fast.
     """
-    from modules.shared.src.utility_update_browser_binary import find_chrome_binary
+    from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     trusted_binary = find_chrome_binary()
     browsers_dir = get_playwright_browsers_path()
@@ -350,7 +350,7 @@ def _smoke_check(session: ISessionAggregate | None) -> tuple[bool, str]:
     if session is None:
         return False, "Smoke test requires a session aggregate; run it through `qwen-web-arwaky doctor --smoke`."
     try:
-        from modules.shared.src.taxonomy_session_vo import SessionRequest
+        from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
         response = session.execute(SessionRequest(verb="validate"))
         return response.valid, response.message or "Session validation returned no detail."

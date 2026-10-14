@@ -19,7 +19,7 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import DataTable, Label
 
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 from modules.tui.src.surface_tui_css import THEME
 
 
@@ -27,7 +27,6 @@ class _TuiSessionsWorkerMixin:
     """Mixin that owns session validation, badge, and account-pool workers."""
 
     # Class-level annotations for attributes set by QwenTuiApp.__init__.
-    _setup: Any
     _session: Any
     _session_manager: Any
     _session_check_timed_out: bool
@@ -56,9 +55,9 @@ class _TuiSessionsWorkerMixin:
         self._ensure_log_handler()
         self._log_msg("[bold {}]LOGIN…[/] authenticating a new session profile".format(THEME["accent"]))
         try:
-            if self._setup is None:
-                raise RuntimeError("Session setup orchestrator not available.")
-            res = self._setup.execute_setup(SetupRequest())
+            if self._session is None:
+                raise RuntimeError("Session orchestrator not available.")
+            res: SessionResponse = self._session.execute(SessionRequest(verb="login"))
             self.call_from_thread(
                 self._log_msg,
                 "[bold {}]LOGIN RESULT:[/] {}".format(
@@ -127,7 +126,7 @@ class _TuiSessionsWorkerMixin:
             self.call_from_thread(self._apply_session_state, "N/A")
             return
         try:
-            from modules.shared.src.taxonomy_session_vo import SessionRequest
+            from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
             response = self._session.execute(SessionRequest(verb="validate"))
             valid = response.valid

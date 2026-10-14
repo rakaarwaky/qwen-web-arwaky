@@ -15,18 +15,16 @@ import os
 import sys
 from pathlib import Path
 
-from modules.shared.src.contract_config_protocol import IConfigEnvironmentProtocol
-from modules.shared.src.taxonomy_config_vo import ModelName, SandboxReport, WorkerCount
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_REQUEST_TIMEOUT_SEC,
     FALSE_VALUES,
     REQUEST_TIMEOUT_ENV,
     TRUE_VALUES,
 )
-from modules.shared.src.taxonomy_core_vo import TimeoutSec
-from modules.shared.src.utility_core_capacity import recommended_max_workers
-from modules.shared.src.utility_core_env import (
+from modules.shared.src.common.taxonomy_core_vo import TimeoutSec
+from modules.shared.src.common.utility_core_capacity import recommended_max_workers
+from modules.shared.src.common.utility_core_env import (
     QWA_SWARM_HEADLESS,
     QWEN_DEFAULT_MODEL,
     QWEN_DISABLE_SANDBOX,
@@ -34,6 +32,8 @@ from modules.shared.src.utility_core_env import (
     QWEN_SWARM_CONCURRENCY,
     QWEN_WEB_MAX_WORKERS,
 )
+from modules.shared.src.config.contract_config_protocol import IConfigEnvironmentProtocol
+from modules.shared.src.config.taxonomy_config_vo import ModelName, SandboxReport, WorkerCount
 
 # Block 1: Class Definition & Constructor
 

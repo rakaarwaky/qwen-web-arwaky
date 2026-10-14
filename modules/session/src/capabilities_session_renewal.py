@@ -16,14 +16,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.shared.src import is_auth_session_expired, renewal_is_possible
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_session_protocol import ISessionRenewalProtocol
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import AuthRequiredError, QwenCliError
-from modules.shared.src.taxonomy_core_event import EVENT_SESSION_EXPIRED, EVENT_SESSION_RENEWED
-from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError, QwenCliError
+from modules.shared.src.common.taxonomy_core_event import EVENT_SESSION_EXPIRED, EVENT_SESSION_RENEWED
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.session.contract_session_protocol import ISessionRenewalProtocol
 
 log = get_logger("session_renewal")
 

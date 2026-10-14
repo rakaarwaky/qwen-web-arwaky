@@ -23,8 +23,8 @@ from modules.shared.src import (
     ResponseDetectionTimeoutError,
     SendDispatchError,
 )
-from modules.shared.src.taxonomy_core_vo import MessageCount
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest
+from modules.shared.src.common.taxonomy_core_vo import MessageCount
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 
 
 def _make_attachment_orchestrator() -> AttachmentPromptAdapter:

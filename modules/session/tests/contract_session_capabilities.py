@@ -9,8 +9,8 @@ from __future__ import annotations
 import inspect
 
 from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import (
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRotatorProtocol,

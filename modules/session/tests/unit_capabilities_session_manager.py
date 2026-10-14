@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from modules.session.src.capabilities_session_manager import SessionManager
-from modules.shared.src.taxonomy_session_vo import SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionStatus
 
 MODULE = "modules.session.src.capabilities_session_manager"
 

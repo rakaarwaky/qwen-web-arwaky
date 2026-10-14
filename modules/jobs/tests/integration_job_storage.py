@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from modules.jobs.src.capabilities_job_storage import JobStorage
-from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
 
 def _record(job_id: str) -> JobRecord:

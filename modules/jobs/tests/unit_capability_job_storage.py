@@ -11,20 +11,20 @@ import pytest
 
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     FailureThreshold,
     JobId,
     JobRecord,
     ResponseText,
     WindowSec,
 )
-from modules.shared.src.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.taxonomy_prompt_vo import PromptResponse
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse
 
 
 def _submit_file(
@@ -190,7 +190,7 @@ class TestJobOwnershipPreserved(unittest.TestCase):
         immediately (not ``RateLimitError``) when the submit-time guard rejects,
         returning the reserved slot so the caller can retry.
         """
-        from modules.shared.src.taxonomy_core_error import CircuitBreakerOpenError
+        from modules.shared.src.common.taxonomy_core_error import CircuitBreakerOpenError
 
         prompt_file = Path(self.temp_dir.name) / "p.md"
         prompt_file.write_text("hi", encoding="utf-8")

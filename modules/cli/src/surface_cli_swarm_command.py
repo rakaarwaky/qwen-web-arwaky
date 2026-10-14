@@ -12,12 +12,12 @@ import argparse
 import json
 import sys
 
-from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest, SwarmSnapshot
-from modules.shared.src.utility_core_path_validation import (
+from modules.shared.src.common.utility_core_path_validation import (
     validate_swarm_id,
     validate_swarm_input_path,
 )
+from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest, SwarmSnapshot
 
 
 def _render_snapshot(snapshot: SwarmSnapshot) -> None:

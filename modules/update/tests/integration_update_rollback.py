@@ -7,7 +7,7 @@ for pip or the network.
 
 from __future__ import annotations
 
-from modules.shared.src.taxonomy_core_vo import UpdateStepResult, VersionString
+from modules.shared.src.common.taxonomy_core_vo import UpdateStepResult, VersionString
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
 

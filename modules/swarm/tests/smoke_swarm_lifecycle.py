@@ -10,19 +10,27 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.shared.src.taxonomy_prompt_vo import PromptResponse, ResponseText
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse, ResponseText
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 
 def _orchestrator(ceiling: int = 4) -> SwarmOrchestrator:
+    registry = SwarmRegistry()
+    attachment = MagicMock(execute=lambda request: PromptResponse(response_text=ResponseText("ok")))
     return SwarmOrchestrator(
-        runner=SwarmRunner(
+        start=SwarmStartRunner(
+            registry=registry,
             output_root=Path("/tmp/qwen-smoke-output"),
             browser_concurrency=ceiling,
-            attachment=MagicMock(execute=lambda request: PromptResponse(response_text=ResponseText("ok"))),
+            attachment=attachment,
         ),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=attachment),
         observability=MagicMock(),
     )
 

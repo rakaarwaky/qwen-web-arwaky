@@ -15,10 +15,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from modules.shared.src.contract_update_protocol import IUpdateRollbackProtocol, IUpdateUpgradeProtocol
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateStepResult, VersionString
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_update_pipeline import (
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateStepResult, VersionString
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.update.contract_update_protocol import IUpdateRollbackProtocol, IUpdateUpgradeProtocol
+from modules.shared.src.update.utility_update_pipeline import (
     refuse_unverified_install,
     resolve_editable_source_dir,
     resolve_github_pinned_url,
@@ -119,7 +119,7 @@ class UpdateRollbackCapability(IUpdateRollbackProtocol):
 
     def _snapshot_dir(self) -> Path:
         """Return the directory holding pre-upgrade environment snapshots."""
-        from modules.shared.src.taxonomy_core_constant import XDG_STATE_HOME
+        from modules.shared.src.common.taxonomy_core_constant import XDG_STATE_HOME
 
         return XDG_STATE_HOME / "update-snapshots"
 

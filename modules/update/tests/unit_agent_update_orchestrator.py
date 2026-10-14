@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateCheckResult
-from modules.shared.src.taxonomy_update_vo import UpdateRequest
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateCheckResult
+from modules.shared.src.update.taxonomy_update_vo import UpdateRequest
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 
 

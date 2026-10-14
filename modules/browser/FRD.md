@@ -15,39 +15,20 @@ call the aggregate and receive a page already proven usable.
 
 ## Functional Requirements
 
-### FR-BROWSER-001: Launch an authenticated browser context
+### FR-BROWSER-001: Open an authenticated, model-pinned chat session
 
-- **Description**: Open the persistent Chromium context over the saved session profile and yield its context manager.
-- **Input**: A validated runtime configuration carrying the session path, headless flag, sandbox verdict, and browser binary preference.
-- **Output**: A context manager yielding the live browser context for the lifetime of one run.
+- **Description**: Open the persistent Chromium context over the saved session profile, take its page to the chat, prove the saved session is still signed in, and pin the model the run requested — the one capability that turns a runtime configuration into a page a caller can drive.
+- **Input**: A validated runtime configuration carrying the session path, headless flag, sandbox verdict, browser binary preference, and target model, plus the lifecycle emitter that records progress events.
+- **Output**: A context manager yielding the live browser context whose page is already positioned on an authenticated chat running the requested model, or the error that stopped it.
 - **Business Rules**:
   - The session directory is created with owner-only permissions; a pre-existing directory with wider permissions is repaired before launch.
   - Stale Chromium lock files left by a killed run are removed before launch so a clean run is not blocked by a dead process.
-  - The configured model is resolved before the first page is handed over.
-- **Edge Cases**: A launch that fails after retries surfaces a browser-launch error naming the reason; a sandbox the host cannot provide falls back to the sandbox-disabled launch only when the configuration allows it.
-- **Error Handling**: Browser-launch errors carry the host capability that failed; session-directory permission failures surface as a file error naming the path.
-
-### FR-BROWSER-002: Navigate to the chat and prove authentication
-
-- **Description**: Take a page to the chat and prove the saved session is still signed in.
-- **Input**: A live page and the lifecycle emitter that records progress events.
-- **Output**: A page positioned on an authenticated chat, or an authentication error.
-- **Business Rules**:
   - Authentication is proven before the page is handed to a caller; no caller may receive an unauthenticated page.
   - A page still loading is tolerated while it exposes the authenticated UI.
-- **Edge Cases**: A page redirected to a login URL or showing a login form raises an authentication error rather than returning an unusable page.
-- **Error Handling**: An authentication error names the login path so the caller can route the operator to the setup verb.
-
-### FR-BROWSER-003: Select the pinned model
-
-- **Description**: Make the chat use the model the run configuration requests.
-- **Input**: A live page and the run's target model.
-- **Output**: A boolean reporting whether the requested model is now active.
-- **Business Rules**:
-  - A model requested per run is resolved without mutating shared state, so concurrent runs keep their own override.
+  - The configured model is resolved before the first page is handed over, without mutating shared state, so concurrent runs keep their own override.
   - A picker that does not expose the requested model falls back to the first model it offers and records a warning rather than aborting the run.
-- **Edge Cases**: A picker that never becomes ready falls back through the configured retry budget before reporting failure.
-- **Error Handling**: A model switch that cannot complete surfaces a model-switch error naming the requested and active model.
+- **Edge Cases**: A launch that fails after retries surfaces a browser-launch error naming the reason; a sandbox the host cannot provide falls back to the sandbox-disabled launch only when the configuration allows it; a page redirected to a login URL or showing a login form raises an authentication error rather than yielding an unusable page; a picker that never becomes ready falls back through the configured retry budget before reporting failure.
+- **Error Handling**: Browser-launch errors carry the host capability that failed; session-directory permission failures surface as a file error naming the path; an authentication error names the login path so the caller can route the operator to the setup verb; a model switch that cannot complete surfaces a model-switch error naming the requested and active model.
 
 ## API Contract
 

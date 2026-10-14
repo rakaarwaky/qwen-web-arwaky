@@ -12,25 +12,18 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.shared.src.contract_core_protocol import (
-    IInjectionProtocol,
-    ISendProtocol,
-    IStreamProtocol,
-)
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_prompt_protocol import IPromptFlowProtocol
-from modules.shared.src.taxonomy_core_constant import MAX_ATTEMPTS, RETRY_BASE_DELAY_SEC
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_constant import MAX_ATTEMPTS, RETRY_BASE_DELAY_SEC
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
+from modules.shared.src.common.taxonomy_core_error import (
     RateLimitError,
     ResponseDetectionTimeoutError,
     RunCancelledError,
 )
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_PROMPT_INJECTED,
     QwenEventType,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
     EventSequenceVO,
     HeadlessFlag,
@@ -40,7 +33,14 @@ from modules.shared.src.taxonomy_core_vo import (
     SenderConfig,
     TimeoutSec,
 )
-from modules.shared.src.utility_dom_query import latest_message_text
+from modules.shared.src.common.utility_dom_query import latest_message_text
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IInjectionProtocol,
+    IPromptFlowProtocol,
+    ISendProtocol,
+    IStreamProtocol,
+)
 
 # Block 1: Class Definition & Constructor
 

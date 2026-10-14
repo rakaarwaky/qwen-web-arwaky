@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_doctor_command import run_doctor
 from modules.root_cli_main_entry import _parse_args
-from modules.shared.src.taxonomy_session_vo import SessionResponse
+from modules.shared.src.session.taxonomy_session_vo import SessionResponse
 
 
 def test_parse_args_accepts_smoke_flag() -> None:
