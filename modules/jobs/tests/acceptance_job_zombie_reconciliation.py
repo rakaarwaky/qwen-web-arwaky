@@ -1,6 +1,6 @@
 """Acceptance tests for the zombie-reconciliation requirement.
 
-The requirement in `modules/jobs/FRD.md` FR-JOBS-003 is that a record whose
+The requirement in `modules/jobs/FRD.md` FR-JOBS-001 is that a record whose
 worker died reaches a terminal state on the next pool start, so a poller
 never waits on a job that will never finish. These seed a record owned by a
 dead process and assert storage construction reconciles it.

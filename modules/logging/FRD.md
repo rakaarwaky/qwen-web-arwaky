@@ -15,16 +15,30 @@ call one orchestrator verb, so the argument contract lives in one place.
 
 ## Functional Requirements
 
-### FR-LOGGING-001: Bootstrap observability for one run
+### FR-LOGGING-001: Carry one run through its observability lifecycle
 
-- **Description**: Attach the log handlers and exception hooks a run needs.
-- **Input**: An observability request naming the verb, the log path, the run id, and whether a standard-error handler may be attached.
-- **Output**: An observability response naming the attached handlers and the run stamp.
+- **Description**: Attach the handlers a run needs, stamp the run into its
+  records, publish what an external monitor reads, and close the run.
+- **Input**: An observability request naming the verb — bootstrap, publish, or
+  close — the log path, the run id, whether a standard-error handler may be
+  attached, and the status fields or final metrics a publish carries.
+- **Output**: The attached handlers and the run stamp, the written status path
+  or quality-report path, and the exit code with the run's records flushed.
 - **Business Rules**:
   - An entry that owns the terminal canvas must attach no standard-error handler, so run records cannot corrupt the interactive UI.
   - Every record emitted from a worker thread routes through the same run stamp, so a record names the run that produced it.
-- **Edge Cases**: A bootstrap run twice with the same run id attaches no duplicate handler.
-- **Error Handling**: A log path the host cannot write to surfaces a file error naming the path.
+  - The status file is the inter-process handoff; its field set is what an external monitor depends on.
+  - The quality report is written at run end, not during the run.
+  - Detaching flushes the run's records before the process exits, so a crash cannot lose its final records.
+  - The exit code a run reports is decided by one rule shared with the surfaces that print it.
+- **Edge Cases**:
+  - A bootstrap run twice with the same run id attaches no duplicate handler.
+  - A close run called twice detaches only once; the second call is a no-op.
+  - A status file the host cannot write to surfaces a file error naming the path; the run still completes.
+- **Error Handling**:
+  - A log path the host cannot write to surfaces a file error naming the path.
+  - A quality-report write that fails surfaces a file error; the run's outcome is not affected.
+  - A flush that fails surfaces the underlying error; the exit code still names the outcome.
 
 ### FR-LOGGING-002: Record metrics for a quality report
 
@@ -36,28 +50,6 @@ call one orchestrator verb, so the argument contract lives in one place.
   - A snapshot is a read that does not mutate the counters.
 - **Edge Cases**: A snapshot taken before any run records an all-zero report.
 - **Error Handling**: A counter that cannot be read back reports the absence rather than raising.
-
-### FR-LOGGING-003: Publish the run status and quality report
-
-- **Description**: Write the inter-process status file and the run's quality report.
-- **Input**: The status record, or the run's final metrics.
-- **Output**: The written status path, or the quality-report path.
-- **Business Rules**:
-  - The status file is the inter-process handoff; its field set is what an external monitor depends on.
-  - The quality report is written at run end, not during the run.
-- **Edge Cases**: A status file the host cannot write to surfaces a file error naming the path; the run still completes.
-- **Error Handling**: A quality-report write that fails surfaces a file error; the run's outcome is not affected.
-
-### FR-LOGGING-004: Close a run
-
-- **Description**: Detach the run's log handler and report its exit code.
-- **Input**: The run's outcome code.
-- **Output**: The exit code, with the run's records flushed.
-- **Business Rules**:
-  - Detaching flushes the run's records before the process exits, so a crash cannot lose its final records.
-  - The exit code a run reports is decided by one rule shared with the surfaces that print it.
-- **Edge Cases**: A close run called twice detaches only once; the second call is a no-op.
-- **Error Handling**: A flush that fails surfaces the underlying error; the exit code still names the outcome.
 
 ## API Contract
 

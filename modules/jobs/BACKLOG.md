@@ -25,7 +25,6 @@ Last Updated: 2026-10-05
 | Scenario | Kind | Test file | Test name | Last verified |
 |---|---|---|---|---|
 | A pool at its pending ceiling rejects a submission | Automated | `modules/jobs/tests/unit_agent_job_backpressure.py` | queue rejection | 2026-10-05 |
-| A folder input compiles to one attachment | Automated | `modules/jobs/tests/unit_folder_compiler.py` | folder compile | 2026-10-05 |
 | An absent status file reads back as no mapping | Automated | `modules/jobs/tests/unit_capability_job_storage.py` | status read | 2026-10-05 |
 | A restart reconciles every zombie record | Gap | none yet | see `JOBS-01` | 2026-10-05 |
 
@@ -43,7 +42,7 @@ None.
 | Area | Status | Notes |
 |---|---|---|
 | Tests | Done | `uv run python -m pytest modules/jobs/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `JOBS-01`. |
+| Scenario evidence | Done | 2 of 3 scenarios mapped; one gap tracked as `JOBS-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
 ## Deferred
@@ -55,3 +54,4 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
+| 2026-10-14 | FRD requirements matched to the two declared capability seams; folder compilation left to the feature whose contract declares it. | @qwen-web-arwaky |
