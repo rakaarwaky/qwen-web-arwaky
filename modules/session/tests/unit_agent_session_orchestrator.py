@@ -252,9 +252,14 @@ def test_login_verb_forces_headless_false(tmp_path: Path) -> None:
     # Stub out the validation helper so the orchestrator proceeds without a
     # real browser. The login verb always opens the headed browser — there is
     # no headless fast-path for ``login``.
+    # POOL_FILE/SESSIONS_DIR are patched in the manager module too: it binds
+    # them at import time, so patching only utility_session_guard leaks the
+    # fake profile into the operator's real sessions.json.
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
         patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.POOL_FILE", fake_sessions / "sessions.json"),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
@@ -300,6 +305,8 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
     with (
         patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True) as validate,
         patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.POOL_FILE", fake_sessions / "sessions.json"),
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
