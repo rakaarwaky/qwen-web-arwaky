@@ -14,9 +14,7 @@ from __future__ import annotations
 import inspect
 
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.swarm.contract_swarm_cancel import ISwarmCancelProtocol
-from modules.shared.src.swarm.contract_swarm_progress import ISwarmProgressProtocol
-from modules.shared.src.swarm.contract_swarm_start import ISwarmStartProtocol
+from modules.shared.src.swarm.contract_swarm_protocol import ISwarmCancelProtocol, ISwarmProgressProtocol, ISwarmStartProtocol
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 

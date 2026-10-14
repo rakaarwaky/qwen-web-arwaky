@@ -1,32 +1,17 @@
-"""Taxonomy: skill constants (AES401).
-
-Domain taxonomy constant layer for embedded SKILL.md template content.
-"""
-
-from __future__ import annotations
-
-EMBEDDED_SKILL_MD: str = r"""---
+---
 name: qwen-web-arwaky
 description: >
   Automate Qwen AI Web (chat.qwen.ai) with the Qwen3.8-Max intelligence model —
   zero API keys, persistent browser sessions. Use when an AI agent needs to send
   prompts, review code, or analyze document attachments via CLI or MCP tools.
 version: 6.0.0
-triggers:
-  - qwen
-  - chat.qwen.ai
-  - prompt automation
-  - code audit
-  - architecture review
-  - deep reasoning
-  - document analysis
-  - no api key
-entry_points: [qwen-web-arwaky, qwa, qwen-web-mcp]
 ---
 
 # Qwen Web Automation Skill Guide
 
-Use this skill when an AI agent needs to send prompts or document files to **Qwen AI (`chat.qwen.ai`)** and receive complete responses via MCP tools or CLI commands.
+Use this skill when an AI agent needs to send prompts or document files to
+**Qwen AI (`chat.qwen.ai`)** and receive complete responses via MCP tools or
+CLI commands.
 
 ---
 
@@ -42,34 +27,44 @@ Use this skill when an AI agent needs to send prompts or document files to **Qwe
 | Reset session | `delete_session` | — |
 | Initialize workspace | `init_workspace` | `qwa init` |
 
-> **File conventions:** Place inputs under `.qwen-web-arwaky/input/` and outputs under `.qwen-web-arwaky/output/`. Always append a timestamp to output filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or `YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous runs.
+> **File conventions:** Place inputs under `.qwen-web-arwaky/input/` and
+outputs under `.qwen-web-arwaky/output/`. Always append a timestamp to output
+filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or
+`YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous
+runs.
 
 ---
 
 ## 2. Usage by Use Case
 
 ### Use Case 1: Quick Inline Prompt / Question
-Use for fast queries, factual explanations, or one-off code generation where no external files are needed.
+
+Use for fast queries, factual explanations, or one-off code generation where no
+external files are needed.
 
 **MCP:**
+
 ```json
 {
-  "prompt": "Explain the difference between optimistic and pessimistic locking in 3 concise bullet points with a brief Python example.",
+  "prompt": "Explain the difference between optimistic and pessimistic locking in
+3 concise bullet points with a brief Python example.",
   "headless": true
 }
 ```
 
 **CLI:**
+
 ```bash
-qwa prompt direct -t "Explain optimistic vs pessimistic locking" -o .qwen-web-arwaky/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt direct -t "Explain optimistic vs pessimistic locking" -o
+.qwen-web-arwaky/output/locking_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
----
-
 ### Use Case 2: Complex Task from a Prompt File
+
 Use for multi-step instructions, complex refactor specs, or long prompts authored in a Markdown file.
 
 **MCP:**
+
 ```json
 {
   "input_file": ".qwen-web-arwaky/input/refactor_task.md",
@@ -79,16 +74,19 @@ Use for multi-step instructions, complex refactor specs, or long prompts authore
 ```
 
 **CLI:**
+
 ```bash
-qwa prompt file -i .qwen-web-arwaky/input/refactor_task.md -o .qwen-web-arwaky/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt file -i .qwen-web-arwaky/input/refactor_task.md -o \
+  .qwen-web-arwaky/output/refactor_result_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
----
-
 ### Use Case 3: Code Audit or Document Analysis with Attachment
-Use when the prompt requires analyzing a codebase export, technical document, log file, or PDF spec (supported: `.pdf`, `.md`, `.txt` up to 100 MB).
+
+Use when the prompt requires analyzing a codebase export, technical document, log
+file, or PDF spec (supported: `.pdf`, `.md`, `.txt` up to 100 MB).
 
 **MCP:**
+
 ```json
 {
   "prompt_file": ".qwen-web-arwaky/input/audit_spec.md",
@@ -99,26 +97,39 @@ Use when the prompt requires analyzing a codebase export, technical document, lo
 ```
 
 **CLI:**
+
 ```bash
-qwa prompt attach -i .qwen-web-arwaky/input/audit_spec.md -a .qwen-web-arwaky/input/codebase_export.md -o .qwen-web-arwaky/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i .qwen-web-arwaky/input/audit_spec.md -a \
+.qwen-web-arwaky/input/codebase_export.md -o \
+.qwen-web-arwaky/output/audit_findings_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
----
-
 ### Use Case 4: Standard Reviews Using Built-in Role Templates
+
 Instead of writing a custom prompt file, you can pass a built-in role template name directly as the prompt input:
+
 - `business-analyst`: Business problem, process model, acceptance criteria, stakeholder alignment, UAT.
+
 - `system-analyst`: Technical behavior, data model, API contract, sequences, requirement traceability.
+
 - `ui-ux-designer`: User journey, wireframes, design system, accessibility, interface states.
+
 - `software-architect`: Module boundaries, integration patterns, scalability, standards, tech debt.
+
 - `backend-engineer`: Server API, database schema, business rules, performance, backend tests.
+
 - `frontend-engineer`: UI components, client state, API consumption, responsiveness, component tests.
+
 - `product-engineer`: Delivery tracking, cross-team dependencies, blockers, demo prep, release readiness.
+
 - `qa-engineer`: Test strategy, functional/regression, automation, defects, quality metrics.
+
 - `security-engineer`: Threat model, auth standards, vuln scan, privacy/encryption, incident protocol.
+
 - `devops-engineer`: CI/CD pipeline, infra provisioning, deployment/rollback, observability, incident response.
 
 **MCP:**
+
 ```json
 {
   "prompt_file": "backend-engineer",
@@ -128,14 +139,18 @@ Instead of writing a custom prompt file, you can pass a built-in role template n
 ```
 
 **CLI:**
+
 ```bash
-qwa prompt attach -i backend-engineer -a src/api/auth.py -o .qwen-web-arwaky/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
-qwa prompt attach -i software-architect -a README.md -o .qwen-web-arwaky/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i backend-engineer -a src/api/auth.py -o \
+.qwen-web-arwaky/output/auth_review_$(date +%Y%m%d_%H%M%S).md --headless
+qwa prompt attach -i software-architect -a README.md -o \
+.qwen-web-arwaky/output/arch_review_$(date +%Y%m%d_%H%M%S).md --headless
 ```
 
 ---
 
 ### Use Case 5: Session Setup & Authentication
+
 Use to verify login status or authenticate a new browser session when cookies expire.
 
 1. **Check session health:**
@@ -150,9 +165,11 @@ Use to verify login status or authenticate a new browser session when cookies ex
 ---
 
 ### Use Case 6: Workspace Initialization
+
 Use when provisioning `.qwen-web-arwaky/` workspace directories and sample configuration in a new project.
 
 **MCP:**
+
 ```json
 {
   "target_dir": "."
@@ -160,6 +177,7 @@ Use when provisioning `.qwen-web-arwaky/` workspace directories and sample confi
 ```
 
 **CLI:**
+
 ```bash
 qwa init
 ```
@@ -172,10 +190,15 @@ To ensure Qwen produces complete code without placeholders or omitted sections:
 
 1. **Specify an explicit Output Contract:** Define exact required section titles and expected markdown formatting.
 2. **Forbid truncation explicitly:** Include this clause in your prompt:
-   > *"Output every file COMPLETE and VERBATIM inside fenced code blocks with language tags. Never use ellipses (`...`), placeholder comments (`// rest unchanged`), or omit code."*
-3. **Reason first, code second:** Request an analysis or plan before the implementation code so the model thinks before writing.
-4. **Put large context into attachments:** Keep the prompt file focused on instructions; provide code, logs, and schemas as attachments.
-5. **Add a self-verification step:** Instruct the model to verify that no placeholders exist and all requested items are satisfied before completing.
+   > *"Output every file COMPLETE and VERBATIM inside fenced code blocks with
+   language tags. Never use ellipses (`...`), placeholder comments
+   (`// rest unchanged`), or omit code."*
+3. **Reason first, code second:** Request an analysis or plan before the
+   implementation code so the model thinks before writing.
+4. **Put large context into attachments:** Keep the prompt file focused on
+   instructions; provide code, logs, and schemas as attachments.
+5. **Add a self-verification step:** Instruct the model to verify that no
+   placeholders exist and all requested items are satisfied before completing.
 
 ---
 
@@ -189,4 +212,3 @@ To ensure Qwen produces complete code without placeholders or omitted sections:
 | `FileValidationError` / `FILE_NOT_FOUND` | Missing, unreadable, or file > 100 MB | Verify file path, permissions, and ensure file size is under 100 MB. |
 | `CircuitBreakerOpenError` | Repeated consecutive failures | Wait 30 seconds before sending next request. |
 | `VALIDATION_ERROR` (MCP) | Invalid tool parameter | Check error `field` in response and correct the argument payload. |
-"""

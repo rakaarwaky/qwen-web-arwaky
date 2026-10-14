@@ -253,7 +253,9 @@ JS_GET_RESPONSE_TEXT: str = r"""
         if (paginationRe.test(nodeText)) continue;
 
         // Tier 1: React Fiber extraction (preserves 100% of raw markdown & code without virtualization truncation)
-        var fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+        var fiberKey = Object.keys(node).find(
+            k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance')
+        );
         if (fiberKey) {
             var curr = node[fiberKey];
             for (var depth = 0; depth < 30 && curr; depth++) {
@@ -275,8 +277,17 @@ JS_GET_RESPONSE_TEXT: str = r"""
         var targetNode = outerContainer || node;
 
         var text = '';
-        var blockTags = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TR', 'TD', 'TH', 'PRE', 'BLOCKQUOTE', 'BR', 'TABLE', 'UL', 'OL', 'SECTION', 'ARTICLE']);
-        var ignoreSelectors = '.margin, .line-numbers, .monaco-editor-margin, [class*="line-numbers"], [class*="margin-view"], [class*="thinking"], [class*="status-card"], [class*="status"], [class*="thinking-tool"], button, svg, [class*="copy"], .copy-code-btn, [class*="code-header"], [class*="pagination"], [class*="pager"]';
+        var blockTags = new Set([
+            'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TR', 'TD', 'TH', 'PRE',
+            'BLOCKQUOTE', 'BR', 'TABLE', 'UL', 'OL', 'SECTION', 'ARTICLE'
+        ]);
+        var ignoreSelectors = [
+            '.margin', '.line-numbers', '.monaco-editor-margin', '[class*="line-numbers"]',
+            '[class*="margin-view"]', '[class*="thinking"]', '[class*="status-card"]',
+            '[class*="status"]', '[class*="thinking-tool"]', 'button', 'svg',
+            '[class*="copy"]', '.copy-code-btn', '[class*="code-header"]',
+            '[class*="pagination"]', '[class*="pager"]'
+        ].join(', ');
 
         function walk(n, isPre) {
             if (n.nodeType === Node.ELEMENT_NODE) {
@@ -284,7 +295,10 @@ JS_GET_RESPONSE_TEXT: str = r"""
 
                 var tag = n.tagName;
                 var classStr = (n.className && typeof n.className === 'string') ? n.className : '';
-                var isCodeBlock = tag === 'PRE' || classStr.includes('code-block') || classStr.includes('highlight') || classStr.includes('markdown-code');
+                var isCodeBlock = tag === 'PRE'
+                    || classStr.includes('code-block')
+                    || classStr.includes('highlight')
+                    || classStr.includes('markdown-code');
                 var nextIsPre = isPre || isCodeBlock;
 
                 if (tag === 'BR') {

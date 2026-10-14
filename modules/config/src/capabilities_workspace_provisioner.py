@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,6 @@ from modules.shared.src.common.taxonomy_core_constant import (
     SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.common.taxonomy_core_vo import FilePath
-from modules.shared.src.common.taxonomy_skill_constant import EMBEDDED_SKILL_MD
 from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
 
 # Block 1: Class Definition & Constructor
@@ -51,11 +51,13 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         DEFAULT_OUTPUT.mkdir(parents=True, exist_ok=True)
         DEFAULT_LOG.mkdir(parents=True, exist_ok=True)
 
-        # Step 2: Create .agents/skills/qwen-web-arwaky/SKILL.md from embedded constant
+        # Step 2: Create .agents/skills/qwen-web-arwaky/SKILL.md from the
+        # shared skills package data file.
         skills_dir = target_path / ".agents" / "skills" / "qwen-web-arwaky"
         skills_dir.mkdir(parents=True, exist_ok=True)
-        skill_md_dest = skills_dir / "SKILL.md"
-        skill_md_dest.write_text(EMBEDDED_SKILL_MD, encoding="utf-8")
+        with as_file(files("modules.shared.skills") / "SKILL.md") as src:
+            skill_md_dest = skills_dir / "SKILL.md"
+            skill_md_dest.write_bytes(src.read_bytes())
 
         # Step 3: Create .qwen-web-arwaky directory with symlinks to XDG paths
         dot_qwen = target_path / LOCAL_WS_DIR

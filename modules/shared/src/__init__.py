@@ -480,6 +480,74 @@ __all__ = [
     "is_refresh_token_valid",
     "is_safe_session_target",
     "renewal_is_possible",
+    # Sub-package re-exports (AES702)
+    "modules",
+    "browser",
+    "common",
+    "config",
+    "jobs",
+    "logging",
+    "prompt",
+    "session",
+    "swarm",
+    "update",
+    "taxonomy_core_constant",
+    "taxonomy_core_entity",
+    "taxonomy_core_error",
+    "taxonomy_core_event",
+    "taxonomy_core_vo",
+    "utility_core_capacity",
+    "utility_core_env",
+    "utility_core_events",
+    "utility_core_exit",
+    "utility_core_path",
+    "utility_core_path_validation",
+    "utility_core_paths",
+    "utility_core_prompt",
+    "utility_core_prompt_template",
+    "utility_core_session_backup",
+    "utility_core_status",
+    "utility_core_text",
+    "utility_core_validation",
+    "utility_core_version",
+    "utility_dom_helper",
+    "utility_dom_query",
+    "utility_error_mapping",
+    "utility_folder_compiler",
+    "utility_io_writer",
+    "utility_logger_factory",
+    "utility_response_normalizer",
+    "utility_telemetry_scrubber",
+    "contract_browser_aggregate",
+    "contract_browser_protocol",
+    "utility_browser_async_loop",
+    "contract_swarm_aggregate",
+    "contract_swarm_protocol",
+    "taxonomy_swarm_vo",
+    "contract_update_aggregate",
+    "contract_update_protocol",
+    "taxonomy_update_vo",
+    "utility_update_browser_binary",
+    "utility_update_pipeline",
+    "contract_logging_aggregate",
+    "contract_logging_protocol",
+    "taxonomy_logging_vo",
+    "contract_jobs_aggregate",
+    "contract_jobs_protocol",
+    "taxonomy_jobs_vo",
+    "contract_session_aggregate",
+    "contract_session_protocol",
+    "taxonomy_session_vo",
+    "utility_session_cloner",
+    "utility_session_guard",
+    "utility_session_renewal_cookie_probe",
+    "contract_config_aggregate",
+    "contract_config_protocol",
+    "taxonomy_config_vo",
+    "utility_config_app_factory",
+    "contract_prompt_aggregate",
+    "contract_prompt_protocol",
+    "taxonomy_prompt_vo",
 ]
 
 # ─── Sub-package imports (AES702 feature subfolders) ───────────────
@@ -495,62 +563,58 @@ import modules.shared.src.prompt
 import modules.shared.src.session
 import modules.shared.src.swarm
 import modules.shared.src.update
-
-from modules.shared.src.common import taxonomy_core_constant
-from modules.shared.src.common import taxonomy_core_entity
-from modules.shared.src.common import taxonomy_core_error
-from modules.shared.src.common import taxonomy_core_event
-from modules.shared.src.common import taxonomy_core_vo
-from modules.shared.src.common import taxonomy_skill_constant
-from modules.shared.src.common import utility_core_capacity
-from modules.shared.src.common import utility_core_env
-from modules.shared.src.common import utility_core_events
-from modules.shared.src.common import utility_core_exit
-from modules.shared.src.common import utility_core_path
-from modules.shared.src.common import utility_core_path_validation
-from modules.shared.src.common import utility_core_paths
-from modules.shared.src.common import utility_core_prompt
-from modules.shared.src.common import utility_core_prompt_template
-from modules.shared.src.common import utility_core_session_backup
-from modules.shared.src.common import utility_core_status
-from modules.shared.src.common import utility_core_text
-from modules.shared.src.common import utility_core_validation
-from modules.shared.src.common import utility_core_version
-from modules.shared.src.common import utility_dom_helper
-from modules.shared.src.common import utility_dom_query
-from modules.shared.src.common import utility_error_mapping
-from modules.shared.src.common import utility_folder_compiler
-from modules.shared.src.common import utility_io_writer
-from modules.shared.src.common import utility_logger_factory
-from modules.shared.src.common import utility_response_normalizer
-from modules.shared.src.common import utility_telemetry_scrubber
-from modules.shared.src.browser import contract_browser_aggregate
-from modules.shared.src.browser import contract_browser_protocol
-from modules.shared.src.browser import utility_browser_async_loop
-from modules.shared.src.swarm import contract_swarm_aggregate
-from modules.shared.src.swarm import contract_swarm_protocol
-from modules.shared.src.swarm import taxonomy_swarm_vo
-from modules.shared.src.update import contract_update_aggregate
-from modules.shared.src.update import contract_update_protocol
-from modules.shared.src.update import taxonomy_update_vo
-from modules.shared.src.update import utility_update_browser_binary
-from modules.shared.src.update import utility_update_pipeline
-from modules.shared.src.logging import contract_logging_aggregate
-from modules.shared.src.logging import contract_logging_protocol
-from modules.shared.src.logging import taxonomy_logging_vo
-from modules.shared.src.jobs import contract_jobs_aggregate
-from modules.shared.src.jobs import contract_jobs_protocol
-from modules.shared.src.jobs import taxonomy_jobs_vo
-from modules.shared.src.session import contract_session_aggregate
-from modules.shared.src.session import contract_session_protocol
-from modules.shared.src.session import taxonomy_session_vo
-from modules.shared.src.session import utility_session_cloner
-from modules.shared.src.session import utility_session_guard
-from modules.shared.src.session import utility_session_renewal_cookie_probe
-from modules.shared.src.config import contract_config_aggregate
-from modules.shared.src.config import contract_config_protocol
-from modules.shared.src.config import taxonomy_config_vo
-from modules.shared.src.config import utility_config_app_factory
-from modules.shared.src.prompt import contract_prompt_aggregate
-from modules.shared.src.prompt import contract_prompt_protocol
-from modules.shared.src.prompt import taxonomy_prompt_vo
+from modules.shared.src.browser import contract_browser_aggregate, contract_browser_protocol, utility_browser_async_loop
+from modules.shared.src.common import (
+    taxonomy_core_constant,
+    taxonomy_core_entity,
+    taxonomy_core_error,
+    taxonomy_core_event,
+    taxonomy_core_vo,
+    utility_core_capacity,
+    utility_core_env,
+    utility_core_events,
+    utility_core_exit,
+    utility_core_path,
+    utility_core_path_validation,
+    utility_core_paths,
+    utility_core_prompt,
+    utility_core_prompt_template,
+    utility_core_session_backup,
+    utility_core_status,
+    utility_core_text,
+    utility_core_validation,
+    utility_core_version,
+    utility_dom_helper,
+    utility_dom_query,
+    utility_error_mapping,
+    utility_folder_compiler,
+    utility_io_writer,
+    utility_logger_factory,
+    utility_response_normalizer,
+    utility_telemetry_scrubber,
+)
+from modules.shared.src.config import (
+    contract_config_aggregate,
+    contract_config_protocol,
+    taxonomy_config_vo,
+    utility_config_app_factory,
+)
+from modules.shared.src.jobs import contract_jobs_aggregate, contract_jobs_protocol, taxonomy_jobs_vo
+from modules.shared.src.logging import contract_logging_aggregate, contract_logging_protocol, taxonomy_logging_vo
+from modules.shared.src.prompt import contract_prompt_aggregate, contract_prompt_protocol, taxonomy_prompt_vo
+from modules.shared.src.session import (
+    contract_session_aggregate,
+    contract_session_protocol,
+    taxonomy_session_vo,
+    utility_session_cloner,
+    utility_session_guard,
+    utility_session_renewal_cookie_probe,
+)
+from modules.shared.src.swarm import contract_swarm_aggregate, contract_swarm_protocol, taxonomy_swarm_vo
+from modules.shared.src.update import (
+    contract_update_aggregate,
+    contract_update_protocol,
+    taxonomy_update_vo,
+    utility_update_browser_binary,
+    utility_update_pipeline,
+)
