@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 
 from textual.app import App
+from textual.screen import ModalScreen
 
 from modules.tui.src.surface_tui_components import ConfirmModal
 from modules.tui.src.surface_tui_css import TUI_CSS
@@ -22,14 +23,23 @@ class _ModalHost(App[None]):
 
     CSS = TUI_CSS
 
+    def __init__(self, modal: ModalScreen[object]) -> None:
+        super().__init__()
+        self._modal = modal
+
     def on_mount(self) -> None:
-        self.push_screen(
-            ConfirmModal(
-                "Delete Session",
-                "Delete 'arwaky007' from the pool and remove its browser profile?",
-                confirm_label="Delete",
-            )
-        )
+        self.push_screen(self._modal)
+
+
+def _assert_centered(screen: object, box_id: str, screen_w: int, screen_h: int) -> None:
+    """Assert a modal's box is a centered box with margin on all four sides."""
+    box = screen.query_one(box_id).region
+    assert box.width < screen_w, f"modal spans the full width: {box}"
+    assert box.height < screen_h, f"modal spans the full height: {box}"
+    assert box.x > 0, f"modal is not centered horizontally: {box}"
+    assert box.y > 0, f"modal is not centered vertically: {box}"
+    assert box.right < screen_w, f"modal overflows the right edge: {box}"
+    assert box.bottom < screen_h, f"modal overflows the bottom edge: {box}"
 
 
 class TestConfirmModalCentering:
@@ -40,16 +50,15 @@ class TestConfirmModalCentering:
         around it on every side, so the confirmation reads as a dialog."""
 
         async def _run() -> None:
-            app = _ModalHost()
+            app = _ModalHost(
+                ConfirmModal(
+                    "Delete Session",
+                    "Delete 'arwaky007' from the pool and remove its browser profile?",
+                    confirm_label="Delete",
+                )
+            )
             async with app.run_test(size=(80, 24)):
-                modal = app.screen
-                box = modal.query_one("#confirm-modal-container").region
-                assert box.width < 80, f"modal spans the full width: {box}"
-                assert box.height < 24, f"modal spans the full height: {box}"
-                assert box.x > 0, f"modal is not centered horizontally: {box}"
-                assert box.y > 0, f"modal is not centered vertically: {box}"
-                assert box.right < 80, f"modal overflows the right edge: {box}"
-                assert box.bottom < 24, f"modal overflows the bottom edge: {box}"
+                _assert_centered(app.screen, "#confirm-modal-container", 80, 24)
 
         asyncio.run(_run())
 
@@ -57,7 +66,13 @@ class TestConfirmModalCentering:
         """Cancel and Delete sit on the dialog's center axis."""
 
         async def _run() -> None:
-            app = _ModalHost()
+            app = _ModalHost(
+                ConfirmModal(
+                    "Delete Session",
+                    "Delete 'arwaky007' from the pool and remove its browser profile?",
+                    confirm_label="Delete",
+                )
+            )
             async with app.run_test(size=(80, 24)):
                 box = app.screen.query_one("#confirm-modal-container").region
                 buttons = {b.id: b.region for b in app.screen.query("#confirm-btn-row Button")}

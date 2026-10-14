@@ -68,7 +68,7 @@ class FilePickerModal(ModalScreen[str | None]):
             else "press Enter on file to select"
         )
         with Vertical(id="modal-container"):
-            yield Label(f"[ {title} — {hint} ]", id="modal-title")
+            yield Static(f"[ {title} — {hint} ]", id="modal-title", markup=False)
             yield DirectoryTree(str(self._start_path), id="modal-tree")
             with Horizontal(id="modal-btn-row"):
                 if self._select_directories:
@@ -165,7 +165,7 @@ class HelpScreen(ModalScreen[None]):
                 "beyond 19 are reachable by mouse or the Overview table only.",
             ]
         with Vertical(id="help-container"):
-            yield Label("[ KEYBOARD SHORTCUTS ]", id="help-title")
+            yield Static("[ KEYBOARD SHORTCUTS ]", id="help-title", markup=False)
             yield Static("\n".join(lines), id="help-body")
             yield Button("Close", id="help-close")
 
@@ -251,7 +251,7 @@ class AddSessionModal(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         """Build the name input field and action buttons."""
         with Vertical(id="add-session-container"):
-            yield Label(f"[ {self._title} ]", id="add-session-title")
+            yield Static(f"[ {self._title} ]", id="add-session-title", markup=False)
             yield Static("\nSession name:")
             yield Input(placeholder="e.g., personal, work, dev", id="input-session-name")
             with Horizontal(id="add-session-btn-row"):
@@ -305,18 +305,22 @@ class TemplatePickerModal(ModalScreen[str | None]):
         """
         seen_roles: set[str] = set()
         with Vertical(id="template-picker-container"):
-            yield Label(f"[ {self._title} ]", id="template-picker-title")
+            yield Static(f"[ {self._title} ]", id="template-picker-title", markup=False)
             if not self._options:
                 yield Label("[dim]No templates discovered under modules/shared/templates/.[/]\n")
-            for display, role in self._options:
-                if role in seen_roles:
-                    continue
-                seen_roles.add(role)
-                # Role keys may carry spaces / punctuation; sanitize the
-                # widget id only, keep the label human-friendly.
-                safe_role = role.replace(" ", "_")
-                yield Button(display, id=f"tpl-{safe_role}", variant="default")
-            yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
+            # Center wraps the role buttons so they sit on the dialog's
+            # center axis; Cancel stays at the foot of the dialog.
+            with Center(id="tpl-btn-row"):
+                for display, role in self._options:
+                    if role in seen_roles:
+                        continue
+                    seen_roles.add(role)
+                    # Role keys may carry spaces / punctuation; sanitize the
+                    # widget id only, keep the label human-friendly.
+                    safe_role = role.replace(" ", "_")
+                    yield Button(display, id=f"tpl-{safe_role}", variant="default")
+            with Center(id="tpl-cancel-row"):
+                yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dismiss with the chosen role, or None on cancel."""

@@ -665,9 +665,22 @@ ConfirmModal {
     padding: 1 2;
 }
 
-/* Template picker modal: one button per discovered role, Cancel at the foot. */
+/* Template picker modal: one button per discovered role, Cancel at the foot.
+   The screen rule below pins the box to the center; the container only
+   carries the box frame. */
+TemplatePickerModal {
+    align: center middle;
+    background: rgba(15, 19, 28, 0.85);
+}
+
+AddSessionModal {
+    align: center middle;
+    background: rgba(15, 19, 28, 0.85);
+}
+
 #template-picker-container {
-    width: 60%;
+    width: 60;
+    max-width: 90%;
     height: auto;
     min-height: 8;
     background: $bg_surface;
@@ -675,13 +688,41 @@ ConfirmModal {
     padding: 1 2;
 }
 
+#tpl-btn-row {
+    height: auto;
+}
+
+#tpl-btn-row Button {
+    width: 20;
+    margin: 0 1;
+}
+
+#tpl-cancel-row {
+    height: auto;
+    margin-top: 1;
+}
+
+#tpl-cancel {
+    width: 20;
+    background: $bg_hover;
+    color: $fg_accent;
+    border: solid $border;
+}
+
+#tpl-cancel:hover {
+    background: $danger;
+    color: $danger_fg;
+    border: solid $danger;
+}
+
 #template-picker-title {
     background: $bg_base;
     color: $fg_accent;
     text-style: bold;
     padding: 0 1;
-    border-bottom: solid $border;
-    height: 1;
+    /* height is border-box: 1 content row + the border-bottom row. At 1,
+       the border consumed the only row and the title rendered blank. */
+    height: 2;
     width: 100%;
     margin-bottom: 1;
 }
@@ -754,6 +795,61 @@ SelectOverlay {
 SelectOverlay > OptionList > .option-list--option-highlighted {
     background: $bg_active;
     color: $fg_accent;
+}
+
+/* --- Add-session modal -------------------------------------------------- */
+#add-session-container {
+    width: 60;
+    max-width: 90%;
+    height: auto;
+    min-height: 12;
+    background: $bg_surface;
+    border: double $fg_accent;
+    padding: 1 2;
+}
+
+#add-session-title {
+    background: $bg_base;
+    color: $fg_accent;
+    text-style: bold;
+    padding: 0 1;
+    /* height is border-box: 1 content row + the border-bottom row. At 1,
+       the border consumed the only row and the title rendered blank. */
+    height: 2;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#add-session-btn-row {
+    height: auto;
+    margin-top: 1;
+    align: center middle;
+}
+
+#add-session-btn-row Button {
+    width: 18;
+    margin: 0 1;
+}
+
+#input-session-name {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#btn-start-login {
+    background: $accent;
+    color: $bg_base;
+    border: solid $fg_accent;
+    text-style: bold;
+}
+
+#btn-start-login:hover {
+    background: $fg_accent;
+    color: $bg_base;
+}
+
+#btn-start-login:focus {
+    border: solid $focus_ring;
 }
 
 /* --- Help Screen -------------------------------------------------------- */
