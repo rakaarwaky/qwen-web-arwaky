@@ -21,7 +21,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Label
 
 from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
-from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 from modules.tui.src.surface_tui_css import THEME
 
 
@@ -33,7 +33,6 @@ class _TuiSessionsWorkerMixin:
     _session_manager: Any
     _session_check_timed_out: bool
     _last_session_state: str | None
-    _login_in_flight: bool
     _session_check_timer: Any
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
@@ -51,37 +50,6 @@ class _TuiSessionsWorkerMixin:
     _updater: Any
     _ensure_sessions_loaded: Any
     _sessions_loaded_once: bool
-
-    # ── Login worker ─────────────────────────────────────────────────────
-
-    @work(thread=True)
-    def _login_worker(self) -> None:
-        self._ensure_log_handler()
-        self._log_msg("[bold {}]LOGIN…[/] authenticating a new session profile".format(THEME["accent"]))
-        try:
-            if self._session is None:
-                raise RuntimeError("Session orchestrator not available.")
-            res: SessionResponse = self._session.execute(SessionRequest(verb="login"))
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]LOGIN RESULT:[/] {}".format(
-                    THEME["ok"],
-                    escape(str(res.error or res.message or res.profile_path or "")),
-                ),
-            )
-            self.call_from_thread(self._check_session)
-            # A login just registered a new session profile — the pool counts
-            # and account cards on the Sessions pane are stale. Force a reload
-            # so the REGISTERED/ACTIVE/LIMITED tiles and cards reflect the
-            # account that was just added.
-            self.call_from_thread(self._force_sessions_refresh)
-        except Exception as exc:
-            self.call_from_thread(
-                self._log_msg,
-                "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(exc))),
-            )
-        finally:
-            self._login_in_flight = False
 
     def _force_sessions_refresh(self) -> None:
         """Reset the one-shot load guard and reload the account pool.

@@ -16,7 +16,6 @@ import modules.tui.src.surface_tui_css as surface_tui_css
 import modules.tui.src.surface_tui_events as surface_tui_events
 import modules.tui.src.surface_tui_main_handlers as surface_tui_main_handlers
 import modules.tui.src.surface_tui_navlog_handler as surface_tui_navlog_handler
-import modules.tui.src.surface_tui_session_setup as surface_tui_session_setup
 import modules.tui.src.surface_tui_sessions_handler as surface_tui_sessions_handler
 import modules.tui.src.surface_tui_sessions_worker as surface_tui_sessions_worker
 import modules.tui.src.surface_tui_settings as surface_tui_settings
@@ -36,7 +35,6 @@ __all__ = [
     "surface_tui_swarm_handler",
     "surface_tui_app_handler",
     "surface_tui_main_handlers",
-    "surface_tui_session_setup",
     "surface_tui_sessions_worker",
     "surface_tui_settings",
     "surface_tui_utils",

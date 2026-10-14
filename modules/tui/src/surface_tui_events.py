@@ -44,7 +44,6 @@ class _TuiEventsMixin:
     _copy_log_by_id: Any
     _copy_slot_log: Any
     _refresh_sessions_table: Any
-    _session_login_action: Any
     action_session_add_new: Any
     _run_session_health_check: Any
     _check_template_roles: Any
@@ -168,7 +167,7 @@ class _TuiEventsMixin:
         if button_id == "btn-session-add":
             # The full-width ADD SESSION button asks for the session name
             # (AddSessionModal) and then runs the headed browser login for
-            # that name. The legacy SessionSetupScreen flow stays on ctrl+l.
+            # that name. The legacy SessionSetupScreen flow is gone.
             self.action_session_add_new()
             return
         # Settings pane: system actions (doctor, update).

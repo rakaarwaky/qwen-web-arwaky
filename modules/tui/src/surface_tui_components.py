@@ -7,6 +7,10 @@ independently testable.
 SA-1: ``ConfirmModal`` lives here (not in ``surface_cli_session_setup``) so
 the TUI handler, slot-cancel confirm, and session-setup flow all reference one
 single, well-tested modal component.
+
+The session-setup flow is the name dialog: ``AddSessionModal`` asks for the
+session name and Start runs the headed browser login for that name. The
+legacy ``SessionSetupScreen`` (which never asked for a name) was removed.
 """
 
 from __future__ import annotations
@@ -186,7 +190,6 @@ class ConfirmModal(ModalScreen[bool]):
     modal. Used by:
     - slot cancel (``surface_cli_tui_workers._cancel_slot``)
     - quit-with-running-jobs (``surface_cli_tui_handlers.action_request_quit``)
-    - session-setup submenu (``surface_cli_session_setup.SessionSetupScreen``)
     """
 
     BINDINGS = [

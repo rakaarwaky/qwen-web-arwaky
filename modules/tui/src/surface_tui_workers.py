@@ -59,7 +59,6 @@ class _TuiWorkersMixin:
     _swarm_started_perf: float | None
     _session_check_timed_out: bool
     _last_session_state: str | None
-    _login_in_flight: bool
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
     _direct: Any
