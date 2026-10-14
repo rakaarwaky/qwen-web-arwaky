@@ -71,8 +71,8 @@ tests:
 fixtures:
   - changed-files:
       - any-glob-to-any-file: tests/fixtures/**
-      - any-glob-to-any-file: tests/artifacts/**
       - any-glob-to-any-file: modules/*/tests/fixtures/**
+      - any-glob-to-any-file: scripts/manual_probe.py
 
 # Deployment / ops
 deployment:

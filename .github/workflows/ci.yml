@@ -113,7 +113,7 @@ jobs:
         run: uv run python -m playwright install chromium
 
       - name: Run tests
-        run: uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ modules/shared/benches/ modules/prompt/benches/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
+        run: uv run python -m pytest modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ modules/shared/benches/ modules/prompt/benches/ -m "not benchmark" -v
 
       - name: Create issue on failure
         if: failure()

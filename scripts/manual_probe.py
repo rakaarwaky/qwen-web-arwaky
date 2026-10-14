@@ -1,6 +1,11 @@
 """Interactive manual probe to verify DOM selectors against live chat.qwen.ai.
 
-Outputs screenshot artifacts and JSON selector status report.
+Outputs screenshot artifacts and JSON selector status report under
+``tests/artifacts/`` (gitignored; created on first run).
+
+This is a script, not a pytest suite: it drives a real, logged-in browser
+session and never runs in CI. The DOM selector constants live in
+``modules/shared/src/common/taxonomy_core_constant.py``.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 import contextlib
 
-from src.types import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_SESSION,
     INPUT_SELECTORS,
     NEW_CHAT_SELECTORS,
@@ -26,7 +31,7 @@ from src.types import (
 )
 
 CHAT_URL = "https://chat.qwen.ai/"
-ART = Path(__file__).resolve().parent / "artifacts"
+ART = ROOT / "tests" / "artifacts"
 ART.mkdir(parents=True, exist_ok=True)
 
 

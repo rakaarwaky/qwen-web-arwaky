@@ -43,7 +43,7 @@ Success is the final message `All 7 gates passed — ready to merge`. The script
 To mirror the CI test job directly:
 
 ```bash
-python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
+python -m pytest modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ -m "not benchmark" -v
 ```
 
 Success is a pytest passed summary and exit status 0. Tests requiring a live authenticated Qwen session are excluded from this command.
