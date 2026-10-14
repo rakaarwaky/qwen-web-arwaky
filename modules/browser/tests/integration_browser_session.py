@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from modules.browser.src import capabilities_browser_adapter as browser_adapter
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.shared.src import AppConfig
 
@@ -154,8 +155,11 @@ class TestBrowserSession:
 
 
 class TestLaunchContext:
-    def test_retries_on_failure(self):
+    def test_retries_on_failure(self, monkeypatch: pytest.MonkeyPatch):
         from playwright.sync_api import Error
+
+        # The retry must still happen; only the real 2s backoff is dropped.
+        monkeypatch.setattr(browser_adapter, "LAUNCH_RETRY_WAIT_SEC", 0.0)
 
         p = MagicMock()
         kwargs = {"user_data_dir": "", "headless": True}
@@ -175,6 +179,7 @@ class TestLaunchContext:
 
         ctx = BrowserAdapter()._launch_context(p, kwargs)
         assert ctx == good_ctx
+        assert call_count[0] == 3, "two failures then a success must cost three attempts"
 
     def test_cleans_stale_locks(self, tmp_path):
         p = MagicMock()

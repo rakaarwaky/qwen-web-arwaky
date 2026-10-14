@@ -227,7 +227,10 @@ def test_no_visible_selector_does_not_press_enter_when_instance_fallback_disable
 def test_per_call_sender_config_overrides_instance_fallback():
     page = _page_with_no_send_selector()
     emitter = MagicMock(spec=LifecycleEmitter)
-    config = SenderConfig(try_enter_key_fallback=False)
+    # The point of the test is the flag, so the per-call timeout is kept short:
+    # it would otherwise default to 3000ms and burn that long in the real
+    # send-enabled poll before the expected refusal.
+    config = SenderConfig(try_enter_key_fallback=False, click_timeout_ms=100)
 
     with pytest.raises(SendDispatchError, match="send button and Enter fallback"):
         SendDispatcher(try_enter_key_fallback=True, click_timeout_ms=ClickTimeoutMs(100)).click_send(

@@ -28,6 +28,7 @@ from modules.shared.src.common.taxonomy_core_constant import (
     AUTH_KEYWORDS,
     CHAT_URL,
     DEFAULT_MODEL,
+    LAUNCH_RETRY_WAIT_SEC,
     LOGIN_FORM_SELECTORS,
     MODEL_SELECTOR_BUTTON,
     NAVIGATION_LOAD_TIMEOUT_MS,
@@ -744,7 +745,7 @@ class BrowserAdapter(IBrowserProtocol):
 
         for attempt in Retrying(
             stop=stop_after_attempt(3),
-            wait=wait_fixed(2),
+            wait=wait_fixed(LAUNCH_RETRY_WAIT_SEC),
             before_sleep=_before_sleep,
             reraise=True,
         ):

@@ -21,7 +21,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Label
 
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
-from modules.shared.src.taxonomy_core_constant import SESSIONS_DIR
+from modules.shared.src.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC, SESSIONS_DIR
 from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.tui.src.surface_tui_css import THEME
 
@@ -109,10 +109,7 @@ class _TuiSessionsWorkerMixin:
         timer = getattr(self, "_session_check_timer", None)
         if timer is not None:
             timer.stop()
-        # The 60s window must exceed the worst-case navigate_to_chat model-
-        # picker verification (up to ~25s of retries) plus page navigation;
-        # a successful check taking ~30s must not trip it.
-        self._session_check_timer = self.set_timer(60.0, self._session_check_timeout)
+        self._session_check_timer = self.set_timer(SESSION_CHECK_TIMEOUT_SEC, self._session_check_timeout)
         self._session_check_worker()
 
     def _session_check_timeout(self) -> None:

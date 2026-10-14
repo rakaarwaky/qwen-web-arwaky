@@ -15,9 +15,12 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock
 
+import pytest
 from textual.timer import Timer
 
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
+from modules.shared.src.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
+from modules.tui.src import surface_tui_sessions_worker as sessions_worker
 from modules.tui.src.surface_tui_app import QwenTuiApp
 
 
@@ -49,8 +52,25 @@ def _make_app() -> QwenTuiApp:
     return app
 
 
-def test_no_spurious_timeout_after_successful_check() -> None:
-    """A valid verdict stops the watchdog, so no timeout warning follows."""
+def test_watchdog_window_is_sixty_seconds() -> None:
+    """The production window must stay wide enough for a slow valid check.
+
+    A successful validation can spend ~25s in ``navigate_to_chat`` model-picker
+    retries plus page navigation, so the window has to clear ~30s. Shrinking it
+    would reintroduce the spurious timeout the regression guards.
+    """
+    assert SESSION_CHECK_TIMEOUT_SEC == 60.0
+
+
+def test_no_spurious_timeout_after_successful_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A valid verdict stops the watchdog, so no timeout warning follows.
+
+    The window is shrunk so the original window can still fully elapse inside
+    the test: the assertion is that the verdict disarms the timer, which makes
+    waiting the real 60s out unnecessary.
+    """
+    window = 3.0
+    monkeypatch.setattr(sessions_worker, "SESSION_CHECK_TIMEOUT_SEC", window)
     app = _make_app()
 
     log_lines: list[str] = []
@@ -70,15 +90,18 @@ def test_no_spurious_timeout_after_successful_check() -> None:
 
             app.set_timer = _arm
             app._check_session()
-            # The armed timer must target the 60s window.
-            assert armed["seconds"] == 60.0, f"unexpected watchdog duration {armed['seconds']}"
+            # The armed timer must target the configured window.
+            assert armed["seconds"] == window, f"unexpected watchdog duration {armed['seconds']}"
             # Let the verdict land.
             for _ in range(6):
                 await pilot.pause(0.25)
             assert app._last_session_state == "VALID", app._last_session_state
             assert app._session_check_timer is None, "watchdog still armed"
-            # Now let the original 60s window fully elapse.
-            await pilot.pause(61.0)
+            # Disarming goes through Timer.stop(), which cancels the asyncio
+            # task — the callback can no longer fire, whatever the clock does.
+            assert armed["timer"]._task is None, "watchdog task still scheduled"
+            # Now let the original window fully elapse.
+            await pilot.pause(window + 0.5)
 
     asyncio.run(_run())
 
