@@ -416,6 +416,36 @@ def test_swarm_clear_button_empties_the_active_log() -> None:
     asyncio.run(_run())
 
 
+# ── Regression: the Swarm Browse chip must open the file picker ────────────
+#
+# "btn-browse-swarm-file" does not carry the "btn-swarm-" prefix that
+# on_button_pressed routes to _swarm_button_pressed, so a plain prefix test
+# silently dropped the press and the chip did nothing.
+
+
+def test_swarm_browse_button_opens_the_file_picker() -> None:
+    """Pressing the Swarm Browse chip pushes the file picker screen."""
+    from textual.screen import ModalScreen
+    from textual.widgets import Button
+
+    app = _make_app()
+
+    async def _run() -> None:
+        async with app.run_test(size=(100, 40)) as pilot:
+            app.query_one("#btn-browse-swarm-file", Button).press()
+            await pilot.pause()
+            for _ in range(4):
+                await pilot.pause()
+
+            # The picker is a modal screen pushed over the app, targeting the
+            # hidden swarm input that _run_swarm reads.
+            assert isinstance(app.screen, ModalScreen)
+            picker_stack = [type(screen).__name__ for screen in app.screen_stack]
+            assert "FilePickerModal" in picker_stack
+
+    asyncio.run(_run())
+
+
 # ── Regression: one pill click must land on the slot it names ──────────────
 #
 # Clicking a slot pill focuses that pill, and Textual makes the pane holding
