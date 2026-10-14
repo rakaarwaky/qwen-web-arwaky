@@ -80,7 +80,11 @@ class _TuiEventsMixin:
             if position.isdigit():
                 self._account_button_pressed("health", int(position))
             return
-        if button_id.startswith("btn-swarm-") or button_id == "btn-clear-swarm-log":
+        if (
+            button_id.startswith("btn-swarm-")
+            or button_id == "btn-clear-swarm-log"
+            or button_id == "btn-browse-swarm-file"
+        ):
             self._swarm_button_pressed(button_id)
             return
         if button_id in ("nav-overview", "nav-login", "nav-chat", "nav-swarm", "nav-settings"):
