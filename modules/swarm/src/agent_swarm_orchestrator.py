@@ -11,13 +11,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.contract_core_protocol import IFolderToAttachmentProtocol
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.contract_swarm_protocol import ISwarmProtocol
-from modules.shared.src.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
-from modules.shared.src.taxonomy_core_vo import FilePath
-from modules.shared.src.taxonomy_swarm_vo import (
+from modules.shared.src.prompt.contract_prompt_protocol import IFolderToAttachmentProtocol
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.swarm.contract_swarm_cancel import ISwarmCancelProtocol
+from modules.shared.src.swarm.contract_swarm_progress import ISwarmProgressProtocol
+from modules.shared.src.swarm.contract_swarm_start import ISwarmStartProtocol
+from modules.shared.src.common.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
+from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.swarm.taxonomy_swarm_vo import (
     BrowserCount,
     SwarmId,
     SwarmRequest,
@@ -31,14 +33,15 @@ __all__ = ["SwarmOrchestrator"]
 class SwarmOrchestrator(ISwarmAggregate):
     """Run Swarm fan-outs on behalf of the CLI, TUI, and MCP surfaces.
 
-    Holds the swarm runner as ``ISwarmProtocol`` so this agent depends on
-    the contract, not the concrete ``SwarmRunner``: a test can inject a
-    stub that never launches a browser.
+    Holds the swarm runner as the three capability seams — start, progress,
+    cancel — so this agent depends on the contracts, not the concrete
+    ``SwarmRunner``: a test can inject a stub that only implements the seam
+    it is exercising.
     """
 
     def __init__(
         self,
-        runner: ISwarmProtocol,
+        runner: ISwarmStartProtocol & ISwarmProgressProtocol & ISwarmCancelProtocol,
         observability: IObservabilityProtocol,
         folder_adapter: IFolderToAttachmentProtocol | None = None,
     ) -> None:

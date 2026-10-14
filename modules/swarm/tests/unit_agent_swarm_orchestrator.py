@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, ResponseText, WindowSec
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.common.taxonomy_core_vo import FailureThreshold, MaxPerMinute, ResponseText, WindowSec
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
