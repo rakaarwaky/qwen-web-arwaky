@@ -23,7 +23,10 @@ from modules.shared.src.common.taxonomy_core_constant import MAX_ATTEMPTS, SWARM
 from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.common.taxonomy_core_vo import FilePath, HeadlessFlag
 from modules.shared.src.common.utility_core_capacity import recommended_max_workers
-from modules.shared.src.common.utility_core_prompt_template import materialize_role_template
+from modules.shared.src.common.utility_core_prompt_template import (
+    list_prompt_templates,
+    materialize_role_template,
+)
 from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
 from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse

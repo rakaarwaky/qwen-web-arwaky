@@ -13,8 +13,8 @@ from unittest.mock import MagicMock
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse, ResponseText
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_cancel import SwarmRunner as SwarmCancelRunner
-from modules.swarm.src.capabilities_swarm_progress import SwarmRunner as SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 

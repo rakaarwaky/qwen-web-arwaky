@@ -102,9 +102,9 @@ from modules.shared.src.update.contract_update_protocol import (
     IUpdateVerifyProtocol,
 )
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_cancel import SwarmRunner as SwarmCancelRunner
-from modules.swarm.src.capabilities_swarm_progress import SwarmRunner as SwarmProgressRunner
-from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
@@ -275,11 +275,11 @@ class SharedContainer:
             rate_limiter=self.rl,
         )
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
-            start=SwarmStartRunner(**swarm_kwargs),  # type: ignore[arg-type]
-            progress=SwarmProgressRunner(**swarm_kwargs),  # type: ignore[arg-type]
-            cancel=SwarmCancelRunner(**swarm_kwargs),  # type: ignore[arg-type]
+            SwarmRunner(**swarm_kwargs),
+            SwarmProgressRunner(**swarm_kwargs),
+            SwarmCancelRunner(**swarm_kwargs),
+            self.observability,
             folder_adapter=self.folder_adapter,
-            observability=self.observability,
         )
 
     def wire(self) -> None:
