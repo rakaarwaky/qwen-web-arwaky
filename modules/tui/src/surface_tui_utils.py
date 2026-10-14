@@ -135,11 +135,20 @@ _GLYPHS: dict[str, tuple[str, str]] = {
     "stream": ("►", ">"),
     "slot": ("#", "#"),
 }
-_WIDE_GLYPHS = frozenset({
-    "↻", "☐", "×",
-    "■", "○", "□", "◆", "⚙",
-    "●", "►",
-})
+_WIDE_GLYPHS = frozenset(
+    {
+        "↻",
+        "☐",
+        "×",
+        "■",
+        "○",
+        "□",
+        "◆",
+        "⚙",
+        "●",
+        "►",
+    }
+)
 
 
 def _thread_state(status: str) -> tuple[str, str]:

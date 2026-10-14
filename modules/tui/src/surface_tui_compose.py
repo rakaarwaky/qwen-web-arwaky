@@ -483,13 +483,20 @@ class _TuiComposeMixin:
         # The mockup docks icon-over-label cells across the full width with no
         # key-hint line. Each cell stacks its icon above its caption, with the
         # active cell carrying a short accent bar centred over its icon.
-        with Horizontal(id="nav-dock", classes="nav-dock"):
-            with Horizontal(classes="nav-items"):
-                yield Button(f"{_TuiUtilsMixin._glyph('overview')}\nOVERVIEW", id="nav-overview", classes="nav-item nav-active")
-                yield Button(f"{_TuiUtilsMixin._glyph('login')}\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
-                yield Button(f"{_TuiUtilsMixin._glyph('chat')}\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
-                yield Button(f"{_TuiUtilsMixin._glyph('swarm')}\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
-                yield Button(f"{_TuiUtilsMixin._glyph('settings')}\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive")
+        with Horizontal(id="nav-dock", classes="nav-dock"), Horizontal(classes="nav-items"):
+            yield Button(
+                f"{_TuiUtilsMixin._glyph('overview')}\nOVERVIEW", id="nav-overview", classes="nav-item nav-active"
+            )
+            yield Button(
+                f"{_TuiUtilsMixin._glyph('login')}\nLOGIN", id="nav-login", classes="nav-item nav-inactive"
+            )
+            yield Button(f"{_TuiUtilsMixin._glyph('chat')}\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
+            yield Button(
+                f"{_TuiUtilsMixin._glyph('swarm')}\nSWARM", id="nav-swarm", classes="nav-item nav-inactive"
+            )
+            yield Button(
+                f"{_TuiUtilsMixin._glyph('settings')}\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive"
+            )
 
     def on_mount(self) -> None:
         """Initialise tables, cache widget refs, and defer log startup."""
