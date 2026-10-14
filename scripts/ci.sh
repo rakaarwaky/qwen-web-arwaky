@@ -113,12 +113,12 @@ run_gate "uv build" uv build
 uv pip install --quiet pytest pytest-asyncio pytest-cov pytest-mock 2>/dev/null || true
 run_gate "pytest" \
     uv run python -m pytest \
-        tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ \
+        modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ modules/mcp/tests/ \
         modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ \
         modules/browser/tests/ modules/config/tests/ modules/logging/tests/ \
         modules/swarm/tests/ modules/update/tests/ \
         modules/shared/benches/ modules/prompt/benches/ \
-        --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v
+        -m "not benchmark" -v
 
 # ─── Gate 5: AES architecture self-lint ──────────────────────────────────────
 # CI downloads lint-arwaky-cli from the GitHub release at runtime.

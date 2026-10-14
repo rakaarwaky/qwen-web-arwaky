@@ -104,7 +104,7 @@ Run application commands inside the activated virtual environment.
 | `qwen-web-arwaky observability report` | Write the quality report for the last run. | The report path prints. |
 | `qwen-web-arwaky update --check` | Compare current and latest versions without installing. | The version verdict prints. |
 | `qwen-web-mcp` | Start the MCP server over standard input/output. | An MCP client can initialize the server; silence while waiting for input is normal. |
-| `python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --ignore=tests/test_e2e_pipeline.py -m "not benchmark" -v` | Run the same test selection as CI. | Pytest ends with a passed summary and status 0. |
+| `python -m pytest modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ -m "not benchmark" -v` | Run the same test selection as CI. | Pytest ends with a passed summary and status 0. |
 | `bash scripts/ci.sh` | Run local lint, type, security, architecture, and test gates. | The script ends with `All 7 gates passed`. |
 | `python -m build` | Build a source archive and wheel. | Package files appear under `dist/`. |
 
@@ -162,10 +162,18 @@ See [`TEST.md`](TEST.md) for test tiers, browser fixtures, regression locks, and
 A quick smoke test is:
 
 ```bash
-python -m pytest tests/unit_swarm_to_issues.py -q
+python -m pytest modules/swarm/tests/unit_swarm_to_issues.py -q
 ```
 
 Success is a progress line ending in `[100%]` and a zero exit status.
+
+Real-session pipeline checks (need a logged-in `chat.qwen.ai` session) run
+outside pytest:
+
+```bash
+python3 scripts/real_tests.py            # direct + file + attach, headful by default
+python3 scripts/real_tests.py --headless -2   # prompt-file pipeline only, headless
+```
 
 ## Contributing
 

@@ -64,9 +64,11 @@ Key elements mirrored:
 - `.spinner` / `.thinking` (parsing indicators)
 
 ### Pipeline fixtures (`tests/fixtures/input|output|log/`)
-These are **production-mirrored runtime directories** (1:1 with `input/`,
-`output/`, `log/`). Golden task content is pinned in `conftest.py`
-`_GOLDEN_TASKS` and restored by `reset_fixture_state` before every test.
+`tests/fixtures` is a symlink to `modules/prompt/tests/fixtures/`, the
+**production-mirrored runtime directories** (1:1 with `input/`, `output/`,
+`log/`). Golden task content is pinned in `conftest.py`
+`_GOLDEN_TASKS` and restored by `restore_fixture_state`
+(`tests/pipeline_fixtures.py`) before every test.
 
 Role fixtures (real source-review prompts, **not** injection payloads):
 - `role-architect/todo/task_001.md` — auth module layer-boundary review
@@ -78,19 +80,20 @@ Role fixtures (real source-review prompts, **not** injection payloads):
 ## 3. Running the Tests
 
 ```bash
-# Full suite (behavior + pipeline)
-pytest tests/ -v
+# Full suite (behavior + pipeline) — mirrors the CI selection
+uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ \
+  modules/tui/tests/ modules/mcp/tests/ modules/prompt/tests/ \
+  modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ \
+  modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ \
+  modules/update/tests/ -m "not benchmark" -v
 
-# Behavior lock only (fast, ~90s headless)
-pytest tests/unit_browser_adapter.py -v
-
-# With coverage
-pytest tests/unit_browser_adapter.py --cov=modules --cov-report=term-missing
+# One module's unit tests
+uv run python -m pytest modules/shared/tests/ -v
 ```
 
 ### Expected coverage boundary
 
-Measured with `pytest tests/ --cov=modules` (2026-09-22, 46 test files):
+Measured with `uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ --cov=modules` (2026-09-22, 46 test files):
 **total line coverage ≈ 75%** of `modules/`. The historical "<40% with four
 layers at 0%" estimate (issue #339) does not hold against measurement — no
 module layer sits at 0%. Representative numbers:
@@ -121,7 +124,7 @@ network/auth — validated manually (see §5 Manual Probe).
 
 1. **Run the lock first** (red baseline — should all pass before you change anything):
    ```bash
-   pytest tests/unit_browser_adapter.py -v
+   uv run python -m pytest modules/browser/tests/contract_browser_adapter.py -v
    ```
 
 2. **Write a failing test for the new feature** against `qwen_fixture.html`.
@@ -154,12 +157,12 @@ For debugging live UI changes without committing fixture changes:
 
 ```bash
 export DISPLAY=:0
-python3 tests/manual_probe.py
+python3 scripts/manual_probe.py
 ```
 
 This opens a visible browser window against `chat.qwen.ai` (using your saved
 session in `qwen_session/`) and exercises the real upload + inject + send flow.
-Screenshots saved to `tests/artifacts/`.
+Screenshots saved to `tests/artifacts/` (created on first run).
 
 Do NOT use `manual_probe.py` as a CI test — it requires a saved login session
 and a real display.
@@ -184,8 +187,8 @@ and a real display.
 - If you change the clipboard tier logic, update the stub in the test too
 
 ### E2E tests need internet + session
-- `test_e2e_pipeline.py` is marked `@pytest.mark.e2e` and excluded from CI by default
-- Run with: `pytest tests/integration_browser_session.py -m e2e`
+- The e2e-marked modules live in `modules/<name>/tests/` and are excluded from CI by default
+- Run with: `pytest modules/browser/tests/ -m e2e`
 - Requires `qwen_session/Default` to exist (valid saved login)
 
 ---
@@ -193,18 +196,23 @@ and a real display.
 ## 7. File Inventory
 
 ```
-tests/
-├── conftest.py                          # Golden-task fixtures + browser/behavior fixtures
-├── fixtures/
+tests/                                  # fixture state + shared helper scripts — NOT a pytest root
+├── conftest.py                          # browser/behavior fixtures for the local fixture page
+├── fixtures/                            # symlink → modules/prompt/tests/fixtures/
 │   ├── qwen_fixture.html                # DOM mirror for behavior tests
 │   ├── input/                           # 1:1 production mirror (real task prompts)
 │   ├── output/
 │   └── log/
-├── contract_qwen_auto.py                # Behavior-lock tests (TDD safety net)
-├── pipeline_fixtures.py                 # Fixture state management tests
-├── unit_concurrency_guards.py           # Thread-safety locks for breaker/limiter/jobs
-├── unit_mcp_hardening.py                # MCP registry + workspace path safety
-└── manual_probe.py                      # Ad-hoc headed probe for live UI debugging
+├── helpers.py                           # thin named wrappers shared by module test dirs
+├── pipeline_fixtures.py                 # fixture state management (restore_fixture_state)
+└── uat/setup.sh                         # deterministic UAT workspace bootstrap
+
+modules/<name>/tests/                    # the pytest roots — one per AES member
+
+scripts/
+├── manual_probe.py                      # ad-hoc headed probe for live UI debugging
+└── real_tests.py                        # real-session pipeline runner (direct/file/attach)
+
 modules/
 ├── shared/src/taxonomy_core_constant.py  # Selectors & constants
 ├── prompt/src/capabilities_prompt_injector.py
@@ -222,12 +230,12 @@ and a preferred harness; when adding code, extend the matching pattern.
 
 | Layer | Pattern | Harness | What to add when changing it |
 |-------|---------|---------|------------------------------|
-| Taxonomy / contracts | `tests/unit_taxonomy_*.py`, `tests/contract_*.py` | pure pytest, no browser | New VO/error/event: constructor + invariant tests; contract changes: method-presence checks (see `TestCancelContract`). |
-| Core capabilities | `tests/unit_capability_*.py`, `tests/unit_browser_adapter.py`, `tests/unit_folder_compiler.py` | pytest + `unittest.mock` Playwright fakes (`MagicMock` page/locator, patched DOM helpers and `time`) | New branch/edge: fake the signals (selector visibility, `time` side-effects) — never sleep real seconds. |
-| Agent orchestrators | `tests/unit_agent_*.py` | mocked capability protocols; thread-level races via `threading.Event` registries | State transitions (retry/partial/failed/cancelled) as snapshot assertions; cancellation isolation checks. |
+| Taxonomy / contracts | `modules/shared/tests/unit_taxonomy_*.py`, `modules/shared/tests/contract_*.py` | pure pytest, no browser | New VO/error/event: constructor + invariant tests; contract changes: method-presence checks (see `TestCancelContract`). |
+| Core capabilities | `modules/shared/tests/unit_capability_*.py`, `modules/browser/tests/contract_browser_adapter.py`, `modules/jobs/tests/unit_folder_compiler.py` | pytest + `unittest.mock` Playwright fakes (`MagicMock` page/locator, patched DOM helpers and `time`) | New branch/edge: fake the signals (selector visibility, `time` side-effects) — never sleep real seconds. |
+| Agent orchestrators | `modules/*/tests/unit_agent_*.py` | mocked capability protocols; thread-level races via `threading.Event` registries | State transitions (retry/partial/failed/cancelled) as snapshot assertions; cancellation isolation checks. |
 | TUI surface | `modules/tui/tests/unit_surface_tui_app.py` | Textual `App.run_test()` async pilot (headless, real widgets) | Drive the app with `asyncio.run(...)`, mutate `_slot_workers`/`_slot_stats` state directly, spy with `patch.object`. No real browser/worker runs. |
-| MCP surface | `tests/integration_surface_mcp.py`, `tests/unit_mcp_hardening.py`, `tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
-| CLI surface | `tests/integration_surface_*.py`, `tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
+| MCP surface | `modules/mcp/tests/integration_surface_mcp.py`, `modules/mcp/tests/unit_mcp_hardening.py`, `modules/mcp/tests/unit_mcp_response_envelope.py` | JSON-RPC envelope + path-boundary assertions over mocked aggregates | New tool/payload field: envelope shape + workspace-path refusal cases. |
+| CLI surface | `modules/cli/tests/integration_surface_*.py`, `modules/cli/tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
 | Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/update/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
 | Swarm | `tests/unit_agent_swarm_orchestrator.py` | fake `IAttachmentPromptAggregate`, real `ThreadPoolExecutor` on tmp dirs | New transition: manifest snapshot after each state change. |
 | End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/pipeline_fixtures.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |

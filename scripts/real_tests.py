@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
-"""Standalone real-world pipeline execution test runner for qwen-web-arwaky v5.0.0.
+"""Standalone real-session pipeline runner for qwen-web-arwaky.
 
-Invokes the real CLI binary/entry point (`modules/root_cli_main_entry.py` or `qwen-web-arwaky`)
-to execute 3 end-to-end pipelines using v5.0.0 release fixtures from `tests/fixtures/`:
+Invokes the real CLI entry point (`qwen-web-arwaky` or
+`modules/root_cli_main_entry.py`) to execute 4 end-to-end pipelines against a
+live, authenticated chat.qwen.ai session, using the fixtures under
+`tests/fixtures/` (a symlink to `modules/prompt/tests/fixtures/`):
 
 1. Pipeline 1: prompt direct (direct inline string prompt)
-2. Pipeline 2: prompt file (prompt file: tests/fixtures/sample_prompt_v5.md)
-3. Pipeline 3: prompt attach (prompt file + attachment: tests/fixtures/sample_attachment_v5.md)
+2. Pipeline 2: prompt file (prompt file: sample_prompt_v5.md)
+3. Pipeline 3: prompt attach (prompt file + attachment: sample_attachment_v5.md)
+4. Pipeline 4: swarm (fan the prompt fixture out across all role templates)
 
-Outputs are saved in the default qwen-web-arwaky output directory (~/.local/share/qwen-web-arwaky/output).
+This is a script, not a pytest suite: it drives the shipped CLI against the
+real site, so it needs a logged-in session (see `qwen-web-arwaky session login`)
+and never runs in CI.
+
+Outputs are saved in the default qwen-web-arwaky output directory
+(~/.local/share/qwen-web-arwaky/output).
 
 Usage:
   python3 scripts/real_tests.py               # Runs all pipelines in headful mode (default)
   python3 scripts/real_tests.py -1            # Run Pipeline 1 only
   python3 scripts/real_tests.py -2            # Run Pipeline 2 only
   python3 scripts/real_tests.py -3            # Run Pipeline 3 only
+  python3 scripts/real_tests.py -4            # Run Pipeline 4 (swarm) only
   python3 scripts/real_tests.py -1 -2         # Run Pipeline 1 and 2 only
   python3 scripts/real_tests.py --headless -2 # Run Pipeline 2 only in headless mode
 """
@@ -44,6 +53,7 @@ class TestArgs:
     run_p1: bool
     run_p2: bool
     run_p3: bool
+    run_p4: bool
     output_dir: Path
     cli_entry: Path
 
@@ -87,6 +97,15 @@ def parse_args() -> TestArgs:
         help="Run Pipeline 3 (prompt attach sample_attachment_v5.md)",
     )
     parser.add_argument(
+        "-4",
+        "--4",
+        "--p4",
+        "--swarm",
+        dest="run_p4",
+        action="store_true",
+        help="Run Pipeline 4 (swarm fan-out of the prompt fixture across role templates)",
+    )
+    parser.add_argument(
         "-o",
         "--output-dir",
         type=Path,
@@ -105,6 +124,7 @@ def parse_args() -> TestArgs:
         run_p1=ns.run_p1,
         run_p2=ns.run_p2,
         run_p3=ns.run_p3,
+        run_p4=ns.run_p4,
         output_dir=ns.output_dir,
         cli_entry=ns.cli_entry,
     )
@@ -159,12 +179,13 @@ def main() -> int:
         print(f"❌ Error: Attachment fixture not found at {ATTACHMENT_FIXTURE}", file=sys.stderr)
         return 1
 
-    # Determine which pipelines to run: if no specific flags (-1, -2, -3) are set, run all.
+    # Determine which pipelines to run: if no specific flags (-1, -2, -3, -4) are set, run all.
     run_p1 = args.run_p1
     run_p2 = args.run_p2
     run_p3 = args.run_p3
-    if not (run_p1 or run_p2 or run_p3):
-        run_p1 = run_p2 = run_p3 = True
+    run_p4 = args.run_p4
+    if not (run_p1 or run_p2 or run_p3 or run_p4):
+        run_p1 = run_p2 = run_p3 = run_p4 = True
 
     headless_flag = ["--headless"] if args.headless else []
 
@@ -241,6 +262,26 @@ def main() -> int:
         results["Pipeline 3: prompt attach"] = (
             run_pipeline_cmd("Pipeline 3 (prompt attach)", cmd_3),
             out_file_3,
+        )
+
+    # --------------------------------------------------------------------------
+    # Pipeline 4: Swarm (Fan-Out Across Role Templates)
+    # --------------------------------------------------------------------------
+    if run_p4:
+        if executed_count > 0:
+            time.sleep(2.5)
+        executed_count += 1
+        cmd_4 = [
+            python_bin,
+            str(cli_entry),
+            "swarm",
+            "start",
+            str(PROMPT_FIXTURE),
+            *headless_flag,
+        ]
+        results["Pipeline 4: swarm"] = (
+            run_pipeline_cmd("Pipeline 4 (swarm fan-out)", cmd_4),
+            output_dir / "real_test_swarm",
         )
 
     # --------------------------------------------------------------------------
