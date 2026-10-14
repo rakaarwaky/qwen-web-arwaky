@@ -11,8 +11,8 @@ from modules.shared.src import (
     RunContext,
     SaverConfig,
 )
-from modules.shared.src.utility_core_text import strip_ui_noise
-from modules.shared.src.utility_dom_query import count_messages, latest_message_text
+from modules.shared.src.common.utility_core_text import strip_ui_noise
+from modules.shared.src.common.utility_dom_query import count_messages, latest_message_text
 from tests.helpers import (
     click_send,
     write_output,

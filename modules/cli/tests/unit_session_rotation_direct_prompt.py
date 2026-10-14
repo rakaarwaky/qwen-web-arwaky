@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 from modules.root_cli_main_entry import _resolve_session_for_prompt, _session_resolver
-from modules.shared.src.taxonomy_core_constant import DEFAULT_SESSION
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 
 def _container_with_single_pool() -> MagicMock:

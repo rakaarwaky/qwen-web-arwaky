@@ -14,9 +14,11 @@ from pathlib import Path
 from modules.shared.src.prompt.contract_prompt_protocol import IFolderToAttachmentProtocol
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.swarm.contract_swarm_cancel import ISwarmCancelProtocol
-from modules.shared.src.swarm.contract_swarm_progress import ISwarmProgressProtocol
-from modules.shared.src.swarm.contract_swarm_start import ISwarmStartProtocol
+from modules.shared.src.swarm.contract_swarm_protocol import (
+    ISwarmCancelProtocol,
+    ISwarmProgressProtocol,
+    ISwarmStartProtocol,
+)
 from modules.shared.src.common.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
 from modules.shared.src.common.taxonomy_core_vo import FilePath
 from modules.shared.src.swarm.taxonomy_swarm_vo import (

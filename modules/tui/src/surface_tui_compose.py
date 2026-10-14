@@ -26,8 +26,8 @@ from textual.widgets import (
     TabPane,
 )
 
-from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
-from modules.shared.src.utility_core_version import get_package_version
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
+from modules.shared.src.common.utility_core_version import get_package_version
 from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
 from modules.tui.src.surface_tui_css import THEME
 from modules.tui.src.surface_tui_utils import _empty_cluster_bar_markup

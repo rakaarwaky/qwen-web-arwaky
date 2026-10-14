@@ -15,7 +15,7 @@ from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.shared.src.taxonomy_logging_vo import ObservabilityRequest, ObservabilityResponse
+from modules.shared.src.logging.taxonomy_logging_vo import ObservabilityRequest, ObservabilityResponse
 
 
 def _orchestrator(tmp_path: Path) -> LoggingOrchestrator:
@@ -53,7 +53,7 @@ def test_e2e_unknown_verb_fails_closed_with_a_named_error(tmp_path: Path) -> Non
     """A verb the aggregate does not route is rejected without a response."""
     import pytest
 
-    from modules.shared.src.taxonomy_core_error import QwenCliError
+    from modules.shared.src.common.taxonomy_core_error import QwenCliError
 
     orchestrator = _orchestrator(tmp_path)
 

@@ -92,6 +92,57 @@ class SwarmRunnerBase:
         """Configured browser concurrency for a single Swarm run."""
         return BrowserCount(self._browser_concurrency)
 
+    def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
+        """Return the latest snapshot for a swarm, or None when absent."""
+        with self._lock:
+            return self._snapshots.get(swarm_id)
+
+    def _update_agent(
+        self,
+        swarm_id: SwarmId,
+        role: str,
+        status: AgentStatus,
+        attempt: int,
+        output_path: Path,
+        error: str | None,
+        started: float,
+    ) -> None:
+        """Update one agent's status in the snapshot and persist the manifest."""
+        with self._lock:
+            current = self._snapshots.get(swarm_id)
+            if current is None:
+                return
+            agents = tuple(
+                SwarmAgentSnapshot(
+                    agent_id=agent.agent_id,
+                    status=status if agent.agent_id == role else agent.status,
+                    attempt=attempt if agent.agent_id == role else agent.attempt,
+                    output_path=output_path if agent.agent_id == role else agent.output_path,
+                    error=error if agent.agent_id == role else agent.error,
+                    duration_sec=round(time.perf_counter() - started, 2)
+                    if agent.agent_id == role
+                    else agent.duration_sec,
+                )
+                for agent in current.agents
+            )
+            if current.status == "cancelled":
+                return
+            finished = all(agent.status in {"completed", "failed", "cancelled"} for agent in agents)
+            final_status: SwarmStatus = current.status
+            if finished:
+                final_status = "completed" if all(agent.status == "completed" for agent in agents) else "partial"
+            updated = SwarmSnapshot(
+                swarm_id=current.swarm_id,
+                input_path=current.input_path,
+                root_path=current.root_path,
+                status=final_status,
+                max_attempts=current.max_attempts,
+                browser_concurrency=current.browser_concurrency,
+                agents=agents,
+            )
+            self._snapshots[swarm_id] = updated
+            self._write_manifest(updated)
+
     def _new_swarm_id(self) -> SwarmId:
         """Generate a short, URL-safe swarm identifier."""
         return SwarmId(f"swarm-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(4)}")

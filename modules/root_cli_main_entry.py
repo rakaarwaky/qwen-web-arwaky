@@ -40,20 +40,20 @@ from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_com
 from modules.cli.src.surface_cli_update_command import handle as handle_update_command
 from modules.cli.src.surface_cli_update_command import handle_rollback
 from modules.root_core_container import SharedContainer
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
     LOCAL_WS_DIR,
 )
-from modules.shared.src.taxonomy_core_vo import AppConfig
-from modules.shared.src.taxonomy_session_vo import RotatorRequest
-from modules.shared.src.utility_core_env import install_settings
-from modules.shared.src.utility_core_prompt_template import (
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.utility_core_env import install_settings
+from modules.shared.src.common.utility_core_prompt_template import (
     is_prompt_role,
     materialize_role_template,
     resolve_prompt_path,
 )
+from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 
 _ERROR_PREFIX = "[ERROR]"
 
@@ -454,7 +454,6 @@ def _dispatch(
             container.agent_prompt_file_orchestrator,
             container.agent_attachment_prompt_orchestrator,
             container.slot_plan,
-            container.agent_setup_orchestrator,
             container.agent_session_orchestrator,
             container.agent_job_orchestrator,
             container.agent_swarm_orchestrator,
@@ -554,7 +553,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _dispatch(_default_container(), raw_argv, args, cfg)
     except Exception as exc:
-        from modules.shared.src.utility_core_exit import exit_code_for
+        from modules.shared.src.common.utility_core_exit import exit_code_for
 
         print(f"{_ERROR_PREFIX} {exc}", file=sys.stderr)
         return exit_code_for(exc)

@@ -13,9 +13,8 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.taxonomy_core_constant import DEFAULT_JOBS_DIR
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
+from modules.shared.src.common.taxonomy_core_vo import (
     JobId,
     JobLimit,
     JobPath,
@@ -24,9 +23,10 @@ from modules.shared.src.taxonomy_core_vo import (
     Pid,
     ResultText,
 )
-from modules.shared.src.taxonomy_jobs_vo import JobCount
-from modules.shared.src.utility_io_writer import ATOMIC_TEMP_SUFFIX, atomic_write_text
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_io_writer import ATOMIC_TEMP_SUFFIX, atomic_write_text
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobCount
 
 log = get_logger("capabilities_job_storage")
 

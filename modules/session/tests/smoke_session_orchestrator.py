@@ -10,7 +10,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 
 
 def test_smoke_orchestrator_exposes_the_aggregate_door() -> None:

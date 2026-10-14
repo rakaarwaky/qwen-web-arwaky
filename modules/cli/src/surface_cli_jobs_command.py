@@ -11,16 +11,16 @@ import argparse
 import json
 import sys
 
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.taxonomy_core_vo import JobRecord
-from modules.shared.src.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.utility_core_path_validation import (
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
+from modules.shared.src.common.utility_core_path_validation import (
     validate_attachment_path,
     validate_output_path,
     validate_prompt_path,
 )
-from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
+from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, materialize_role_template
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
 
 
 def _job_status(record: JobRecord) -> str:

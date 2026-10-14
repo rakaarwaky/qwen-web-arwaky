@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_manager import SessionManager
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.taxonomy_session_vo import SessionRequest
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 MODULE = "modules.session.src.capabilities_session_manager"
 

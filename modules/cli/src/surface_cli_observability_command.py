@@ -14,9 +14,9 @@ import json
 import sys
 from typing import Any
 
-from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.contract_logging_protocol import IMetricsProtocol
-from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest
+from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
+from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol
+from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest
 
 
 def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate) -> int:
@@ -40,9 +40,9 @@ def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = Non
     """Show the current status file contents and metrics snapshot."""
     json_output = bool(getattr(args, "json", False))
 
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
-    from modules.shared.src.utility_core_path_validation import _get_workspace_root
-    from modules.shared.src.utility_core_status import status_path_for
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG
+    from modules.shared.src.common.utility_core_path_validation import _get_workspace_root
+    from modules.shared.src.common.utility_core_status import status_path_for
 
     status_path = status_path_for(DEFAULT_LOG)
 

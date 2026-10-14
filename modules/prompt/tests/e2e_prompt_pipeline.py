@@ -20,7 +20,7 @@ from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDis
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,
     EVENT_LOGIN_VERIFIED,

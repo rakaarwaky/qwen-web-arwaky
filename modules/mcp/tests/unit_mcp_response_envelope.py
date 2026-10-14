@@ -20,9 +20,9 @@ from modules.mcp.src.surface_mcp_tool_command import (
     STATUS_SUCCESS,
     McpToolCommand,
 )
-from modules.shared.src.taxonomy_core_error import RateLimitError
-from modules.shared.src.taxonomy_core_vo import ErrorReason, JobRecord
-from modules.shared.src.taxonomy_jobs_vo import JobResponse
+from modules.shared.src.common.taxonomy_core_error import RateLimitError
+from modules.shared.src.common.taxonomy_core_vo import ErrorReason, JobRecord
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 
 
 def _job_record(**overrides) -> JobRecord:

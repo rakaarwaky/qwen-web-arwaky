@@ -79,9 +79,6 @@ pool, health checking, rotation, renewal, deletion, and login.
 | `mark_healthy` | session identifier | session pool | file error | none | Mark one session usable. |
 | `mark_limited` | session identifier | session pool | file error | none | Mark one session rate limited. |
 | `get_next_healthy_session` | none | session info | no-healthy-session error | none | Return the next usable session. |
-| `check_session` | session path | health verdict | file error | none | Report whether one session is still signed in. |
-| `check_all_sessions` | pool | health report | file error | none | Report which tracked sessions are usable. |
-| `rotate` | rotator request | rotation response | no-healthy-session error | none | Pick the next session a run should use. |
 
 ### Aggregate API
 

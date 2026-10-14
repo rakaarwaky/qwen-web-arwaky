@@ -26,14 +26,14 @@ import pytest
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter, get_status_writer
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker
+from modules.shared.src.common.taxonomy_core_error import (
     AuthRequiredError,
     ErrorCategory,
     NetworkTimeoutError,
     RateLimitError,
 )
-from modules.shared.src.utility_core_status import status_path_for
+from modules.shared.src.common.utility_core_status import status_path_for
 
 
 def _counter(tmp_path: Path) -> MetricsCounter:

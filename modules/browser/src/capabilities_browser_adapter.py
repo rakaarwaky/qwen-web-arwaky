@@ -22,8 +22,9 @@ from playwright.sync_api import (
 )
 from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
+from modules.shared.src.common.taxonomy_core_constant import (
     AUTH_KEYWORDS,
     CHAT_URL,
     DEFAULT_MODEL,
@@ -36,24 +37,23 @@ from modules.shared.src.taxonomy_core_constant import (
     SESSION_EXPIRED_KEYWORDS,
     TEXTAREA_SELECTOR,
 )
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import (
     AuthRequiredError,
     BrowserLaunchError,
     ModelSwitchError,
 )
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_NETWORK_RECONNECTING,
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
-from modules.shared.src.utility_browser_async_loop import isolate_thread_event_loop
-from modules.shared.src.utility_dom_helper import click_first_visible_enabled, is_any_visible
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_session_cloner import clean_stale_locks, create_ephemeral_session
-from modules.shared.src.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
+from modules.shared.src.common.utility_dom_helper import click_first_visible_enabled, is_any_visible
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.session.utility_session_cloner import clean_stale_locks, create_ephemeral_session
+from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
 
 log = get_logger("browser")
 

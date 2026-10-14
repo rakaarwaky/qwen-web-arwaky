@@ -21,8 +21,8 @@ from modules.mcp.src.surface_mcp_tool_command import (
     STATUS_RUNNING,
     McpToolCommand,
 )
-from modules.shared.src.taxonomy_core_vo import JobRecord
-from modules.shared.src.taxonomy_jobs_vo import JobResponse
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 
 pytestmark = pytest.mark.uat
 
@@ -31,14 +31,13 @@ pytestmark = pytest.mark.uat
 def tools_and_mocks(tmp_path, monkeypatch):
     """Build an McpToolCommand whose aggregates are all mocks."""
     monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
-    mocks = {name: MagicMock() for name in ("direct", "file_only", "attachment", "session", "setup", "workspace")}
+    mocks = {name: MagicMock() for name in ("direct", "file_only", "attachment", "session", "workspace")}
     jobs = MagicMock()
     tools = McpToolCommand(
         direct=mocks["direct"],
         file_only=mocks["file_only"],
         attachment=mocks["attachment"],
         session=mocks["session"],
-        setup=mocks["setup"],
         workspace=mocks["workspace"],
         jobs=jobs,
     )
@@ -132,7 +131,7 @@ def test_uat_mcp_007_empty_prompt_is_rejected(tools_and_mocks) -> None:
 def test_uat_mcp_008_setup_session_error_carries_actionable_hint(tools_and_mocks) -> None:
     """UAT-MCP-008: a failed setup_session surfaces a hint, not a bare traceback."""
     tools, mocks, _ = tools_and_mocks
-    mocks["setup"].execute_setup.side_effect = RuntimeError("Browser launch requires a display")
+    mocks["session"].execute.side_effect = RuntimeError("Browser launch requires a display")
 
     payload = json.loads(tools.setup_session())
 

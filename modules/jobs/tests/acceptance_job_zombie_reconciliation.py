@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from modules.jobs.src.capabilities_job_storage import JobStorage
-from modules.shared.src.taxonomy_core_vo import JobRecord
+from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
 
 def _dead_worker_record(job_id: str, age_hours: int) -> JobRecord:

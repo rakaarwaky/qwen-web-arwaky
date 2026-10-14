@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from modules.shared.src.utility_core_env import (
+from modules.shared.src.common.utility_core_env import (
     clear_settings,
     install_settings,
     load_settings,

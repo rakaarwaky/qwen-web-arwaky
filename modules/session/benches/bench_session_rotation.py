@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionStatus
 
 pytestmark = pytest.mark.benchmark
 

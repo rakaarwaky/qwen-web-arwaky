@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
-from modules.shared.src.utility_folder_compiler import (
+from modules.shared.src.common.utility_folder_compiler import (
     collect_folder_files,
     collect_folder_files_with_imports,
     compile_files_to_markdown,

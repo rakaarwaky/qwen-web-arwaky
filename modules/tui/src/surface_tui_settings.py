@@ -21,7 +21,7 @@ from typing import Any
 from rich.markup import escape
 from textual.widgets import Input, Static
 
-from modules.shared.src.utility_core_env import (
+from modules.shared.src.common.utility_core_env import (
     REGISTERED_ENV,
     clear_settings,
     is_secret,

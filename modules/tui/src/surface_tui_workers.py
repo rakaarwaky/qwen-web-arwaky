@@ -21,10 +21,10 @@ from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.widgets import Input, LoadingIndicator
 
-from modules.shared.src.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
-from modules.shared.src.taxonomy_session_vo import RotatorRequest
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
-from modules.shared.src.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
+from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_css import THEME
 
 # A badge write can land while the app is tearing down: the worker thread's

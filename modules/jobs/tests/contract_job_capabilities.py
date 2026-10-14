@@ -10,8 +10,8 @@ import inspect
 
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_jobs_protocol import IJobStorageProtocol, IStatusProtocol
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol, IStatusProtocol
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (IJobStorageProtocol, IStatusProtocol)
 

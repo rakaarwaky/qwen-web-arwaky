@@ -8,15 +8,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from modules.shared.src.contract_core_protocol import IFolderCompileProtocol
-from modules.shared.src.taxonomy_core_constant import LOCAL_WS_DIR, MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
-from modules.shared.src.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
-from modules.shared.src.utility_folder_compiler import (
+from modules.shared.src.common.taxonomy_core_constant import LOCAL_WS_DIR, MAX_FOLDER_DEPTH, MAX_IMPORT_DEPTH
+from modules.shared.src.common.taxonomy_core_error import FolderCompileError, FolderEmptyError, FolderValidationError
+from modules.shared.src.common.utility_folder_compiler import (
     collect_folder_files_with_imports,
     compile_files_to_markdown,
     validate_folder_for_compile,
 )
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.prompt.contract_prompt_protocol import IFolderCompileProtocol
 
 log = get_logger("capabilities_folder_compiler")
 

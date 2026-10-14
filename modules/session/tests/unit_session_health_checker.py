@@ -18,8 +18,8 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
-from modules.shared.src.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.taxonomy_session_vo import SessionInfo, SessionStatus
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionStatus
 
 
 def _session(index: int = 0) -> SessionInfo:

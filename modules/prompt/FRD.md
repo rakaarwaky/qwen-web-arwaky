@@ -81,22 +81,92 @@ surfaces and job runners see one pipeline.
 - **Edge Cases**: A stream that emits no forward event for the full ceiling reports stalled, not complete.
 - **Error Handling**: A monitor that cannot read the stream reports the extraction incomplete rather than raising into the caller.
 
+### FR-PROMPT-007: Inject prompt text into the chat
+
+- **Description**: Locate the chat input and inject the prompt text via multi-strategy DOM injection.
+- **Input**: A page, the prompt text, and the optional injector configuration.
+- **Output**: The input element that received the text, or a not-found error.
+- **Business Rules**: The input element must exist before injection; a missing input is a hard error.
+- **Edge Cases**: A chat that has not loaded reports a not-found error for the input element.
+- **Error Handling**: A not-found input surfaces an element-not-found error naming the selector.
+
+### FR-PROMPT-008: Trigger the send action
+
+- **Description**: Click the send control and count the chat turns that result.
+- **Input**: A page, a lifecycle emitter, and the optional send configuration.
+- **Output**: The number of chat turns after the send, and the latest assistant text.
+- **Business Rules**: The send control must be clickable; a disabled control is a hard error.
+- **Edge Cases**: A send that produces no new turn is reported as a dispatch failure.
+- **Error Handling**: A send that fails surfaces a send-dispatch error carrying the reason.
+
+### FR-PROMPT-009: Save the response to the operator's destination
+
+- **Description**: Persist the processed response with a metadata header and sidecar.
+- **Input**: The output path, the response text, the run context, the source file, duration, and character counts.
+- **Output**: A written response file at the named destination.
+- **Business Rules**: The output path must be writable; a non-writable path is a hard error.
+- **Edge Cases**: A mid-stream extraction failure keeps the response file so an operator can inspect it.
+- **Error Handling**: A write failure surfaces an output-write error naming the path.
+
+### FR-PROMPT-010: Upload an attachment
+
+- **Description**: Attach a file to the chat as an attachment, with pre-flight validation.
+- **Input**: A page, the file path, the optional upload configuration, and the optional lifecycle emitter.
+- **Output**: A boolean indicating whether the attachment was accepted.
+- **Business Rules**: A file exceeding the upload limit is rejected with the limit named.
+- **Edge Cases**: A file that cannot be read surfaces a file error naming the path.
+- **Error Handling**: An upload failure surfaces an upload-failure error carrying the reason.
+
+### FR-PROMPT-011: Compile a folder to a single markdown file
+
+- **Description**: Compile folder contents to a single markdown file, optionally following imports.
+- **Input**: A folder path, an optional output path, a maximum recursion depth, and an import depth.
+- **Output**: The compiled markdown file path.
+- **Business Rules**: The folder must exist and be readable before compilation starts.
+- **Edge Cases**: A folder that cannot be read surfaces a file error naming the path.
+- **Error Handling**: A compile failure surfaces the reason and leaves the partial output for inspection.
+
+### FR-PROMPT-012: Resolve a folder to an attachment-ready file
+
+- **Description**: Resolve a path to an attachment-ready file, compiling folders to markdown when needed.
+- **Input**: A path, a maximum recursion depth, and an import depth.
+- **Output**: A path to an attachment-ready file.
+- **Business Rules**: A directory is compiled to markdown before it is used as an attachment.
+- **Edge Cases**: A path that is neither a file nor a folder is rejected.
+- **Error Handling**: A resolution failure surfaces the reason and names the path.
+
 ## API Contract
 
 ### Protocol API
 
+Each row below is one method on one protocol class (FR = 1 protocol class).
+The class is named in the Description column.
+
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `process_direct_prompt` | text, timeout, headless, output path | prompt response | prompt failure | generation finished | Run a direct prompt. |
-| `process_prompt_file_only` | file path, timeout, headless, output path | prompt response | file error, prompt failure | generation finished | Run a file prompt. |
-| `process_prompt_with_attachment` | text, attachment path, timeout, headless, output path | prompt response | upload error, prompt failure | generation finished | Run an attachment prompt. |
-| `request_cancel` | run cancel event | stopped-pipelines count | none | none | Stop the file and attachment pipelines a run owns. |
-| `execute` | prompt request | prompt response | verb error | dispatch acknowledged | Single entry point over the prompt verb. |
-| `dispatch_and_wait_for_response` | dispatch input, stream configuration | extraction verdict | stream error | generation finished | Drive one send and follow its stream. |
-| `register` | run-scoped cancel state | registered verdict | none | none | Register a run's cancel state. |
-| `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. |
-| `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run and close its browser context. |
-| `cancel_by_event` | original ``threading.Event`` | cancelled verdict | none | none | Cancel the run registered with the original event. |
+| `process_direct_prompt` | text, timeout, headless, output path | prompt response | prompt failure | generation finished | Run a direct prompt. (IDirectPromptProtocol) |
+| `process_prompt_file_only` | file path, timeout, headless, output path | prompt response | file error, prompt failure | generation finished | Run a file prompt. (IPromptFileProtocol) |
+| `process_prompt_with_attachment` | text, attachment path, timeout, headless, output path | prompt response | upload error, prompt failure | generation finished | Run an attachment prompt. (IAttachmentPromptProtocol) |
+| `request_cancel` | run cancel event | stopped-pipelines count | none | none | Stop the file and attachment pipelines a run owns. (IPromptFlowProtocol) |
+| `dispatch_and_wait_for_response` | dispatch input, stream configuration | extraction verdict | stream error | generation finished | Drive one send and follow its stream. (IPromptFlowProtocol) |
+| `register` | run-scoped cancel state | registered verdict | none | none | Register a run's cancel state. (IRunCancelProtocol) |
+| `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. (IRunCancelProtocol) |
+| `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run and close its browser context. (IRunCancelProtocol) |
+| `cancel_by_event` | original ``threading.Event`` | cancelled verdict | none | none | Cancel the run registered with the original event. (IRunCancelProtocol) |
+| `upload_attachment` | page, filepath, config, emitter, web_loaded | accepted flag | upload error | file uploaded | Attach a file as an attachment. (IUploadProtocol) |
+| `validate_file` | filepath, max_size_mb | file size in bytes | file error | none | Pre-flight validation of an attachment. (IUploadProtocol) |
+| `compile_folder` | folder path, output path, max_depth, import_depth | compiled markdown path | file error | document parsed | Compile folder contents to a single markdown file. (IFolderCompileProtocol) |
+| `resolve_to_attachment` | path, max_depth, import_depth | attachment-ready path | file error | none | Resolve a path to an attachment-ready file. (IFolderToAttachmentProtocol) |
+| `is_folder` | path | directory flag | none | none | Check whether a path is a directory. (IFolderToAttachmentProtocol) |
+| `find_input` | page, config | input element | element not found | none | Locate the chat input element. (IInjectionProtocol) |
+| `inject_text` | page, text, config | none | element not found | prompt injected | Inject prompt text via multi-strategy DOM injection. (IInjectionProtocol) |
+| `click_send` | page, emitter, config, document_parsed | none | send dispatch error | send clicked | Trigger the send action. (ISendProtocol) |
+| `count_messages` | page | chat turn count | none | none | Count chat turns. (ISendProtocol) |
+| `latest_message_text` | page | response text | none | none | Return the latest assistant response text. (ISendProtocol) |
+| `wait_for_response` | page, timeout, msg_count_before, emitter, config, cancel_event | response text | stream error, run cancelled | generation finished | Wait for a stable assistant response. (IStreamProtocol) |
+| `is_generation_complete` | page | generation flag | none | none | True when Qwen has finished generating. (IStreamProtocol) |
+| `is_thinking_active` | page | thinking flag | none | none | True when Qwen is currently thinking/streaming. (IStreamProtocol) |
+| `write_output` | path, content, ctx, src, dur, input_chars, output_chars, config | none | output write error | output copied | Write processed output with metadata header + sidecar. (ISaverProtocol) |
 
 ### Aggregate API
 

@@ -9,13 +9,13 @@ import pytest
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 
 def _make_cfg(tmp_path: Path, mode: str, headless: bool, **extra: object) -> AppConfig:
@@ -180,7 +180,7 @@ def test_raise_if_session_expired_banner_selector():
     mock_page, _, _ = _make_page_mock(body_text="", banner_shell_visible=True)
     # Drive the two probes independently: login-form selectors are absent,
     # banner-shell selectors are present, so only the expiry path can fire.
-    import modules.shared.src.taxonomy_core_constant as const
+    import modules.shared.src.common.taxonomy_core_constant as const
 
     banner = ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
 
@@ -344,7 +344,7 @@ def test_clean_stale_locks(tmp_path: Path):
 
 
 def test_ensure_default_model_clicks_default_option():
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 
     mock_page = MagicMock()
     picker = MagicMock()
@@ -410,7 +410,7 @@ def test_ensure_default_model_swallows_error():
 def test_verify_default_model_retries_transient_picker_read_failure():
     from playwright.sync_api import Error as PwError
 
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 
     mock_page = MagicMock()
     picker = mock_page.get_by_role.return_value
@@ -463,7 +463,7 @@ def test_verify_default_model_fallback_event_payload() -> None:
 
 
 def test_verify_default_model_ok_event_payload() -> None:
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 
     mock_page = MagicMock()
     emitter = _navigate_fixture(mock_page, f"Select Model {DEFAULT_MODEL}")
@@ -481,7 +481,7 @@ def test_verify_default_model_ok_event_payload() -> None:
 
 
 def test_verify_default_model_ok():
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 
     mock_page = MagicMock()
     mock_page.get_by_role.return_value.inner_text.return_value = f"Select Model {DEFAULT_MODEL}"
@@ -523,7 +523,7 @@ def test_verify_default_model_rejects_superstring_model():
 
 
 def test_verify_default_model_retries_when_switch_reported_failure():
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_MODEL
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 
     mock_page = MagicMock()
     # First read shows the old model; the retry re-runs ensure_default_model,
@@ -545,7 +545,7 @@ def test_verify_default_model_retries_when_switch_reported_failure():
 def test_verify_default_model_raises_when_unreadable():
     from playwright.sync_api import Error as PwError
 
-    from modules.shared.src.taxonomy_core_error import ModelSwitchError
+    from modules.shared.src.common.taxonomy_core_error import ModelSwitchError
 
     mock_page = MagicMock()
     mock_page.get_by_role.return_value.wait_for.side_effect = PwError("picker gone")
@@ -583,7 +583,7 @@ def test_login_form_selectors_do_not_include_class_wildcards():
     """[class*='login'] and [class*='passport'] were false positives that
     triggered AuthRequiredError on the authenticated chat page (avatar menu,
     .login-info elements, etc.).  They must not appear in the tuple."""
-    from modules.shared.src.taxonomy_core_constant import LOGIN_FORM_SELECTORS
+    from modules.shared.src.common.taxonomy_core_constant import LOGIN_FORM_SELECTORS
 
     for sel in LOGIN_FORM_SELECTORS:
         assert "[class*='login']" not in sel, f"false-positive selector still present: {sel}"
@@ -631,7 +631,7 @@ def test_login_form_selectors_do_not_include_has_text_buttons():
     visible on the authenticated Qwen chat page nav bar.  They must not appear
     in LOGIN_FORM_SELECTORS or _assert_on_chat_page will raise a false-positive
     AuthRequiredError."""
-    from modules.shared.src.taxonomy_core_constant import LOGIN_FORM_SELECTORS
+    from modules.shared.src.common.taxonomy_core_constant import LOGIN_FORM_SELECTORS
 
     for sel in LOGIN_FORM_SELECTORS:
         assert ":has-text(" not in sel, f"false-positive has-text selector still present: {sel}"
@@ -809,7 +809,7 @@ def test_detect_session_expired_fires_on_banner_shell_selector():
     mock_page.inner_text.return_value = ""
 
     def _banner_probe(_page, selectors):
-        import modules.shared.src.taxonomy_core_constant as const
+        import modules.shared.src.common.taxonomy_core_constant as const
 
         return selectors == ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
 

@@ -12,8 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     BatchPromptOutcome,
     FilePath,
     HeadlessFlag,
@@ -22,11 +21,12 @@ from modules.shared.src.taxonomy_core_vo import (
     SlotInputValue,
     SlotRunPlan,
 )
-from modules.shared.src.utility_config_app_factory import (
+from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, materialize_role_template
+from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol
+from modules.shared.src.config.utility_config_app_factory import (
     build_app_config,
     resolve_pipeline_output_path,
 )
-from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
 
 # Backward-compatible aliases — the concrete types now live in the taxonomy
 # layer so the contract can name them without importing Capabilities.

@@ -17,7 +17,7 @@ from modules.config.src.capabilities_config_capacity import ConfigCapacityAdviso
 from modules.config.src.capabilities_config_environment import ConfigEnvironment
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 # ─── ConfigEnvironment ────────────────────────────────────────────────────
 

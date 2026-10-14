@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
-from modules.shared.src.taxonomy_swarm_vo import (
+from modules.shared.src.swarm.taxonomy_swarm_vo import (
     SwarmAgentSnapshot,
     SwarmRequest,
     SwarmSnapshot,

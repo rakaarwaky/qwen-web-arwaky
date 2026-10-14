@@ -14,16 +14,16 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
-from modules.shared.src.contract_config_protocol import IConfigCapacityProtocol
-from modules.shared.src.taxonomy_config_vo import ByteCount, CapacityReport, WorkerCount
-from modules.shared.src.taxonomy_core_constant import SOURCE_DERIVED, SOURCE_OVERRIDE
-from modules.shared.src.utility_core_capacity import (
+from modules.shared.src.common.taxonomy_core_constant import SOURCE_DERIVED, SOURCE_OVERRIDE
+from modules.shared.src.common.utility_core_capacity import (
     available_memory_bytes,
     format_bytes,
     recommended_max_workers,
     total_memory_bytes,
 )
-from modules.shared.src.utility_core_env import QWEN_WEB_MAX_WORKERS
+from modules.shared.src.common.utility_core_env import QWEN_WEB_MAX_WORKERS
+from modules.shared.src.config.contract_config_protocol import IConfigCapacityProtocol
+from modules.shared.src.config.taxonomy_config_vo import ByteCount, CapacityReport, WorkerCount
 
 # Block 1: Class Definition & Constructor
 

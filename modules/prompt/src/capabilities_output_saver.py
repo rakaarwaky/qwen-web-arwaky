@@ -8,13 +8,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_core_protocol import ISaverProtocol
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_ATOMIC_WRITE,
     DEFAULT_GENERATE_SIDECAR,
 )
-from modules.shared.src.taxonomy_core_error import OutputWriteError
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_error import OutputWriteError
+from modules.shared.src.common.taxonomy_core_vo import (
     AtomicWriteFlag,
     FilePath,
     GenerateSidecarFlag,
@@ -22,9 +21,10 @@ from modules.shared.src.taxonomy_core_vo import (
     ResponseText,
     RunContext,
 )
-from modules.shared.src.utility_core_text import strip_ui_noise, utc_now_iso
-from modules.shared.src.utility_io_writer import atomic_write_text, ensure_dir, write_json_file
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_core_text import strip_ui_noise, utc_now_iso
+from modules.shared.src.common.utility_io_writer import atomic_write_text, ensure_dir, write_json_file
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.prompt.contract_prompt_protocol import ISaverProtocol
 
 log = get_logger("capabilities_saver")
 

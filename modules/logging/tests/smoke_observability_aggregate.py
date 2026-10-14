@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 from modules.logging.src.agent_logging_orchestrator import LoggingOrchestrator
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-from modules.shared.src.taxonomy_logging_vo import ObservabilityRequest
+from modules.shared.src.logging.taxonomy_logging_vo import ObservabilityRequest
 
 
 def _orchestrator(tmp_path: Path) -> LoggingOrchestrator:

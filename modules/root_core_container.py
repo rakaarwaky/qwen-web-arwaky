@@ -28,9 +28,9 @@ from modules.config.src.capabilities_config_validator import ConfigValidator
 
 # agent_session_orchestrator
 # SessionOrchestrator is the single agent in the session feature folder; it
-# implements both ISessionAggregate (validate/delete) and ISetupAggregate
-# (login). The ``agent_setup_orchestrator`` attribute below reuses the same
-# class so the setup-labelled surfaces keep a stable container attribute.
+# implements ISessionAggregate (validate/delete/login) for the whole
+# session feature, so the setup-labelled surfaces reuse
+# ``agent_session_orchestrator``.
 from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 
 # agent_job_orchestrator
@@ -64,46 +64,47 @@ from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_renewal import SessionRenewer
-from modules.shared.src.contract_browser_aggregate import IBrowserAggregate
-from modules.shared.src.contract_config_aggregate import IConfigAggregate
-from modules.shared.src.contract_config_protocol import IConfigSlotPlanProtocol
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
-from modules.shared.src.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-    IPromptFlowProtocol,
-)
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_session_protocol import (
-    ISessionManagerProtocol,
-    ISessionRenewalProtocol,
-    ISessionRotatorProtocol,
-)
-from modules.shared.src.contract_setup_aggregate import ISetupAggregate
-from modules.shared.src.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.contract_update_protocol import (
-    IUpdateCheckProtocol,
-    IUpdateRollbackProtocol,
-    IUpdateUpgradeProtocol,
-    IUpdateVerifyProtocol,
-)
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
     DEFAULT_PACKAGE_NAME,
     SWARM_CONCURRENCY_ENV,
     SWARM_OUTPUT_ROOT,
 )
-from modules.shared.src.taxonomy_core_entity import CircuitBreaker, RateLimiter
-from modules.shared.src.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
-from modules.shared.src.utility_core_capacity import recommended_max_workers
-from modules.shared.src.utility_core_status import status_path_for
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.common.taxonomy_core_vo import FailureThreshold, MaxPerMinute, WindowSec
+from modules.shared.src.common.utility_core_capacity import recommended_max_workers
+from modules.shared.src.common.utility_core_status import status_path_for
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
+from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+    IPromptFlowProtocol,
+)
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.contract_session_protocol import (
+    ISessionManagerProtocol,
+    ISessionRenewalProtocol,
+    ISessionRotatorProtocol,
+)
+from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
+from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
+from modules.shared.src.update.contract_update_protocol import (
+    IUpdateCheckProtocol,
+    IUpdateRollbackProtocol,
+    IUpdateUpgradeProtocol,
+    IUpdateVerifyProtocol,
+)
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
-from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+from modules.swarm.src.capabilities_swarm_cancel import SwarmRunner as SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmRunner as SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
@@ -248,7 +249,6 @@ class SharedContainer:
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
         )
-        self.agent_setup_orchestrator: ISetupAggregate = self.agent_session_orchestrator
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(
@@ -266,15 +266,18 @@ class SharedContainer:
         # Issue #277: the Swarm fan-out must respect the same shared resource
         # guards as the job pipeline — the shared breaker and limiter are
         # injected so 10 concurrent agent attempts cannot bypass them.
+        swarm_kwargs: dict[str, object] = dict(
+            attachment=cast(IPromptAggregate, self.agent_attachment_prompt_orchestrator),
+            output_root=SWARM_OUTPUT_ROOT,
+            browser_concurrency=swarm_workers,
+            headless=swarm_headless,
+            circuit_breaker=self.cb,
+            rate_limiter=self.rl,
+        )
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
-            runner=SwarmRunner(
-                attachment=cast(IPromptAggregate, self.agent_attachment_prompt_orchestrator),
-                output_root=SWARM_OUTPUT_ROOT,
-                browser_concurrency=swarm_workers,
-                headless=swarm_headless,
-                circuit_breaker=self.cb,
-                rate_limiter=self.rl,
-            ),
+            start=SwarmStartRunner(**swarm_kwargs),  # type: ignore[arg-type]
+            progress=SwarmProgressRunner(**swarm_kwargs),  # type: ignore[arg-type]
+            cancel=SwarmCancelRunner(**swarm_kwargs),  # type: ignore[arg-type]
             folder_adapter=self.folder_adapter,
             observability=self.observability,
         )

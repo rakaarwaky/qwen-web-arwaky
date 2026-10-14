@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from modules.shared.src.contract_session_protocol import (
+from modules.shared.src.session.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
 )
-from modules.shared.src.taxonomy_session_vo import (
+from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
     RotatorResponse,
     SessionId,

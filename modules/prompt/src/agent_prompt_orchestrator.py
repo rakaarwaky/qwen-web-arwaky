@@ -10,16 +10,16 @@ from __future__ import annotations
 
 from typing import cast
 
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_prompt_aggregate import IPromptAggregate
-from modules.shared.src.contract_prompt_protocol import (
+from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.prompt.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
     IPromptFileProtocol,
     IRunCancelProtocol,
 )
-from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
 
 
 class PromptOrchestrator(IPromptAggregate):

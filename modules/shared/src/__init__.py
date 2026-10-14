@@ -7,37 +7,13 @@ Barrel re-export of all shared types. Layers identified by filename prefix
 from __future__ import annotations
 
 # ─── Contract: aggregates ─────────────────────────────────────
-from .contract_browser_aggregate import IBrowserAggregate
+from .browser.contract_browser_aggregate import IBrowserAggregate
 
 # ─── Contract: protocols ──────────────────────────────────────
-from .contract_browser_protocol import IBrowserProtocol
-from .contract_config_aggregate import IConfigAggregate
-from .contract_config_protocol import IWorkspaceProtocol
-from .contract_core_protocol import (
-    IInjectionProtocol,
-    ISaverProtocol,
-    ISendProtocol,
-    IStreamProtocol,
-    IUploadProtocol,
-)
-from .contract_jobs_aggregate import IJobManagerAggregate
-from .contract_jobs_protocol import IJobStorageProtocol
-from .contract_logging_aggregate import IObservabilityAggregate
-from .contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
-from .contract_prompt_aggregate import IPromptAggregate
-from .contract_prompt_protocol import IRunCancelProtocol
-from .contract_session_aggregate import ISessionAggregate
-from .contract_session_protocol import (
-    ISessionRenewalProtocol,
-    ISessionRotatorProtocol,
-)
-from .contract_setup_aggregate import ISetupAggregate
-from .contract_swarm_aggregate import ISwarmAggregate
-from .contract_update_aggregate import IUpdateAggregate
-from .contract_update_protocol import ISmokeGate
+from .browser.contract_browser_protocol import IBrowserProtocol
 
 # ─── Taxonomy: constants ──────────────────────────────────────
-from .taxonomy_core_constant import (
+from .common.taxonomy_core_constant import (
     AUTH_KEYWORDS,
     BASE_DIR,
     CHALLENGE_KEYWORDS,
@@ -82,10 +58,10 @@ from .taxonomy_core_constant import (
 )
 
 # ─── Taxonomy: entities ───────────────────────────────────────
-from .taxonomy_core_entity import CircuitBreaker, LifecycleEmitter, LifecycleGate, LifecycleState, RateLimiter
+from .common.taxonomy_core_entity import CircuitBreaker, LifecycleEmitter, LifecycleGate, LifecycleState, RateLimiter
 
 # ─── Taxonomy: domain errors ──────────────────────────────────
-from .taxonomy_core_error import (
+from .common.taxonomy_core_error import (
     AuthRequiredError,
     BrowserLaunchError,
     CircuitBreakerOpenError,
@@ -110,7 +86,7 @@ from .taxonomy_core_error import (
 )
 
 # ─── Taxonomy: events ─────────────────────────────────────────
-from .taxonomy_core_event import (
+from .common.taxonomy_core_event import (
     EVENT_DESCRIPTIONS,
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,
@@ -140,7 +116,7 @@ from .taxonomy_core_event import (
 
 # ─── Taxonomy: config VOs ─────────────────────────────────────
 # ─── Taxonomy: core VOs ───────────────────────────────────────
-from .taxonomy_core_vo import (
+from .common.taxonomy_core_vo import (
     DEFAULT_INJECTOR_CONFIG,
     DEFAULT_SAVER_CONFIG,
     DEFAULT_SENDER_CONFIG,
@@ -205,53 +181,70 @@ from .taxonomy_core_vo import (
     WaitTimeoutMs,
 )
 
-# ─── Taxonomy: Logging VOs ────────────────────────────────────
-from .taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest, ObservabilityResponse
-
-# ─── Taxonomy: Swarm VOs ───────────────────────────────────────
-from .taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmId, SwarmSnapshot
-
 # ─── Utility: events ──────────────────────────────────────────
-from .utility_core_events import is_stability_satisfied, should_treat_as_new_response
+from .common.utility_core_events import is_stability_satisfied, should_treat_as_new_response
 
 # ─── Utility: error ───────────────────────────────────────────
-from .utility_core_exit import exit_code_for
+from .common.utility_core_exit import exit_code_for
 
 # ─── Utility: path ────────────────────────────────────────────
-from .utility_core_path import (
+from .common.utility_core_path import (
     cleanup_empty_dirs,
     list_input_files,
     should_process_file,
 )
 
 # ─── Utility: paths (Playwright browser path resolution) ──────
-from .utility_core_paths import get_playwright_browsers_path
+from .common.utility_core_paths import get_playwright_browsers_path
 
 # ─── Utility: prompt ──────────────────────────────────────────
-from .utility_core_prompt import (
+from .common.utility_core_prompt import (
     extract_prompt_text,
     strip_input_from_output,
 )
 
 # ─── Utility: text ────────────────────────────────────────────
-from .utility_core_text import strip_ui_noise, utc_now_iso
+from .common.utility_core_text import strip_ui_noise, utc_now_iso
 
 # ─── Utility: validation ──────────────────────────────────────
-from .utility_core_validation import validate_file, validate_response_content
+from .common.utility_core_validation import validate_file, validate_response_content
 
 # ─── Utility: response ────────────────────────────────────────
-from .utility_response_normalizer import (
+from .common.utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,
     success_response,
 )
+from .config.contract_config_aggregate import IConfigAggregate
+from .config.contract_config_protocol import IWorkspaceProtocol
+from .jobs.contract_jobs_aggregate import IJobManagerAggregate
+from .jobs.contract_jobs_protocol import IJobStorageProtocol
+from .logging.contract_logging_aggregate import IObservabilityAggregate
+from .logging.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
+
+# ─── Taxonomy: Logging VOs ────────────────────────────────────
+from .logging.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest, ObservabilityResponse
+from .prompt.contract_prompt_aggregate import IPromptAggregate
+from .prompt.contract_prompt_protocol import (
+    IInjectionProtocol,
+    IRunCancelProtocol,
+    ISaverProtocol,
+    ISendProtocol,
+    IStreamProtocol,
+    IUploadProtocol,
+)
+from .session.contract_session_aggregate import ISessionAggregate
+from .session.contract_session_protocol import (
+    ISessionRenewalProtocol,
+    ISessionRotatorProtocol,
+)
 
 # ─── Utility: session guard ───────────────────────────────────
-from .utility_session_guard import is_filesystem_root, is_safe_session_target
+from .session.utility_session_guard import is_filesystem_root, is_safe_session_target
 
 # ─── Utility: session renewal cookie probe ────────────────────
-from .utility_session_renewal_cookie_probe import (
+from .session.utility_session_renewal_cookie_probe import (
     AUTH_SESSION_COOKIE,
     REFRESH_TOKEN_COOKIE,
     find_cookie_db,
@@ -259,6 +252,12 @@ from .utility_session_renewal_cookie_probe import (
     is_refresh_token_valid,
     renewal_is_possible,
 )
+from .swarm.contract_swarm_aggregate import ISwarmAggregate
+
+# ─── Taxonomy: Swarm VOs ───────────────────────────────────────
+from .swarm.taxonomy_swarm_vo import SwarmAgentSnapshot, SwarmId, SwarmSnapshot
+from .update.contract_update_aggregate import IUpdateAggregate
+from .update.contract_update_protocol import ISmokeGate
 
 __all__ = [
     # VOs
@@ -446,7 +445,6 @@ __all__ = [
     "IUpdateAggregate",
     "IPromptFlowAggregate",
     "ISessionAggregate",
-    "ISetupAggregate",
     "ISwarmAggregate",
     # Swarm VOs
     "SwarmAgentSnapshot",
@@ -483,3 +481,76 @@ __all__ = [
     "is_safe_session_target",
     "renewal_is_possible",
 ]
+
+# ─── Sub-package imports (AES702 feature subfolders) ───────────────
+# Import each subpackage and re-export every module name it owns as an
+# attribute of modules.shared.src, so that
+# `from modules.shared.src import <module>` keeps working after the move.
+import modules.shared.src.browser
+import modules.shared.src.common
+import modules.shared.src.config
+import modules.shared.src.jobs
+import modules.shared.src.logging
+import modules.shared.src.prompt
+import modules.shared.src.session
+import modules.shared.src.swarm
+import modules.shared.src.update
+
+from modules.shared.src.common import taxonomy_core_constant
+from modules.shared.src.common import taxonomy_core_entity
+from modules.shared.src.common import taxonomy_core_error
+from modules.shared.src.common import taxonomy_core_event
+from modules.shared.src.common import taxonomy_core_vo
+from modules.shared.src.common import taxonomy_skill_constant
+from modules.shared.src.common import utility_core_capacity
+from modules.shared.src.common import utility_core_env
+from modules.shared.src.common import utility_core_events
+from modules.shared.src.common import utility_core_exit
+from modules.shared.src.common import utility_core_path
+from modules.shared.src.common import utility_core_path_validation
+from modules.shared.src.common import utility_core_paths
+from modules.shared.src.common import utility_core_prompt
+from modules.shared.src.common import utility_core_prompt_template
+from modules.shared.src.common import utility_core_session_backup
+from modules.shared.src.common import utility_core_status
+from modules.shared.src.common import utility_core_text
+from modules.shared.src.common import utility_core_validation
+from modules.shared.src.common import utility_core_version
+from modules.shared.src.common import utility_dom_helper
+from modules.shared.src.common import utility_dom_query
+from modules.shared.src.common import utility_error_mapping
+from modules.shared.src.common import utility_folder_compiler
+from modules.shared.src.common import utility_io_writer
+from modules.shared.src.common import utility_logger_factory
+from modules.shared.src.common import utility_response_normalizer
+from modules.shared.src.common import utility_telemetry_scrubber
+from modules.shared.src.browser import contract_browser_aggregate
+from modules.shared.src.browser import contract_browser_protocol
+from modules.shared.src.browser import utility_browser_async_loop
+from modules.shared.src.swarm import contract_swarm_aggregate
+from modules.shared.src.swarm import contract_swarm_protocol
+from modules.shared.src.swarm import taxonomy_swarm_vo
+from modules.shared.src.update import contract_update_aggregate
+from modules.shared.src.update import contract_update_protocol
+from modules.shared.src.update import taxonomy_update_vo
+from modules.shared.src.update import utility_update_browser_binary
+from modules.shared.src.update import utility_update_pipeline
+from modules.shared.src.logging import contract_logging_aggregate
+from modules.shared.src.logging import contract_logging_protocol
+from modules.shared.src.logging import taxonomy_logging_vo
+from modules.shared.src.jobs import contract_jobs_aggregate
+from modules.shared.src.jobs import contract_jobs_protocol
+from modules.shared.src.jobs import taxonomy_jobs_vo
+from modules.shared.src.session import contract_session_aggregate
+from modules.shared.src.session import contract_session_protocol
+from modules.shared.src.session import taxonomy_session_vo
+from modules.shared.src.session import utility_session_cloner
+from modules.shared.src.session import utility_session_guard
+from modules.shared.src.session import utility_session_renewal_cookie_probe
+from modules.shared.src.config import contract_config_aggregate
+from modules.shared.src.config import contract_config_protocol
+from modules.shared.src.config import taxonomy_config_vo
+from modules.shared.src.config import utility_config_app_factory
+from modules.shared.src.prompt import contract_prompt_aggregate
+from modules.shared.src.prompt import contract_prompt_protocol
+from modules.shared.src.prompt import taxonomy_prompt_vo

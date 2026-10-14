@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from modules.shared.src.utility_response_normalizer import (
+from modules.shared.src.common.utility_response_normalizer import (
     detect_processing_failure,
     safe_handle,
     success_response,

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.shared.src.taxonomy_session_vo import SessionRequest
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 
 def _orchestrator() -> tuple[SessionOrchestrator, MagicMock]:

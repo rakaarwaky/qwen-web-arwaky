@@ -7,15 +7,15 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
-from modules.shared.src.taxonomy_core_error import SendDispatchError
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_error import SendDispatchError
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
     STANDARD_PROMPT_EVENTS,
 )
-from modules.shared.src.taxonomy_core_vo import MessageCount
+from modules.shared.src.common.taxonomy_core_vo import MessageCount
 
 
 def _browser_stub(emitter_events: tuple = ()) -> MagicMock:

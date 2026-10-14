@@ -12,7 +12,7 @@ import stat
 from pathlib import Path
 
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 
 def _config(root: Path) -> AppConfig:

@@ -12,12 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from modules.shared.src.contract_jobs_protocol import IStatusProtocol
-from modules.shared.src.taxonomy_core_constant import STATUS_SCHEMA_VERSION
-from modules.shared.src.taxonomy_core_vo import StatusRecordVO
-from modules.shared.src.taxonomy_logging_vo import MetricsSnapshot
-from modules.shared.src.utility_core_status import status_path_for
-from modules.shared.src.utility_io_writer import atomic_write_json, ensure_dir
+from modules.shared.src.common.taxonomy_core_constant import STATUS_SCHEMA_VERSION
+from modules.shared.src.common.taxonomy_core_vo import StatusRecordVO
+from modules.shared.src.common.utility_core_status import status_path_for
+from modules.shared.src.common.utility_io_writer import atomic_write_json, ensure_dir
+from modules.shared.src.jobs.contract_jobs_protocol import IStatusProtocol
+from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot
 
 # Block 1: Class Definition & Constructor
 
@@ -45,7 +45,7 @@ class StatusFileWriter(IStatusProtocol):
         - ``status`` / ``mode`` / ``headless`` / ``run_id``: run identity.
         - ``files_processed`` / ``files_failed`` / ``cpu_sec``: run totals.
         - ``failure_categories``: optional mapping of
-          :class:`~modules.shared.src.taxonomy_core_error.ErrorCategory` values
+          :class:`~modules.shared.src.common.taxonomy_core_error.ErrorCategory` values
           to occurrence counts, letting monitoring tools answer "which
           capability is most defective?" without parsing ``app.jsonl`` by hand.
         - ``metrics``: counters plus ``total_executions``,

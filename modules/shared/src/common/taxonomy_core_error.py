@@ -1,0 +1,241 @@
+"""Taxonomy definitions for qwen-web-arwaky domain errors and error categories."""
+
+from __future__ import annotations
+
+from modules.shared.src.common.taxonomy_core_vo import ErrorReason, JobLimit, RetryWaitSec
+
+
+class QwenCliError(RuntimeError):
+    """Base exception for qwen-cli errors."""
+
+
+class AuthRequiredError(QwenCliError):
+    """Raised when authentication challenge/login is required in headless mode.
+
+    Attributes:
+        session_expired: True when the trigger was an in-page session-expiry
+            banner rather than a redirect to a login URL. Callers that need to
+            distinguish the two cases read this flag instead of matching the
+            message text.
+    """
+
+    def __init__(self, message: object, *, session_expired: bool = False) -> None:
+        """Build the error, optionally tagging it as an in-page expiry."""
+        super().__init__(message)
+        self.session_expired = session_expired
+
+
+class ModelSwitchError(QwenCliError):
+    """Raised when the hardcoded default model cannot be selected/verified."""
+
+
+class PromptInjectionError(QwenCliError):
+    """Raised when prompt text injection into Qwen input fails across all strategies."""
+
+
+class RateLimitError(QwenCliError):
+    """Raised when the server returns a rate-limit / throttling response.
+
+    Attributes:
+        retry_after_sec: Seconds the caller should wait before retrying, when
+            the throttling source can estimate it. ``None`` when unknown.
+
+    """
+
+    def __init__(
+        self,
+        message: ErrorReason,
+        retry_after_sec: RetryWaitSec | None = None,
+    ) -> None:
+        """Store the human-readable reason plus an optional retry hint."""
+        super().__init__(message)
+        self.retry_after_sec = retry_after_sec
+
+
+class CircuitBreakerOpenError(QwenCliError):
+    """Raised when the circuit breaker trips due to consecutive failures."""
+
+
+class JobQueueFullError(QwenCliError):
+    """Raised when the async job queue is at capacity and a submission is refused.
+
+    Carries a retry hint so the caller (MCP tool, CLI) can back off
+    deliberately instead of silently queueing work that may never start.
+
+    Attributes:
+        retry_after_sec: Seconds the caller should wait before retrying.
+        queue_depth: Number of jobs queued (running plus pending) at refusal time.
+
+    """
+
+    def __init__(
+        self,
+        message: ErrorReason,
+        retry_after_sec: RetryWaitSec | None = None,
+        queue_depth: JobLimit = JobLimit(0),
+    ) -> None:
+        """Store the human-readable reason plus retry and depth context."""
+        super().__init__(message)
+        self.retry_after_sec = retry_after_sec
+        self.queue_depth = queue_depth
+
+
+class BrowserLaunchError(QwenCliError):
+    """Raised when the browser context cannot be launched."""
+
+
+class ElementNotFoundError(QwenCliError):
+    """Raised when a required DOM element is not found on the page."""
+
+
+class NetworkTimeoutError(QwenCliError):
+    """Raised when network operation times out or drops."""
+
+
+class ResponseDetectionTimeoutError(QwenCliError):
+    """Raised when a valid dispatch produces no detectable assistant response."""
+
+
+class StuckDetectedError(QwenCliError):
+    """Raised when the event-driven monitor sees no forward progress.
+
+    Detection is event-based, not wall-clock: the stream monitor tracks the
+    last forward event (thinking, streaming text change, or terminal
+    completion). When no forward event arrives within ``stall_timeout_sec``,
+    the run is classified stuck and this error is raised so callers can
+    retry. Slow-but-alive generations keep emitting events and are never
+    misclassified.
+    """
+
+
+class OutputValidationError(QwenCliError):
+    """Raised when response content fails sanity check, such as a challenge page."""
+
+
+class FileUploadError(QwenCliError):
+    """Base exception for file upload errors."""
+
+
+class FileValidationError(FileUploadError):
+    """Raised when file pre-flight validation fails."""
+
+
+class UploadFailureError(FileUploadError):
+    """Raised when an attachment cannot be positively verified as uploaded."""
+
+
+class UploadTimeoutError(FileUploadError):
+    """Raised when Playwright interactions encounter an upload timeout."""
+
+
+class UIInteractionError(FileUploadError):
+    """Raised when upload UI elements cannot be found or interacted with."""
+
+
+class RunCancelledError(QwenCliError):
+    """Raised when a run is cancelled by a user-initiated cancellation request."""
+
+
+class PipelineError(QwenCliError):
+    """Base exception for queue processing pipeline errors."""
+
+
+class QuarantineError(PipelineError):
+    """Raised when a file fails all processing attempts and is moved to quarantine."""
+
+
+class SendDispatchError(QwenCliError):
+    """Raised when all send strategies fail."""
+
+
+class OutputWriteError(QwenCliError):
+    """Raised when writing output or metadata sidecar fails."""
+
+
+class FolderCompileError(QwenCliError):
+    """Raised when folder-to-markdown compilation fails."""
+
+
+class FolderValidationError(FolderCompileError):
+    """Raised when folder path validation fails."""
+
+
+class FolderDepthExceededError(FolderCompileError):
+    """Raised when folder recursion depth exceeds limit."""
+
+
+class FolderEmptyError(FolderCompileError):
+    """Raised when folder contains no compilable files."""
+
+
+_ERROR_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("auth", "login", "captcha", "signin"), "auth"),
+    (("model", "switch", "default model"), "model"),
+    (("response detection", "response timeout", "stream timeout"), "response_timeout"),
+    (("network", "connection", "timeout", "dns", "socket"), "network"),
+    (("rate", "limit", "throttl", "429"), "rate_limit"),
+    (("over capacity", "queue full", "queue full; retry"), "capacity"),
+    (("stuck", "stalled", "no forward progress"), "stuck"),
+    (("browser", "launch", "dom", "playwright", "chromium"), "browser"),
+    (("injection", "paste", "clipboard", "fill"), "injection"),
+    (("parse", "empty", "no response", "timeout"), "parsing"),
+    (("file", "ioerror", "disk", "read", "write"), "file_io"),
+)
+
+
+class ErrorCategory:
+    """Categorize errors for dashboards and alerting."""
+
+    @staticmethod
+    def known() -> frozenset[str]:
+        """Return every category name this taxonomy can produce.
+
+        Consumers that must bucket errors (metrics counters, ``status.json``
+        breakdowns, quality reports) use this to reject unknown keys instead of
+        duplicating the list.
+        """
+        return frozenset({category for _keywords, category in _ERROR_CATEGORY_RULES} | {"other"})
+
+    @staticmethod
+    def categorize(exc: BaseException) -> str:
+        """Return the error category string."""
+        exc_type = type(exc).__name__.lower()
+        msg = str(exc).lower()
+        for keywords, category in _ERROR_CATEGORY_RULES:
+            if any(keyword in msg or keyword in exc_type for keyword in keywords):
+                return category
+        if isinstance(exc, (OSError, IOError)):
+            return "file_io"
+        return "other"
+
+
+__all__ = [
+    "QwenCliError",
+    "AuthRequiredError",
+    "ModelSwitchError",
+    "PromptInjectionError",
+    "RateLimitError",
+    "CircuitBreakerOpenError",
+    "JobQueueFullError",
+    "BrowserLaunchError",
+    "ElementNotFoundError",
+    "NetworkTimeoutError",
+    "ResponseDetectionTimeoutError",
+    "StuckDetectedError",
+    "OutputValidationError",
+    "FileUploadError",
+    "FileValidationError",
+    "UploadFailureError",
+    "UploadTimeoutError",
+    "UIInteractionError",
+    "RunCancelledError",
+    "PipelineError",
+    "QuarantineError",
+    "SendDispatchError",
+    "OutputWriteError",
+    "FolderCompileError",
+    "FolderValidationError",
+    "FolderDepthExceededError",
+    "FolderEmptyError",
+    "ErrorCategory",
+]

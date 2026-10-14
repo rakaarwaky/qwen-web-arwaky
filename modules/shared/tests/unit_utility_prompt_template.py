@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from modules.shared.src.utility_core_prompt_template import (
+from modules.shared.src.common.utility_core_prompt_template import (
     is_prompt_role,
     list_prompt_templates,
     load_prompt_template,
@@ -89,7 +89,7 @@ def test_discovery_picks_up_new_template_file(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A new .md dropped in the templates folder is discovered automatically."""
-    import modules.shared.src.utility_core_prompt_template as mod
+    import modules.shared.src.common.utility_core_prompt_template as mod
 
     # Point the module's template dir at a fresh folder with one new role.
     scratch = tmp_path_factory.mktemp("templates")

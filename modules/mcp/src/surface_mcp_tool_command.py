@@ -12,27 +12,26 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from modules.shared.src.contract_config_protocol import IWorkspaceProtocol
-from modules.shared.src.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
-from modules.shared.src.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.contract_setup_aggregate import ISetupAggregate
-from modules.shared.src.taxonomy_core_error import QwenCliError, RateLimitError
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_error import QwenCliError, RateLimitError
+from modules.shared.src.common.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
     JobId,
     PromptText,
     TimeoutSec,
 )
-from modules.shared.src.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
-from modules.shared.src.utility_core_prompt_template import is_prompt_role, materialize_role_template
-from modules.shared.src.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, materialize_role_template
+from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
+from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IAttachmentPromptProtocol,
+    IDirectPromptProtocol,
+    IPromptFileProtocol,
+)
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 # ─── FR-002 success envelope status values ──────────────────────────────────
 # Every successful MCP payload carries a `status` discriminator so agent
@@ -231,8 +230,8 @@ class McpToolCommand:
         file_only: IPromptFileProtocol,
         attachment: IAttachmentPromptProtocol,
         session: ISessionAggregate,
-        setup: ISetupAggregate,
-        workspace: IWorkspaceProtocol,
+        setup: Any = None,
+        workspace: IWorkspaceProtocol | None = None,
         jobs: IJobManagerAggregate | None = None,
     ) -> None:
         """Inject individual agent aggregate contracts."""
@@ -576,7 +575,7 @@ class McpToolCommand:
             JSON string with session_valid flag and recommended next action.
         """
         try:
-            from modules.shared.src.taxonomy_session_vo import SessionRequest
+            from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
             response = self._session.execute(SessionRequest(verb="validate"))
             return json.dumps(
@@ -614,7 +613,7 @@ class McpToolCommand:
             )
 
         try:
-            from modules.shared.src.taxonomy_session_vo import SessionRequest
+            from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
             self._session.execute(SessionRequest(verb="delete", force=bool(force)))
             return json.dumps(
@@ -644,7 +643,7 @@ class McpToolCommand:
             JSON string with setup result message.
         """
         try:
-            response = self._setup.execute_setup(SetupRequest())
+            response = self._session.execute(SessionRequest(verb="login"))
             return _format_success_payload(str(response.error or response.message or response.profile_path or ""))
         except Exception as exc:
             return _format_error_payload(

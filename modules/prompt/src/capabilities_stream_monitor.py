@@ -12,38 +12,38 @@ import time
 
 from playwright.sync_api import Error, Page
 
-from modules.shared.src.contract_core_protocol import IStreamProtocol
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_SAFETY_TIMEOUT_SEC,
     DEFAULT_STALL_TIMEOUT_SEC,
     SAFETY_TIMEOUT_ENV,
     STOP_BUTTON_SELECTORS,
 )
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import (
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import (
     AuthRequiredError,
     OutputValidationError,
     ResponseDetectionTimeoutError,
     RunCancelledError,
     StuckDetectedError,
 )
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_GENERATION_FINISHED,
     EVENT_STREAMING_GENERATION,
     EVENT_THINKING_STARTED,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     MinTextLength,
     PollIntervalSec,
     ResponseText,
     StabilityChecks,
     StreamerConfig,
 )
-from modules.shared.src.utility_core_events import is_stability_satisfied, should_treat_as_new_response
-from modules.shared.src.utility_core_validation import validate_response_content
-from modules.shared.src.utility_dom_helper import is_any_visible
-from modules.shared.src.utility_dom_query import latest_message_text
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_core_events import is_stability_satisfied, should_treat_as_new_response
+from modules.shared.src.common.utility_core_validation import validate_response_content
+from modules.shared.src.common.utility_dom_helper import is_any_visible
+from modules.shared.src.common.utility_dom_query import latest_message_text
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.prompt.contract_prompt_protocol import IStreamProtocol
 
 log = get_logger("capabilities_stream_monitor")
 # Test seam: patched by unit_capability_stream_monitor to script DOM responses.

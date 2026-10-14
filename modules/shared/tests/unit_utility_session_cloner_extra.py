@@ -24,7 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from modules.shared.src import utility_session_cloner as cloner
-from modules.shared.src.utility_session_cloner import (
+from modules.shared.src.session.utility_session_cloner import (
     _IMMUTABLE_DIRS,
     _IMMUTABLE_GLOBS,
     _MASTER_LOCKS_LOCK,

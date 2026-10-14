@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from modules.shared.src.taxonomy_core_error import AuthRequiredError, QwenCliError, RunCancelledError
-from modules.shared.src.utility_error_mapping import to_error_response
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError, QwenCliError, RunCancelledError
+from modules.shared.src.common.utility_error_mapping import to_error_response
 
 
 class TestToErrorResponse:

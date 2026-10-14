@@ -10,26 +10,26 @@ import time
 
 from playwright.sync_api import Error, Page
 
-from modules.shared.src.contract_core_protocol import ISendProtocol
-from modules.shared.src.taxonomy_core_constant import (
+from modules.shared.src.common.taxonomy_core_constant import (
     PARSE_FAST_PHASE_SEC,
     PARSE_POLL_FAST_MS,
     PARSE_POLL_SLOW_MS,
     TEXTAREA_SELECTOR,
 )
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.taxonomy_core_error import SendDispatchError
-from modules.shared.src.taxonomy_core_event import EVENT_DISPATCH_ACKNOWLEDGED, EVENT_SEND_CLICKED
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import SendDispatchError
+from modules.shared.src.common.taxonomy_core_event import EVENT_DISPATCH_ACKNOWLEDGED, EVENT_SEND_CLICKED
+from modules.shared.src.common.taxonomy_core_vo import (
     ClickTimeoutMs,
     MessageCount,
     ResponseText,
     SenderConfig,
     TryEnterKeyFallbackFlag,
 )
-from modules.shared.src.utility_dom_helper import click_send
-from modules.shared.src.utility_dom_query import count_messages, count_user_messages, latest_message_text
-from modules.shared.src.utility_logger_factory import get_logger
+from modules.shared.src.common.utility_dom_helper import click_send
+from modules.shared.src.common.utility_dom_query import count_messages, count_user_messages, latest_message_text
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.prompt.contract_prompt_protocol import ISendProtocol
 
 log = get_logger("capabilities_send_dispatcher")
 
@@ -157,7 +157,7 @@ class SendDispatcher(ISendProtocol):
         started, which matters for large attachments whose parsing makes
         the first response slow.
         """
-        from modules.shared.src.utility_dom_query import latest_message_text
+        from modules.shared.src.common.utility_dom_query import latest_message_text
 
         effective_timeout = timeout_ms if timeout_ms is not None else int(self.click_timeout_ms)
         deadline = time.monotonic() + (effective_timeout / 1000)

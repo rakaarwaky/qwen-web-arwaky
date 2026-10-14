@@ -23,9 +23,9 @@ from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 from modules.root_core_container import SharedContainer
-from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
-from modules.shared.src.utility_core_status import status_path_for
-from modules.shared.src.utility_core_version import get_package_version
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG
+from modules.shared.src.common.utility_core_status import status_path_for
+from modules.shared.src.common.utility_core_version import get_package_version
 
 # ─── Logging setup ──────────────────────────────────────────────────────────
 
@@ -52,7 +52,6 @@ def _get_tools() -> McpToolCommand:
             file_only=shared.agent_prompt_file_orchestrator,
             attachment=shared.agent_attachment_prompt_orchestrator,
             session=shared.agent_session_orchestrator,
-            setup=shared.agent_setup_orchestrator,
             workspace=shared.workspace,
             jobs=shared.agent_job_orchestrator,
         )

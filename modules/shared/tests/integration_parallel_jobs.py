@@ -14,8 +14,8 @@ from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.root_core_container import SharedContainer
-from modules.shared.src.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.taxonomy_prompt_vo import PromptResponse
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse
 
 
 def test_shared_container_wires_max_workers(monkeypatch: pytest.MonkeyPatch) -> None:

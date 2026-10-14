@@ -6,7 +6,7 @@ import argparse
 from typing import TYPE_CHECKING, Any
 
 from modules.session.src.capabilities_session_manager import SessionManager
-from modules.shared.src.taxonomy_session_vo import SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionStatus
 
 if TYPE_CHECKING:
     pass
@@ -118,8 +118,8 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     from modules.logging.src.capabilities_metrics_counter import MetricsCounter
     from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
     from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-    from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG, SESSIONS_DIR
-    from modules.shared.src.taxonomy_setup_vo import SetupRequest
+    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG, SESSIONS_DIR
+    from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 
     profile_path = SESSIONS_DIR / args.name
     profile_path.mkdir(parents=True, exist_ok=True)
@@ -153,12 +153,12 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
         sessions=manager,
     )
 
-    response = orchestrator.execute_setup(
-        SetupRequest(profile_path=profile_path, name=args.name, browser_headless=False)
+    response: SessionResponse = orchestrator.execute(
+        SessionRequest(verb="login", session_path=profile_path, name=args.name)
     )
 
-    if not response.success:
-        print(f"\n❌ {response.error or 'Login failed'}")
+    if not response.valid:
+        print(f"\n❌ {response.error or response.message or 'Login failed'}")
         return 1
 
     print(f"\n✅ Session '{args.name}' saved!")
@@ -181,7 +181,7 @@ def cmd_health_check(manager: SessionManager) -> int:
     import asyncio
 
     from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
-    from modules.shared.src.taxonomy_session_vo import SessionInfo
+    from modules.shared.src.session.taxonomy_session_vo import SessionInfo
 
     sessions = manager.list_sessions()
 

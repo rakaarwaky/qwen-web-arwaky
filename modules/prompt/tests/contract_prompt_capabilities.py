@@ -11,17 +11,15 @@ import inspect
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
-from modules.shared.src.contract_core_protocol import (
-    IInjectionProtocol,
-    ISendProtocol,
-    IStreamProtocol,
-)
-from modules.shared.src.contract_prompt_protocol import (
+from modules.shared.src.prompt.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
+    IInjectionProtocol,
     IPromptFileProtocol,
     IPromptFlowProtocol,
     IRunCancelProtocol,
+    ISendProtocol,
+    IStreamProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (

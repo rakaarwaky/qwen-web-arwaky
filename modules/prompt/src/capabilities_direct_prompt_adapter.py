@@ -13,25 +13,13 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.shared.src.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.contract_core_protocol import (
-    IInjectionProtocol,
-    ISaverProtocol,
-    ISendProtocol,
-    IStreamProtocol,
-    LifecycleObserver,
-)
-from modules.shared.src.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.contract_prompt_protocol import (
-    IDirectPromptProtocol,
-    IPromptFlowProtocol,
-)
-from modules.shared.src.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.taxonomy_core_event import (
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     STANDARD_PROMPT_EVENTS,
 )
-from modules.shared.src.taxonomy_core_vo import (
+from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
     HeadlessFlag,
     JobName,
@@ -42,11 +30,21 @@ from modules.shared.src.taxonomy_core_vo import (
     RunId,
     TimeoutSec,
 )
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse
-from modules.shared.src.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
-from modules.shared.src.utility_dom_helper import setup_lifecycle_state
-from modules.shared.src.utility_error_mapping import to_error_response
-from modules.shared.src.utility_io_writer import save_orchestrator_output
+from modules.shared.src.common.utility_dom_helper import setup_lifecycle_state
+from modules.shared.src.common.utility_error_mapping import to_error_response
+from modules.shared.src.common.utility_io_writer import save_orchestrator_output
+from modules.shared.src.config.utility_config_app_factory import build_app_config, resolve_pipeline_output_path
+from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.prompt.contract_prompt_protocol import (
+    IDirectPromptProtocol,
+    IInjectionProtocol,
+    IPromptFlowProtocol,
+    ISaverProtocol,
+    ISendProtocol,
+    IStreamProtocol,
+    LifecycleObserver,
+)
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
 
 # Block 1: Class Definition & Constructor
 

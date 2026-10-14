@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
-from modules.shared.src.taxonomy_core_vo import StatusRecordVO
+from modules.shared.src.common.taxonomy_core_vo import StatusRecordVO
 
 
 def _record() -> StatusRecordVO:

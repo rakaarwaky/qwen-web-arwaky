@@ -13,8 +13,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
-from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
+from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
 
 _CANCELLED = PromptResponse(cancelled=True)
 

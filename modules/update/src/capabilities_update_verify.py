@@ -20,18 +20,18 @@ import json
 import sys
 from pathlib import Path
 
-from modules.shared.src.contract_update_protocol import (
+from modules.shared.src.common.taxonomy_core_constant import XDG_STATE_HOME
+from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateReport, UpdateStepResult, VersionString
+from modules.shared.src.common.utility_core_version import get_package_version
+from modules.shared.src.common.utility_logger_factory import get_logger
+from modules.shared.src.update.contract_update_protocol import (
     ISmokeGate,
     IUpdateCheckProtocol,
     IUpdateRollbackProtocol,
     IUpdateUpgradeProtocol,
     IUpdateVerifyProtocol,
 )
-from modules.shared.src.taxonomy_core_constant import XDG_STATE_HOME
-from modules.shared.src.taxonomy_core_vo import ForceFlag, UpdateReport, UpdateStepResult, VersionString
-from modules.shared.src.utility_core_version import get_package_version
-from modules.shared.src.utility_logger_factory import get_logger
-from modules.shared.src.utility_update_pipeline import (
+from modules.shared.src.update.utility_update_pipeline import (
     chromium_present,
     compare_versions,
     playwright_browsers_path,

@@ -15,7 +15,7 @@ from modules.prompt.src.capabilities_prompt_file_adapter import (
     PromptFileAdapter,
 )
 from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
-from modules.shared.src.taxonomy_core_vo import RunState
+from modules.shared.src.common.taxonomy_core_vo import RunState
 
 
 def _make_file_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> PromptFileAdapter:
@@ -86,9 +86,9 @@ class TestCancelContract:
 
     def test_swarm_calls_request_cancel_without_getattr_hack(self) -> None:
 
-        from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
+        from modules.swarm.src.utility_swarm_runner_base import SwarmRunnerBase
 
-        src = inspect.getsource(SwarmRunner._request_attachment_cancel)
+        src = inspect.getsource(SwarmRunnerBase._request_attachment_cancel)
         # direct typed contract call (no duck-typing escape hatch)
         assert "self._attachment.execute(" in src
         assert 'PromptRequest(verb="request_cancel"' in src

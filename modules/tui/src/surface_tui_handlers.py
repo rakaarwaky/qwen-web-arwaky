@@ -601,7 +601,7 @@ class _TuiHandlersMixin:
 
     @work(thread=True)
     def _init_worker(self) -> None:
-        from modules.shared.src.taxonomy_core_vo import FilePath
+        from modules.shared.src.common.taxonomy_core_vo import FilePath
 
         try:
             self._workspace.init_workspace(FilePath(Path(str(Path.cwd()))))

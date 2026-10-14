@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
-from modules.shared.src.taxonomy_core_error import QwenCliError
-from modules.shared.src.taxonomy_core_vo import RunId
-from modules.shared.src.taxonomy_logging_vo import (
+from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.common.taxonomy_core_vo import RunId
+from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
+from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol, IObservabilityProtocol
+from modules.shared.src.logging.taxonomy_logging_vo import (
     ObservabilityRequest,
     ObservabilityResponse,
 )
@@ -78,6 +78,6 @@ class LoggingOrchestrator(IObservabilityAggregate):
         A request with no path falls back to the shared default so a caller
         that only sets the verb still gets a real log file.
         """
-        from modules.shared.src.taxonomy_core_constant import DEFAULT_LOG
+        from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG
 
         return request.log_path if request.log_path is not None else DEFAULT_LOG

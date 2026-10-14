@@ -9,7 +9,7 @@ validation problems.
 
 from __future__ import annotations
 
-from modules.shared.src.utility_core_env import (
+from modules.shared.src.common.utility_core_env import (
     ENVIRONMENT,
     QWEN_DEFAULT_MODEL,
     QWEN_SWARM_CONCURRENCY,

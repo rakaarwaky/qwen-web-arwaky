@@ -9,9 +9,9 @@ import pytest
 
 from modules.prompt.src.capabilities_output_saver import Saver
 from modules.shared.src import RunContext, SaverConfig
-from modules.shared.src.taxonomy_core_error import OutputWriteError
-from modules.shared.src.utility_core_text import strip_ui_noise
-from modules.shared.src.utility_io_writer import ensure_dir, save_orchestrator_output
+from modules.shared.src.common.taxonomy_core_error import OutputWriteError
+from modules.shared.src.common.utility_core_text import strip_ui_noise
+from modules.shared.src.common.utility_io_writer import ensure_dir, save_orchestrator_output
 
 
 class TestStripUiNoise:

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.contract_config_protocol import IWorkspaceProtocol
-from modules.shared.src.taxonomy_core_vo import FilePath
-from modules.shared.src.utility_response_normalizer import safe_handle, success_response
+from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.common.utility_response_normalizer import safe_handle, success_response
+from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
 
 
 @safe_handle

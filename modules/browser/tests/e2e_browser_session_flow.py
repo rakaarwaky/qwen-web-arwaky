@@ -13,8 +13,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.shared.src.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 
 @pytest.fixture

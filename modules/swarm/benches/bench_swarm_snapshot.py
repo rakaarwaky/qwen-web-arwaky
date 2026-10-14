@@ -12,17 +12,24 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src.taxonomy_swarm_vo import SwarmRequest
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 
 pytestmark = pytest.mark.benchmark
 
 
 def _orchestrator() -> SwarmOrchestrator:
-    """Return an orchestrator over a stub runner that reports no legs."""
-    runner = MagicMock()
-    runner.snapshot.return_value = None
-    return SwarmOrchestrator(runner=runner, observability=MagicMock())
+    """Return an orchestrator over stub seams that report no legs."""
+    start = MagicMock()
+    progress = MagicMock()
+    progress.snapshot.return_value = None
+    cancel = MagicMock()
+    return SwarmOrchestrator(
+        start=start,
+        progress=progress,
+        cancel=cancel,
+        observability=MagicMock(),
+    )
 
 
 def bench_snapshot(iterations: int = 2000) -> float:

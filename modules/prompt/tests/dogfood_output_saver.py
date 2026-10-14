@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from modules.prompt.src.capabilities_output_saver import Saver
-from modules.shared.src.taxonomy_core_vo import RunContext
+from modules.shared.src.common.taxonomy_core_vo import RunContext
 
 
 def _save(saver: Saver, target: Path, source: Path, context: RunContext) -> None:

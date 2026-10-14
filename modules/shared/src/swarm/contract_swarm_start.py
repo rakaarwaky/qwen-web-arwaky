@@ -20,7 +20,7 @@ __all__ = ["ISwarmStartProtocol"]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
-    "ISwarmStartProtocol": ISwarmStartProtocol,
+    "ISwarmStartProtocol": "ISwarmStartProtocol",
 }
 
 

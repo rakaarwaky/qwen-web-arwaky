@@ -13,8 +13,8 @@ from modules.config.src.capabilities_config_path_resolver import ConfigPathResol
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
 from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
-from modules.shared.src.contract_config_aggregate import IConfigAggregate
-from modules.shared.src.contract_config_protocol import (
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
+from modules.shared.src.config.contract_config_protocol import (
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IConfigValidatorProtocol,

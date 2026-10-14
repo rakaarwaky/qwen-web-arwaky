@@ -8,7 +8,7 @@ registry is empty afterwards".
 from __future__ import annotations
 
 from modules.prompt.src.capabilities_run_cancel_registry import RunCancelRegistry
-from modules.shared.src.taxonomy_core_vo import RunState
+from modules.shared.src.common.taxonomy_core_vo import RunState
 
 
 def _state(run_id: str) -> RunState:
