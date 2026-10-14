@@ -20,7 +20,7 @@ from rich.style import Style
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Center, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, RichLog, Static
 
@@ -68,7 +68,7 @@ class FilePickerModal(ModalScreen[str | None]):
             else "press Enter on file to select"
         )
         with Vertical(id="modal-container"):
-            yield Label(f"[ {title} — {hint} ]", id="modal-title")
+            yield Static(f"[ {title} — {hint} ]", id="modal-title", markup=False)
             yield DirectoryTree(str(self._start_path), id="modal-tree")
             with Horizontal(id="modal-btn-row"):
                 if self._select_directories:
@@ -165,7 +165,7 @@ class HelpScreen(ModalScreen[None]):
                 "beyond 19 are reachable by mouse or the Overview table only.",
             ]
         with Vertical(id="help-container"):
-            yield Label("[ KEYBOARD SHORTCUTS ]", id="help-title")
+            yield Static("[ KEYBOARD SHORTCUTS ]", id="help-title", markup=False)
             yield Static("\n".join(lines), id="help-body")
             yield Button("Close", id="help-close")
 
@@ -205,8 +205,12 @@ class ConfirmModal(ModalScreen[bool]):
         """Build the warning text and Cancel / Confirm buttons."""
         with Vertical(id="confirm-modal-container"):
             yield Static(f"[bold red]{self._title.upper()}[/bold red]\n\n{self._message}\n")
-            yield Button("Cancel", id="btn-cancel", variant="default")
-            yield Button(self._confirm_label, id="btn-confirm", variant="error")
+            # Center wraps the buttons so Cancel/Confirm sit on the dialog's
+            # center axis; its 1fr width needs the container's min-height to
+            # resolve, so the box keeps a floor (see #confirm-modal-container).
+            with Center(id="confirm-btn-row"):
+                yield Button("Cancel", id="btn-cancel", variant="default")
+                yield Button(self._confirm_label, id="btn-confirm", variant="error")
 
     def on_mount(self) -> None:
         """Focus Cancel so Enter never confirms a destructive action by default."""
@@ -247,7 +251,7 @@ class AddSessionModal(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         """Build the name input field and action buttons."""
         with Vertical(id="add-session-container"):
-            yield Label(f"[ {self._title} ]", id="add-session-title")
+            yield Static(f"[ {self._title} ]", id="add-session-title", markup=False)
             yield Static("\nSession name:")
             yield Input(placeholder="e.g., personal, work, dev", id="input-session-name")
             with Horizontal(id="add-session-btn-row"):
@@ -301,18 +305,22 @@ class TemplatePickerModal(ModalScreen[str | None]):
         """
         seen_roles: set[str] = set()
         with Vertical(id="template-picker-container"):
-            yield Label(f"[ {self._title} ]", id="template-picker-title")
+            yield Static(f"[ {self._title} ]", id="template-picker-title", markup=False)
             if not self._options:
                 yield Label("[dim]No templates discovered under modules/shared/templates/.[/]\n")
-            for display, role in self._options:
-                if role in seen_roles:
-                    continue
-                seen_roles.add(role)
-                # Role keys may carry spaces / punctuation; sanitize the
-                # widget id only, keep the label human-friendly.
-                safe_role = role.replace(" ", "_")
-                yield Button(display, id=f"tpl-{safe_role}", variant="default")
-            yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
+            # Center wraps the role buttons so they sit on the dialog's
+            # center axis; Cancel stays at the foot of the dialog.
+            with Center(id="tpl-btn-row"):
+                for display, role in self._options:
+                    if role in seen_roles:
+                        continue
+                    seen_roles.add(role)
+                    # Role keys may carry spaces / punctuation; sanitize the
+                    # widget id only, keep the label human-friendly.
+                    safe_role = role.replace(" ", "_")
+                    yield Button(display, id=f"tpl-{safe_role}", variant="default")
+            with Center(id="tpl-cancel-row"):
+                yield Button("Cancel (Esc)", id="tpl-cancel", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dismiss with the chosen role, or None on cancel."""
