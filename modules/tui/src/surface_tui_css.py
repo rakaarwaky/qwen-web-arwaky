@@ -1222,30 +1222,31 @@ HelpScreen {
 .session-add-row {
     layout: horizontal;
     width: 100%;
-    height: 1;
+    height: 3;
     margin-bottom: 1;
+    align: left middle;
 }
 
 .session-add-spacer {
     width: 1fr;
-    height: 1;
+    height: 3;
 }
 
 .btn-session-add-contained {
     width: auto;
     min-width: 14;
-    height: 1;
+    height: 3;
     background: $accent;
     color: $text;
-    border: solid $accent;
+    border: none;
     text-style: bold;
-    padding: 0 1;
+    padding: 0 2;
+    content-align: center middle;
 }
 
 .btn-session-add-contained:hover {
     background: $fg_accent;
     color: $bg_base;
-    border: solid $fg_accent;
 }
 
 /* Full-width primary call-to-action ("ADD ACCOUNT"). Kept for other panes;

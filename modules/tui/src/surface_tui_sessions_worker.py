@@ -20,9 +20,8 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Label
 
+from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
-from modules.shared.src.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC, SESSIONS_DIR
-from modules.shared.src.taxonomy_setup_vo import SetupRequest
 from modules.tui.src.surface_tui_css import THEME
 
 
@@ -331,18 +330,14 @@ class _TuiSessionsWorkerMixin:
     def start_add_session_login(self, session_name: str) -> None:
         """Start the background worker to run headed browser login for a new session.
 
-        Creates the profile directory, builds a SetupRequest, and runs the
-        login in a background thread. Logs the outcome to the event log and
-        shows a success/error toast when the worker completes.
+        Registers ``session_name`` in the pool by running the ``login`` session
+        verb, which opens the headed browser and waits for a valid session.
+        Logs the outcome to the event log and shows a success/error toast when
+        the worker completes.
         """
-        if not hasattr(self, "_setup") or self._setup is None:
-            self._log_msg("[bold {}]ERROR:[/] Session setup orchestrator not available.".format(THEME["err"]))
+        if getattr(self, "_session", None) is None:
+            self._log_msg("[bold {}]ERROR:[/] Session orchestrator not available.".format(THEME["err"]))
             return
-
-        profile_path = SESSIONS_DIR / session_name
-        profile_path.mkdir(parents=True, exist_ok=True)
-
-        setup_request = SetupRequest(profile_path=profile_path, name=session_name, browser_headless=False)
 
         self._log_msg(
             "[bold {}]LAUNCHING BROWSER:[/] Please log in at chat.qwen.ai, then close the window.".format(
@@ -356,21 +351,21 @@ class _TuiSessionsWorkerMixin:
             timeout=10,
         )
 
-        self._run_add_session_worker(setup_request)
+        self._run_add_session_worker(session_name)
 
     @work(thread=True)
-    def _run_add_session_worker(self, setup_request: SetupRequest) -> None:
+    def _run_add_session_worker(self, session_name: str) -> None:
         """Background worker that runs the headed browser login and validates the session."""
         try:
-            response = self._setup.execute_setup(setup_request)
-            if response.success:
+            response = self._session.execute(SessionRequest(verb="login", name=session_name))
+            if response.valid and not response.error:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]SUCCESS:[/] Session '{}' saved at {}".format(
-                        THEME["ok"], escape(setup_request.name), escape(str(response.profile_path))
+                        THEME["ok"], escape(session_name), escape(str(response.profile_path or ""))
                     ),
                 )
-                self.call_from_thread(self.notify, f"Session '{setup_request.name}' added successfully!", "success", 5)
+                self.call_from_thread(self.notify, f"Session '{session_name}' added successfully!", "success", 5)
                 self.call_from_thread(self._refresh_sessions_table)
             else:
                 error_msg = response.error or response.message or "Login failed"

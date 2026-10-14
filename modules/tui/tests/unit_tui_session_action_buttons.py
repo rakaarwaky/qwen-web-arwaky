@@ -288,7 +288,6 @@ class TestSessionsPaneLayout:
             file_only=MagicMock(),
             attachment=MagicMock(),
             slot_config=MagicMock(),
-            setup=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
             updater=MagicMock(),

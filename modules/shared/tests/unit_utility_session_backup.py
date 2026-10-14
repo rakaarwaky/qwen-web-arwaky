@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import modules.shared.src.common.utility_core_session_backup as session_backup
 from modules.shared.src.common.utility_core_session_backup import (
     DEFAULT_MAX_GENERATIONS,
     SNAPSHOT_MODE,

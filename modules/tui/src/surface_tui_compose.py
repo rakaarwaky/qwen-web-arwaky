@@ -487,13 +487,9 @@ class _TuiComposeMixin:
             yield Button(
                 f"{_TuiUtilsMixin._glyph('overview')}\nOVERVIEW", id="nav-overview", classes="nav-item nav-active"
             )
-            yield Button(
-                f"{_TuiUtilsMixin._glyph('login')}\nLOGIN", id="nav-login", classes="nav-item nav-inactive"
-            )
+            yield Button(f"{_TuiUtilsMixin._glyph('login')}\nLOGIN", id="nav-login", classes="nav-item nav-inactive")
             yield Button(f"{_TuiUtilsMixin._glyph('chat')}\nCHAT", id="nav-chat", classes="nav-item nav-inactive")
-            yield Button(
-                f"{_TuiUtilsMixin._glyph('swarm')}\nSWARM", id="nav-swarm", classes="nav-item nav-inactive"
-            )
+            yield Button(f"{_TuiUtilsMixin._glyph('swarm')}\nSWARM", id="nav-swarm", classes="nav-item nav-inactive")
             yield Button(
                 f"{_TuiUtilsMixin._glyph('settings')}\nSETTINGS", id="nav-settings", classes="nav-item nav-inactive"
             )
