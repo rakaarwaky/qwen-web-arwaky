@@ -662,6 +662,8 @@ class McpToolCommand:
             JSON string confirming workspace initialization.
         """
         t_path = Path(target_dir).expanduser().resolve()
+        if self._workspace is None:
+            return json.dumps({"success": False, "error": "Workspace not initialized."})
         try:
             self._workspace.init_workspace(FilePath(t_path))
             return json.dumps(

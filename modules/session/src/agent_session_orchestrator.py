@@ -82,14 +82,38 @@ class SessionOrchestrator(ISessionAggregate):
                 wait_for_confirmation=request.wait_for_confirmation,
             )
             error_val: str | None = outcome["error"] if isinstance(outcome["error"], str) else None
-            profile_val: Path | str | None = outcome.get("profile_path")
+            profile_val = outcome.get("profile_path")
+            profile_val_typed: Path | str | None = profile_val if isinstance(profile_val, (Path, str)) else None
             return SessionResponse(
                 valid=bool(outcome["success"]),
                 message=str(outcome["message"] or outcome["error"] or ""),
                 error=error_val,
-                profile_path=profile_val,
+                profile_path=profile_val_typed,
             )
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
+
+    def setup_session(
+        self,
+        wait_for_confirmation: Callable[[], bool] | None = None,
+        session_path: Path | None = None,
+    ) -> str:
+        """Return the login outcome as text, delegating to the ``login`` verb.
+
+        Thin convenience wrapper over the manual-login flow so callers that
+        only need a string verdict do not have to build a ``SessionRequest``
+        themselves. On failure the message and error are reported together,
+        matching the setup flow's single-sentence guidance.
+        """
+        response = self.execute(
+            SessionRequest(
+                verb="login",
+                session_path=session_path,
+                wait_for_confirmation=wait_for_confirmation,
+            )
+        )
+        if response.error is not None:
+            return str(f"{response.message} {response.error}" if response.message else response.error)
+        return str(response.message or response.profile_path or "")
 
     # Block 3: Dunder Methods, Factories, Helpers
 

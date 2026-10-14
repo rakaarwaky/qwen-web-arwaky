@@ -27,7 +27,6 @@ def _make_app(session_manager: MagicMock) -> QwenTuiApp:
         file_only=MagicMock(),
         attachment=MagicMock(),
         slot_config=MagicMock(),
-        setup=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),
         session_manager=session_manager,

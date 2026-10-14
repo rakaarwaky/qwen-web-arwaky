@@ -100,7 +100,6 @@ def _make_app() -> QwenTuiApp:
         file_only=_NoOp(),
         attachment=_NoOp(),
         slot_config=_NoOp(),
-        setup=_NoOp(),
         session=_NoOp(),
         jobs=_NoOp(),
         swarm=_NoOp(),
