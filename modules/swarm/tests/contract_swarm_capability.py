@@ -3,10 +3,10 @@
 Pins the aggregate and protocol surface a caller may depend on, so a
 signature change fails here rather than in a caller that has to be reworked.
 
-The swarm feature has three capability seams — start, progress, cancel —
-each sealed in its own protocol file. A single concrete class
-(``SwarmRunner``) implements all three, so the runner's MRO carries every
-one of them and a stub can implement only the seam it is exercising.
+The swarm feature has three consumer seams — start, progress, cancel —
+each sealed in its own protocol file and implemented by its own
+capability file, plus the shared registry behind them. A test can therefore
+inject a stub that implements only the seam it is exercising.
 """
 
 from __future__ import annotations
@@ -14,8 +14,16 @@ from __future__ import annotations
 import inspect
 
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.swarm.contract_swarm_protocol import ISwarmCancelProtocol, ISwarmProgressProtocol, ISwarmStartProtocol
+from modules.shared.src.swarm.contract_swarm_protocol import (
+    ISwarmCancelProtocol,
+    ISwarmProgressProtocol,
+    ISwarmRegistryProtocol,
+    ISwarmStartProtocol,
+)
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
+from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
+from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
 _SEAMS: tuple[type, frozenset[str]] = (
@@ -24,10 +32,32 @@ _SEAMS: tuple[type, frozenset[str]] = (
     (ISwarmCancelProtocol, frozenset({"cancel"})),
 )
 
+#: The one capability that implements each seam.
+_IMPLEMENTORS: dict[type, type] = {
+    ISwarmStartProtocol: SwarmRunner,
+    ISwarmProgressProtocol: SwarmProgressRunner,
+    ISwarmCancelProtocol: SwarmCancelRunner,
+    ISwarmRegistryProtocol: SwarmRegistry,
+}
 
-def test_runner_implements_every_swarm_seam() -> None:
-    for seam, _ in _SEAMS:
-        assert seam in inspect.getmro(SwarmRunner), f"SwarmRunner does not implement {seam.__name__}"
+
+def _implemented_protocols(implementation: type) -> list[type]:
+    """Return every seam protocol *implementation* inherits."""
+    return [seam for seam in _IMPLEMENTORS if seam in inspect.getmro(implementation)]
+
+
+def test_every_seam_has_its_own_implementor() -> None:
+    for seam, implementation in _IMPLEMENTORS.items():
+        assert seam in inspect.getmro(implementation), f"{implementation.__name__} does not implement {seam.__name__}"
+
+
+def test_no_capability_implements_more_than_one_seam() -> None:
+    """AES403: one protocol per capability file, so the seams stay separable."""
+    for seam, implementation in _IMPLEMENTORS.items():
+        implemented = _implemented_protocols(implementation)
+        assert implemented == [seam], (
+            f"{implementation.__name__} implements {implemented}, expected only {seam.__name__}"
+        )
 
 
 def test_orchestrator_implements_the_swarm_aggregate() -> None:

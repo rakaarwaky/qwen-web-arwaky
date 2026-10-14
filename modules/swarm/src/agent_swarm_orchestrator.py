@@ -10,17 +10,18 @@ live here, so a surface cannot skip either one.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
-from modules.shared.src.prompt.contract_prompt_protocol import IFolderToAttachmentProtocol
+from modules.shared.src.common.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
+from modules.shared.src.common.taxonomy_core_vo import FilePath
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
+from modules.shared.src.prompt.contract_prompt_protocol import IFolderToAttachmentProtocol
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.swarm.contract_swarm_protocol import (
     ISwarmCancelProtocol,
     ISwarmProgressProtocol,
     ISwarmStartProtocol,
 )
-from modules.shared.src.common.taxonomy_core_constant import SWARM_RESOURCE_WARNING_BROWSERS
-from modules.shared.src.common.taxonomy_core_vo import FilePath
 from modules.shared.src.swarm.taxonomy_swarm_vo import (
     BrowserCount,
     SwarmId,
@@ -37,8 +38,9 @@ class SwarmOrchestrator(ISwarmAggregate):
 
     Holds the swarm runner as the three capability seams — start, progress,
     cancel — so this agent depends on the contracts, not the concrete
-    ``SwarmRunner``: a test can inject a stub that only implements the seam
-    it is exercising.
+    runner classes: a test can inject a stub that only implements the seam
+    it is exercising. All three read the one registry the root container
+    created, so a poll and a cancel talk about the same run.
     """
 
     def __init__(
@@ -114,8 +116,9 @@ class SwarmOrchestrator(ISwarmAggregate):
         attachment = input_path
         if self._folder_adapter is not None and self._folder_adapter.is_folder(input_path):
             attachment = self._folder_adapter.resolve_to_attachment(input_path)
-        as_filepath = FilePath
-        return self._start_seam(as_filepath(input_path), as_filepath(attachment))
+        # ``FilePath`` is a NewType over ``Path``: this narrows the request
+        # value for the start seam and touches nothing on disk.
+        return self._start_seam.start(cast(FilePath, input_path), cast(FilePath, attachment))
 
     def _progress(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""

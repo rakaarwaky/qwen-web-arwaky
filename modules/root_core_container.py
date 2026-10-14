@@ -104,6 +104,7 @@ from modules.shared.src.update.contract_update_protocol import (
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
 from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 from modules.update.src.agent_update_orchestrator import UpdateOrchestrator
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
@@ -266,18 +267,28 @@ class SharedContainer:
         # Issue #277: the Swarm fan-out must respect the same shared resource
         # guards as the job pipeline — the shared breaker and limiter are
         # injected so 10 concurrent agent attempts cannot bypass them.
-        swarm_kwargs: dict[str, object] = dict(
-            attachment=cast(IPromptAggregate, self.agent_attachment_prompt_orchestrator),
-            output_root=SWARM_OUTPUT_ROOT,
-            browser_concurrency=swarm_workers,
-            headless=swarm_headless,
-            circuit_breaker=self.cb,
-            rate_limiter=self.rl,
-        )
+        #
+        # One registry backs all three Swarm seams: the capability files
+        # never import each other, so the shared fan-out state is reached
+        # through the single store composed here.
+        swarm_registry = SwarmRegistry()
+        swarm_attachment = cast(IPromptAggregate, self.agent_attachment_prompt_orchestrator)
+        self.swarm_registry: SwarmRegistry = swarm_registry
         self.agent_swarm_orchestrator: ISwarmAggregate = SwarmOrchestrator(
-            SwarmRunner(**swarm_kwargs),
-            SwarmProgressRunner(**swarm_kwargs),
-            SwarmCancelRunner(**swarm_kwargs),
+            SwarmRunner(
+                attachment=swarm_attachment,
+                registry=swarm_registry,
+                output_root=SWARM_OUTPUT_ROOT,
+                browser_concurrency=swarm_workers,
+                headless=swarm_headless,
+                circuit_breaker=self.cb,
+                rate_limiter=self.rl,
+            ),
+            SwarmProgressRunner(registry=swarm_registry),
+            SwarmCancelRunner(
+                registry=swarm_registry,
+                attachment=swarm_attachment,
+            ),
             self.observability,
             folder_adapter=self.folder_adapter,
         )

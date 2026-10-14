@@ -86,9 +86,9 @@ class TestCancelContract:
 
     def test_swarm_calls_request_cancel_without_getattr_hack(self) -> None:
 
-        from modules.swarm.src.utility_swarm_runner_base import SwarmRunnerBase
+        from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
 
-        src = inspect.getsource(SwarmRunnerBase._request_attachment_cancel)
+        src = inspect.getsource(SwarmCancelRunner._request_attachment_cancel)
         # direct typed contract call (no duck-typing escape hatch)
         assert "self._attachment.execute(" in src
         assert 'PromptRequest(verb="request_cancel"' in src

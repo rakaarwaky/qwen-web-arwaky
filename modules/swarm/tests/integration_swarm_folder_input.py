@@ -18,6 +18,7 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
 from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 
@@ -65,10 +66,11 @@ def test_integration_a_folder_input_reaches_every_role_as_one_attachment(
     (project / "README.md").write_text("# project", encoding="utf-8")
 
     seam = _RecordingPromptSeam()
+    registry = SwarmRegistry()
     orchestrator = SwarmOrchestrator(
-        start=SwarmStartRunner(output_root=tmp_path, browser_concurrency=2, attachment=seam),
-        progress=SwarmProgressRunner(output_root=tmp_path, browser_concurrency=2, attachment=seam),
-        cancel=SwarmCancelRunner(output_root=tmp_path, browser_concurrency=2, attachment=seam),
+        start=SwarmStartRunner(registry=registry, output_root=tmp_path, browser_concurrency=2, attachment=seam),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=seam),
         observability=MagicMock(),
     )
     started = orchestrator.execute(SwarmRequest(verb="start", input_path=project))

@@ -19,6 +19,7 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
 from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 
@@ -40,10 +41,12 @@ class _PromptSeam:
 
 
 def _orchestrator(tmp_path: Path) -> SwarmOrchestrator:
+    registry = SwarmRegistry()
+    attachment = _PromptSeam()
     return SwarmOrchestrator(
-        start=SwarmStartRunner(output_root=tmp_path, browser_concurrency=2, attachment=_PromptSeam()),
-        progress=SwarmProgressRunner(output_root=tmp_path, browser_concurrency=2, attachment=_PromptSeam()),
-        cancel=SwarmCancelRunner(output_root=tmp_path, browser_concurrency=2, attachment=_PromptSeam()),
+        start=SwarmStartRunner(registry=registry, output_root=tmp_path, browser_concurrency=2, attachment=attachment),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=attachment),
         observability=MagicMock(),
     )
 

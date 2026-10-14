@@ -15,19 +15,22 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.swarm.src.agent_swarm_orchestrator import SwarmOrchestrator
 from modules.swarm.src.capabilities_swarm_cancel import SwarmCancelRunner
 from modules.swarm.src.capabilities_swarm_progress import SwarmProgressRunner
+from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 from modules.swarm.src.capabilities_swarm_runner import SwarmRunner as SwarmStartRunner
 
 
 def _orchestrator(ceiling: int = 4) -> SwarmOrchestrator:
-    kwargs = dict(
-        output_root=Path("/tmp/qwen-smoke-output"),
-        browser_concurrency=ceiling,
-        attachment=MagicMock(execute=lambda request: PromptResponse(response_text=ResponseText("ok"))),
-    )
+    registry = SwarmRegistry()
+    attachment = MagicMock(execute=lambda request: PromptResponse(response_text=ResponseText("ok")))
     return SwarmOrchestrator(
-        start=SwarmStartRunner(**kwargs),
-        progress=SwarmProgressRunner(**kwargs),
-        cancel=SwarmCancelRunner(**kwargs),
+        start=SwarmStartRunner(
+            registry=registry,
+            output_root=Path("/tmp/qwen-smoke-output"),
+            browser_concurrency=ceiling,
+            attachment=attachment,
+        ),
+        progress=SwarmProgressRunner(registry=registry),
+        cancel=SwarmCancelRunner(registry=registry, attachment=attachment),
         observability=MagicMock(),
     )
 

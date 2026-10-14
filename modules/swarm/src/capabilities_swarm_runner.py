@@ -1,13 +1,17 @@
-"""Capabilities: the swarm fan-out engine (AES403).
+"""Capabilities: start a Swarm fan-out (AES403).
 
-Implements ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProtocol.
+Implements ISwarmStartProtocol.
 
-One file owns the fan-out engine — the thread-safe snapshot store, the
-cancellation events, the executors, and the per-role retry loop — while
-three protocol seams (start, progress, cancel) describe what a caller may
-do. The stateless helpers (retry predicate, snapshot-status replacement,
-manifest writer) live in ``utility_swarm_runner_base`` so this file is a
-thin class around the engine and never re-states another seam's logic.
+One file per protocol seam. This file owns ``ISwarmStartProtocol`` — the
+fan-out engine's start seam: discovering the role templates, creating the
+Swarm directory, scheduling one leg per role, and running each leg with
+the retry policy bounded by the host's circuit breaker and rate limiter.
+
+The snapshot store, the cancel events, and the executor all live in the
+shared registry this seam is handed; the progress and cancel seams read the
+same registry, so all three observe one fan-out without any of them
+importing another. The stateless helpers live in
+``utility_swarm_runner_base``.
 """
 
 from __future__ import annotations
@@ -31,8 +35,7 @@ from modules.shared.src.common.utility_response_normalizer import detect_process
 from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.shared.src.swarm.contract_swarm_protocol import (
-    ISwarmCancelProtocol,
-    ISwarmProgressProtocol,
+    ISwarmRegistryProtocol,
     ISwarmStartProtocol,
 )
 from modules.shared.src.swarm.taxonomy_swarm_vo import (
@@ -41,21 +44,21 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import (
     SwarmAgentSnapshot,
     SwarmId,
     SwarmSnapshot,
-    SwarmStatus,
 )
-from modules.swarm.src.utility_swarm_runner_base import (
+from modules.shared.src.swarm.utility_swarm_runner_base import (
+    CANCELLED_ERROR,
     is_retryable,
+    mark_agent_progress,
     new_swarm_id,
     replace_status,
-    write_manifest,
 )
 
 log = logging.getLogger(__name__)
 
 
 # ─── Block 1: Class Definition & Constructor ────────────
-class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProtocol):
-    """Run every discovered role template against one attachment.
+class SwarmRunner(ISwarmStartProtocol):
+    """Start a fan-out of every discovered role template over one attachment.
 
     The runner owns the mechanics of a fan-out and nothing else: it does
     not read a request, it does not decide what a folder input means, and
@@ -66,6 +69,7 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
     def __init__(
         self,
         attachment: IPromptAggregate,
+        registry: ISwarmRegistryProtocol,
         output_root: Path = SWARM_OUTPUT_ROOT,
         browser_concurrency: int | None = None,
         max_attempts: int = MAX_ATTEMPTS,
@@ -75,83 +79,31 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
     ) -> None:
         """Wire the fan-out engine to the attachment aggregate it fans out over.
 
-        ``attachment`` is the single material every role reads. The host
-        capacity is the ceiling for a fan-out: an explicit request above
-        it is clamped so a Swarm cannot OOM the runner (issue #291).
+        ``attachment`` is the single material every role reads. ``registry``
+        is the shared store the progress and cancel seams read the same run
+        from. The host capacity is the ceiling for a fan-out: an explicit
+        request above it is clamped so a Swarm cannot OOM the runner
+        (issue #291).
         """
         self._attachment = attachment
+        self._registry = registry
         self._output_root = Path(output_root)
         self._headless = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get("QWA_SWARM_CONCURRENCY", "").strip()
-            concurrency = (
-                int(swarm_env)
-                if swarm_env.isdigit() and int(swarm_env) > 0
-                else recommended_max_workers()
-            )
+            concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
         else:
             concurrency = int(browser_concurrency)
         self._browser_concurrency = min(recommended_max_workers(), max(1, concurrency))
         self._max_attempts = max(1, int(max_attempts))
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
-        self._lock = threading.RLock()
-        self._snapshots: dict[SwarmId, SwarmSnapshot] = {}
-        self._cancel_events: dict[SwarmId, dict[str, threading.Event]] = {}
-        self._executors: dict[SwarmId, ThreadPoolExecutor] = {}
-        self._attachment_paths: dict[SwarmId, Path] = {}
 
     # Block 2: Protocol Method Implementation
     @property
     def browser_concurrency(self) -> BrowserCount:
         """Configured browser concurrency for a single Swarm run."""
         return BrowserCount(self._browser_concurrency)
-
-    def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
-        """Return the latest snapshot for a swarm, or None when absent."""
-        with self._lock:
-            return self._snapshots.get(swarm_id)
-
-    def cancel(self, swarm_id: SwarmId) -> None:
-        """Stop active browser contexts and prevent queued work from running."""
-        with self._lock:
-            snapshot = self._snapshots.get(swarm_id)
-            events = self._cancel_events.get(swarm_id, {})
-            if snapshot is None:
-                return
-            for event in events.values():
-                event.set()
-            for event in events.values():
-                self._request_attachment_cancel(event)
-            updated = tuple(
-                agent
-                if agent.status in {"completed", "failed"}
-                else SwarmAgentSnapshot(
-                    agent_id=agent.agent_id,
-                    status="cancelled",
-                    attempt=agent.attempt,
-                    output_path=agent.output_path,
-                    error="Cancelled by user",
-                    duration_sec=agent.duration_sec,
-                )
-                for agent in snapshot.agents
-            )
-            self._snapshots[swarm_id] = replace_status(
-                SwarmSnapshot(
-                    swarm_id=snapshot.swarm_id,
-                    input_path=snapshot.input_path,
-                    root_path=snapshot.root_path,
-                    status="cancelled",
-                    max_attempts=snapshot.max_attempts,
-                    browser_concurrency=snapshot.browser_concurrency,
-                    agents=updated,
-                ),
-                "cancelled",
-            )
-            write_manifest(self._snapshots[swarm_id])
-            executor = self._executors.pop(swarm_id, None)
-        if executor is not None:
-            executor.shutdown(wait=False, cancel_futures=True)
 
     def start(self, input_path: FilePath, attachment_path: FilePath) -> SwarmSnapshot:
         """Create a Swarm directory and schedule all discovered templates.
@@ -168,12 +120,9 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
         roles = list_prompt_templates()
         if not roles:
             raise RuntimeError("No prompt templates were discovered")
-        swarm_id = new_swarm_id()
+        swarm_id = SwarmId(new_swarm_id())
         root = self._output_root / swarm_id
         root.mkdir(parents=True, exist_ok=False)
-        agents = tuple(
-            SwarmAgentSnapshot(agent_id=role, status="queued", output_path=root / role / "output.md") for role in roles
-        )
         snapshot = SwarmSnapshot(
             swarm_id=swarm_id,
             input_path=source,
@@ -181,23 +130,25 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
             status="queued",
             max_attempts=self._max_attempts,
             browser_concurrency=self._browser_concurrency,
-            agents=agents,
+            agents=tuple(
+                SwarmAgentSnapshot(agent_id=role, status="queued", output_path=root / role / "output.md")
+                for role in roles
+            ),
         )
-        with self._lock:
-            self._snapshots[swarm_id] = snapshot
-            self._cancel_events[swarm_id] = {role: threading.Event() for role in roles}
-            self._attachment_paths[swarm_id] = Path(attachment_path)
-        write_manifest(snapshot)
+        self._registry.open_run(
+            snapshot,
+            {role: threading.Event() for role in roles},
+            FilePath(attachment_path),
+        )
         executor = ThreadPoolExecutor(
             max_workers=self._browser_concurrency,
             thread_name_prefix=f"qwen_swarm_{swarm_id[-6:]}",
         )
-        with self._lock:
-            self._executors[swarm_id] = executor
-            self._snapshots[swarm_id] = replace_status(snapshot, "running")
+        self._registry.attach_executor(swarm_id, executor)
+        running = self._registry.revise(swarm_id, lambda current: replace_status(current, "running"))
         for role in roles:
             executor.submit(self._run_agent, swarm_id, role)
-        return self.snapshot(swarm_id) or snapshot
+        return running or snapshot
 
     # Block 3: Constructors, Std Traits, Helpers
     def _update_agent(
@@ -210,74 +161,34 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
         error: str | None,
         started: float,
     ) -> None:
-        """Update one agent's status in the snapshot and persist the manifest."""
-        with self._lock:
-            current = self._snapshots.get(swarm_id)
-            if current is None:
-                return
-            agents = tuple(
-                SwarmAgentSnapshot(
-                    agent_id=agent.agent_id,
-                    status=status if agent.agent_id == role else agent.status,
-                    attempt=attempt if agent.agent_id == role else agent.attempt,
-                    output_path=output_path if agent.agent_id == role else agent.output_path,
-                    error=error if agent.agent_id == role else agent.error,
-                    duration_sec=round(time.perf_counter() - started, 2)
-                    if agent.agent_id == role
-                    else agent.duration_sec,
-                )
-                for agent in current.agents
-            )
-            if current.status == "cancelled":
-                return
-            finished = all(agent.status in {"completed", "failed", "cancelled"} for agent in agents)
-            final_status: SwarmStatus = current.status
-            if finished:
-                final_status = "completed" if all(agent.status == "completed" for agent in agents) else "partial"
-            updated = SwarmSnapshot(
-                swarm_id=current.swarm_id,
-                input_path=current.input_path,
-                root_path=current.root_path,
-                status=final_status,
-                max_attempts=current.max_attempts,
-                browser_concurrency=current.browser_concurrency,
-                agents=agents,
-            )
-            self._snapshots[swarm_id] = updated
-            write_manifest(updated)
-
-    def _request_attachment_cancel(self, event: threading.Event) -> None:
-        """Forward a cancel event to the attachment aggregate via its typed seam.
-
-        ``IPromptAggregate.request_cancel`` is a first-class contract
-        operation, so the Swarm runner reaches it through ``execute`` with
-        the ``request_cancel`` verb rather than duck-typing on an attribute
-        that may or may not exist (issue #360).
-        """
-        self._attachment.execute(
-            PromptRequest(verb="request_cancel", cancel_event=event)
+        """Update one leg's status in the shared snapshot and persist the manifest."""
+        self._registry.revise(
+            swarm_id,
+            lambda current: mark_agent_progress(
+                current,
+                role,
+                status,
+                attempt,
+                output_path,
+                error,
+                round(time.perf_counter() - started, 2),
+            ),
         )
 
     def _run_agent(self, swarm_id: SwarmId, role: str) -> None:
-        """Execute one fan-out leg with retries, bounded by the cancel event.
-
-        The start seam schedules this per role; the loop itself is engine
-        mechanics shared conceptually with the whole fan-out, so it lives
-        in the base rather than in any one capability file.
-        """
+        """Execute one fan-out leg with retries, bounded by the cancel event."""
         start = time.perf_counter()
-        with self._lock:
-            events_map = self._cancel_events.get(swarm_id, {})
-            event = events_map.get(role)
-            attachment_path = self._attachment_paths.get(swarm_id)
+        events = self._registry.cancel_events(swarm_id)
+        event = events.get(role)
+        attachment_path = self._registry.attachment(swarm_id)
         output_path = self._output_root / swarm_id / role / "output.md"
         last_error = "Unknown Swarm agent failure"
         if event is None or attachment_path is None:
-            self._update_agent(swarm_id, role, "cancelled", 0, output_path, "Cancelled by user", start)
+            self._update_agent(swarm_id, role, "cancelled", 0, output_path, CANCELLED_ERROR, start)
             return
         for attempt in range(1, self._max_attempts + 1):
             if event.is_set():
-                self._update_agent(swarm_id, role, "cancelled", attempt - 1, output_path, "Cancelled by user", start)
+                self._update_agent(swarm_id, role, "cancelled", attempt - 1, output_path, CANCELLED_ERROR, start)
                 return
             if self._circuit_breaker is not None and self._circuit_breaker.is_tripped:
                 # The breaker only gates the agent in front of it: siblings keep
@@ -300,7 +211,7 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
                     )
                     if event.wait(wait_sec):
                         self._update_agent(
-                            swarm_id, role, "cancelled", attempt - 1, output_path, "Cancelled by user", start
+                            swarm_id, role, "cancelled", attempt - 1, output_path, CANCELLED_ERROR, start
                         )
                         return
             self._update_agent(
@@ -335,7 +246,7 @@ class SwarmRunner(ISwarmStartProtocol, ISwarmProgressProtocol, ISwarmCancelProto
             except Exception as exc:
                 last_error = str(exc)
                 if event.is_set():
-                    self._update_agent(swarm_id, role, "cancelled", attempt, output_path, "Cancelled by user", start)
+                    self._update_agent(swarm_id, role, "cancelled", attempt, output_path, CANCELLED_ERROR, start)
                     return
                 if self._circuit_breaker is not None:
                     self._circuit_breaker.record_failure()

@@ -30,14 +30,19 @@ class TestSwarmPipelineStructure:
         """Verify swarm concurrency is capacity-derived and capped (issue #291)."""
         from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MAX_WORKERS
         from modules.shared.src.common.utility_core_capacity import recommended_max_workers
-        from modules.swarm.src.utility_swarm_runner_base import SwarmRunnerBase
+        from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
+        from modules.swarm.src.capabilities_swarm_runner import SwarmRunner
 
         assert DEFAULT_MAX_WORKERS == 10
         capacity = recommended_max_workers()
         assert 1 <= capacity <= DEFAULT_MAX_WORKERS
         print(f"\n[SWARM-TEST] Concurrency: capacity {capacity} / cap {DEFAULT_MAX_WORKERS}")
 
-        runner = SwarmRunnerBase(attachment=MagicMock(), browser_concurrency=DEFAULT_MAX_WORKERS + 5)
+        runner = SwarmRunner(
+            attachment=MagicMock(),
+            registry=SwarmRegistry(),
+            browser_concurrency=DEFAULT_MAX_WORKERS + 5,
+        )
         assert int(runner.browser_concurrency) <= capacity
 
 
