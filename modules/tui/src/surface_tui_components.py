@@ -20,7 +20,7 @@ from rich.style import Style
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Center, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, RichLog, Static
 
@@ -205,8 +205,12 @@ class ConfirmModal(ModalScreen[bool]):
         """Build the warning text and Cancel / Confirm buttons."""
         with Vertical(id="confirm-modal-container"):
             yield Static(f"[bold red]{self._title.upper()}[/bold red]\n\n{self._message}\n")
-            yield Button("Cancel", id="btn-cancel", variant="default")
-            yield Button(self._confirm_label, id="btn-confirm", variant="error")
+            # Center wraps the buttons so Cancel/Confirm sit on the dialog's
+            # center axis; its 1fr width needs the container's min-height to
+            # resolve, so the box keeps a floor (see #confirm-modal-container).
+            with Center(id="confirm-btn-row"):
+                yield Button("Cancel", id="btn-cancel", variant="default")
+                yield Button(self._confirm_label, id="btn-confirm", variant="error")
 
     def on_mount(self) -> None:
         """Focus Cancel so Enter never confirms a destructive action by default."""

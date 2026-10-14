@@ -605,6 +605,58 @@ FilePickerModal {
     background: rgba(15, 19, 28, 0.85);
 }
 
+/* --- Confirm Modal (destructive-action gate) -----------------------------
+   Centered on screen: the ConfirmModal screen fills the terminal and the
+   inner container is pinned to the center with a fixed box. Used by the
+   session delete flow, slot cancel, fan-out gate, and session-setup. */
+ConfirmModal {
+    align: center middle;
+    background: rgba(15, 19, 28, 0.85);
+}
+
+#confirm-modal-container {
+    width: 60;
+    height: auto;
+    min-height: 9;
+    background: $bg_surface;
+    border: double $danger;
+    padding: 1 2;
+}
+
+#confirm-btn-row {
+    height: auto;
+    margin-top: 1;
+}
+
+#confirm-btn-row Button {
+    width: 16;
+    margin: 0 1;
+}
+
+#btn-confirm {
+    background: $danger_bg;
+    color: $danger_fg;
+    border: solid $danger;
+    text-style: bold;
+}
+
+#btn-confirm:hover {
+    background: $danger;
+    color: $danger_fg;
+}
+
+#btn-cancel {
+    background: $bg_hover;
+    color: $fg_accent;
+    border: solid $border;
+}
+
+#btn-cancel:hover {
+    color: $danger_fg;
+    background: $danger;
+    border: solid $danger;
+}
+
 #modal-container {
     width: 80%;
     height: 80%;
