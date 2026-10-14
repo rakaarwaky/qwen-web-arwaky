@@ -49,7 +49,7 @@ from modules.tui.src.surface_tui_components import (
 from modules.tui.src.surface_tui_compose import _TuiComposeMixin
 from modules.tui.src.surface_tui_css import THEME, TUI_CSS
 from modules.tui.src.surface_tui_events import _TuiEventsMixin
-from modules.tui.src.surface_tui_handlers import _TuiHandlersMixin
+from modules.tui.src.surface_tui_main_handlers import _TuiHandlersMixin
 from modules.tui.src.surface_tui_sessions_worker import _TuiSessionsWorkerMixin
 from modules.tui.src.surface_tui_settings import _TuiSettingsMixin
 from modules.tui.src.surface_tui_utils import _TuiUtilsMixin
