@@ -32,7 +32,6 @@ class IBrowserAggregate(ABC):
         session is still authenticated; exiting tears the browser down even
         when the caller's body raises.
         """
-        ...
 
 
 __all__ = ["IBrowserAggregate"]

@@ -19,9 +19,8 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable, Mapping
-from concurrent.futures import ThreadPoolExecutor
 
-from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.common.taxonomy_core_vo import CancelToken, FilePath, TaskExecutor
 from modules.shared.src.swarm.contract_swarm_protocol import ISwarmRegistryProtocol
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmId, SwarmSnapshot
 from modules.shared.src.swarm.utility_swarm_runner_base import write_manifest
@@ -44,15 +43,15 @@ class SwarmRegistry(ISwarmRegistryProtocol):
         """Start with no runs registered."""
         self._lock = threading.RLock()
         self._snapshots: dict[SwarmId, SwarmSnapshot] = {}
-        self._cancel_events: dict[SwarmId, Mapping[str, threading.Event]] = {}
+        self._cancel_events: dict[SwarmId, Mapping[str, CancelToken]] = {}
         self._attachments: dict[SwarmId, FilePath] = {}
-        self._executors: dict[SwarmId, ThreadPoolExecutor] = {}
+        self._executors: dict[SwarmId, TaskExecutor] = {}
 
     # Block 2: Protocol Method Implementation
     def open_run(
         self,
         snapshot: SwarmSnapshot,
-        cancel_events: Mapping[str, threading.Event],
+        cancel_events: Mapping[str, CancelToken],
         attachment: FilePath,
     ) -> None:
         """Register a new run with its cancel events and attachment, then persist it.
@@ -91,7 +90,7 @@ class SwarmRegistry(ISwarmRegistryProtocol):
             write_manifest(updated)
             return updated
 
-    def cancel_events(self, swarm_id: SwarmId) -> Mapping[str, threading.Event]:
+    def cancel_events(self, swarm_id: SwarmId) -> Mapping[str, CancelToken]:
         """Return the per-role cancel events of a swarm, empty when unknown."""
         with self._lock:
             return self._cancel_events.get(swarm_id, {})
@@ -101,12 +100,12 @@ class SwarmRegistry(ISwarmRegistryProtocol):
         with self._lock:
             return self._attachments.get(swarm_id)
 
-    def attach_executor(self, swarm_id: SwarmId, executor: ThreadPoolExecutor) -> None:
+    def attach_executor(self, swarm_id: SwarmId, executor: TaskExecutor) -> None:
         """Bind the executor that runs the legs of a swarm."""
         with self._lock:
             self._executors[swarm_id] = executor
 
-    def release(self, swarm_id: SwarmId) -> ThreadPoolExecutor | None:
+    def release(self, swarm_id: SwarmId) -> TaskExecutor | None:
         """Drop a swarm's executor, cancel events, and attachment path.
 
         The snapshot is kept so a caller can still read the terminal state

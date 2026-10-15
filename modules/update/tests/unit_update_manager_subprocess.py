@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from modules.shared.src.update.utility_update_pipeline import (
+from modules.shared.src.update.utility_update_subprocess import (
     SUBPROCESS_FORBIDDEN_CHARS,
     approved_spawn_command,
     run_subprocess,

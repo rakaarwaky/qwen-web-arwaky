@@ -8,7 +8,7 @@ the previous version when it fails) so no caller can skip it.
 The other three capabilities arrive as protocol seams (``IUpdateCheckProtocol``,
 ``IUpdateUpgradeProtocol``, ``IUpdateRollbackProtocol``); the low-level shared
 mechanics (subprocess sandbox, Chromium checks, version resolution, dependency
-snapshot) live in ``utility_update_pipeline`` so this capability never imports
+snapshot) live in the focused update utility modules so this capability never imports
 a sibling capability file (AES201).
 """
 
@@ -31,15 +31,10 @@ from modules.shared.src.update.contract_update_protocol import (
     IUpdateUpgradeProtocol,
     IUpdateVerifyProtocol,
 )
-from modules.shared.src.update.utility_update_pipeline import (
-    chromium_present,
-    compare_versions,
-    playwright_browsers_path,
-    run_pip_show,
-    run_subprocess,
-    smoke_gate_unavailable,
-    tail,
-)
+from modules.shared.src.update.utility_update_chromium import chromium_present, playwright_browsers_path
+from modules.shared.src.update.utility_update_refusal import smoke_gate_unavailable
+from modules.shared.src.update.utility_update_subprocess import run_pip_show, run_subprocess, tail
+from modules.shared.src.update.utility_update_version import compare_versions
 
 log = get_logger("capabilities_update_verify")
 

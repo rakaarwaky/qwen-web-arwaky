@@ -3,7 +3,7 @@
 Implements IUpdateUpgradeProtocol (contract_update_protocol.py).
 Owns the package-upgrade and browser-sync business rules; the shared
 subprocess sandbox, pinned-release resolution, editable-source detection,
-and Chromium cache mechanics live in ``utility_update_pipeline`` so this
+and Chromium cache mechanics live in the focused update utility modules so this
 capability stays independent of its sibling capability files (AES201).
 """
 
@@ -15,17 +15,12 @@ from modules.shared.src.common.taxonomy_core_constant import DEFAULT_PACKAGE_NAM
 from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateStepResult
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.update.contract_update_protocol import IUpdateUpgradeProtocol
-from modules.shared.src.update.utility_update_pipeline import (
-    chromium_present,
-    compare_versions,
-    purge_chromium_cache,
-    read_source_version,
-    refuse_unverified_install,
-    resolve_editable_source_dir,
-    resolve_github_pinned_url,
-    run_subprocess,
-    tail,
-)
+from modules.shared.src.update.utility_update_chromium import chromium_present, purge_chromium_cache
+from modules.shared.src.update.utility_update_github import resolve_github_pinned_url
+from modules.shared.src.update.utility_update_refusal import refuse_unverified_install
+from modules.shared.src.update.utility_update_source import read_source_version, resolve_editable_source_dir
+from modules.shared.src.update.utility_update_subprocess import run_subprocess, tail
+from modules.shared.src.update.utility_update_version import compare_versions
 
 log = get_logger("capabilities_update_upgrade")
 

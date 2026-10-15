@@ -11,8 +11,11 @@ from contextlib import suppress
 
 
 def isolate_thread_event_loop() -> None:
-    """Ensure the current thread has an isolated event loop for sync APIs."""
+    """Ensure the current thread has an isolated event loop for sync APIs.
+
+    Uses only the public ``asyncio`` API so the behaviour is stable across
+    Python versions (the previous implementation reached into the private
+    ``asyncio._set_running_loop`` slot, which is not guaranteed to exist).
+    """
     with suppress(RuntimeError, AttributeError):
-        if hasattr(asyncio, "_set_running_loop"):
-            asyncio._set_running_loop(None)
         asyncio.set_event_loop(asyncio.new_event_loop())

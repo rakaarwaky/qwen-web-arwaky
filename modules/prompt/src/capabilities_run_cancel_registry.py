@@ -15,7 +15,7 @@ from __future__ import annotations
 import contextlib
 import threading
 
-from modules.shared.src.common.taxonomy_core_vo import RunId, RunState
+from modules.shared.src.common.taxonomy_core_vo import CancelToken, RunId, RunState
 from modules.shared.src.prompt.contract_prompt_protocol import IRunCancelProtocol
 
 
@@ -32,7 +32,7 @@ class RunCancelRegistry:
 
     def __init__(self) -> None:
         self._states: dict[RunId, RunState] = {}
-        self._event_index: dict[threading.Event, RunId] = {}
+        self._event_index: dict[CancelToken, RunId] = {}
         self._lock = threading.Lock()
 
     # Block 2: Protocol Method Implementation
@@ -89,7 +89,7 @@ class RunCancelRegistry:
                 with contextlib.suppress(Exception):
                     close_fn()
 
-    def cancel_by_event(self, cancel_event: threading.Event) -> None:
+    def cancel_by_event(self, cancel_event: CancelToken) -> None:
         """Cancel the run whose ``cancel_event`` was supplied.
 
         Delegates to ``cancel_run`` using the stable run_id resolved from
