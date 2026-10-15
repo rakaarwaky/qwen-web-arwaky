@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -115,8 +116,14 @@ def parse_args() -> TestArgs:
     parser.add_argument(
         "--cli-entry",
         type=Path,
-        default=ROOT_DIR / "modules" / "root_cli_main_entry.py",
-        help="Path to Python CLI entry script",
+        default=(Path(sys.executable).parent / "qwen-web-arwaky")
+        if (Path(sys.executable).parent / "qwen-web-arwaky").exists()
+        else ROOT_DIR / "modules" / "root_cli_main_entry.py",
+        help="CLI entry point: the installed qwen-web-arwaky executable by default, "
+        "or the repo entry script when no installed executable is present. "
+        "The installed executable is preferred because running the entry script "
+        "directly puts `modules/` on sys.path, and modules/logging/__init__.py "
+        "shadows the stdlib `logging` module.",
     )
     ns = parser.parse_args()
     return TestArgs(
@@ -128,6 +135,24 @@ def parse_args() -> TestArgs:
         output_dir=ns.output_dir,
         cli_entry=ns.cli_entry,
     )
+
+
+def _latest_swarm_run_dir() -> Path:
+    """Return the newest swarm run directory, or a sentinel that never exists.
+
+    ``swarm start`` writes each fan-out to its own swarm-id directory under
+    the swarm output root, so the summary cannot check a fixed output file
+    the way pipelines 1-3 do. Falls back to a non-existent path so the
+    report still shows ``[File Missing]`` when no run directory exists.
+    """
+    data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    swarm_root = data_home / "qwen-web-arwaky" / "swarm"
+    if not swarm_root.is_dir():
+        return swarm_root / "no_run"
+    runs = [p for p in swarm_root.iterdir() if p.is_dir()]
+    if not runs:
+        return swarm_root / "no_run"
+    return max(runs, key=lambda p: p.stat().st_mtime)
 
 
 def run_pipeline_cmd(name: str, cmd: list[str]) -> bool:
@@ -169,7 +194,6 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cli_entry: Path = args.cli_entry
-    python_bin = sys.executable
 
     # Verify fixture files exist
     if not PROMPT_FIXTURE.exists():
@@ -177,6 +201,15 @@ def main() -> int:
         return 1
     if not ATTACHMENT_FIXTURE.exists():
         print(f"❌ Error: Attachment fixture not found at {ATTACHMENT_FIXTURE}", file=sys.stderr)
+        return 1
+
+    # Validate the CLI entry point is invocable before launching any pipeline.
+    probe = subprocess.run([str(cli_entry), "--help"], capture_output=True, text=True, cwd=str(ROOT_DIR))
+    if probe.returncode != 0:
+        print(
+            f"❌ Error: CLI entry point {cli_entry} is not invocable (exit code {probe.returncode}).", file=sys.stderr
+        )
+        print(probe.stdout + probe.stderr, file=sys.stderr)
         return 1
 
     # Determine which pipelines to run: if no specific flags (-1, -2, -3, -4) are set, run all.
@@ -207,7 +240,6 @@ def main() -> int:
             "of key architecture requirements for distributed microservices."
         )
         cmd_1 = [
-            python_bin,
             str(cli_entry),
             "prompt",
             "direct",
@@ -227,7 +259,6 @@ def main() -> int:
             time.sleep(2.5)
         executed_count += 1
         cmd_2 = [
-            python_bin,
             str(cli_entry),
             "prompt",
             "file",
@@ -247,7 +278,6 @@ def main() -> int:
             time.sleep(2.5)
         executed_count += 1
         cmd_3 = [
-            python_bin,
             str(cli_entry),
             "prompt",
             "attach",
@@ -272,16 +302,14 @@ def main() -> int:
             time.sleep(2.5)
         executed_count += 1
         cmd_4 = [
-            python_bin,
             str(cli_entry),
             "swarm",
             "start",
             str(PROMPT_FIXTURE),
-            *headless_flag,
         ]
         results["Pipeline 4: swarm"] = (
             run_pipeline_cmd("Pipeline 4 (swarm fan-out)", cmd_4),
-            output_dir / "real_test_swarm",
+            _latest_swarm_run_dir(),
         )
 
     # --------------------------------------------------------------------------
