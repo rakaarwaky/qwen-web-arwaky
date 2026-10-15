@@ -23,6 +23,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Input, LoadingIndicator
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
+from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, load_prompt_template
 from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
 from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
@@ -132,9 +133,14 @@ class _TuiWorkersMixin:
 
         if attachment_val and prompt_val:
             # A typed task plus an attachment runs through the attachment
-            # pipeline so the folder uploads as a document.
+            # pipeline so the folder uploads as a document. If the task is a
+            # role template name (shared matcher, not exact key), materialize
+            # it first so the template — not the role text — is the prompt.
+            task_text = prompt_val
+            if is_prompt_role(prompt_val):
+                task_text = load_prompt_template(prompt_val)
             self._append_chat_message(slot_id, "user", prompt_val, attachment=attachment_val)
-            self._run_composer_slot_with_attachment(slot_id, prompt_val, attachment_val, bool(headless_val), out_val)
+            self._run_composer_slot_with_attachment(slot_id, task_text, attachment_val, bool(headless_val), out_val)
             return
         if attachment_val and not prompt_val:
             msg = "Type a task before sending with an attachment."

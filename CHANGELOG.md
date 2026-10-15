@@ -15,6 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   `prompt file -i <folder>` and the run failed instead of uploading the
   folder as a document. Choosing a template then sending a task runs the
   prompt alone, as intended.
+- fix(shared): prompt-template role matching is now tolerant of how an
+  operator types a role. `is_prompt_role` / `resolve_prompt_role` normalize
+  hyphens, spaces, and underscores so `Front-End Engineer`, `front end
+  engineer`, and `frontend_engineer` all resolve to the canonical key
+  `frontend-engineer`. Previously only the exact key matched, so a typed
+  role fell through to a filesystem-path lookup and the raw text was sent
+  to Qwen instead of the template.
 
 ### Changed
 
