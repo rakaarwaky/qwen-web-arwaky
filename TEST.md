@@ -205,7 +205,6 @@ tests/                                  # fixture state + shared helper scripts 
 │   └── log/
 ├── helpers.py                           # thin named wrappers shared by module test dirs
 ├── pipeline_fixtures.py                 # fixture state management (restore_fixture_state)
-└── uat/setup.sh                         # deterministic UAT workspace bootstrap
 
 modules/<name>/tests/                    # the pytest roots — one per AES member
 
