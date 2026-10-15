@@ -22,6 +22,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   `frontend-engineer`. Previously only the exact key matched, so a typed
   role fell through to a filesystem-path lookup and the raw text was sent
   to Qwen instead of the template.
+- fix(tui): picking a template from the Templates pill then pressing Send
+  now loads the full template body as the prompt. The Send path
+  (`_send_composer` → `_run_composer_slot` → `process_direct_prompt`) sent
+  the bare role name to Qwen; it now materializes the template when the
+  composer text names a role, matching the keyboard run path.
 
 ### Changed
 

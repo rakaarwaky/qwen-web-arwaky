@@ -206,6 +206,15 @@ class _TuiWorkersMixin:
             with contextlib.suppress(Exception):
                 self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
+
+        # A role picked from the Templates pill is stored in the composer as
+        # its display label (``Frontend Engineer``). Without this the Send
+        # path would hand that label to ``process_direct_prompt`` verbatim
+        # and Qwen would see the bare role name instead of the full template.
+        # Materialize it so the template body is the actual prompt.
+        if is_prompt_role(text):
+            text = load_prompt_template(text)
+
         if getattr(self, "_direct", None) is None and not attachment:
             msg = f"Direct prompt capability is not available for Slot {slot_id}."
             self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
