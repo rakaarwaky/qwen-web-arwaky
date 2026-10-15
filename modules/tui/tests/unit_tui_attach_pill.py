@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 from textual.widgets import Input, Label
 
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
+from modules.shared.src.common.utility_core_prompt_template import load_prompt_template
 from modules.tui.src.surface_tui_app import QwenTuiApp
 from modules.tui.src.surface_tui_navlog_handler import _attachment_label
 
@@ -155,3 +156,53 @@ class TestAttachmentLabel:
         f = tmp_path / "blob.xyz"
         f.write_text("x")
         assert _attachment_label(str(f)) == "blob.xyz (unsupported type: xyz)"
+
+
+class TestTemplatePickerComposer:
+    """Picking a template then pressing Send must load the full template."""
+
+    def test_send_with_picked_template_loads_full_template(self, tmp_path: Path) -> None:
+        """Regression: the Templates pill stores the role label in the
+        composer; pressing Send (no attachment) must materialize the full
+        template body instead of sending the bare role name to Qwen.
+        """
+        app = _make_app(tmp_path)
+
+        async def _run() -> None:
+            async with app.run_test(size=(100, 40)):
+                # Simulate the picker filling the composer with the display
+                # label it shows for the frontend-engineer template.
+                app.query_one("#composer-1", Input).value = "Frontend Engineer"
+
+                app._execute_direct_worker = MagicMock()
+                app._execute_attachment_worker = MagicMock()
+
+                app._send_composer(1)
+
+                # The direct worker received the FULL template body, not the
+                # bare role name.
+                args = app._execute_direct_worker.call_args[0]
+                prompt_text = args[1]
+                expected = load_prompt_template("frontend-engineer")
+                assert prompt_text == expected
+                assert "Frontend Engineer" not in prompt_text[:80] or "# frontend-engineer" in prompt_text
+
+        asyncio.run(_run())
+
+    def test_send_with_plain_task_does_not_materialize_template(self, tmp_path: Path) -> None:
+        """A free-text task that is not a role name passes through verbatim."""
+        app = _make_app(tmp_path)
+
+        async def _run() -> None:
+            async with app.run_test(size=(100, 40)):
+                app.query_one("#composer-1", Input).value = "Summarize this code"
+
+                app._execute_direct_worker = MagicMock()
+                app._execute_attachment_worker = MagicMock()
+
+                app._send_composer(1)
+
+                args = app._execute_direct_worker.call_args[0]
+                assert args[1] == "Summarize this code"
+
+        asyncio.run(_run())
