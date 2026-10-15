@@ -312,7 +312,9 @@ class _TuiComposeMixin:
                             id=f"btn-headless-{s}",
                             classes="action-pill action-pill-headless",
                         )
-                    # File indicator: shows the attached file/folder, hidden by default.
+                    # File indicator: shows the attached file/folder (issue #341).
+                    # It stays hidden until the Attach pill picks a path; an
+                    # empty indicator would only waste a console row.
                     file_indicator = Label("", id=f"file-indicator-{s}", classes="file-indicator")
                     file_indicator.display = False
                     yield file_indicator

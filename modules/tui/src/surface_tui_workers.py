@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -122,9 +123,25 @@ class _TuiWorkersMixin:
         prompt_val = ""
         with contextlib.suppress(NoMatches):
             prompt_val = self.query_one(f"#composer-{slot_id}", Input).value.strip()
+        # Issue #341: the Attach pill's picker state holds the slot's
+        # attachment; the composer itself never carries a path anymore.
+        attachment_val = getattr(self, "_slot_attachments", {}).get(slot_id, "")
         file_val = ""
         out_val = ""
         headless_val = getattr(self, "_headless", True)
+
+        if attachment_val and prompt_val:
+            # A typed task plus an attachment runs through the attachment
+            # pipeline so the folder uploads as a document.
+            self._append_chat_message(slot_id, "user", prompt_val, attachment=attachment_val)
+            self._run_composer_slot_with_attachment(slot_id, prompt_val, attachment_val, bool(headless_val), out_val)
+            return
+        if attachment_val and not prompt_val:
+            msg = "Type a task before sending with an attachment."
+            self._log_msg("[bold {}]ERROR:[/] {} (Slot {})".format(THEME["err"], msg, slot_id), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(msg, severity="warning", title=f"Slot {slot_id}")
+            return
 
         plan = self._slot_config.resolve_slot_run_plan(
             PromptText(prompt_val),
@@ -168,20 +185,22 @@ class _TuiWorkersMixin:
 
         self._slot_workers[slot_id] = self._execute_slot_worker(slot_id, cfg)
 
-    def _run_composer_slot(self, slot_id: int, text: str) -> None:
+    def _run_composer_slot(self, slot_id: int, text: str, attachment: str = "") -> None:
         """Dispatch a chat-console task as a direct text prompt.
 
         The composer is the mockup's inline execution surface: it takes a
         typed task instead of a prompt file, so it runs through the direct
         prompt capability while reusing the same per-slot status, table, and
-        finalize plumbing every other run uses.
+        finalize plumbing every other run uses. When an attachment was
+        chosen via the Attach pill (issue #341) it runs through the
+        attachment capability instead so the folder uploads as a document.
         """
         if self._slot_workers.get(slot_id) is not None:
             self._log_msg("[bold {}]WARNING:[/] Slot {} already running.".format(THEME["warn"], slot_id), slot_id)
             with contextlib.suppress(Exception):
                 self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
-        if getattr(self, "_direct", None) is None:
+        if getattr(self, "_direct", None) is None and not attachment:
             msg = f"Direct prompt capability is not available for Slot {slot_id}."
             self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
             with contextlib.suppress(Exception):
@@ -192,6 +211,24 @@ class _TuiWorkersMixin:
         # composer inherits the shared headless flag and session default output.
         headless = getattr(self, "_headless", True)
         out_val = ""
+
+        # Issue #341: a folder/file chosen via the Attach pill routes through
+        # the attachment capability so it uploads as a document, not as the
+        # prompt source.
+        if attachment:
+            if getattr(self, "_attachment", None) is None:
+                msg = f"Attachment capability is not available for Slot {slot_id}."
+                self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
+                with contextlib.suppress(Exception):
+                    self.notify(msg, severity="error", title=f"Slot {slot_id}")
+                return
+            if not Path(attachment).exists():
+                msg = f"Attachment path does not exist: {attachment}"
+                self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
+                with contextlib.suppress(Exception):
+                    self.notify(msg, severity="error", title=f"Slot {slot_id}")
+                return
+            return self._run_composer_slot_with_attachment(slot_id, text, attachment, headless, out_val)
 
         filename = self._truncate_name(text, 24)
         self._slot_cancel_events[slot_id] = threading.Event()
@@ -211,6 +248,46 @@ class _TuiWorkersMixin:
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_direct_worker(slot_id, text, headless, out_val)
+
+    def _run_composer_slot_with_attachment(
+        self,
+        slot_id: int,
+        text: str,
+        attachment: str,
+        headless: bool,
+        out_val: str,
+    ) -> None:
+        """Run a composer task with the Attach pill's file/folder (issue #341).
+
+        ``process_prompt_with_attachment`` requires a prompt file on disk, so
+        the typed task is written to a temporary .md file first. The
+        ``FolderToAttachmentAdapter`` inside the pipeline compiles a folder
+        attachment into one markdown document before upload.
+        """
+        prompt_path = self._write_prompt_temp_file(slot_id, text)
+        if prompt_path is None:
+            return
+
+        filename = self._truncate_name(Path(attachment).name or text, 24)
+        self._slot_cancel_events[slot_id] = threading.Event()
+        self._set_slot_tab_title(slot_id, f"Slot {slot_id}: {filename} ▶")
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#btn-retry-{slot_id}").display = False
+        self._update_slot_status(slot_id, self._format_status("RUNNING", "badge"))
+        self._slot_stats[slot_id] = {
+            "status": "RUNNING",
+            "file": filename,
+            "duration": 0.0,
+            "event": "EVENT_WEB_LOADED",
+            "_start_perf": time.perf_counter(),
+        }
+        self._refresh_metrics()
+        with contextlib.suppress(NoMatches):
+            self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
+
+        self._slot_workers[slot_id] = self._execute_attachment_worker(
+            slot_id, prompt_path, attachment, headless, out_val
+        )
 
     def _cancel_slot(self, slot_id: int) -> None:
         worker = self._slot_workers.get(slot_id)
@@ -558,6 +635,92 @@ class _TuiWorkersMixin:
                 timeout_sec=600,
                 output_file=Path(output_val) if output_val.strip() else None,
                 headless=HeadlessFlag(headless),
+                event_observer=_on_event,
+                session_resolver=self._session_resolver(),
+            )
+            dur = round(time.perf_counter() - start_t, 1)
+            res_str = str(res)
+            fail_reason = detect_processing_failure(res_str)
+            if fail_reason is not None:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(fail_reason))),
+                    slot_id,
+                )
+                self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
+            else:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
+                    slot_id,
+                )
+                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
+                self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", filename, dur, True, gen)
+        except Exception as exc:
+            dur = round(time.perf_counter() - start_t, 1)
+            self.call_from_thread(
+                self._log_msg,
+                "[bold {}][Slot {}] FAILED:[/] {}".format(THEME["err"], slot_id, escape(str(exc))),
+                slot_id,
+            )
+            self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
+
+    def _write_prompt_temp_file(self, slot_id: int, text: str) -> Path | None:
+        """Write a composer task to a temporary prompt file (issue #341).
+
+        ``process_prompt_with_attachment`` takes a prompt file on disk, so
+        the typed task is materialized as a .md file first. Returns None and
+        notifies when the write fails, so the caller can abort the run.
+        """
+        try:
+            tmp_dir = Path(tempfile.mkdtemp(prefix=f"qwen_slot_{slot_id}_"))
+            prompt_path = tmp_dir / "prompt.md"
+            prompt_path.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            msg = f"Cannot write prompt file for Slot {slot_id}: {exc}"
+            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
+            with contextlib.suppress(Exception):
+                self.notify(msg, severity="error", title=f"Slot {slot_id}")
+            return None
+        return prompt_path
+
+    @work(thread=True)
+    def _execute_attachment_worker(
+        self,
+        slot_id: int,
+        prompt_path: Path,
+        attachment: str,
+        headless: bool,
+        output_val: str,
+    ) -> None:
+        """Run one composer task with an attachment (issue #341).
+
+        Mirrors ``_execute_direct_worker``; a folder attachment is compiled
+        to a single markdown document by the pipeline's
+        ``FolderToAttachmentAdapter`` before it is uploaded.
+        """
+        threading.current_thread().name = f"qwen_slot_worker_{slot_id}"
+        self._ensure_log_handler()
+        filename = self._truncate_name(Path(attachment).name, 24)
+        start_t = time.perf_counter()
+        gen = self._slot_generation.get(slot_id, 0)
+        _on_event = self._observe_slot_event(slot_id)
+
+        self.call_from_thread(
+            self._log_msg,
+            "[bold {}]>>> [Slot {}] Prompt with attachment: {}[/]".format(
+                THEME["accent_fg"], slot_id, escape(filename)
+            ),
+            slot_id,
+        )
+
+        try:
+            res = self._attachment.process_prompt_with_attachment(
+                prompt_file=prompt_path,
+                attachment_file=Path(attachment),
+                output_file=Path(output_val) if output_val.strip() else None,
+                headless=HeadlessFlag(headless),
+                cancel_event=self._slot_cancel_events.get(slot_id),
                 event_observer=_on_event,
                 session_resolver=self._session_resolver(),
             )

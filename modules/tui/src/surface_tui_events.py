@@ -36,6 +36,7 @@ class _TuiEventsMixin:
     _override_rows: Any
     _show_slot_log: Any
     _open_picker: Any
+    _open_attachment_picker: Any
     _toggle_slot_config: Any
     _apply_template_chip: Any
     _run_slot: Any
@@ -123,7 +124,12 @@ class _TuiEventsMixin:
             return
         if button_id.startswith("btn-pill-attach-"):
             slot_id = int(button_id.removeprefix("btn-pill-attach-"))
-            self._open_picker(f"composer-{slot_id}", select_directories=True)
+            # Issue #341: the Attach pill must not write into the composer.
+            # A path in the composer is read as the prompt source, so an
+            # attached folder was sent to `qwen-web-arwaky prompt file -i
+            # <folder>` instead of `prompt attach -a <folder>`. The picker
+            # result is stored in the slot's attachment state instead.
+            self._open_attachment_picker(slot_id)
             return
         if button_id.startswith("btn-pill-templates-"):
             slot_id = int(button_id.removeprefix("btn-pill-templates-"))

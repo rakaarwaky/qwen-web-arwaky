@@ -88,10 +88,11 @@ class _TuiChatLogHandlerMixin:
                 )
             return
         attachment = ""
-        with contextlib.suppress(NoMatches):
-            attachment = self.query_one(f"#input-file-{slot_id}", Input).value.strip()
+        # Issue #341: the attachment comes from the Attach pill's picker
+        # state, not a composer field (the chat console has no file input).
+        attachment = getattr(self, "_slot_attachments", {}).get(slot_id, "")
         self._append_chat_message(slot_id, "user", text, attachment=attachment)
-        self._run_composer_slot(slot_id, text)
+        self._run_composer_slot(slot_id, text, attachment=attachment)
 
 
 __all__ = ["_TuiChatLogHandlerMixin"]
