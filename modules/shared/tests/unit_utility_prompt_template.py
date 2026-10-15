@@ -11,6 +11,7 @@ from modules.shared.src.common.utility_core_prompt_template import (
     materialize_role_template,
     prompt_template_manifest,
     render_prompt,
+    resolve_prompt_role,
 )
 
 BUNDLED_ROLES = (
@@ -38,6 +39,44 @@ def test_is_prompt_role_invalid() -> None:
     assert is_prompt_role("not_a_role") is False
     assert is_prompt_role("") is False
     assert is_prompt_role("path/to/prompt.md") is False
+
+
+def test_resolve_prompt_role_fuzzy_variants() -> None:
+    """Human-typed variants of a role name resolve to the canonical key."""
+    # hyphen / underscore / space are interchangeable with the canonical
+    # hyphenated key, case-insensitive.
+    assert resolve_prompt_role("Front-End Engineer") == "frontend-engineer"
+    assert resolve_prompt_role("front-end engineer") == "frontend-engineer"
+    assert resolve_prompt_role("front end engineer") == "frontend-engineer"
+    assert resolve_prompt_role("frontend_engineer") == "frontend-engineer"
+    assert resolve_prompt_role("frontend-engineer") == "frontend-engineer"
+    assert resolve_prompt_role("QA Engineer") == "qa-engineer"
+    # ui-ux-designer: the canonical key already uses hyphens; the spaced
+    # form must match it too.
+    assert resolve_prompt_role("UI UX Designer") == "ui-ux-designer"
+    # Unknown / empty inputs stay None.
+    assert resolve_prompt_role("") is None
+    assert resolve_prompt_role("not_a_role") is None
+    assert resolve_prompt_role("path/to/prompt.md") is None
+
+
+def test_is_prompt_role_accepts_fuzzy_variants() -> None:
+    """is_prompt_role delegates to fuzzy resolution, not exact-key match."""
+    for variant in ("Front-End Engineer", "front end engineer", "qa_engineer"):
+        assert is_prompt_role(variant) is True
+    # A role name that is only a substring of a real role must not match
+    # (e.g. "security" is not "security-engineer").
+    assert is_prompt_role("security") is False
+
+
+def test_load_and_materialize_accept_fuzzy_variants() -> None:
+    """Loading / materializing a template works from any typed variant."""
+    canonical = resolve_prompt_role("Front-End Engineer")
+    assert canonical == "frontend-engineer"
+    assert load_prompt_template("Front-End Engineer") == load_prompt_template(canonical)
+    path = materialize_role_template("front end engineer")
+    assert path.name == f"{canonical}.md"
+    assert path.read_text(encoding="utf-8") == load_prompt_template(canonical)
 
 
 def test_list_prompt_templates_returns_bundled_roles() -> None:

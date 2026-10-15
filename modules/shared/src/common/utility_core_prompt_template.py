@@ -23,6 +23,22 @@ from pathlib import Path
 _TEMPLATE_DIR: Path = Path(__file__).resolve().parents[2] / "templates"
 
 _HEADING_RE = re.compile(r"^##\s+(?P<title>.+)$")
+# Canonical role keys are lowercase hyphenated stems (``frontend-engineer``).
+# Humans type variants — ``Front-End Engineer``, ``front end engineer``,
+# ``frontend_engineer`` — so matching collapses every role and the input to
+# its bare-alphanumeric form before comparing. This makes ``-``, ``_``, and
+# whitespace all interchangeable without a per-role alias table.
+_ROLE_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_role(value: str) -> str:
+    """Collapse a role name or input to its comparable alphanumeric form.
+
+    ``"Front-End Engineer"``, ``"front end engineer"``, and
+    ``"frontend-engineer"`` all normalize to ``"frontendengineer"``.
+    """
+    return _ROLE_NORMALIZE_RE.sub("", value.strip().lower())
+
 
 # Discovery cache. Keyed on the templates directory mtime rather than cached for
 # the process lifetime: the MCP server is long-running, so a template dropped
@@ -75,22 +91,43 @@ def list_prompt_templates() -> tuple[str, ...]:
     return _discovered_roles()
 
 
+def resolve_prompt_role(value: str) -> str | None:
+    """Return the canonical role key that *value* names, or ``None``.
+
+    Matching is tolerant of the spellings operators actually type:
+    ``"Front-End Engineer"``, ``"front end engineer"``, and
+    ``"frontend_engineer"`` all resolve to the canonical key
+    ``"frontend-engineer"``. The canonical key is returned so callers
+    (``materialize_role_template``, ``load_prompt_template``) address the
+    on-disk file unambiguously.
+    """
+    normalized = _normalize_role(value)
+    if not normalized:
+        return None
+    for role in _discovered_roles():
+        if _normalize_role(role) == normalized:
+            return role
+    return None
+
+
 def is_prompt_role(value: str) -> bool:
     """Return True when the value names a discovered prompt template role."""
-    return value.strip().lower() in _discovered_roles()
+    return resolve_prompt_role(value) is not None
 
 
 def load_prompt_template(role: str) -> str:
     """Load a discovered role template as a raw markdown string.
 
     Args:
-        role: A discovered role name, e.g. ``architect``.
+        role: A discovered role name, e.g. ``architect``. Human-typed
+            variants (``"Front End Architect"``, ``"architect_engineer"``)
+            are accepted and resolved to their canonical key.
 
     Raises:
         ValueError: if role is not a discovered template.
     """
-    role_key = role.strip().lower()
-    if role_key not in _discovered_roles():
+    role_key = resolve_prompt_role(role)
+    if role_key is None:
         supported = ", ".join(_discovered_roles())
         raise ValueError(f"Unknown prompt template role: {role!r}. Supported: {supported}")
     return (_TEMPLATE_DIR / f"{role_key}.md").read_text(encoding="utf-8")
@@ -104,16 +141,21 @@ def render_prompt(role: str) -> str:
 def materialize_role_template(role: str) -> Path:
     """Render a built-in role template to a stable temp file and return its path.
 
-    The file lives in ``/tmp/qwa-templates/{role}.md`` and is overwritten on
-    every call (idempotent). Used by CLI, MCP, and TUI surfaces to bridge the
-    existing file-based pipelines.
+    The file lives in ``/tmp/qwa-templates/{role}.md`` (the canonical key,
+    not the raw input) and is overwritten on every call (idempotent). Used
+    by CLI, MCP, and TUI surfaces to bridge the existing file-based
+    pipelines.
     """
     from tempfile import gettempdir
 
-    rendered = load_prompt_template(role)
+    canonical = resolve_prompt_role(role)
+    if canonical is None:
+        supported = ", ".join(_discovered_roles())
+        raise ValueError(f"Unknown prompt template role: {role!r}. Supported: {supported}")
+    rendered = load_prompt_template(canonical)
     tmp_dir = Path(gettempdir()) / "qwa-templates"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    tmp = tmp_dir / f"{role.strip().lower()}.md"
+    tmp = tmp_dir / f"{canonical}.md"
     tmp.write_text(rendered, encoding="utf-8")
     return tmp
 
@@ -171,4 +213,5 @@ __all__ = [
     "prompt_template_manifest",
     "render_prompt",
     "resolve_prompt_path",
+    "resolve_prompt_role",
 ]
