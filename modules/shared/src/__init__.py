@@ -528,7 +528,6 @@ __all__ = [
     "contract_update_protocol",
     "taxonomy_update_vo",
     "utility_update_browser_binary",
-    "utility_update_pipeline",
     "contract_logging_aggregate",
     "contract_logging_protocol",
     "taxonomy_logging_vo",
@@ -616,5 +615,4 @@ from modules.shared.src.update import (
     contract_update_protocol,
     taxonomy_update_vo,
     utility_update_browser_binary,
-    utility_update_pipeline,
 )

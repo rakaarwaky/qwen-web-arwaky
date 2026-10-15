@@ -6,7 +6,6 @@ flow driven by the direct, file-only, and attachment prompt adapters.
 
 from __future__ import annotations
 
-import threading
 import time
 from pathlib import Path
 
@@ -25,6 +24,7 @@ from modules.shared.src.common.taxonomy_core_event import (
 )
 from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
+    CancelToken,
     EventSequenceVO,
     HeadlessFlag,
     MessageCount,
@@ -66,7 +66,7 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
-        cancel_event: threading.Event | None = None,
+        cancel_event: CancelToken | None = None,
     ) -> str:
         """Inject prompt, click send, and wait for the AI response.
 
@@ -181,7 +181,7 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None,
         document_parsed: bool,
-        cancel_event: threading.Event | None,
+        cancel_event: CancelToken | None,
     ) -> str:
         """Single inject → send → wait cycle. Raises on failure; caller retries."""
         logger = observability.get_logger()
@@ -232,6 +232,6 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         raise ResponseDetectionTimeoutError("No terminal response event detected before the browser flow ended")
 
 
-def _interruptible_sleep(cancel_event: threading.Event, seconds: int) -> None:
+def _interruptible_sleep(cancel_event: CancelToken, seconds: int) -> None:
     """Sleep for ``seconds`` but wake early if ``cancel_event`` is set."""
     cancel_event.wait(timeout=seconds)

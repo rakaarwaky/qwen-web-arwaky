@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -55,42 +55,20 @@ class SessionInfo:
         return self.failed_requests / self.total_requests
 
     def with_status(self, status: SessionStatus) -> SessionInfo:
-        """Return a copy with updated status."""
-        return SessionInfo(
-            session_id=self.session_id,
-            name=self.name,
-            path=self.path,
-            status=status,
-            last_used=self.last_used,
-            total_requests=self.total_requests,
-            failed_requests=self.failed_requests,
-            created_at=self.created_at,
-        )
+        """Return a copy with updated status (delegates to ``dataclasses.replace``)."""
+        return replace(self, status=status)
 
     def with_name(self, name: SessionName) -> SessionInfo:
-        """Return a copy with an updated account name."""
-        return SessionInfo(
-            session_id=self.session_id,
-            name=name,
-            path=self.path,
-            status=self.status,
-            last_used=self.last_used,
-            total_requests=self.total_requests,
-            failed_requests=self.failed_requests,
-            created_at=self.created_at,
-        )
+        """Return a copy with an updated account name (delegates to ``dataclasses.replace``)."""
+        return replace(self, name=name)
 
     def with_usage(self, success: bool) -> SessionInfo:
-        """Return a copy with updated usage counters."""
-        return SessionInfo(
-            session_id=self.session_id,
-            name=self.name,
-            path=self.path,
-            status=self.status,
+        """Return a copy with updated usage counters (delegates to ``dataclasses.replace``)."""
+        return replace(
+            self,
             last_used=datetime.now().astimezone(),
             total_requests=self.total_requests + 1,
             failed_requests=self.failed_requests + (0 if success else 1),
-            created_at=self.created_at,
         )
 
 
