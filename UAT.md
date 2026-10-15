@@ -33,4 +33,3 @@ The following deterministic scenarios are required for release sign-off:
 
 ## Isolated UAT setup
 
-Run `tests/uat/setup.sh` before deterministic UAT. It creates isolated input, output, and session directories without performing live authentication. Browser-backed scenarios may supply a session separately.

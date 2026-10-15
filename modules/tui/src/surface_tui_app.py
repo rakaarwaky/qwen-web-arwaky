@@ -199,6 +199,11 @@ class QwenTuiApp(
         # Sessions pane: 0-based index of the row the operator has highlighted
         # via ↑/↓ (problem 4). -1 = none.
         self._session_row: int = -1
+        # Issue #341: the chat console no longer carries an attachment field,
+        # so the Attach pill stores its picked file/folder here per slot. The
+        # composer must stay prompt-only; writing a path into it made the run
+        # treat the folder as the prompt source.
+        self._slot_attachments: dict[int, str] = {}
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406

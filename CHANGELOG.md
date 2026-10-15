@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- fix(tui): the Attach pill on the chat console stores its picked file or
+  folder in per-slot attachment state and routes the run through the
+  attachment pipeline. It previously wrote the path into the composer,
+  which is read as the prompt source, so an attached folder was sent to
+  `prompt file -i <folder>` and the run failed instead of uploading the
+  folder as a document. Choosing a template then sending a task runs the
+  prompt alone, as intended.
+
 ### Changed
 
 - **BREAKING (CLI)**: standardize the command tree to

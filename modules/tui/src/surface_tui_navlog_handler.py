@@ -9,16 +9,19 @@ statements). The combined alias re-exports this mixin for
 from __future__ import annotations
 
 import contextlib
+from pathlib import Path
 from typing import Any
 
+from rich.markup import escape
 from textual.css.query import NoMatches
-from textual.widgets import Button, Input, TabbedContent
+from textual.widgets import Button, Input, Label, TabbedContent
 
 from modules.tui.src.surface_tui_components import (
     FilePickerModal,
     HelpScreen,
     QwenTuiRichLog,
 )
+from modules.tui.src.surface_tui_css import THEME
 
 
 class _TuiNavLogHandlerMixin:
@@ -35,6 +38,8 @@ class _TuiNavLogHandlerMixin:
     _sessions_cache: list[Any]
     _sessions_loaded_once: bool
     _session_row: int
+    # Issue #341: per-slot attachment path chosen via the Attach pill.
+    _slot_attachments: dict[int, str]
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
@@ -299,5 +304,82 @@ class _TuiNavLogHandlerMixin:
             _on_picked,
         )
 
+    def _open_attachment_picker(self, slot_id: int) -> None:
+        """Open the folder/file picker for the Attach pill (issue #341).
+
+        The chat console has no attachment input field anymore, so the picked
+        path is stored in the app's per-slot attachment state and rendered in
+        the slot's file indicator instead of being written into an Input.
+        """
+        return_focus_id = f"btn-pill-attach-{slot_id}"
+
+        def _on_picked(path: str | None) -> None:
+            if not path:
+                return
+            self._slot_attachments[slot_id] = path
+            with contextlib.suppress(NoMatches):
+                indicator = self.query_one(f"#file-indicator-{slot_id}", Label)
+                indicator.update(f"📎 {_attachment_label(path)}")
+                indicator.display = True
+            self._log_msg(
+                "[bold {}]ATTACH:[/] Slot {} ← {}".format(THEME["ok"], slot_id, escape(str(Path(path)))),
+                slot_id,
+            )
+
+        self.push_screen(
+            FilePickerModal(
+                select_directories=True,
+                return_focus_id=return_focus_id,
+            ),
+            _on_picked,
+        )
+
 
 __all__ = ["_TuiNavLogHandlerMixin"]
+
+#: Attachment types the file uploader accepts; a folder compiles to its
+#: own markdown. A file that matches none of these is sent as-is and the
+#: Qwen UI will reject it with its own type error.
+_ATTACHMENT_TYPES: frozenset[str] = frozenset(
+    {
+        "txt",
+        "md",
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "csv",
+        "json",
+        "yaml",
+        "yml",
+        "py",
+        "js",
+        "ts",
+        "go",
+        "rs",
+        "java",
+        "c",
+        "cpp",
+        "html",
+        "css",
+        "xml",
+        "sh",
+        "toml",
+    }
+)
+
+
+def _attachment_label(path: str) -> str:
+    """Display label for a picked attachment: folder or <type> file."""
+    p = Path(path)
+    if p.is_dir():
+        return f"FOLDER: {p.name}"
+    suffix = p.suffix.lstrip(".").lower()
+    if not suffix:
+        return p.name
+    if suffix in _ATTACHMENT_TYPES:
+        return f"<{suffix.upper()}> {p.name}"
+    return f"{p.name} (unsupported type: {suffix})"
