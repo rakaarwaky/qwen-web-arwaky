@@ -18,11 +18,9 @@ from modules.shared.src.common.taxonomy_core_vo import UpdateCheckResult, Versio
 from modules.shared.src.common.utility_core_version import get_package_version
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol
-from modules.shared.src.update.utility_update_pipeline import (
-    compare_versions,
-    github_repo_name,
-    run_pip_show,
-)
+from modules.shared.src.update.utility_update_github import github_repo_name
+from modules.shared.src.update.utility_update_subprocess import run_pip_show
+from modules.shared.src.update.utility_update_version import compare_versions
 
 log = get_logger("capabilities_update_check")
 

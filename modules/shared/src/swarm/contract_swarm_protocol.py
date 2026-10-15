@@ -22,12 +22,10 @@ count.
 
 from __future__ import annotations
 
-import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from concurrent.futures import ThreadPoolExecutor
 
-from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.common.taxonomy_core_vo import CancelToken, FilePath, TaskExecutor
 from modules.shared.src.swarm.taxonomy_swarm_vo import BrowserCount, SwarmId, SwarmSnapshot
 
 __all__ = [
@@ -104,7 +102,7 @@ class ISwarmRegistryProtocol(ABC):
     def open_run(
         self,
         snapshot: SwarmSnapshot,
-        cancel_events: Mapping[str, threading.Event],
+        cancel_events: Mapping[str, CancelToken],
         attachment: FilePath,
     ) -> None:
         """Register a new run with its cancel events and attachment, then persist it.
@@ -133,7 +131,7 @@ class ISwarmRegistryProtocol(ABC):
         ...
 
     @abstractmethod
-    def cancel_events(self, swarm_id: SwarmId) -> Mapping[str, threading.Event]:
+    def cancel_events(self, swarm_id: SwarmId) -> Mapping[str, CancelToken]:
         """Return the per-role cancel events of a swarm, empty when unknown."""
         ...
 
@@ -143,12 +141,12 @@ class ISwarmRegistryProtocol(ABC):
         ...
 
     @abstractmethod
-    def attach_executor(self, swarm_id: SwarmId, executor: ThreadPoolExecutor) -> None:
+    def attach_executor(self, swarm_id: SwarmId, executor: TaskExecutor) -> None:
         """Bind the executor that runs the legs of a swarm."""
         ...
 
     @abstractmethod
-    def release(self, swarm_id: SwarmId) -> ThreadPoolExecutor | None:
+    def release(self, swarm_id: SwarmId) -> TaskExecutor | None:
         """Drop a swarm's executor, cancel events, and attachment path.
 
         The snapshot itself is kept so a caller can still read the

@@ -12,13 +12,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Event
 from typing import Literal
 
 from modules.shared.src.common.taxonomy_core_event import LifecycleEvent, QwenEventType
 from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
+    CancelToken,
     HeadlessFlag,
     MessageCount,
     OutputPath,
@@ -59,7 +59,7 @@ class PromptRequest:
     sender_config: SenderConfig | None = None
     document_parsed: bool = True
     msg_count_before: MessageCount = MessageCount(0)
-    cancel_event: Event | None = None
+    cancel_event: CancelToken | None = None
     active_cfg: AppConfig | None = None
     emitter: object = None
     state: object = None

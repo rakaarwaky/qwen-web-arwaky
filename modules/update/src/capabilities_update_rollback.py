@@ -5,7 +5,7 @@ Rollback runs only after a FR-UPDATE-003 health-gate failure; it restores the
 package before the browser build and reconciles the pre-upgrade dependency
 snapshot so the environment matches what the previous version actually ran with.
 The shared subprocess sandbox, pinned-release resolution, editable-source
-detection, and the browser re-sync live in ``utility_update_pipeline`` and the
+detection, and the browser re-sync live in the focused update utility modules and the
 injected ``IUpdateUpgradeProtocol`` seam, so this capability never imports a
 sibling capability file (AES201).
 """
@@ -18,13 +18,10 @@ from pathlib import Path
 from modules.shared.src.common.taxonomy_core_vo import ForceFlag, UpdateStepResult, VersionString
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.update.contract_update_protocol import IUpdateRollbackProtocol, IUpdateUpgradeProtocol
-from modules.shared.src.update.utility_update_pipeline import (
-    refuse_unverified_install,
-    resolve_editable_source_dir,
-    resolve_github_pinned_url,
-    run_subprocess,
-    tail,
-)
+from modules.shared.src.update.utility_update_github import resolve_github_pinned_url
+from modules.shared.src.update.utility_update_refusal import refuse_unverified_install
+from modules.shared.src.update.utility_update_source import resolve_editable_source_dir
+from modules.shared.src.update.utility_update_subprocess import run_subprocess, tail
 
 log = get_logger("capabilities_update_rollback")
 

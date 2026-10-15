@@ -19,11 +19,9 @@ The outward entry point, ``IPromptAggregate``, is in
 
 from __future__ import annotations
 
-import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from threading import Event
 from typing import Any
 
 from playwright.sync_api import ElementHandle, Page
@@ -34,6 +32,7 @@ from modules.shared.src.common.taxonomy_core_event import LifecycleEvent, QwenEv
 from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
+    CancelToken,
     FilePath,
     FileSizeBytes,
     HeadlessFlag,
@@ -106,7 +105,7 @@ class IPromptFileProtocol(ABC):
         prompt_file: Path | PromptPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
-        cancel_event: Event | None = None,
+        cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
@@ -125,7 +124,7 @@ class IPromptFileProtocol(ABC):
         ...
 
     @abstractmethod
-    def request_cancel(self, cancel_event: Event) -> None:
+    def request_cancel(self, cancel_event: CancelToken) -> None:
         """Register ``cancel_event`` so setting it stops the matching in-flight run.
 
         Cancellation is part of the seam so surfaces and the Swarm
@@ -151,7 +150,7 @@ class IAttachmentPromptProtocol(ABC):
         attachment_file: Path | AttachmentPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
-        cancel_event: Event | None = None,
+        cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
@@ -165,7 +164,7 @@ class IAttachmentPromptProtocol(ABC):
         ...
 
     @abstractmethod
-    def request_cancel(self, cancel_event: Event) -> None:
+    def request_cancel(self, cancel_event: CancelToken) -> None:
         """Register ``cancel_event`` so setting it stops the matching in-flight run.
 
         Cancellation is part of the seam so surfaces and the Swarm
@@ -201,7 +200,7 @@ class IPromptFlowProtocol(ABC):
         active_cfg: AppConfig,
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
-        cancel_event: threading.Event | None = None,
+        cancel_event: CancelToken | None = None,
     ) -> str:
         """Inject the prompt, send it, and wait for the AI response.
 
@@ -238,7 +237,7 @@ class IRunCancelProtocol(ABC):
         ...
 
     @abstractmethod
-    def cancel_by_event(self, cancel_event: threading.Event) -> None:
+    def cancel_by_event(self, cancel_event: CancelToken) -> None:
         """Cancel the run that was registered with this cancel event.
 
         Convenience for surface callers that only hold the original

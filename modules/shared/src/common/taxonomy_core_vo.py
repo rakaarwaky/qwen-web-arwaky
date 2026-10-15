@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import threading
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import NewType, TypeAlias
+from typing import NewType, Protocol, TypeAlias, runtime_checkable
 
 PromptText = NewType("PromptText", str)
 PromptPath = NewType("PromptPath", Path)
@@ -43,6 +43,37 @@ EventDetailsMapping: TypeAlias = Mapping[str, object]
 EventOrderMapping: TypeAlias = dict[object, int]
 RetryWaitSec = NewType("RetryWaitSec", float)
 ErrorReason = NewType("ErrorReason", str)
+
+
+@runtime_checkable
+class CancelToken(Protocol):
+    """Domain view of a per-run cancellation handle.
+
+    Contracts and capabilities depend on this protocol instead of
+    importing ``threading.Event`` directly, so a shared contract never
+    carries a concurrency primitive in a signature. The concrete
+    ``threading.Event`` structurally satisfies it, so callers keep
+    passing the real object with no adapter and no cast.
+    """
+
+    def set(self) -> None: ...
+    def is_set(self) -> bool: ...
+    def clear(self) -> None: ...
+    def wait(self, timeout: float | None = None) -> bool: ...
+
+
+@runtime_checkable
+class TaskExecutor(Protocol):
+    """Domain view of the pool that runs the legs of a fan-out.
+
+    Contracts depend on this protocol instead of importing
+    ``concurrent.futures.ThreadPoolExecutor`` directly. The concrete
+    ``ThreadPoolExecutor`` structurally satisfies it, so callers keep
+    passing the real object with no adapter and no cast.
+    """
+
+    def submit(self, fn: Callable[..., object], /, *args: object, **kwargs: object) -> object: ...
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None: ...
 
 
 class EventDetails(dict[str, object]):
@@ -681,7 +712,7 @@ class RunState:
     cancellation never depends on event object identity across threads.
     """
 
-    cancel_event: threading.Event = field(default_factory=threading.Event)
+    cancel_event: CancelToken = field(default_factory=threading.Event)
     active_bctx: object | None = None
     bctx_lock: threading.Lock = field(default_factory=threading.Lock)
     run_id: RunId = field(default_factory=lambda: RunId(uuid.uuid4().hex[:8]))
@@ -719,6 +750,8 @@ __all__ = [
     "EventOrderMapping",
     "RetryWaitSec",
     "ErrorReason",
+    "CancelToken",
+    "TaskExecutor",
     "EventDetails",
     "EventOrderMap",
     "EventSequenceVO",

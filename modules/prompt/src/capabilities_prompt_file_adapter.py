@@ -5,7 +5,6 @@ Orchestrates prompt execution from local prompt file (.md) without attachment.
 
 from __future__ import annotations
 
-import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -21,6 +20,7 @@ from modules.shared.src.common.taxonomy_core_event import (
 )
 from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
+    CancelToken,
     HeadlessFlag,
     JobName,
     OutputPath,
@@ -51,7 +51,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
 
 
-def new_run_state(cancel_event: threading.Event | None = None) -> RunState:
+def new_run_state(cancel_event: CancelToken | None = None) -> RunState:
     """Create per-run state, reusing the caller event when supplied."""
     if cancel_event is not None:
         return RunState(cancel_event=cancel_event)
@@ -86,7 +86,7 @@ class PromptFileAdapter(IPromptFileProtocol):
 
     # Block 2: Protocol Method Implementation
 
-    def request_cancel(self, cancel_event: threading.Event) -> None:
+    def request_cancel(self, cancel_event: CancelToken) -> None:
         """Cancel a specific in-flight run identified by its cancel event.
 
         The caller (e.g. the TUI slot worker) creates its own
@@ -115,7 +115,7 @@ class PromptFileAdapter(IPromptFileProtocol):
         prompt_file: Path | PromptPath | str,
         output_file: Path | OutputPath | str | None = None,
         headless: HeadlessFlag | bool = True,
-        cancel_event: threading.Event | None = None,
+        cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
     ) -> ResponseText:
@@ -182,7 +182,7 @@ class PromptFileAdapter(IPromptFileProtocol):
         active_cfg: AppConfig,
         emitter: LifecycleEmitter,
         state: LifecycleState,
-        cancel_event: threading.Event | None = None,
+        cancel_event: CancelToken | None = None,
     ) -> str:
         prompt = filepath.read_text(encoding="utf-8").strip()
 

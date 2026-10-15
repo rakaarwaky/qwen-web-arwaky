@@ -15,8 +15,8 @@ the run the caller is looking at.
 from __future__ import annotations
 
 import logging
-import threading
 
+from modules.shared.src.common.taxonomy_core_vo import CancelToken
 from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 from modules.shared.src.swarm.contract_swarm_protocol import (
@@ -68,7 +68,7 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
             executor.shutdown(wait=False, cancel_futures=True)
 
     # Block 3: Constructors, Std Traits, Helpers
-    def _request_attachment_cancel(self, event: threading.Event) -> None:
+    def _request_attachment_cancel(self, event: CancelToken) -> None:
         """Forward a cancel event to the attachment aggregate via its typed seam.
 
         ``IPromptAggregate.request_cancel`` is a first-class contract
