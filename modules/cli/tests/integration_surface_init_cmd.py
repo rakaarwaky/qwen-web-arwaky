@@ -42,6 +42,8 @@ class TestQwaInit(unittest.TestCase):
                 self.assertEqual(link.resolve(), target.resolve(), f".qwen-web-arwaky/{name} target mismatch")
 
             # 3. Verify the nested .qwen-web-arwaky/.gitignore
+            # (codegraph-style: ignore the whole dir, keep only the
+            # .gitignore itself).
             gitignore = dot_qwen / ".gitignore"
             self.assertTrue(gitignore.is_file())
             gi_content = gitignore.read_text(encoding="utf-8")
