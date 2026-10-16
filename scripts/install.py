@@ -355,7 +355,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
         (xdg_data / "input" / role / "failed").mkdir(parents=True, exist_ok=True)
 
     (xdg_data / "output").mkdir(parents=True, exist_ok=True)
-    (xdg_data / "qwen_session").mkdir(parents=True, exist_ok=True)
+    (xdg_data / "sessions" / "default").mkdir(parents=True, exist_ok=True)
     (xdg_state / "log").mkdir(parents=True, exist_ok=True)
     (xdg_cache / ".processing").mkdir(parents=True, exist_ok=True)
     xdg_config.mkdir(parents=True, exist_ok=True)
@@ -374,7 +374,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
         )
         session_dir = Path(res.stdout.strip())
     except Exception:
-        session_dir = xdg_data / "qwen_session"
+        session_dir = xdg_data / "sessions" / "default"
 
     log(f"🔐 [install] Repairing browser session dir: {session_dir}")
     session_dir.mkdir(parents=True, exist_ok=True)
