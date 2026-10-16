@@ -104,7 +104,7 @@ _RESULT_TRUST_NOTICE = (
 TOOLS: list[Tool] = [
     Tool(
         name="init",
-        description="Initialize workspace directory structure, .agents/skills/qwen-web-arwaky/SKILL.md guide, sample prompt/file, and .gitignore.",
+        description="Initialize workspace directory structure, .agents/skills/qwen-web-arwaky/SKILL.md guide, and a self-contained nested .qwen-web-arwaky/.gitignore.",
         input_schema={
             "type": "object",
             "properties": {

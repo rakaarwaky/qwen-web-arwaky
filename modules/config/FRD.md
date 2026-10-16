@@ -70,7 +70,7 @@ config the other features read.
 
 ### FR-CONFIG-006: Initialize the run workspace
 
-- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web-arwaky` symlinks, and update `.gitignore` so a run has the local paths it expects.
+- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web-arwaky` symlinks, and write a self-contained nested `.qwen-web-arwaky/.gitignore` (ignores everything inside the workspace dir except itself) so a run has the local paths it expects. Legacy root `.gitignore` entries (`.qwen-web-arwaky/`, `.qwen-web/`) that older versions appended are cleaned up when the root file already exists; init never creates a root `.gitignore`.
 - **Input**: The target directory the operator named, or the working directory.
 - **Output**: The created workspace, or the paths that could not be created.
 - **Business Rules**:
@@ -96,7 +96,7 @@ config the other features read.
 | `report` | host characteristics | capacity report | none | none | Report the host's browser capacity. |
 | `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
 | `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
-| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and `.gitignore` entry. |
+| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and a nested `.qwen-web-arwaky/.gitignore` that keeps the workspace dir local. |
 
 ### Aggregate API
 
