@@ -19,8 +19,8 @@ def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:
 
 def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> None:
     """The workspace holds session symlinks, so it must be ignored via a
-    nested .gitignore inside the workspace dir itself — not via an entry
-    in the operator's root .gitignore."""
+    nested .gitignore with codegraph-style rules inside the workspace dir
+    itself — not via an entry in the operator's root .gitignore."""
     WorkspaceProvisioner().init_workspace(tmp_path)
 
     nested = tmp_path / ".qwen-web-arwaky" / ".gitignore"
