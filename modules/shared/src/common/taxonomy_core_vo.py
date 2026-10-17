@@ -141,6 +141,12 @@ class JobPath:
     def __fspath__(self) -> str:
         return str(self.path)
 
+    def __str__(self) -> str:
+        # Without this, ``str(job_path)`` yields the dataclass repr
+        # ("JobPath(path=PosixPath('/tmp/x'))"), and any caller that round-trips
+        # the value through ``str()`` would build paths named after the repr.
+        return str(self.path)
+
     @staticmethod
     def blank() -> JobPath:
         """An empty ``JobPath`` for the no-output case in call sites."""

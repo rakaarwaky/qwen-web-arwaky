@@ -127,6 +127,12 @@ def handle(
             "update_failed",
             "cli-422",
         )
+    if not response.report.healthy:
+        return error_response(
+            RuntimeError(response.report.message),
+            "update_failed",
+            "cli-422",
+        )
     return success_response(_format_report(response.report))
 
 

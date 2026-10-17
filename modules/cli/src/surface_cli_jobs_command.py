@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
 from modules.shared.src.common.utility_core_path_validation import (
@@ -39,6 +40,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
 
     # Validate and resolve prompt path (handles role templates)
     prompt_raw = args.prompt_path
+    prompt_path: Path | None
     if is_prompt_role(prompt_raw):
         prompt_path = materialize_role_template(prompt_raw)
     else:
@@ -49,6 +51,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
             else:
                 print(f"[ERROR] {error['message']}", file=sys.stderr)
             return 1
+        prompt_path = validated_path
 
     # Validate attachment path if provided
     attachment_raw = getattr(args, "attachment_path", None)
@@ -77,31 +80,38 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
         output_path = validated_output
 
     # Build request
-    if attachment_path:
-        response = jobs.execute(
-            JobRequest(
-                verb="submit_attachment_job",
-                prompt_file=str(prompt_path),
-                attachment_file=str(attachment_path),
-                output_file=str(output_path) if output_path else None,
-                headless=headless,
+    try:
+        if attachment_path:
+            response = jobs.execute(
+                JobRequest(
+                    verb="submit_attachment_job",
+                    prompt_file=str(prompt_path),
+                    attachment_file=str(attachment_path),
+                    output_file=str(output_path) if output_path else None,
+                    headless=headless,
+                )
             )
-        )
-    else:
-        response = jobs.execute(
-            JobRequest(
-                verb="submit_file_job",
-                prompt_file=str(prompt_path),
-                output_file=str(output_path) if output_path else None,
-                headless=headless,
+        else:
+            response = jobs.execute(
+                JobRequest(
+                    verb="submit_file_job",
+                    prompt_file=str(prompt_path),
+                    output_file=str(output_path) if output_path else None,
+                    headless=headless,
+                )
             )
-        )
+    except Exception as exc:
+        if json_output:
+            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
+        else:
+            print(f"[ERROR] Job submission failed: {exc}", file=sys.stderr)
+        return 1
 
     if response.error:
         if json_output:
             print(json.dumps({"success": False, "error": response.error}, indent=2))
         else:
-            print(f"[ERROR] {response.error}", file=sys.stderr)
+            print(f"[ERROR] Job submission failed: {response.error}", file=sys.stderr)
         return 1
 
     record = response.record
@@ -112,23 +122,50 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
         print(json.dumps({"success": True, "job_id": str(record.job_id)}, indent=2))
     else:
         print(f"✅ Job queued: {record.job_id}")
+        print(f"Poll with: qwen-web-arwaky job status {record.job_id}")
     return 0
 
 
 def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     """Handle jobs subcommand via the IJobManagerAggregate verbs."""
-    command = getattr(args, "command", None)
+    # The job subparser registers dest="job_command"; older releases read
+    # args.command, so prefer whichever the parser actually set.
+    command = getattr(args, "job_command", getattr(args, "command", None))
+    json_output = bool(getattr(args, "json", False))
 
     if command == "submit":
         return _cmd_submit(args, jobs)
     if command == "list":
-        response = jobs.execute(JobRequest(verb="list_jobs"))
+        limit = int(getattr(args, "limit", 10))
+        response = jobs.execute(JobRequest(verb="list_jobs", limit=limit))
         if response.error:
             print(f"[ERROR] {response.error}", file=sys.stderr)
             return 1
         records = list(response.records or [])
+        if json_output:
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "total": len(records),
+                        "jobs": [
+                            {
+                                "job_id": r.job_id,
+                                "status": _job_status(r),
+                                "completed": r.completed,
+                                "input_file": r.input_file,
+                                "output_file": r.output_file,
+                            }
+                            for r in records
+                        ],
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+            return 0
         if not records:
-            print("No jobs.")
+            print("No jobs found. Submit one with 'qwen-web-arwaky job submit -i <prompt.md>'.")
             return 0
         print(f"{'Job ID':<36} {'Status':<12} {'Completed':<12}")
         print("-" * 60)
@@ -142,8 +179,22 @@ def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) ->
             return 1
         record = response.record
         if record is None:
-            print(f"Job '{getattr(args, 'job_id', '')}' not found")
+            print(f"Job not found: {getattr(args, 'job_id', '')}")
             return 1
+        if json_output:
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "job_id": record.job_id,
+                        "status": _job_status(record),
+                        "completed": record.completed,
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+            return 0
         print(f"{str(record.job_id)}: {_job_status(record)}")
         return 0
     if command == "cleanup":

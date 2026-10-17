@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_core_container import SharedContainer
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol
 
 
@@ -20,17 +21,25 @@ def test_container_exposes_slot_config_protocol() -> None:
     """SharedContainer.slot_plan must satisfy IConfigSlotPlanProtocol."""
     container = SharedContainer()
     assert isinstance(container.slot_plan, IConfigSlotPlanProtocol)
+    assert isinstance(container.config, IConfigAggregate)
 
 
 def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
     """QwenTuiApp must get slot_config injected from the container, not imported."""
     container = SharedContainer()
+    from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
+
+    prompt_aggregate = PromptOrchestrator(
+        direct=container.agent_direct_prompt_orchestrator,
+        file_only=container.agent_prompt_file_orchestrator,
+        attachment=container.agent_attachment_prompt_orchestrator,
+        cancel_registry=container.run_cancel_registry,
+        observability=container.observability,
+    )
     controller = InteractiveController(
-        container.workspace,
-        container.agent_direct_prompt_orchestrator,
-        container.agent_prompt_file_orchestrator,
-        container.agent_attachment_prompt_orchestrator,
-        container.slot_plan,
+        container.config,
+        prompt_aggregate,
+        container.config,
         container.agent_session_orchestrator,
         container.agent_job_orchestrator,
         container.agent_swarm_orchestrator,
@@ -46,18 +55,16 @@ def test_qwen_tui_app_receives_slot_config_via_constructor() -> None:
 
     assert result["success"] is True
     mock_app.assert_called_once()
-    # 5th positional constructor argument is slot_config (IConfigSlotPlanProtocol).
-    injected = mock_app.call_args.args[4]
-    assert injected is container.slot_plan
-    assert isinstance(injected, IConfigSlotPlanProtocol)
+    # 3rd positional constructor argument is slot_config (IConfigAggregate).
+    injected = mock_app.call_args.args[2]
+    assert injected is container.config
+    assert isinstance(injected, IConfigAggregate)
 
 
 def test_controller_forwards_slot_config_without_capability_import() -> None:
-    """InteractiveController must forward the injected resolver unchanged."""
-    slot_config = MagicMock(spec=IConfigSlotPlanProtocol)
+    """InteractiveController must forward the injected config aggregate unchanged."""
+    slot_config = MagicMock()
     controller = InteractiveController(
-        MagicMock(),
-        MagicMock(),
         MagicMock(),
         MagicMock(),
         slot_config,

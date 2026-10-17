@@ -680,9 +680,7 @@ class McpToolCommand:
         if self._workspace is None:
             return json.dumps({"success": False, "error": "Workspace not initialized."})
         try:
-            response = self._workspace.execute(
-                ConfigRequest(verb="init_workspace", input_path=t_path)
-            )
+            response = self._workspace.execute(ConfigRequest(verb="init_workspace", input_path=t_path))
             if response.error is not None:
                 return _format_error_payload(
                     code="INIT_WORKSPACE_FAILED",

@@ -17,9 +17,7 @@ class TestMcpPromptTemplateIntegration:
 
     def test_mcp_file_only_with_role(self) -> None:
         prompt_aggregate = MagicMock()
-        prompt_aggregate.execute.return_value = PromptResponse(
-            response_text=ResponseText("Mock result")
-        )
+        prompt_aggregate.execute.return_value = PromptResponse(response_text=ResponseText("Mock result"))
 
         cmd = McpToolCommand(
             prompt=prompt_aggregate,
@@ -42,9 +40,7 @@ class TestMcpPromptTemplateIntegration:
         dummy_att.write_text("print('hello')")
 
         prompt_aggregate = MagicMock()
-        prompt_aggregate.execute.return_value = PromptResponse(
-            response_text=ResponseText("Mock attachment result")
-        )
+        prompt_aggregate.execute.return_value = PromptResponse(response_text=ResponseText("Mock attachment result"))
 
         cmd = McpToolCommand(
             prompt=prompt_aggregate,
