@@ -448,14 +448,25 @@ def _dispatch(
         # handler would write them straight to the terminal, corrupting the UI.
         container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
+        # build_session_prompt_aggregate() composes the three prompt adapters
+        # into the single IPromptAggregate the interactive controller drives.
+        from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
+
+        prompt_aggregate = PromptOrchestrator(
+            direct=container.agent_direct_prompt_orchestrator,
+            file_only=container.agent_prompt_file_orchestrator,
+            attachment=container.agent_attachment_prompt_orchestrator,
+            cancel_registry=container.run_cancel_registry,
+            observability=container.observability,
+        )
         result = InteractiveController(
-            container.workspace,
-            container.agent_direct_prompt_orchestrator,
-            container.slot_plan,
+            container.config,
+            prompt_aggregate,
+            container.config,
             session=container.agent_session_orchestrator,
             jobs=container.agent_job_orchestrator,
             swarm=container.agent_swarm_orchestrator,
-            updater=container.updater_check,
+            updater=container.agent_update_orchestrator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 

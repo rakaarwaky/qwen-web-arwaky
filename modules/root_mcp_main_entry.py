@@ -53,11 +53,13 @@ def _get_tools() -> McpToolCommand:
             direct=shared.agent_direct_prompt_orchestrator,
             file_only=shared.agent_prompt_file_orchestrator,
             attachment=shared.agent_attachment_prompt_orchestrator,
+            cancel_registry=shared.run_cancel_registry,
+            observability=shared.observability,
         )
         _container = McpToolCommand(
             prompt=prompt_orchestrator,
             session=shared.agent_session_orchestrator,
-            workspace=shared.workspace,
+            workspace=shared.config,
             jobs=shared.agent_job_orchestrator,
         )
     return _container

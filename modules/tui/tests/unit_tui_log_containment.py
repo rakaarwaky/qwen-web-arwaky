@@ -96,9 +96,7 @@ def _stderr_handlers(root: logging.Logger) -> list[logging.Handler]:
 def _make_app() -> QwenTuiApp:
     return QwenTuiApp(
         workspace=_NoOp(),
-        direct=_NoOp(),
-        file_only=_NoOp(),
-        attachment=_NoOp(),
+        prompt=_NoOp(),
         slot_config=_NoOp(),
         session=_NoOp(),
         jobs=_NoOp(),

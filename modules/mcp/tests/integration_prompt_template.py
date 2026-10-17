@@ -8,19 +8,21 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
+from modules.shared.src.common.taxonomy_core_vo import ResponseText
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse
 
 
 class TestMcpPromptTemplateIntegration:
     """Test MCP tool methods with role template input."""
 
     def test_mcp_file_only_with_role(self) -> None:
-        mock_file_only = MagicMock()
-        mock_file_only.process_prompt_file_only.return_value = "Mock result"
+        prompt_aggregate = MagicMock()
+        prompt_aggregate.execute.return_value = PromptResponse(
+            response_text=ResponseText("Mock result")
+        )
 
         cmd = McpToolCommand(
-            direct=MagicMock(),
-            attachment=MagicMock(),
-            file_only=mock_file_only,
+            prompt=prompt_aggregate,
             session=MagicMock(),
             setup=MagicMock(),
             workspace=MagicMock(),
@@ -29,22 +31,23 @@ class TestMcpPromptTemplateIntegration:
 
         res = cmd.process_prompt_file_only(input_file="frontend-engineer", async_run=False)
         assert "Mock result" in res
-        mock_file_only.process_prompt_file_only.assert_called_once()
-        called_prompt = mock_file_only.process_prompt_file_only.call_args[0][0]
-        assert str(called_prompt).endswith("frontend-engineer.md")
+        prompt_aggregate.execute.assert_called_once()
+        called_prompt = prompt_aggregate.execute.call_args.args[0]
+        assert called_prompt.verb == "process_prompt_file_only"
+        assert str(called_prompt.prompt_file).endswith("frontend-engineer.md")
 
     def test_mcp_attachment_with_role(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
         dummy_att = tmp_path / "code.py"
         dummy_att.write_text("print('hello')")
 
-        mock_attachment = MagicMock()
-        mock_attachment.process_prompt_with_attachment.return_value = "Mock attachment result"
+        prompt_aggregate = MagicMock()
+        prompt_aggregate.execute.return_value = PromptResponse(
+            response_text=ResponseText("Mock attachment result")
+        )
 
         cmd = McpToolCommand(
-            direct=MagicMock(),
-            attachment=mock_attachment,
-            file_only=MagicMock(),
+            prompt=prompt_aggregate,
             session=MagicMock(),
             setup=MagicMock(),
             workspace=MagicMock(),
@@ -57,6 +60,7 @@ class TestMcpPromptTemplateIntegration:
             async_run=False,
         )
         assert "Mock attachment result" in res
-        mock_attachment.process_prompt_with_attachment.assert_called_once()
-        called_prompt = mock_attachment.process_prompt_with_attachment.call_args[0][0]
-        assert str(called_prompt).endswith("business-analyst.md")
+        prompt_aggregate.execute.assert_called_once()
+        called_prompt = prompt_aggregate.execute.call_args.args[0]
+        assert called_prompt.verb == "process_prompt_with_attachment"
+        assert str(called_prompt.prompt_file).endswith("business-analyst.md")

@@ -56,9 +56,7 @@ def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 def _make_app() -> QwenTuiApp:
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),

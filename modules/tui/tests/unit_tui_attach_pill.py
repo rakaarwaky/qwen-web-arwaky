@@ -24,9 +24,7 @@ from modules.tui.src.surface_tui_navlog_action import _attachment_label
 def _make_app(tmp_path: Path) -> QwenTuiApp:
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=SlotRunPlanResolver(),
         session=MagicMock(),
         jobs=MagicMock(),

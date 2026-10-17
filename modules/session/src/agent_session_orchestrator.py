@@ -117,8 +117,6 @@ class SessionOrchestrator(ISessionAggregate):
             if self._sessions is None or self._health_checker is None:
                 return SessionResponse(error="session health checker not wired")
             pool = self._sessions.load_pool()
-            if pool is None:
-                return SessionResponse(error="no session pool available")
             results = self._health_checker.check_pool_sync(pool, self._sessions)
             healthy_count, total = self._health_checker.summarize_pool_results(results)
             return SessionResponse(

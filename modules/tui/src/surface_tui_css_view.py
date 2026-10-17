@@ -104,7 +104,6 @@ def _css_vars() -> str:
 _CSS_HEADER = "/* ═══ Obsidian Terminal Design Tokens (V2 — auto-generated) ═══ */\n" + _css_vars()
 
 
-
 # Assemble TUI_CSS by reading body parts from sibling .css files
 TUI_CSS = (
     _CSS_HEADER

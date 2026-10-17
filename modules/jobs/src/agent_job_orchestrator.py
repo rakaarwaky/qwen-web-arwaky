@@ -189,7 +189,8 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         if request.verb == "cleanup_stale_jobs":
             removed = self._storage.cleanup_stale_jobs()
             return JobResponse(removed=removed)
-        return JobResponse(error=f"unknown job verb: {request.verb!r}")
+        # ``JobVerb`` is an exhaustive Literal, so every member is handled
+        # above; a trailing fallback would be unreachable (warn_unreachable).
 
     # Block 3: Dunder Methods, Factories, Helpers
 

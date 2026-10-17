@@ -194,9 +194,7 @@ def cmd_remove(session: ISessionAggregate, args: argparse.Namespace) -> int:
 
     if getattr(args, "keep_profile", False):
         # Drop the pool entry only; leave the profile on disk.
-        response: SessionResponse = session.execute(
-            SessionRequest(verb="remove_session", name=token)
-        )
+        response: SessionResponse = session.execute(SessionRequest(verb="remove_session", name=token))
         if response.error:
             print(f"❌ {response.error}")
             return 1
@@ -206,9 +204,7 @@ def cmd_remove(session: ISessionAggregate, args: argparse.Namespace) -> int:
 
     # Resolve the profile path for the token, then delete profile + pool entry.
     listing = session.execute(SessionRequest(verb="list_sessions"))
-    matches = [
-        s for s in list(listing.sessions or []) if s.session_id == token or s.name == token
-    ]
+    matches = [s for s in list(listing.sessions or []) if s.session_id == token or s.name == token]
     if not matches:
         print(f"❌ Session '{token}' not found in the pool")
         return 1

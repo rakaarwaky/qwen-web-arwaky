@@ -10,7 +10,9 @@ patching a module global.
 
 from __future__ import annotations
 
-from modules.shared.src.common.taxonomy_core_vo import AppConfig, SlotRunPlan
+from typing import cast
+
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, FilePath, SlotRunPlan
 from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.config.contract_config_protocol import (
     IConfigCapacityProtocol,
@@ -96,7 +98,11 @@ class ConfigOrchestrator(IConfigAggregate):
         if request.verb == "init_workspace":
             if self._workspace is None:
                 return ConfigResponse(error="workspace provisioner not wired")
-            self._workspace.init_workspace(request.input_path)
+            if request.input_path is None:
+                return ConfigResponse(error="input_path is required for init_workspace")
+            # ``FilePath`` is a NewType over ``Path``: this narrows the request
+            # value for the workspace seam and touches nothing on disk.
+            self._workspace.init_workspace(cast(FilePath, request.input_path))
             return ConfigResponse(workspace=request.input_path)
         return ConfigResponse(error=f"Unknown config verb: {request.verb!r}")
 

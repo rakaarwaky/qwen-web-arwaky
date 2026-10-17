@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
+from modules.cli.src.surface_cli_observability_command import handle_observability_command
 from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot
 
 

@@ -41,11 +41,11 @@ from modules.shared.src.common.utility_core_env import (
 )
 from modules.shared.src.common.utility_core_paths import get_playwright_browsers_path
 from modules.shared.src.common.utility_core_session_backup import has_session_backup, snapshots_count
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 from modules.shared.src.session.utility_session_cloner import session_age_warning
 
 if TYPE_CHECKING:
     from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-    from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"

@@ -19,9 +19,7 @@ def _make_app() -> QwenTuiApp:
     # constructed inside the TUI surface.
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),

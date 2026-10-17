@@ -149,6 +149,21 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
+        # Session rotation infrastructure is composed before the update
+        # pipeline so the doctor smoke gate can be wired against the session
+        # aggregate at construction time (mirrors the pre-refactor ordering).
+        self.session_health_checker = SessionHealthChecker(browser=self.browser)
+        self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
+            browser=self.browser,
+            observability=self.observability,
+        )
+        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
+            browser=self.browser,
+            observability=self.observability,
+            sessions=self.session_manager,
+            renewer=self.session_renewer,
+            health_checker=self.session_health_checker,
+        )
         self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
         self.updater_upgrade: IUpdateUpgradeProtocol = UpdateUpgradeCapability(DEFAULT_PACKAGE_NAME)
         self.updater_rollback: IUpdateRollbackProtocol = UpdateRollbackCapability(
@@ -160,7 +175,7 @@ class SharedContainer:
             self.updater_upgrade,
             self.updater_rollback,
             package_name=DEFAULT_PACKAGE_NAME,
-            smoke_gate=build_smoke_gate(self.session_manager),
+            smoke_gate=build_smoke_gate(self.agent_session_orchestrator),
         )
         # Feature agents sit between capabilities and surfaces so no caller
         # repeats the sequencing each feature owns.
@@ -191,6 +206,7 @@ class SharedContainer:
             path_resolver=ConfigPathResolver(),
             capacity=ConfigCapacityAdvisor(),
             slot_plan=self.slot_plan,
+            workspace=self.workspace,
         )
 
         # Shared prompt-flow capability (injected into the three prompt adapters)
@@ -232,19 +248,6 @@ class SharedContainer:
             cancel=self.run_cancel_registry,
         )
         # Session rotation infrastructure
-        self.session_health_checker = SessionHealthChecker(browser=self.browser)
-        self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
-            browser=self.browser,
-            observability=self.observability,
-        )
-        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
-            browser=self.browser,
-            observability=self.observability,
-            sessions=self.session_manager,
-            renewer=self.session_renewer,
-            health_checker=self.session_health_checker,
-        )
-
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 
         self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(

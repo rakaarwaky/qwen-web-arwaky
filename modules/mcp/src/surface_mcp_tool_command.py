@@ -23,10 +23,11 @@ from modules.shared.src.common.taxonomy_core_vo import (
 from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
 from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
+from modules.shared.src.config.taxonomy_config_vo import ConfigRequest
 from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
 from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
-from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -68,6 +69,15 @@ def _check_execution_result(res_str: str) -> str | None:
         )
         return _format_error_payload(code=code, message=fail_msg, hint=hint, retryable=True)
     return None
+
+
+def _response_text(res: PromptResponse) -> str:
+    """Pull the assistant answer off a ``PromptResponse`` for the envelope.
+
+    ``str()`` on the dataclass would serialize the whole record; the MCP
+    envelope must carry only the answer text.
+    """
+    return str(res.response_text) if res.response_text is not None else ""
 
 
 def _format_success_payload(
@@ -274,7 +284,10 @@ class McpToolCommand:
                     timeout_sec=TimeoutSec(timeout_sec),
                 )
             )
-            return _format_success_payload(str(res), output_path=str(out_path) if out_path else None)
+            return _format_success_payload(
+                result_text=_response_text(res),
+                output_path=str(out_path) if out_path else None,
+            )
         except Exception as exc:
             return _format_error_payload(
                 code="EXECUTION_ERROR",
@@ -355,7 +368,7 @@ class McpToolCommand:
                 )
             )
             return _format_success_payload(
-                result_text=str(res),
+                result_text=_response_text(res),
                 output_path=str(out_path) if out_path else None,
             )
         except Exception as exc:
@@ -452,7 +465,7 @@ class McpToolCommand:
                 )
             )
             return _format_success_payload(
-                result_text=str(res),
+                result_text=_response_text(res),
                 output_path=str(out_path) if out_path else None,
             )
         except Exception as exc:
@@ -667,7 +680,15 @@ class McpToolCommand:
         if self._workspace is None:
             return json.dumps({"success": False, "error": "Workspace not initialized."})
         try:
-            self._workspace.init_workspace(FilePath(t_path))
+            response = self._workspace.execute(
+                ConfigRequest(verb="init_workspace", input_path=t_path)
+            )
+            if response.error is not None:
+                return _format_error_payload(
+                    code="INIT_WORKSPACE_FAILED",
+                    message=response.error,
+                    hint="Check write permissions for target_dir.",
+                )
             return json.dumps(
                 {
                     "success": True,

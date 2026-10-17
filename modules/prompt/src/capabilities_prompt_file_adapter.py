@@ -228,6 +228,7 @@ class PromptFileAdapter(IPromptFileProtocol):
                     headless=request.headless,
                     cancel_event=request.cancel_event,
                     event_observer=request.event_observer,
+                    session_resolver=request.session_resolver,
                 )
             )
         if request.verb == "request_cancel":

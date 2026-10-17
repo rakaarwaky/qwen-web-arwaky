@@ -83,9 +83,7 @@ def test_async_envelope_paths_are_trust_marked() -> None:
     from modules.mcp.src.surface_mcp_tool_command import McpToolCommand
 
     command = McpToolCommand(
-        direct=tools,
-        file_only=tools,
-        attachment=tools,
+        prompt=tools,
         session=tools,
         setup=tools,
         workspace=tools,

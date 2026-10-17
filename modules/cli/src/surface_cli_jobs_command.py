@@ -31,6 +31,7 @@ def _job_status(record: JobRecord) -> str:
         return "RUNNING"
     return "FAILED" if record.error else "COMPLETED"
 
+
 def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     """Submit a file or attachment prompt job to the background worker pool."""
     json_output = bool(getattr(args, "json", False))
@@ -53,9 +54,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     attachment_raw = getattr(args, "attachment_path", None)
     attachment_path = None
     if attachment_raw:
-        validated_attachment, error = validate_attachment_path(
-            attachment_raw, field="attachment_file"
-        )
+        validated_attachment, error = validate_attachment_path(attachment_raw, field="attachment_file")
         if error is not None:
             if json_output:
                 print(json.dumps({"success": False, "error": error}, indent=2))
@@ -137,9 +136,7 @@ def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) ->
             print(f"{str(r.job_id):<36} {_job_status(r):<12} {str(r.completed):<12}")
         return 0
     if command == "status":
-        response = jobs.execute(
-            JobRequest(verb="get_job_status", job_id=getattr(args, "job_id", None))
-        )
+        response = jobs.execute(JobRequest(verb="get_job_status", job_id=getattr(args, "job_id", None)))
         if response.error:
             print(f"[ERROR] {response.error}", file=sys.stderr)
             return 1

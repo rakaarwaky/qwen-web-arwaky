@@ -22,9 +22,17 @@ from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.widgets import Input, LoadingIndicator
 
-from modules.shared.src.common.taxonomy_core_vo import AppConfig, FilePath, HeadlessFlag, PromptText, SlotInputValue
+from modules.shared.src.common.taxonomy_core_vo import (
+    AppConfig,
+    FilePath,
+    HeadlessFlag,
+    PromptText,
+    SlotInputValue,
+    TimeoutSec,
+)
 from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, load_prompt_template
 from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_css_view import THEME
@@ -50,8 +58,7 @@ class _TuiWorkersMixin:
     _slot_workers: dict[int, Any]
     _slot_stats: dict[int, dict[str, Any]]
     _slot_config: Any
-    _attachment: Any
-    _file_only: Any
+    _prompt: Any
     _setup: Any
     _session: Any
     _swarm: Any
@@ -63,7 +70,6 @@ class _TuiWorkersMixin:
     _last_session_state: str | None
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
-    _direct: Any
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -215,7 +221,7 @@ class _TuiWorkersMixin:
         if is_prompt_role(text):
             text = load_prompt_template(text)
 
-        if getattr(self, "_direct", None) is None and not attachment:
+        if getattr(self, "_prompt", None) is None and not attachment:
             msg = f"Direct prompt capability is not available for Slot {slot_id}."
             self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
             with contextlib.suppress(Exception):
@@ -231,7 +237,7 @@ class _TuiWorkersMixin:
         # the attachment capability so it uploads as a document, not as the
         # prompt source.
         if attachment:
-            if getattr(self, "_attachment", None) is None:
+            if getattr(self, "_prompt", None) is None:
                 msg = f"Attachment capability is not available for Slot {slot_id}."
                 self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
                 with contextlib.suppress(Exception):
@@ -351,8 +357,9 @@ class _TuiWorkersMixin:
         slot_event = self._slot_cancel_events.get(slot_id)
         if slot_event is not None:
             with contextlib.suppress(Exception):
-                self._attachment.request_cancel(slot_event)
-                self._file_only.request_cancel(slot_event)
+                # The aggregate routes request_cancel to the file and
+                # attachment adapters sharing this cancel registry event.
+                self._prompt.execute(PromptRequest(verb="request_cancel", cancel_event=slot_event))
         worker.cancel()
         self._slot_workers[slot_id] = None
         # Issue #331: release the per-slot cancel event entry. The cancelled
@@ -566,24 +573,30 @@ class _TuiWorkersMixin:
 
         try:
             if cfg.file_path:
-                res = self._attachment.process_prompt_with_attachment(
-                    prompt_file=cfg.prompt_path or cfg.input_path,
-                    attachment_file=cfg.file_path,
-                    output_file=cfg.output_path,
-                    headless=HeadlessFlag(cfg.headless),
-                    cancel_event=slot_cancel_event,
-                    event_observer=_on_event,
-                    session_resolver=self._session_resolver(),
-                )
+                res = self._prompt.execute(
+                    PromptRequest(
+                        verb="process_prompt_with_attachment",
+                        prompt_file=cfg.prompt_path or cfg.input_path,
+                        attachment_file=cfg.file_path,
+                        output_file=cfg.output_path,
+                        headless=HeadlessFlag(cfg.headless),
+                        cancel_event=slot_cancel_event,
+                        event_observer=_on_event,
+                        session_resolver=self._session_resolver(),
+                    )
+                ).response_text
             else:
-                res = self._file_only.process_prompt_file_only(
-                    prompt_file=cfg.prompt_path or cfg.input_path,
-                    output_file=cfg.output_path,
-                    headless=HeadlessFlag(cfg.headless),
-                    cancel_event=slot_cancel_event,
-                    event_observer=_on_event,
-                    session_resolver=self._session_resolver(),
-                )
+                res = self._prompt.execute(
+                    PromptRequest(
+                        verb="process_prompt_file_only",
+                        prompt_file=cfg.prompt_path or cfg.input_path,
+                        output_file=cfg.output_path,
+                        headless=HeadlessFlag(cfg.headless),
+                        cancel_event=slot_cancel_event,
+                        event_observer=_on_event,
+                        session_resolver=self._session_resolver(),
+                    )
+                ).response_text
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
             is_dict_err = isinstance(cast(Any, res), dict) and cast(dict[str, Any], res).get("status") in {
@@ -645,14 +658,17 @@ class _TuiWorkersMixin:
         )
 
         try:
-            res = self._direct.process_direct_prompt(
-                prompt=PromptText(prompt),
-                timeout_sec=600,
-                output_file=Path(output_val) if output_val.strip() else None,
-                headless=HeadlessFlag(headless),
-                event_observer=_on_event,
-                session_resolver=self._session_resolver(),
-            )
+            res = self._prompt.execute(
+                PromptRequest(
+                    verb="process_direct_prompt",
+                    prompt=PromptText(prompt),
+                    timeout_sec=TimeoutSec(600),
+                    output_file=Path(output_val) if output_val.strip() else None,
+                    headless=HeadlessFlag(headless),
+                    event_observer=_on_event,
+                    session_resolver=self._session_resolver(),
+                )
+            ).response_text
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
             fail_reason = detect_processing_failure(res_str)
@@ -730,15 +746,18 @@ class _TuiWorkersMixin:
         )
 
         try:
-            res = self._attachment.process_prompt_with_attachment(
-                prompt_file=prompt_path,
-                attachment_file=Path(attachment),
-                output_file=Path(output_val) if output_val.strip() else None,
-                headless=HeadlessFlag(headless),
-                cancel_event=self._slot_cancel_events.get(slot_id),
-                event_observer=_on_event,
-                session_resolver=self._session_resolver(),
-            )
+            res = self._prompt.execute(
+                PromptRequest(
+                    verb="process_prompt_with_attachment",
+                    prompt_file=prompt_path,
+                    attachment_file=Path(attachment),
+                    output_file=Path(output_val) if output_val.strip() else None,
+                    headless=HeadlessFlag(headless),
+                    cancel_event=self._slot_cancel_events.get(slot_id),
+                    event_observer=_on_event,
+                    session_resolver=self._session_resolver(),
+                )
+            ).response_text
             dur = round(time.perf_counter() - start_t, 1)
             res_str = str(res)
             fail_reason = detect_processing_failure(res_str)

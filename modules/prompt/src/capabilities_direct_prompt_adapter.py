@@ -197,6 +197,7 @@ class DirectPromptAdapter(IDirectPromptProtocol):
                     output_file=request.output_file,
                     headless=request.headless,
                     event_observer=request.event_observer,
+                    session_resolver=request.session_resolver,
                 )
             )
         if request.verb == "request_cancel":

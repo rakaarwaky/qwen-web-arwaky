@@ -47,9 +47,7 @@ class TestAccountCardButtons:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -105,9 +103,7 @@ class TestAccountCardButtons:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -139,9 +135,7 @@ class TestAccountButtonRouting:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -168,9 +162,7 @@ class TestAccountButtonRouting:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -199,9 +191,7 @@ class TestDeleteSessionWorker:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -243,9 +233,7 @@ class TestDeleteSessionWorker:
 
         app = QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),
@@ -284,9 +272,7 @@ class TestSessionsPaneLayout:
 
         return QwenTuiApp(
             workspace=MagicMock(),
-            direct=MagicMock(),
-            file_only=MagicMock(),
-            attachment=MagicMock(),
+            prompt=MagicMock(),
             slot_config=MagicMock(),
             session=MagicMock(),
             jobs=MagicMock(),

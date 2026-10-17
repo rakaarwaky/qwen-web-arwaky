@@ -64,8 +64,8 @@ class TestQwenTuiLogHandler:
     def test_emit_info_and_error_levels(self):
         import logging
 
-        from modules.tui.src.tui_app import QwenTuiApp
-        from modules.tui.src.tui_components import QwenTuiLogHandler
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+        from modules.tui.src.surface_tui_component import QwenTuiLogHandler
 
         mock_app = MagicMock(spec=QwenTuiApp)
         handler = QwenTuiLogHandler(mock_app)

@@ -21,11 +21,13 @@ from modules.shared.src.update.taxonomy_update_vo import UpdateRequest
 
 _DIVIDER = "─" * 58
 
+
 def _step_icon(step: UpdateStepResult) -> str:
     """Return the terminal status icon for one pipeline step."""
     if not step.executed:
         return "[–]"
     return "[✓]" if step.success else "[✗]"
+
 
 def _step_detail(step: UpdateStepResult) -> str:
     """Return the human-readable detail line for one pipeline step."""
@@ -34,6 +36,7 @@ def _step_detail(step: UpdateStepResult) -> str:
     if step.skipped_reason:
         return f"skipped — {step.skipped_reason}"
     return "ok"
+
 
 def _format_check_result(res: UpdateCheckResult) -> str:
     """Format a read-only --check probe into a terminal report."""
@@ -60,6 +63,7 @@ def _format_check_result(res: UpdateCheckResult) -> str:
         lines.append("✅ You are already running the latest version.")
     lines.append("")
     return "\n".join(lines)
+
 
 def _format_report(report: UpdateReport) -> str:
     """Format a full update run (steps + health checks) into a terminal report."""
@@ -94,6 +98,7 @@ def _format_report(report: UpdateReport) -> str:
     lines.append("")
     return "\n".join(lines)
 
+
 @safe_handle
 def handle(
     args: object,
@@ -114,9 +119,7 @@ def handle(
             )
         return success_response(_format_check_result(response.check_result))
 
-    response = orchestrator.execute(
-        UpdateRequest(verb="perform_update", force=ForceFlag(force))
-    )
+    response = orchestrator.execute(UpdateRequest(verb="perform_update", force=ForceFlag(force)))
     if response.error or response.report is None:
         reason = response.error or "update returned no report"
         return error_response(
@@ -125,6 +128,7 @@ def handle(
             "cli-422",
         )
     return success_response(_format_report(response.report))
+
 
 def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
     """Handle the --rollback subcommand of update: restore a previous version."""
