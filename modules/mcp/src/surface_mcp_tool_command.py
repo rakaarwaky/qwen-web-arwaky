@@ -22,14 +22,11 @@ from modules.shared.src.common.taxonomy_core_vo import (
 )
 from modules.shared.src.common.utility_core_prompt_template import is_prompt_role, materialize_role_template
 from modules.shared.src.common.utility_response_normalizer import detect_processing_failure
-from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.jobs.taxonomy_jobs_vo import JobRequest
-from modules.shared.src.prompt.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -226,18 +223,14 @@ class McpToolCommand:
 
     def __init__(
         self,
-        direct: IDirectPromptProtocol,
-        file_only: IPromptFileProtocol,
-        attachment: IAttachmentPromptProtocol,
+        prompt: IPromptAggregate,
         session: ISessionAggregate,
         setup: Any = None,
-        workspace: IWorkspaceProtocol | None = None,
+        workspace: IConfigAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
     ) -> None:
         """Inject individual agent aggregate contracts."""
-        self._direct = direct
-        self._file_only = file_only
-        self._attachment = attachment
+        self._prompt = prompt
         self._session = session
         self._setup = setup
         self._workspace = workspace
@@ -245,7 +238,7 @@ class McpToolCommand:
 
     def process_direct_prompt(
         self,
-        prompt: str,
+        prompt_text: str,
         timeout_sec: int = 120,
         headless: bool = True,
         output_file: str | None = None,
@@ -253,7 +246,7 @@ class McpToolCommand:
         """Process a direct text prompt string to chat.qwen.ai.
 
         Args:
-            prompt: Direct text prompt to send to Qwen.
+            prompt_text: Direct text prompt to send to Qwen.
             timeout_sec: Maximum seconds to wait for assistant response (default: 120s).
             headless: Run browser headlessly (default: True).
             output_file: Optional destination path for the AI response, matching
@@ -262,7 +255,7 @@ class McpToolCommand:
         Returns:
             JSON string containing success status, assistant response text, and metadata.
         """
-        if not prompt or not prompt.strip():
+        if not prompt_text or not prompt_text.strip():
             return _format_error_payload(
                 code="VALIDATION_ERROR",
                 message="prompt text must not be empty.",
@@ -272,11 +265,14 @@ class McpToolCommand:
 
         out_path = Path(output_file).expanduser().resolve() if output_file else None
         try:
-            res = self._direct.process_direct_prompt(
-                PromptText(prompt),
-                TimeoutSec(timeout_sec),
-                output_file=out_path,
-                headless=HeadlessFlag(headless),
+            res = self._prompt.execute(
+                PromptRequest(
+                    verb="process_direct_prompt",
+                    prompt=PromptText(prompt_text),
+                    output_file=out_path,
+                    headless=HeadlessFlag(headless),
+                    timeout_sec=TimeoutSec(timeout_sec),
+                )
             )
             return _format_success_payload(str(res), output_path=str(out_path) if out_path else None)
         except Exception as exc:
@@ -350,10 +346,13 @@ class McpToolCommand:
                 )
 
         try:
-            res = self._file_only.process_prompt_file_only(
-                FilePath(p_path),
-                FilePath(out_path) if out_path else None,
-                HeadlessFlag(headless),
+            res = self._prompt.execute(
+                PromptRequest(
+                    verb="process_prompt_file_only",
+                    prompt_file=FilePath(p_path),
+                    output_file=FilePath(out_path) if out_path else None,
+                    headless=HeadlessFlag(headless),
+                )
             )
             return _format_success_payload(
                 result_text=str(res),
@@ -443,11 +442,14 @@ class McpToolCommand:
                 )
 
         try:
-            res = self._attachment.process_prompt_with_attachment(
-                FilePath(p_path),
-                FilePath(a_path),
-                FilePath(out_path) if out_path else None,
-                HeadlessFlag(headless),
+            res = self._prompt.execute(
+                PromptRequest(
+                    verb="process_prompt_with_attachment",
+                    prompt_file=FilePath(p_path),
+                    attachment_file=FilePath(a_path),
+                    output_file=FilePath(out_path) if out_path else None,
+                    headless=HeadlessFlag(headless),
+                )
             )
             return _format_success_payload(
                 result_text=str(res),

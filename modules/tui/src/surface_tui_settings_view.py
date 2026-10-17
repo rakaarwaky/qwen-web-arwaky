@@ -30,7 +30,7 @@ from modules.shared.src.common.utility_core_env import (
     settings_path,
     validate_env,
 )
-from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_css_view import THEME
 
 #: Override records go to the Overview event log (slot 0), not to a slot's
 #: event log: a change to a process-wide value belongs to no single slot.

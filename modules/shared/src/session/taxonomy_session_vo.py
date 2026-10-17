@@ -198,7 +198,9 @@ class SessionRequest:
     ``delete`` reads it and ``force`` to bypass the no-backup guard that
     protects the master profile from accidental deletion; ``login`` reads
     ``session_path`` (or ``name`` under ``SESSIONS_DIR``) and
-    ``wait_for_confirmation``. Fields the chosen verb does not read stay
+    ``wait_for_confirmation``; ``list_sessions`` returns the whole pool in
+    pool order; ``remove_session`` reads ``session_path`` (or ``name``) and
+    ``force``. Fields the chosen verb does not read stay
     at their defaults, so no verb passes arguments another ignores.
 
     ``browser_headless`` is read only by the ``login`` verb. Manual login
@@ -232,7 +234,8 @@ class SessionResponse:
     not be answered at all. ``profile_path`` carries the resolved profile
     directory after a successful ``login`` so callers that receive the
     response without reading the exception can still locate the persisted
-    session.
+    session. ``sessions`` carries the pool listing for ``list_sessions``;
+    ``removed`` reports whether ``remove_session`` dropped a pool entry.
     """
 
     valid: bool = False
@@ -241,6 +244,13 @@ class SessionResponse:
     error: str | None = None
     #: Resolved profile directory, set on a successful ``login``.
     profile_path: Path | str | None = None
+    #: Pool listing in pool order, set by the ``list_sessions`` verb.
+    sessions: SessionList | None = None
+    #: True when ``remove_session`` dropped a pool entry.
+    removed: bool = False
+    #: Session count for the ``check_health`` verb (healthy / total).
+    health_healthy: int | None = None
+    health_total: int | None = None
 
 
 __all__ = [

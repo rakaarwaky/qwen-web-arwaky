@@ -1,9 +1,7 @@
 """CLI surface: update command — self-update & environment synchronization (AES406).
 
-Smart surface: presentation only. Version discovery, pip upgrade, Playwright
-Chromium synchronization, and post-flight health checks are owned by the update
-capability protocols; this surface formats reports and maps outcomes to the
-standardized success/error response envelope.
+Smart surface: maps parsed args to the IUpdateAggregate verbs
+(check_update, perform_update, rollback_to) and formats reports.
 """
 
 from __future__ import annotations
@@ -19,18 +17,15 @@ from modules.shared.src.common.taxonomy_core_vo import (
 )
 from modules.shared.src.common.utility_response_normalizer import error_response, safe_handle, success_response
 from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
-from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol, IUpdateVerifyProtocol
 from modules.shared.src.update.taxonomy_update_vo import UpdateRequest
 
 _DIVIDER = "─" * 58
-
 
 def _step_icon(step: UpdateStepResult) -> str:
     """Return the terminal status icon for one pipeline step."""
     if not step.executed:
         return "[–]"
     return "[✓]" if step.success else "[✗]"
-
 
 def _step_detail(step: UpdateStepResult) -> str:
     """Return the human-readable detail line for one pipeline step."""
@@ -39,7 +34,6 @@ def _step_detail(step: UpdateStepResult) -> str:
     if step.skipped_reason:
         return f"skipped — {step.skipped_reason}"
     return "ok"
-
 
 def _format_check_result(res: UpdateCheckResult) -> str:
     """Format a read-only --check probe into a terminal report."""
@@ -66,7 +60,6 @@ def _format_check_result(res: UpdateCheckResult) -> str:
         lines.append("✅ You are already running the latest version.")
     lines.append("")
     return "\n".join(lines)
-
 
 def _format_report(report: UpdateReport) -> str:
     """Format a full update run (steps + health checks) into a terminal report."""
@@ -101,36 +94,37 @@ def _format_report(report: UpdateReport) -> str:
     lines.append("")
     return "\n".join(lines)
 
-
 @safe_handle
 def handle(
     args: object,
-    check: IUpdateCheckProtocol,
-    verify: IUpdateVerifyProtocol,
+    orchestrator: IUpdateAggregate,
 ) -> dict[str, object]:
-    """Dispatch the update subcommand to the check and verify capability protocols."""
+    """Dispatch the update subcommand to the update aggregate verbs."""
     check_only = bool(getattr(args, "check", False))
     force = bool(getattr(args, "force", False))
 
     if check_only:
-        result = check.check_update()
-        if result.latest_version is None:
+        response = orchestrator.execute(UpdateRequest(verb="check_update"))
+        if response.error or response.check_result is None:
+            reason = response.error or "update check returned no result"
             return error_response(
-                RuntimeError(f"Update check failed: {result.error or 'version source unavailable'}"),
+                RuntimeError(f"Update check failed: {reason}"),
                 "update_check_failed",
                 "cli-502",
             )
-        return success_response(_format_check_result(result))
+        return success_response(_format_check_result(response.check_result))
 
-    report = verify.perform_update(ForceFlag(force))
-    if not report.healthy:
+    response = orchestrator.execute(
+        UpdateRequest(verb="perform_update", force=ForceFlag(force))
+    )
+    if response.error or response.report is None:
+        reason = response.error or "update returned no report"
         return error_response(
-            RuntimeError(_format_report(report)),
+            RuntimeError(reason),
             "update_failed",
             "cli-422",
         )
-    return success_response(_format_report(report))
-
+    return success_response(_format_report(response.report))
 
 def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
     """Handle the --rollback subcommand of update: restore a previous version."""
@@ -159,22 +153,8 @@ def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
     else:
         report = f"✅ Rollback to {version} completed."
 
-    if json_output:
-        steps_data = (
-            [{"name": s.name, "success": s.success, "detail": s.detail or ""} for s in response.steps]
-            if response.steps
-            else []
-        )
-        print(
-            json.dumps(
-                {
-                    "success": True,
-                    "version": version,
-                    "steps": steps_data,
-                },
-                indent=2,
-            )
-        )
-    else:
-        print(report)
+    print(report)
     return 0
+
+
+__all__ = ["handle", "handle_rollback"]

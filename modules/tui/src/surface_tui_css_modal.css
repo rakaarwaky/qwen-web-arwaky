@@ -1,0 +1,474 @@
+/* ═══ Mockup parity: CHAT (slot console) ═══════════════════════════════ */
+
+/* Horizontal slot picker: one pill per job slot, active one filled. */
+/* The strip is a bare row of pills in the mockup, so it carries no frame of
+   its own: a border here would eat the two rows the chips need and clip their
+   labels out of the viewport. */
+.slot-carousel {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_surface;
+    padding: 0 1;
+    margin-bottom: 1;
+    /* Hidden, not auto: the pills below size themselves to the terminal, so
+       the carousel can never overflow and never grows a scrollbar. */
+    overflow-x: hidden;
+}
+
+/* The pills split the width instead of sizing to their labels, so all ten
+   slots fit whatever the terminal is. Textual's Button also ships
+   min-width: 16, which alone pushed the last pills off the viewport. */
+.slot-chip {
+    width: 1fr;
+    min-width: 0;
+    height: 3;
+    margin-right: 1;
+    background: $bg_raised;
+    color: $fg_muted;
+    border: solid $border;
+    padding: 0;
+    text-align: center;
+}
+
+.slot-chip.slot-chip-active {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* Telemetry header: segmented Event/System log switch plus the live beacon.
+   The switch sits on the left as in the mockup; an auto-width spacer carries
+   the badge and beacon to the right edge. */
+.telemetry-header {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    align: left middle;
+    margin-bottom: 1;
+}
+
+.telemetry-spacer {
+    width: 1fr;
+    height: 1;
+}
+
+/* Frameless: the two segments abut, so the container only supplies the
+   backing colour. A border would leave the buttons a one-row viewport. */
+.seg-switch {
+    layout: horizontal;
+    width: auto;
+    height: 3;
+    background: $bg_hover;
+    margin-right: 1;
+}
+
+.seg-btn {
+    width: auto;
+    min-width: 12;
+    height: 3;
+    background: $bg_hover;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.seg-btn.seg-active {
+    background: $accent;
+    color: $fg_on_accent;
+}
+
+.live-beacon {
+    color: $status_ok;
+    text-style: bold;
+    width: 1;
+}
+
+/* Chat transcript: user prompt on the right, agent response on the left.
+   It sizes to its own content up to a cap instead of taking 1fr, so an idle
+   slot hands its rows to the log card below instead of leaving a void. */
+.chat-stream {
+    width: 100%;
+    height: auto;
+    max-height: 12;
+    background: $bg_base;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+.msg {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+.msg-user {
+    align-horizontal: right;
+}
+
+.msg-agent {
+    align-horizontal: left;
+}
+
+.msg-author {
+    color: $fg_accent;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.msg-bubble {
+    width: auto;
+    max-width: 80%;
+    height: auto;
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+    color: $fg_primary;
+}
+
+.msg-bubble.msg-bubble-user {
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+}
+
+.msg-chip {
+    color: $fg_muted;
+    background: $bg_active;
+    text-style: bold;
+    padding: 0 1;
+}
+
+.msg-time {
+    color: $status_muted;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.msg-time.msg-time-user {
+    text-align: right;
+}
+
+.msg-attach {
+    width: auto;
+    height: auto;
+    background: $bg_raised;
+    color: $fg_muted;
+    border: solid $border;
+    padding: 0 1;
+    margin-top: 0;
+}
+
+.code-block {
+    width: 100%;
+    height: 3;
+    background: $bg_surface;
+    border: solid $border;
+    color: $fg_muted;
+    padding: 0 1;
+}
+
+/* Action pills above the composer (Upload Prompt / Attach / Templates). */
+.action-pill-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+}
+
+.action-pill {
+    width: auto;
+    height: 3;
+    background: $bg_raised;
+    color: $fg_primary;
+    border: solid $border;
+    padding: 0 1;
+    margin-right: 1;
+    text-style: bold;
+}
+
+.action-pill-templates {
+    background: $bg_hover;
+    color: $fg_accent;
+}
+
+/* File indicator row: shows the attached file/folder, hidden by default. */
+.file-indicator {
+    width: 100%;
+    height: 1;
+    color: $fg_muted;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+/* Composer row: prompt glyph, free-text input, send button. */
+.composer {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    padding: 0 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.composer-glyph {
+    color: $fg_accent;
+    text-style: bold;
+    width: 2;
+}
+
+.composer-input {
+    width: 1fr;
+    background: $bg_raised;
+    border: none;
+    color: $fg_primary;
+    height: 1;
+}
+
+.btn-send {
+    width: 5;
+    min-width: 5;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+/* The console shell: a vertical stack of carousel, telemetry header,
+   transcript, log card, action pills, and composer. The transcript takes the
+   slack (1fr) while the log card keeps a fixed block so a chatty run cannot
+   squeeze the composer off the pane. */
+.chat-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2;
+}
+
+.chat-hint {
+    width: 100%;
+    height: auto;
+    color: $fg_muted;
+    text-style: italic;
+    text-align: center;
+}
+
+.msg-author.msg-author-right {
+    text-align: right;
+}
+
+/* EVENT LOG [SLOT #N] card: header row, the buffer, and the trailing clock. */
+/* The log card is the pane's 1fr child: it takes every row the carousel,
+   header, transcript and composer leave, so the console always fills the
+   screen exactly, and min-height 10 keeps the buffer readable when the
+   terminal is short. */
+.event-log-card {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    min-height: 4;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+/* One row, as the mockup draws it: title, slot tag and the Copy ghost share
+   the header line, so the card's floor is 4 rows (2 border + header + clock)
+   and the console still fits a 30-row terminal. */
+.event-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    align: left middle;
+}
+
+.event-log-title {
+    width: auto;
+    margin-right: 1;
+    color: $fg_accent;
+    text-style: bold;
+}
+
+.event-log-slot {
+    width: 1fr;
+    color: $status_ok;
+    text-style: bold;
+}
+
+.slot-log-time {
+    width: 100%;
+    height: 1;
+    text-align: left;
+    color: $status_muted;
+}
+
+/* ═══ Mockup parity: SWARM (multi-agent stream) ═══════════════════════ */
+
+/* The console shell, same as the chat console: attachment card, view toggle,
+   log card, action deck. The log card is the only 1fr child, so the deck
+   lands above the nav dock at every terminal height. */
+.swarm-screen {
+    layout: vertical;
+    width: 100%;
+    height: 1fr;
+    background: $bg_base;
+    padding: 1 2 0 2;
+}
+
+/* Attachment card: file icon, resolved filename, Browse chip. The chip is a
+   one-row ghost — the default three-row Button overflowed this three-row card
+   and rendered as an empty box with no label. */
+.swarm-file-card {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    background: $bg_raised;
+    border: solid $border;
+    margin-bottom: 1;
+    padding: 0 1;
+    align: left middle;
+}
+
+.swarm-file-icon {
+    color: $fg_accent;
+    text-style: bold;
+    width: auto;
+    margin-right: 1;
+}
+
+.swarm-file-name {
+    width: 1fr;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.swarm-browse-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_active;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-browse-chip:hover {
+    color: $fg_accent;
+}
+
+.swarm-file-input {
+    width: 1fr;
+    height: 1;
+    background: $bg_raised;
+    border: solid $border;
+    color: $fg_primary;
+}
+
+/* View toggle row: caption on the left, segmented switch on the right. The
+   swarm switch is one row (the mockup's pill pair); the chat console keeps
+   its taller switch under .telemetry-header. */
+.output-inspection {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.output-inspection .card-caption {
+    width: 1fr;
+    color: $status_muted;
+    text-style: bold;
+}
+
+.swarm-seg {
+    height: 1;
+}
+
+.swarm-seg .seg-btn {
+    height: 1;
+    min-width: 10;
+}
+
+/* Log card: the path header with its hairline, the stream, and the socket
+   footer. Compound selector so .screen-card's padding cannot win over the
+   1fr height the mockup gives the panel. */
+.screen-card.swarm-log-card {
+    height: 1fr;
+    min-height: 8;
+    background: $bg_surface;
+    margin-bottom: 0;
+}
+
+.swarm-log-head {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    align: left middle;
+    border-bottom: solid $border;
+}
+
+.swarm-log-path {
+    width: 1fr;
+    height: 1;
+    color: $status_muted;
+    text-style: bold;
+}
+
+.swarm-clear-chip {
+    width: auto;
+    height: 1;
+    min-width: 0;
+    background: $bg_surface;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.swarm-clear-chip:hover {
+    color: $status_err;
+}
+
+/* The card carries the frame, so the view only paints stream rows. */
+.swarm-log-view {
+    width: 100%;
+    height: 1fr;
+    max-width: 100%;
+    background: transparent;
+    border: none;
+    color: $fg_primary;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.swarm-log-foot {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    align: left middle;
+}
+
+.swarm-caret {
+    width: auto;
+    color: $accent;
+    text-style: bold;
+    margin-right: 1;
+}
+
+/* Socket listener line under the stream. */
+.listener-line {
+    width: 1fr;
+    height: 1;
+    color: $fg_muted;
+    text-style: italic;
+}

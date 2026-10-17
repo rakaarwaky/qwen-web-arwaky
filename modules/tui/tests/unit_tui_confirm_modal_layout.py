@@ -14,8 +14,8 @@ import asyncio
 from textual.app import App
 from textual.screen import ModalScreen
 
-from modules.tui.src.surface_tui_components import ConfirmModal
-from modules.tui.src.surface_tui_css import TUI_CSS
+from modules.tui.src.surface_tui_component import ConfirmModal
+from modules.tui.src.surface_tui_css_view import TUI_CSS
 
 
 class _ModalHost(App[None]):

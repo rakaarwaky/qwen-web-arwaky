@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.tui.src.surface_tui_app import QwenTuiApp
+from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
 
 def _make_app() -> QwenTuiApp:

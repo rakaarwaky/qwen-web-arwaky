@@ -19,7 +19,10 @@ from modules.shared.src.session.taxonomy_session_vo import SessionRequest, Sessi
 class ISessionAggregate(ABC):
     """Single entry point over the session feature.
 
-    Exactly one method: the door consumers knock on.
+    Exactly one method: the door consumers knock on. The session verbs are
+    ``validate``, ``delete``, ``login``, ``list_sessions``, and
+    ``remove_session`` (pool-entry removal without profile cleanup); each
+    routes on ``SessionRequest.verb``.
     """
 
     @abstractmethod

@@ -168,8 +168,9 @@ class ConfigRequest:
 
     The ``for_mode`` verb reads ``mode`` / ``input_path`` /
     ``output_path``; the ``slot_plan`` verb reads the three raw slot
-    strings. Fields the chosen verb does not read stay at their defaults,
-    so no verb passes arguments another ignores.
+    strings; the ``init_workspace`` verb reads ``input_path`` as the
+    target directory. Fields the chosen verb does not read stay at their
+    defaults, so no verb passes arguments another ignores.
     """
 
     verb: str
@@ -188,8 +189,9 @@ class ConfigResponse:
 
     ``config`` carries the built runtime configuration; the reporting
     verbs put their finding in ``issues``, ``paths``, ``sandbox``, or
-    ``capacity`` instead. ``error`` names the reason a request could not
-    be answered at all.
+    ``capacity`` instead. ``workspace`` carries the resolved target
+    directory for ``init_workspace``. ``error`` names the reason a
+    request could not be answered at all.
     """
 
     config: object | None = None
@@ -198,6 +200,7 @@ class ConfigResponse:
     paths: ResolvedConfigPaths | None = None
     sandbox: SandboxReport | None = None
     capacity: CapacityReport | None = None
+    workspace: Path | None = None
     error: str | None = None
 
 

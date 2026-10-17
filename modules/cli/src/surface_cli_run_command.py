@@ -1,7 +1,7 @@
 """CLI surface: run command — single prompt processing dispatch.
 
-Smart surface: maps parsed args/config to the correct specialized pipeline
-orchestrator based on AppConfig.mode, then delegates with zero business logic.
+Smart surface: maps parsed args/config to the prompt aggregate based on
+AppConfig.mode, then delegates with zero business logic.
 """
 
 from __future__ import annotations
@@ -9,18 +9,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from modules.shared.src.common.taxonomy_core_vo import AppConfig, HeadlessFlag
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, HeadlessFlag, PromptText
 from modules.shared.src.common.utility_response_normalizer import (
     detect_processing_failure,
     error_response,
     safe_handle,
     success_response,
 )
-from modules.shared.src.prompt.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest
 
 
 def _processing_failure_message(result: object) -> str | None:
@@ -30,9 +27,7 @@ def _processing_failure_message(result: object) -> str | None:
 
 def dispatch_run(
     cfg: AppConfig,
-    direct: IDirectPromptProtocol,
-    file_only: IPromptFileProtocol,
-    attachment: IAttachmentPromptProtocol,
+    prompt: IPromptAggregate,
     session_resolver: Callable[[], Path | None] | None = None,
 ) -> dict[str, object]:
     """C4: single shared dispatcher for direct/single modes.
@@ -48,34 +43,46 @@ def dispatch_run(
     mode = cfg.mode
 
     if mode == "direct":
-        prompt_text = cfg.inline_prompt_text
-        if not prompt_text:
+        raw_prompt = cfg.inline_prompt_text
+        if not raw_prompt:
             return error_response(
                 RuntimeError("Missing inline prompt text for direct mode."), "validation_error", "cli-400"
             )
-        result = direct.process_direct_prompt(
-            prompt=prompt_text,
-            output_file=cfg.output_path,
-            headless=HeadlessFlag(cfg.headless),
-            session_resolver=session_resolver,
+        prompt_text = PromptText(raw_prompt)
+        response = prompt.execute(
+            PromptRequest(
+                verb="process_direct_prompt",
+                prompt=prompt_text,
+                output_file=cfg.output_path,
+                headless=HeadlessFlag(cfg.headless),
+                session_resolver=session_resolver,
+            )
         )
+        result = response.response_text
     elif mode == "single":
         prompt_file = cfg.prompt_path or cfg.input_path
         if cfg.file_path:
-            result = attachment.process_prompt_with_attachment(
-                prompt_file=prompt_file,
-                attachment_file=cfg.file_path,
-                output_file=cfg.output_path,
-                headless=HeadlessFlag(cfg.headless),
-                session_resolver=session_resolver,
+            response = prompt.execute(
+                PromptRequest(
+                    verb="process_prompt_with_attachment",
+                    prompt_file=prompt_file,
+                    attachment_file=cfg.file_path,
+                    output_file=cfg.output_path,
+                    headless=HeadlessFlag(cfg.headless),
+                    session_resolver=session_resolver,
+                )
             )
         else:
-            result = file_only.process_prompt_file_only(
-                prompt_file=prompt_file,
-                output_file=cfg.output_path,
-                headless=HeadlessFlag(cfg.headless),
-                session_resolver=session_resolver,
+            response = prompt.execute(
+                PromptRequest(
+                    verb="process_prompt_file_only",
+                    prompt_file=prompt_file,
+                    output_file=cfg.output_path,
+                    headless=HeadlessFlag(cfg.headless),
+                    session_resolver=session_resolver,
+                )
             )
+        result = response.response_text
     else:
         return error_response(RuntimeError(f"Unsupported CLI mode: {mode}"), "validation_error", "cli-400")
 
@@ -89,11 +96,12 @@ def dispatch_run(
 def handle(
     args: object,
     cfg: AppConfig,
-    direct: IDirectPromptProtocol,
-    file_only: IPromptFileProtocol,
-    attachment: IAttachmentPromptProtocol,
+    prompt: IPromptAggregate,
     session_resolver: Callable[[], Path | None] | None = None,
 ) -> dict[str, object]:
-    """Dispatch single prompt processing to the matching pipeline orchestrator."""
+    """Dispatch single prompt processing to the prompt aggregate pipeline."""
     _ = args
-    return dispatch_run(cfg, direct, file_only, attachment, session_resolver=session_resolver)
+    return dispatch_run(cfg, prompt, session_resolver=session_resolver)
+
+
+__all__ = ["dispatch_run", "handle"]

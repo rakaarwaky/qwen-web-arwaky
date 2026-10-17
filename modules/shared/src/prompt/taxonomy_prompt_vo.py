@@ -65,6 +65,10 @@ class PromptRequest:
     state: object = None
     observability: object = None
     event_observer: Callable[[QwenEventType, LifecycleEvent], None] | None = None
+    #: Returns the pool session path chosen by session rotation, so a
+    #: direct / file / attachment pipeline can run against the rotated
+    #: profile instead of the default.
+    session_resolver: Callable[[], Path | None] | None = None
 
 
 @dataclass(frozen=True)

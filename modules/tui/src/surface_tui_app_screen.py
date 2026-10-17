@@ -26,34 +26,25 @@ from textual.widgets import Button, Input
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MAX_WORKERS
 from modules.shared.src.common.utility_core_prompt_template import prompt_template_manifest
 from modules.shared.src.common.utility_core_version import get_package_version
-from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.prompt.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.session.contract_session_protocol import (
-    ISessionManagerProtocol,
-    ISessionRotatorProtocol,
-)
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmId
-from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol
-from modules.tui.src.surface_tui_components import (
+from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
+from modules.tui.src.surface_tui_component import (
     ConfirmModal,
     TemplatePickerModal,
 )
-from modules.tui.src.surface_tui_compose import _TuiComposeMixin
-from modules.tui.src.surface_tui_css import THEME, TUI_CSS
-from modules.tui.src.surface_tui_events import _TuiEventsMixin
-from modules.tui.src.surface_tui_main_handlers import _TuiHandlersMixin
-from modules.tui.src.surface_tui_sessions_worker import _TuiSessionsWorkerMixin
-from modules.tui.src.surface_tui_settings import _TuiSettingsMixin
-from modules.tui.src.surface_tui_utils import _TuiUtilsMixin
-from modules.tui.src.surface_tui_workers import _TuiWorkersMixin
+from modules.tui.src.surface_tui_compose_layout import _TuiComposeMixin
+from modules.tui.src.surface_tui_css_view import THEME, TUI_CSS
+from modules.tui.src.surface_tui_events_action import _TuiEventsMixin
+from modules.tui.src.surface_tui_main_action import _TuiHandlersMixin
+from modules.tui.src.surface_tui_sessions_store import _TuiSessionsWorkerMixin
+from modules.tui.src.surface_tui_settings_view import _TuiSettingsMixin
+from modules.tui.src.surface_tui_utils_component import _TuiUtilsMixin
+from modules.tui.src.surface_tui_workers_store import _TuiWorkersMixin
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
 
@@ -121,35 +112,36 @@ class QwenTuiApp(
 
     def __init__(
         self,
-        workspace: IWorkspaceProtocol,
-        direct: IDirectPromptProtocol,
-        file_only: IPromptFileProtocol,
-        attachment: IAttachmentPromptProtocol,
-        slot_config: IConfigSlotPlanProtocol,
+        workspace: IConfigAggregate,
+        prompt: IPromptAggregate,
+        slot_config: IConfigAggregate,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
-        session_manager: ISessionManagerProtocol | None = None,
-        updater: IUpdateCheckProtocol | None = None,
-        job_storage: IJobStorageProtocol | None = None,
-        session_rotator: ISessionRotatorProtocol | None = None,
+        updater: IUpdateAggregate | None = None,
+        session_manager: Any | None = None,
+        job_storage: Any | None = None,
+        session_rotator: Any | None = None,
+        doctor_runner: Any | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
-        self._direct = direct
-        self._file_only = file_only
-        self._attachment = attachment
+        self._prompt = prompt
+        self._slot_config = slot_config
         self._session = session
         self._jobs = jobs
         self._swarm = swarm
-        self._session_manager = session_manager
         self._updater = updater
+        self._session_manager = session_manager
         self._job_storage = job_storage
         self._session_rotator = session_rotator
+        # Doctor-check runner injected so the sessions store mixin does not
+        # import the CLI command-layer ``run_doctor_checks`` (AES201).
+        self._doctor_runner = doctor_runner
+        # Design tokens injected into the sessions store mixin so the
+        # store layer does not import the view-layer THEME symbol.
+        self._theme = THEME
         self._swarm_id: SwarmId | None = None
-        # AR-1: TUI slot config is injected from the Root container, never
-        # imported from Capabilities directly.
-        self._slot_config = slot_config
         self._target_field_for_picker: str | None = None
         self._slot_workers: dict[int, Any] = {}
         # AR-2/FE-1: per-slot cancel events isolate concurrent runs.

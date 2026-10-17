@@ -7,36 +7,36 @@ interactive controller defers its TUI import so headless CLI paths stay
 TUI-free.
 """
 
-import modules.tui.src.surface_tui_app as surface_tui_app
-import modules.tui.src.surface_tui_app_handler as surface_tui_app_handler
-import modules.tui.src.surface_tui_chatlog_handler as surface_tui_chatlog_handler
-import modules.tui.src.surface_tui_components as surface_tui_components
-import modules.tui.src.surface_tui_compose as surface_tui_compose
-import modules.tui.src.surface_tui_css as surface_tui_css
-import modules.tui.src.surface_tui_events as surface_tui_events
-import modules.tui.src.surface_tui_main_handlers as surface_tui_main_handlers
-import modules.tui.src.surface_tui_navlog_handler as surface_tui_navlog_handler
-import modules.tui.src.surface_tui_sessions_handler as surface_tui_sessions_handler
-import modules.tui.src.surface_tui_sessions_worker as surface_tui_sessions_worker
-import modules.tui.src.surface_tui_settings as surface_tui_settings
-import modules.tui.src.surface_tui_swarm_handler as surface_tui_swarm_handler
-import modules.tui.src.surface_tui_utils as surface_tui_utils
-import modules.tui.src.surface_tui_workers as surface_tui_workers
+import modules.tui.src.surface_tui_app_action as surface_tui_app_action
+import modules.tui.src.surface_tui_app_screen as surface_tui_app_screen
+import modules.tui.src.surface_tui_chatlog_action as surface_tui_chatlog_action
+import modules.tui.src.surface_tui_component as surface_tui_component
+import modules.tui.src.surface_tui_compose_layout as surface_tui_compose_layout
+import modules.tui.src.surface_tui_css_view as surface_tui_css_view
+import modules.tui.src.surface_tui_events_action as surface_tui_events_action
+import modules.tui.src.surface_tui_main_action as surface_tui_main_action
+import modules.tui.src.surface_tui_navlog_action as surface_tui_navlog_action
+import modules.tui.src.surface_tui_sessions_action as surface_tui_sessions_action
+import modules.tui.src.surface_tui_sessions_store as surface_tui_sessions_store
+import modules.tui.src.surface_tui_settings_view as surface_tui_settings_view
+import modules.tui.src.surface_tui_swarm_action as surface_tui_swarm_action
+import modules.tui.src.surface_tui_utils_component as surface_tui_utils_component
+import modules.tui.src.surface_tui_workers_store as surface_tui_workers_store
 
 __all__ = [
-    "surface_tui_app",
-    "surface_tui_components",
-    "surface_tui_compose",
-    "surface_tui_css",
-    "surface_tui_events",
-    "surface_tui_sessions_handler",
-    "surface_tui_navlog_handler",
-    "surface_tui_chatlog_handler",
-    "surface_tui_swarm_handler",
-    "surface_tui_app_handler",
-    "surface_tui_main_handlers",
-    "surface_tui_sessions_worker",
-    "surface_tui_settings",
-    "surface_tui_utils",
-    "surface_tui_workers",
+    "surface_tui_app_screen",
+    "surface_tui_component",
+    "surface_tui_compose_layout",
+    "surface_tui_css_view",
+    "surface_tui_events_action",
+    "surface_tui_sessions_action",
+    "surface_tui_navlog_action",
+    "surface_tui_chatlog_action",
+    "surface_tui_swarm_action",
+    "surface_tui_app_action",
+    "surface_tui_main_action",
+    "surface_tui_sessions_store",
+    "surface_tui_settings_view",
+    "surface_tui_utils_component",
+    "surface_tui_workers_store",
 ]

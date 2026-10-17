@@ -22,7 +22,7 @@ import os
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from modules.tui.src.surface_tui_utils import _TuiUtilsMixin
+from modules.tui.src.surface_tui_utils_component import _TuiUtilsMixin
 
 
 class TestAccountCardButtons:
@@ -43,7 +43,7 @@ class TestAccountCardButtons:
         from textual.containers import Container
         from textual.widgets import Button
 
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -101,7 +101,7 @@ class TestAccountCardButtons:
         from textual.containers import Container
         from textual.widgets import Button
 
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -135,7 +135,7 @@ class TestAccountButtonRouting:
     def test_delete_button_routes_to_confirm(self) -> None:
         """Pressing the trash button pushes a ConfirmModal, not a
         'run CLI command' notification."""
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -164,7 +164,7 @@ class TestAccountButtonRouting:
 
     def test_test_button_routes_to_health_check(self) -> None:
         """Pressing the flask button runs the session health check."""
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -195,7 +195,7 @@ class TestDeleteSessionWorker:
     remove the pool entry, then delete the profile via the manager."""
 
     def test_delete_removes_pool_entry_and_profile(self) -> None:
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -239,7 +239,7 @@ class TestDeleteSessionWorker:
         asyncio.run(_run())
 
     def test_delete_declined_is_noop(self) -> None:
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = QwenTuiApp(
             workspace=MagicMock(),
@@ -280,7 +280,7 @@ class TestSessionsPaneLayout:
 
     @staticmethod
     def _app() -> Any:
-        from modules.tui.src.surface_tui_app import QwenTuiApp
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         return QwenTuiApp(
             workspace=MagicMock(),
