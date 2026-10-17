@@ -3,13 +3,32 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
+from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.root_core_container import SharedContainer
 from modules.shared.src import DEFAULT_JOBS_DIR, DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION, SWARM_OUTPUT_ROOT
 
 
 class TestQwaInit(unittest.TestCase):
     """Test suite for qwa init functionality."""
+
+    def test_cli_init_handler_wires_config_aggregate(self) -> None:
+        """Regression: qwa init must call config.execute, not workspace.execute.
+
+        ``handle_init_command`` is an ``IConfigAggregate`` surface. Passing
+        ``container.workspace`` raises ``'WorkspaceProvisioner' object has
+        no attribute 'execute'`` (see modules/root_cli_main_entry.py).
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            target_path = Path(tmp_dir)
+            container = SharedContainer()
+            args = SimpleNamespace(target_dir=str(target_path))
+
+            result = handle_init_command(args, container.config)
+
+            self.assertTrue(result.get("success"), result)
+            self.assertTrue((target_path / ".qwen-web-arwaky").exists())
 
     def test_run_init_creates_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
