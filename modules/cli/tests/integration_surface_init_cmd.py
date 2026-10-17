@@ -41,11 +41,15 @@ class TestQwaInit(unittest.TestCase):
                 self.assertTrue(link.is_symlink() or link.exists(), f".qwen-web-arwaky/{name} missing")
                 self.assertEqual(link.resolve(), target.resolve(), f".qwen-web-arwaky/{name} target mismatch")
 
-            # 3. Verify .gitignore
-            gitignore = target_path / ".gitignore"
-            self.assertTrue(gitignore.exists())
+            # 3. Verify the nested .qwen-web-arwaky/.gitignore
+            # (codegraph-style: ignore the whole dir, keep only the
+            # .gitignore itself).
+            gitignore = dot_qwen / ".gitignore"
+            self.assertTrue(gitignore.is_file())
             gi_content = gitignore.read_text(encoding="utf-8")
-            self.assertIn(".qwen-web-arwaky/", gi_content)
+            self.assertIn("*", gi_content)
+            self.assertIn("!.gitignore", gi_content)
+            self.assertFalse((target_path / ".gitignore").exists())
 
     def test_run_init_idempotent_and_existing_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -53,17 +57,25 @@ class TestQwaInit(unittest.TestCase):
             gitignore = target_path / ".gitignore"
             gitignore.write_text("existing_file.txt\n", encoding="utf-8")
 
-            # First run
+            # First run: the nested .gitignore is created; the operator's
+            # existing root .gitignore entries survive, but any legacy
+            # .qwen-web-arwaky/ / .qwen-web/ entries init once appended
+            # are cleaned up.
             container = SharedContainer()
             container.workspace.init_workspace(target_path)
             gi_content = gitignore.read_text(encoding="utf-8")
             self.assertIn("existing_file.txt", gi_content)
-            self.assertIn(".qwen-web-arwaky/", gi_content)
+            self.assertNotIn(".qwen-web-arwaky/", gi_content)
+            self.assertNotIn(".qwen-web/", gi_content)
 
-            # Second run (idempotency check)
+            # Second run (idempotency check): the nested file is rewritten
+            # with the canonical content and the root file stays clean.
             container.workspace.init_workspace(target_path)
             gi_content_2 = gitignore.read_text(encoding="utf-8")
-            self.assertEqual(gi_content_2.count(".qwen-web-arwaky/"), 1)
+            self.assertNotIn(".qwen-web-arwaky/", gi_content_2)
+            self.assertNotIn(".qwen-web/", gi_content_2)
+            nested = (target_path / ".qwen-web-arwaky" / ".gitignore").read_text(encoding="utf-8")
+            self.assertEqual(nested.count("!.gitignore"), 1)
 
 
 if __name__ == "__main__":

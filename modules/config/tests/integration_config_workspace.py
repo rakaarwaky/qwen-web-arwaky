@@ -18,11 +18,17 @@ def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:
 
 
 def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> None:
-    """The workspace holds session symlinks, so it must be ignored rather
-    than committed alongside the operator's own work."""
+    """The workspace holds session symlinks, so it must be ignored via a
+    nested .gitignore with codegraph-style rules inside the workspace dir
+    itself — not via an entry in the operator's root .gitignore."""
     WorkspaceProvisioner().init_workspace(tmp_path)
 
-    assert ".qwen-web-arwaky/" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    nested = tmp_path / ".qwen-web-arwaky" / ".gitignore"
+    assert nested.is_file()
+    content = nested.read_text(encoding="utf-8")
+    assert "*" in content
+    assert "!.gitignore" in content
+    assert not (tmp_path / ".gitignore").exists()
 
 
 def test_integration_reinitializing_preserves_an_existing_workspace(tmp_path: Path) -> None:
