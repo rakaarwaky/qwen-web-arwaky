@@ -482,7 +482,7 @@ def _dispatch(
         )
 
     if action == "init":
-        result = handle_init_command(args, container.workspace)
+        result = handle_init_command(args, container.config)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "update":
