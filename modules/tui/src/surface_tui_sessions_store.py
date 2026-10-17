@@ -203,6 +203,12 @@ class _TuiSessionsWorkerMixin:
                     "[bold {}]DOCTOR:[/] Doctor runner not injected.".format(self._theme["warn"]),
                 )
                 return
+            if not callable(doctor_runner):
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DOCTOR:[/] Doctor runner must be callable.".format(self._theme["warn"]),
+                )
+                return
             checks = doctor_runner()
             failed = [c for c in checks if not c["passed"]]
             if failed:
