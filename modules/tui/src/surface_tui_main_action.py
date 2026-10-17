@@ -1,7 +1,7 @@
 """Combined TUI handler mixin — the public entry point for screen actions.
 
 Surface layer (surface_cli): re-exports the per-concern handler mixins as the single ``_TuiHandlersMixin`` symbol that
-:class:`~modules.tui.src.surface_tui_app.QwenTuiApp` binds. Each concern lives in its
+:class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp` binds. Each concern lives in its
 own ``surface_tui_{concern}_handler.py`` file:
 
 - ``sessions`` — Sessions pane account cards, delete flow, row keyboard nav.
@@ -15,11 +15,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from modules.tui.src.surface_tui_app_handler import _TuiAppHandlerMixin
-from modules.tui.src.surface_tui_chatlog_handler import _TuiChatLogHandlerMixin
-from modules.tui.src.surface_tui_navlog_handler import _TuiNavLogHandlerMixin
-from modules.tui.src.surface_tui_sessions_handler import _TuiSessionsHandlerMixin
-from modules.tui.src.surface_tui_swarm_handler import _TuiSwarmHandlerMixin
+from modules.tui.src.surface_tui_app_action import _TuiAppHandlerMixin
+from modules.tui.src.surface_tui_chatlog_action import _TuiChatLogHandlerMixin
+from modules.tui.src.surface_tui_navlog_action import _TuiNavLogHandlerMixin
+from modules.tui.src.surface_tui_sessions_action import _TuiSessionsHandlerMixin
+from modules.tui.src.surface_tui_swarm_action import _TuiSwarmHandlerMixin
 
 
 class _TuiHandlersMixin(

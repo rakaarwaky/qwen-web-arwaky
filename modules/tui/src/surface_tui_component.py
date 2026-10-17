@@ -28,7 +28,7 @@ from textual.containers import Center, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, RichLog, Static
 
-from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_css_view import THEME
 
 
 class FilePickerModal(ModalScreen[str | None]):

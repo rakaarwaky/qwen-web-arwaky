@@ -3,10 +3,10 @@
 Surface layer (surface_cli): Mixin providing the ``@work(thread=True)``
 workers that validate the stored session, load the account pool into the
 Sessions screen, and run health checks. Splitting them from
-:class:`~modules.tui.src.surface_tui_workers._TuiWorkersMixin` keeps that
+:class:`~modules.tui.src.surface_tui_workers_store._TuiWorkersMixin` keeps that
 file on slot/swarm execution and both files inside the AES surface complexity
 budget.
-Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from textual.widgets import Label
 
 from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
-from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_css_view import THEME
 
 
 class _TuiSessionsWorkerMixin:
@@ -130,13 +130,13 @@ class _TuiSessionsWorkerMixin:
         it the second invocation's callback would race the first into the DOM
         and ``query_one`` would see an inconsistent widget tree.
         """
-        if not hasattr(self, "_session_manager") or self._session_manager is None:
-            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
+        if not hasattr(self, "_session") or self._session is None:
+            self.call_from_thread(self._log_msg, "[yellow]Session aggregate not available.[/]")
             return
         try:
-            pool = self._session_manager.load_pool()
-            sessions = pool.sessions
-            total = pool.total_count
+            response = self._session.execute(SessionRequest(verb="list_sessions"))
+            sessions = response.sessions or []
+            total = len(sessions)
             healthy = sum(1 for s in sessions if s.is_healthy)
             limited = sum(1 for s in sessions if s.is_limited)
 
