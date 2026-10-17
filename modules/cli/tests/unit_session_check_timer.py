@@ -20,8 +20,8 @@ from textual.timer import Timer
 
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
-from modules.tui.src import surface_tui_sessions_worker as sessions_worker
-from modules.tui.src.surface_tui_app import QwenTuiApp
+from modules.tui.src import tui_sessions_worker as sessions_worker
+from modules.tui.src.tui_app import QwenTuiApp
 
 
 class _ValidSession:

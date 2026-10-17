@@ -122,6 +122,7 @@ class QwenTuiApp(
         session_manager: Any | None = None,
         job_storage: Any | None = None,
         session_rotator: Any | None = None,
+        doctor_runner: Any | None = None,
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -134,6 +135,12 @@ class QwenTuiApp(
         self._session_manager = session_manager
         self._job_storage = job_storage
         self._session_rotator = session_rotator
+        # Doctor-check runner injected so the sessions store mixin does not
+        # import the CLI command-layer ``run_doctor_checks`` (AES201).
+        self._doctor_runner = doctor_runner
+        # Design tokens injected into the sessions store mixin so the
+        # store layer does not import the view-layer THEME symbol.
+        self._theme = THEME
         self._swarm_id: SwarmId | None = None
         self._target_field_for_picker: str | None = None
         self._slot_workers: dict[int, Any] = {}

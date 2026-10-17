@@ -22,7 +22,6 @@ from textual.widgets import Label
 
 from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
-from modules.tui.src.surface_tui_css_view import THEME
 
 
 class _TuiSessionsWorkerMixin:
@@ -50,6 +49,12 @@ class _TuiSessionsWorkerMixin:
     _updater: Any
     _ensure_sessions_loaded: Any
     _sessions_loaded_once: bool
+    #: Design-token map injected by :class:`QwenTuiApp` so this store-layer
+    #: mixin does not import the view-layer ``THEME`` symbol.
+    _theme: dict[str, str]
+    #: Doctor-check runner callable injected by :class:`QwenTuiApp` so the
+    #: store layer does not import the CLI command-layer ``run_doctor_checks``.
+    _doctor_runner: Any
 
     def _force_sessions_refresh(self) -> None:
         """Reset the one-shot load guard and reload the account pool.
@@ -85,7 +90,7 @@ class _TuiSessionsWorkerMixin:
         self._session_check_timed_out = True
         self._last_session_state = "TIMEOUT"
         msg = "Session check timed out — run 'qwen-web-arwaky doctor' for diagnostics."
-        self._log_msg("[bold {}]WARNING:[/] {}".format(THEME["warn"], msg))
+        self._log_msg("[bold {}]WARNING:[/] {}".format(self._theme["warn"], msg))
         with contextlib.suppress(Exception):
             self.notify(msg, severity="warning", title="Session")
 
@@ -116,7 +121,7 @@ class _TuiSessionsWorkerMixin:
             self._session_check_timer = None
         self._session_check_timed_out = state == "TIMEOUT"
         self._last_session_state = state
-        self._log_msg("[bold {}]SESSION:[/] {}".format(THEME["muted"], state))
+        self._log_msg("[bold {}]SESSION:[/] {}".format(self._theme["muted"], state))
 
     # ── Session Pool Management ────────────────────────────────────────
 
@@ -158,7 +163,7 @@ class _TuiSessionsWorkerMixin:
                     self.query_one("#session-metric-expired", Label).update(f"{limited}")
                 self._log_msg(
                     "[bold {}]SESSIONS:[/] Loaded {} sessions ({} healthy, {} limited).".format(
-                        THEME["ok"], total, healthy, limited
+                        self._theme["ok"], total, healthy, limited
                     ),
                 )
 
@@ -181,7 +186,7 @@ class _TuiSessionsWorkerMixin:
             # misleading "SESSION LOAD ERROR".
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]SESSION LOAD ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}]SESSION LOAD ERROR:[/] {}".format(self._theme["err"], escape(str(exc))),
             )
 
     # ── System Actions (Settings pane) ─────────────────────────────────
@@ -189,16 +194,21 @@ class _TuiSessionsWorkerMixin:
     @work(thread=True)
     def _run_doctor_worker(self) -> None:
         """Run the doctor diagnostic checks in a background thread."""
-        self._log_msg("[bold {}]DOCTOR:[/] Running system diagnostics...".format(THEME["accent_fg"]))
+        self._log_msg("[bold {}]DOCTOR:[/] Running system diagnostics...".format(self._theme["accent_fg"]))
         try:
-            from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
-
-            checks = run_doctor_checks()
+            doctor_runner = getattr(self, "_doctor_runner", None)
+            if doctor_runner is None:
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]DOCTOR:[/] Doctor runner not injected.".format(self._theme["warn"]),
+                )
+                return
+            checks = doctor_runner()
             failed = [c for c in checks if not c["passed"]]
             if failed:
                 self.call_from_thread(
                     self._log_msg,
-                    "[bold {}]DOCTOR:[/] {} check(s) failed.".format(THEME["err"], len(failed)),
+                    "[bold {}]DOCTOR:[/] {} check(s) failed.".format(self._theme["err"], len(failed)),
                 )
                 for c in failed:
                     self.call_from_thread(
@@ -208,24 +218,24 @@ class _TuiSessionsWorkerMixin:
             else:
                 self.call_from_thread(
                     self._log_msg,
-                    "[bold {}]DOCTOR:[/] All checks passed. System is healthy.".format(THEME["ok"]),
+                    "[bold {}]DOCTOR:[/] All checks passed. System is healthy.".format(self._theme["ok"]),
                 )
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]DOCTOR ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}]DOCTOR ERROR:[/] {}".format(self._theme["err"], escape(str(exc))),
             )
 
     @work(thread=True)
     def _run_update_worker(self) -> None:
         """Run a self-update check in a background thread."""
-        self._log_msg("[bold {}]UPDATE:[/] Checking for updates...".format(THEME["accent_fg"]))
+        self._log_msg("[bold {}]UPDATE:[/] Checking for updates...".format(self._theme["accent_fg"]))
         updater = getattr(self, "_updater", None)
         if updater is None:
             self.call_from_thread(
                 self._log_msg,
                 "[bold {}]UPDATE:[/] No updater injected — run 'qwa update --check' from the shell.".format(
-                    THEME["warn"]
+                    self._theme["warn"]
                 ),
             )
             return
@@ -235,14 +245,14 @@ class _TuiSessionsWorkerMixin:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]UPDATE:[/] Could not reach version source ({}).".format(
-                        THEME["warn"], escape(str(check.error or "unknown"))
+                        self._theme["warn"], escape(str(check.error or "unknown"))
                     ),
                 )
             elif check.update_available:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]UPDATE:[/] Update available: {} → {} — run 'qwa update' to upgrade.".format(
-                        THEME["ok"],
+                        self._theme["ok"],
                         escape(check.current_version or "unknown"),
                         escape(check.latest_version or "latest"),
                     ),
@@ -251,46 +261,38 @@ class _TuiSessionsWorkerMixin:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]UPDATE:[/] Already up to date ({}).".format(
-                        THEME["ok"], escape(check.current_version or "unknown")
+                        self._theme["ok"], escape(check.current_version or "unknown")
                     ),
                 )
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]UPDATE ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}]UPDATE ERROR:[/] {}".format(self._theme["err"], escape(str(exc))),
             )
 
     # ── Swarm engine readout ─────────────────────────────────────────────
 
     @work(thread=True)
     def _run_session_health_check(self) -> None:
-        """Run health checks on all sessions."""
-        if not hasattr(self, "_session_manager") or self._session_manager is None:
-            self.call_from_thread(self._log_msg, "[yellow]Session manager not available.[/]")
+        """Run health checks on all sessions via the session aggregate."""
+        if not hasattr(self, "_session") or self._session is None:
+            self.call_from_thread(self._log_msg, "[yellow]Session aggregate not available.[/]")
             return
         try:
-            from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-            from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
-
-            # No Root container in the TUI worker: construct the browser seam
-            # in-process (AES205) so the probe runs against real Chromium.
-            # Without this, check_session short-circuits to False for every
-            # session and the TUI reports 0 healthy even on a live pool.
-            checker = SessionHealthChecker(browser=BrowserAdapter(), timeout_seconds=10)
-            results = checker.check_pool_sync(
-                self._session_manager.load_pool(),
-                self._session_manager,
-            )
-            healthy_count = sum(1 for _, h in results if h)
+            response = self._session.execute(SessionRequest(verb="check_health"))
+            if response.error:
+                raise RuntimeError(response.error)
+            healthy_count = response.health_healthy or 0
+            total = response.health_total or 0
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]HEALTH CHECK:[/] {}/{} sessions healthy.".format(THEME["ok"], healthy_count, len(results)),
+                "[bold {}]HEALTH CHECK:[/] {}/{} sessions healthy.".format(self._theme["ok"], healthy_count, total),
             )
             self.call_from_thread(self._refresh_sessions_table)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]HEALTH CHECK ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}]HEALTH CHECK ERROR:[/] {}".format(self._theme["err"], escape(str(exc))),
             )
 
     # ── Add Session Worker ──────────────────────────────────────────────
@@ -304,12 +306,12 @@ class _TuiSessionsWorkerMixin:
         the worker completes.
         """
         if getattr(self, "_session", None) is None:
-            self._log_msg("[bold {}]ERROR:[/] Session orchestrator not available.".format(THEME["err"]))
+            self._log_msg("[bold {}]ERROR:[/] Session orchestrator not available.".format(self._theme["err"]))
             return
 
         self._log_msg(
             "[bold {}]LAUNCHING BROWSER:[/] Please log in at chat.qwen.ai, then close the window.".format(
-                THEME["accent_fg"]
+                self._theme["accent_fg"]
             )
         )
         self.notify(
@@ -330,7 +332,7 @@ class _TuiSessionsWorkerMixin:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]SUCCESS:[/] Session '{}' saved at {}".format(
-                        THEME["ok"], escape(session_name), escape(str(response.profile_path or ""))
+                        self._theme["ok"], escape(session_name), escape(str(response.profile_path or ""))
                     ),
                 )
                 self.call_from_thread(self.notify, f"Session '{session_name}' added successfully!", "success", 5)
@@ -339,13 +341,13 @@ class _TuiSessionsWorkerMixin:
                 error_msg = response.error or response.message or "Login failed"
                 self.call_from_thread(
                     self._log_msg,
-                    "[bold {}]LOGIN FAILED:[/] {}".format(THEME["err"], escape(str(error_msg))),
+                    "[bold {}]LOGIN FAILED:[/] {}".format(self._theme["err"], escape(str(error_msg))),
                 )
                 self.call_from_thread(self.notify, f"Login failed: {error_msg}", "error", 8)
         except Exception as exc:
             self.call_from_thread(
                 self._log_msg,
-                "[bold {}]LOGIN ERROR:[/] {}".format(THEME["err"], escape(str(exc))),
+                "[bold {}]LOGIN ERROR:[/] {}".format(self._theme["err"], escape(str(exc))),
             )
             self.call_from_thread(self.notify, f"Login error: {exc}", "error", 8)
 

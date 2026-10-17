@@ -242,6 +242,7 @@ class SharedContainer:
             observability=self.observability,
             sessions=self.session_manager,
             renewer=self.session_renewer,
+            health_checker=self.session_health_checker,
         )
 
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter

@@ -96,6 +96,13 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
         return _asyncio.run(_run())
 
+    def summarize_pool_results(
+        self, results: list[tuple[SessionInfo, bool]]
+    ) -> tuple[int, int]:
+        """Return ``(healthy_count, total)`` for a pool-check result list."""
+        healthy_count = sum(1 for _, h in results if h)
+        return healthy_count, len(results)
+
     # Block 3: Dunder Methods, Factories, Helpers
     def _build_cfg(self, session: SessionInfo) -> AppConfig:
         """Point the probe at *session*'s stored profile, reusing the base cfg's flags."""

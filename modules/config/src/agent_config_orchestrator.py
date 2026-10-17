@@ -18,6 +18,7 @@ from modules.shared.src.config.contract_config_protocol import (
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IConfigValidatorProtocol,
+    IWorkspaceProtocol,
 )
 from modules.shared.src.config.taxonomy_config_vo import ConfigRequest, ConfigResponse
 from modules.shared.src.config.utility_config_app_factory import build_app_config
@@ -42,21 +43,27 @@ class ConfigOrchestrator(IConfigAggregate):
         path_resolver: IConfigPathResolverProtocol,
         capacity: IConfigCapacityProtocol,
         slot_plan: IConfigSlotPlanProtocol,
+        workspace: IWorkspaceProtocol | None = None,
     ) -> None:
-        """Bind the five config capability seams.
+        """Bind the five config capability seams plus the optional workspace seam.
 
-        All five are required: a config built without the environment
-        probe would silently ignore ``QWEN_DISABLE_SANDBOX``, one without
-        the validator would skip the path checks that keep a run from
-        spending a browser on an unwritable output, and one without the
-        slot plan would leave each TUI form re-deriving its own output
-        naming rule.
+        All five config seams are required: a config built without the
+        environment probe would silently ignore ``QWEN_DISABLE_SANDBOX``,
+        one without the validator would skip the path checks that keep a
+        run from spending a browser on an unwritable output, and one
+        without the slot plan would leave each TUI form re-deriving its
+        own output naming rule.
+
+        ``workspace`` is an optional :class:`IWorkspaceProtocol` seam so
+        the ``init_workspace`` verb can run without the surface importing
+        a capabilities class directly.
         """
         self._environment = environment
         self._validator = validator
         self._path_resolver = path_resolver
         self._capacity = capacity
         self._slot_plan = slot_plan
+        self._workspace = workspace
 
     # Block 2: Protocol Method Implementation
 
@@ -86,6 +93,11 @@ class ConfigOrchestrator(IConfigAggregate):
             if isinstance(resolved, SlotRunPlan):
                 return ConfigResponse(config=resolved)
             return ConfigResponse(error=resolved.message)
+        if request.verb == "init_workspace":
+            if self._workspace is None:
+                return ConfigResponse(error="workspace provisioner not wired")
+            self._workspace.init_workspace(request.input_path)
+            return ConfigResponse(workspace=request.input_path)
         return ConfigResponse(error=f"Unknown config verb: {request.verb!r}")
 
     # Block 3: Dunder Methods, Factories, Helpers

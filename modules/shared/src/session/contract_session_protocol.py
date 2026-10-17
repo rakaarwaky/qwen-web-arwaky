@@ -118,6 +118,20 @@ class ISessionHealthCheckerProtocol(ABC):
         """Health-check every session and return the updated pool."""
         ...
 
+    @abstractmethod
+    def check_pool_sync(
+        self,
+        pool: SessionPool,
+        session_manager: ISessionManagerProtocol,
+    ) -> list[tuple[SessionInfo, bool]]:
+        """Synchronously ping every session and mark manager state; returns ``(session, healthy)`` pairs."""
+        ...
+
+    @abstractmethod
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, bool]]) -> tuple[int, int]:
+        """Return ``(healthy_count, total)`` for a pool-check result list."""
+        ...
+
 
 class ISessionRotatorProtocol(ABC):
     """Session rotation contract: select the next healthy session to use."""
