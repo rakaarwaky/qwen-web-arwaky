@@ -1,21 +1,24 @@
-# BACKLOG — CLI and Textual TUI
+# BACKLOG — Textual TUI Surface
 
-Feature prefix: `CLI-`. Last Updated: **2026-09-24**.
+Feature prefix: `TUI-`. Last Updated: **2026-10-18**.
 
 State and Health vocabulary, verification requirements, ownership rules, and ID policy are defined only in the root [ROADMAP](../../ROADMAP.md#state-definitions) and [Status Policy](../../ROADMAP.md#status-policy).
 
 ## Current Condition
 
-- Done: `git show d8a9b60:modules/cli/FRD.md` returns the shipped CLI/TUI specification at commit `d8a9b60`.
+- Done: `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` reports **110 passed** (14 test files) on commit `73aee43`.
 - In Progress: None.
 - Blocked: None.
-- Next: `CLI-01`, `CLI-02`, `CLI-03`, `CLI-04`.
+- Next: `TUI-01`, `TUI-02`, `TUI-03`, `TUI-04`.
 
 ## Scenario Evidence
 
 | Scenario | Evidence | Status |
 |---|---|---|
-| CLI/MCP feature flows | Test runs in CI | Pass |
+| TUI compose tree, slot tabs, modals | `uv run python -m pytest modules/tui/tests/unit_surface_tui_app.py modules/tui/tests/unit_tui_modal_layout.py modules/tui/tests/unit_tui_confirm_modal_layout.py -m "not benchmark"` — 29 passed on commit `73aee43` | Pass |
+| TUI log containment across terminal resizes | `uv run python -m pytest modules/tui/tests/unit_tui_log_containment.py -m "not benchmark"` — 34 passed on commit `73aee43` | Pass |
+| TUI toast region and click guards | `uv run python -m pytest modules/tui/tests/unit_tui_toast_region_crash.py modules/tui/tests/unit_tui_handlers.py -m "not benchmark"` — 9 passed on commit `73aee43` | Pass |
+| TUI session action button wiring | `uv run python -m pytest modules/tui/tests/unit_tui_session_action_buttons.py modules/tui/tests/unit_tui_add_session_button_wiring.py -m "not benchmark"` — 13 passed on commit `73aee43` | Pass |
 
 ## Blockers
 
@@ -23,7 +26,7 @@ None.
 
 ## Release Readiness
 
-Feature is release-ready pending the items in the Backlog section above.
+Surface is release-ready pending the items in the Backlog section below.
 
 ## Deferred
 
@@ -33,20 +36,18 @@ None.
 
 | Date | Change |
 |---|---|
-| 2026-10-05 | Added required BACKLOG template sections |
+| 2026-10-18 | Reworked this file to the aes-docs BACKLOG template: `TUI-` prefix, nine-column table, evidence-backed Done row, per-scenario commands and counts |
 
 ## Backlog
 
 | ID | Item | Priority | State | Health | Owner | Actual Condition | Next | Updated |
 |---|---|---|---|---|---|---|---|---|
-| CLI-01 | Unify output-destination behavior and filesystem-edge acceptance | P1 | Ready | At Risk | — | Open findings [#373](https://github.com/rakaarwaky/qwen-web-arwaky/issues/373) and [#280](https://github.com/rakaarwaky/qwen-web-arwaky/issues/280) report divergent destination rules and missing acceptance cases. No current-commit reproduction is attached to this row. | Build a path-resolution matrix for direct, file, attachment, and TUI runs; reproduce on `d8a9b60`; specify one rule before changing code. | 2026-09-24 |
-| CLI-02 | Complete update/rollback contract, tests, and cross-platform behavior | P1 | Refinement | At Risk | — | Findings [#379](https://github.com/rakaarwaky/qwen-web-arwaky/issues/379), [#367](https://github.com/rakaarwaky/qwen-web-arwaky/issues/367), [#334](https://github.com/rakaarwaky/qwen-web-arwaky/issues/334), [#294](https://github.com/rakaarwaky/qwen-web-arwaky/issues/294), [#293](https://github.com/rakaarwaky/qwen-web-arwaky/issues/293), and [#279](https://github.com/rakaarwaky/qwen-web-arwaky/issues/279) span protocol drift, POSIX assumptions, subprocess coverage, smoke checks, and rollback acceptance. The FRD now lists `update`, so stale portions require revalidation. | Revalidate each claim, define rollback acceptance, and split only confirmed implementation work. | 2026-09-24 |
-| CLI-03 | Remove redundant login validation and add a functional doctor smoke gate | P1 | Refinement | On Track | — | Findings [#381](https://github.com/rakaarwaky/qwen-web-arwaky/issues/381) and [#322](https://github.com/rakaarwaky/qwen-web-arwaky/issues/322) remain open; neither has verification evidence against the current baseline in this backlog. | Trace the login lifecycle and define a non-destructive doctor smoke scenario with unit-testable boundaries. | 2026-09-24 |
-| CLI-04 | Lock TUI filesystem and async interaction behavior in documented tests | P2 | Ready | On Track | — | Finding [#335](https://github.com/rakaarwaky/qwen-web-arwaky/issues/335) reports missing Textual async-runner guidance; existing TUI unit tests are present but their required workflow is not documented in `TEST.md`. | Document the test runner and add acceptance coverage identified by `CLI-01`. | 2026-09-24 |
+| TUI-01 | Ship the five shipped screens: Overview, Sessions, per-slot Chat, Swarm, and Settings under one token system | P1 | Done | On Track | — | `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` — 110 passed, 0 failed on commit `73aee43`; compose tree in `surface_tui_compose_layout.py`, tokens in `surface_tui_css_view.py`. | Record a released version containing `modules/tui` via `gh release view` and update this row to Released. | 2026-10-18 |
+| TUI-02 | TUI modal layout and toast-region crash guard | P1 | Done | On Track | — | `uv run python -m pytest modules/tui/tests/unit_tui_modal_layout.py modules/tui/tests/unit_tui_confirm_modal_layout.py modules/tui/tests/unit_tui_toast_region_crash.py -m "not benchmark"` — 10 passed, 0 failed on commit `73aee43`. | Verify the toast crash guard against the next Textual upgrade. | 2026-10-18 |
+| TUI-03 | TUI visual and interaction contract for designers and surface engineers | P1 | In Progress | On Track | — | `DESIGN.md` (this folder) is reworked to the aes-docs DESIGN contract; the token map cites the root `DESIGN.md` palette and `modules/tui/src/surface_tui_css_view.py` as the single source of truth. | Close this row when `DESIGN.md` passes `lint-arwaky-cli docs modules/tui` at Total: 0 in a release PR. | 2026-10-18 |
+| TUI-04 | TUI log containment: the log panel keeps its height on every terminal size | P1 | Done | On Track | — | `uv run python -m pytest modules/tui/tests/unit_tui_log_containment.py -m "not benchmark"` — 34 passed, 0 failed on commit `73aee43`. | No action; monitor for regressions in future Textual releases. | 2026-10-18 |
 
 ## Dependencies and Exit Evidence
 
-- `CLI-01` depends on the Core output/path contracts remaining explicit.
-- `CLI-02` depends on the shared update protocol and release infrastructure.
-- Authenticated browser acceptance contributes to workspace gate `WS-03`; it is not duplicated as a CLI row.
-- A row can become Done only with the exact verification command, its result, and the implementing commit recorded in `Actual Condition`.
+- TUI depends on the Root containers (`modules/root_cli_main_entry.py`) for orchestrator wiring; the TUI module never imports CLI code.
+- A row can become Done only with the exact verification command, its pass/fail counts, and the implementing commit recorded in `Actual Condition`. `Done` evidence lives on the `Actual Condition` cell of the row above.
