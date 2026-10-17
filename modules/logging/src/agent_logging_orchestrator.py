@@ -68,6 +68,8 @@ class LoggingOrchestrator(IObservabilityAggregate):
                     run_id=RunId(request.run_id) if request.run_id else None
                 )
                 return ObservabilityResponse(success=True, report_path=report)
+            if request.verb == "metrics_snapshot":
+                return ObservabilityResponse(success=True, metrics=self._metrics.snapshot())
         except Exception as exc:
             return ObservabilityResponse(success=False, error=str(exc))
         raise QwenCliError(f"Unknown observability verb: {request.verb!r}")  # pragma: no cover

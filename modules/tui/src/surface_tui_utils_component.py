@@ -3,7 +3,7 @@
 Surface layer (surface_cli): Mixin providing stateless-ish helpers used by
 compose, handlers, and workers — table management, metrics refresh, slot
 status update, log messaging, and the log-handler guard.
-Imported by :class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
+Imported by :class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, Label, Static, TabbedContent
 
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
-from modules.tui.src.surface_tui_components import QwenTuiLogHandler, QwenTuiRichLog
-from modules.tui.src.surface_tui_css import _COLORS, THEME
+from modules.tui.src.surface_tui_component import QwenTuiLogHandler, QwenTuiRichLog
+from modules.tui.src.surface_tui_css_view import _COLORS, THEME
 
 if TYPE_CHECKING:
     pass

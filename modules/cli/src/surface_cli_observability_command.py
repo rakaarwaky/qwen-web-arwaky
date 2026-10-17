@@ -1,10 +1,8 @@
 """CLI surface: observability command — query run metrics and quality reports.
 
 Smart surface: maps parsed args to the IObservabilityAggregate verbs
-(write_quality_report, write_status) and formats the response as a
-human-readable summary or JSON envelope. Exposes the LoggingOrchestrator
-and MetricsCounter capability so operators can inspect run outcomes without
-relying on the interactive TUI.
+(write_quality_report, metrics_snapshot) and formats the response as a
+human-readable summary or JSON envelope.
 """
 
 from __future__ import annotations
@@ -15,8 +13,10 @@ import sys
 from typing import Any
 
 from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
-from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol
-from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot, ObservabilityRequest
+from modules.shared.src.logging.taxonomy_logging_vo import (
+    MetricsSnapshot,
+    ObservabilityRequest,
+)
 
 
 def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate) -> int:
@@ -36,7 +36,7 @@ def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate)
     return 0
 
 
-def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = None) -> int:
+def _cmd_status(args: argparse.Namespace, orchestrator: IObservabilityAggregate) -> int:
     """Show the current status file contents and metrics snapshot."""
     json_output = bool(getattr(args, "json", False))
 
@@ -53,7 +53,6 @@ def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = Non
         status_path_resolved = status_path.resolve()
         status_path_resolved.relative_to(workspace_root)
     except (OSError, ValueError):
-        # Path is outside workspace root
         error = {
             "code": "PATH_OUTSIDE_WORKSPACE",
             "message": "Status file path is outside the workspace root",
@@ -74,20 +73,23 @@ def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = Non
             # Invalid or unreadable status file - treat as absent
             status_map = None
 
-    # contract_logging_protocol.IMetricsProtocol.snapshot() returns a MetricsSnapshot;
-    # use its fields directly.
-    metrics_snapshot: MetricsSnapshot | None = None
-    if metrics is not None:
-        metrics_snapshot = metrics.snapshot()
+    snapshot: MetricsSnapshot | None = None
+    response = orchestrator.execute(ObservabilityRequest(verb="metrics_snapshot"))
+    # A non-Snapshot payload (e.g. a mock in tests, or a future verb shape)
+    # must not crash the status rendering — degrade to "no metrics".
+    if response.success and isinstance(response.metrics, MetricsSnapshot):
+        snapshot = response.metrics
 
     if json_output:
-        payload: dict[str, Any] = {"success": True, "status_path": str(status_path), "status": status_map}
-        if metrics_snapshot is not None:
+        payload: dict[str, Any] = {"success": True, "status_path": str(status_path)}
+        if status_map:
+            payload["status"] = status_map
+        if snapshot is not None:
             payload["metrics"] = {
-                "counters": metrics_snapshot.counters,
-                "total_executions": metrics_snapshot.total_executions,
-                "successful_executions": metrics_snapshot.successful_executions,
-                "success_rate": metrics_snapshot.success_rate,
+                "total_executions": snapshot.total_executions,
+                "successful_executions": snapshot.successful_executions,
+                "success_rate": snapshot.success_rate,
+                "counters": dict(snapshot.counters),
             }
         print(json.dumps(payload, indent=2, default=str))
     else:
@@ -99,32 +101,35 @@ def _cmd_status(args: argparse.Namespace, metrics: IMetricsProtocol | None = Non
                 print(f"  {key:<20}: {value}")
         else:
             print("  (no status file present — no run in flight)")
-        if metrics_snapshot is not None:
+        if snapshot is not None:
             print("\nMetrics snapshot:")
-            print(f"  Total executions:      {metrics_snapshot.total_executions}")
-            print(f"  Successful executions: {metrics_snapshot.successful_executions}")
-            if metrics_snapshot.success_rate is not None:
-                print(f"  Success rate:          {metrics_snapshot.success_rate:.1%}")
-            for key, value in sorted(metrics_snapshot.counters.items()):
+            print(f"  Total executions:      {snapshot.total_executions}")
+            print(f"  Successful executions: {snapshot.successful_executions}")
+            if snapshot.success_rate is not None:
+                print(f"  Success rate:          {snapshot.success_rate:.1%}")
+            for key, value in sorted(snapshot.counters.items()):
                 print(f"  {key:<24}: {value}")
         else:
             print("\nMetrics: (no metrics recorded this session)")
     return 0
 
 
-def handle(
-    args: argparse.Namespace, orchestrator: IObservabilityAggregate, metrics: IMetricsProtocol | None = None
+def handle_observability_command(
+    args: argparse.Namespace,
+    orchestrator: IObservabilityAggregate,
 ) -> int:
-    """Dispatch the observability subcommand to the matching handler."""
-    verb = getattr(args, "observability_command", None)
-    if verb == "report":
+    """Handle observability subcommand via the IObservabilityAggregate verbs."""
+    # The observability subparser registers dest="observability_command";
+    # prefer whichever attribute the parser actually set.
+    command = getattr(args, "observability_command", getattr(args, "command", None))
+
+    if command == "report":
         return _cmd_report(args, orchestrator)
-    if verb == "status":
-        # metrics=None is a valid runtime state (e.g. container not fully
-        # initialised); fall back to the status file only rather than erroring.
-        return _cmd_status(args, metrics)
+    if command == "status":
+        return _cmd_status(args, orchestrator)
+
     print("Use 'qwen-web-arwaky observability --help' for usage")
     return 1
 
 
-__all__ = ["handle"]
+__all__ = ["handle_observability_command"]

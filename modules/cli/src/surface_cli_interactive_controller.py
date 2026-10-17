@@ -1,7 +1,7 @@
 """CLI surface: interactive controller — TUI entry wrapper.
 
 Smart surface: presentation only. Interactive mode is owned by the Textual
-TUI app (modules.tui surface_tui_app.QwenTuiApp); this wrapper injects the specialized
+TUI app (modules.tui surface_tui_app_screen.QwenTuiApp); this wrapper injects the specialized
 pipeline orchestrators, workspace provisioner, and setup orchestrator, and also
 supports headless single-file execution when a config is supplied.
 """
@@ -9,24 +9,16 @@ supports headless single-file execution when a config is supplied.
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.common.utility_response_normalizer import error_response, safe_handle, success_response
-from modules.shared.src.config.contract_config_protocol import IConfigSlotPlanProtocol, IWorkspaceProtocol
+from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
-from modules.shared.src.jobs.contract_jobs_protocol import IJobStorageProtocol
-from modules.shared.src.prompt.contract_prompt_protocol import (
-    IAttachmentPromptProtocol,
-    IDirectPromptProtocol,
-    IPromptFileProtocol,
-)
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.session.contract_session_protocol import (
-    ISessionManagerProtocol,
-    ISessionRotatorProtocol,
-)
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
-from modules.shared.src.update.contract_update_protocol import IUpdateCheckProtocol
+from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
 
 
 class InteractiveController:
@@ -34,34 +26,30 @@ class InteractiveController:
 
     def __init__(
         self,
-        workspace: IWorkspaceProtocol,
-        direct: IDirectPromptProtocol,
-        file_only: IPromptFileProtocol,
-        attachment: IAttachmentPromptProtocol,
-        slot_config: IConfigSlotPlanProtocol,
+        workspace: IConfigAggregate,
+        prompt: IPromptAggregate,
+        slot_config: IConfigAggregate,
         session: ISessionAggregate | None = None,
         jobs: IJobManagerAggregate | None = None,
         swarm: ISwarmAggregate | None = None,
-        session_manager: ISessionManagerProtocol | None = None,
-        updater: IUpdateCheckProtocol | None = None,
-        job_storage: IJobStorageProtocol | None = None,
-        session_rotator: ISessionRotatorProtocol | None = None,
+        updater: IUpdateAggregate | None = None,
+        session_manager: Any | None = None,
+        job_storage: Any | None = None,
+        session_rotator: Any | None = None,
+        doctor_runner: Any | None = None,
     ) -> None:
         """Inject the specialized pipeline orchestrators, workspace, and setup."""
         self._workspace = workspace
-        self._direct = direct
-        self._file_only = file_only
-        self._attachment = attachment
-        # AR-1: slot config resolver comes from the Root container, not the
-        # Capabilities layer, so the TUI Surface stays AES-compliant.
+        self._prompt = prompt
         self._slot_config = slot_config
         self._session = session
         self._jobs = jobs
         self._swarm = swarm
-        self._session_manager = session_manager
         self._updater = updater
+        self._session_manager = session_manager
         self._job_storage = job_storage
         self._session_rotator = session_rotator
+        self._doctor_runner = doctor_runner
 
     @safe_handle
     def run(self, cfg: AppConfig | None = None, *, prompt: bool = True) -> dict[str, object]:
@@ -83,21 +71,27 @@ class InteractiveController:
             )
 
         if prompt:
-            from modules.tui.src.surface_tui_app import QwenTuiApp
+            from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+
+            doctor_runner = self._doctor_runner
+            if doctor_runner is None:
+                from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+
+                def doctor_runner() -> list[dict[str, Any]]:
+                    return run_doctor_checks()
 
             app = QwenTuiApp(
                 self._workspace,
-                self._direct,
-                self._file_only,
-                self._attachment,
+                self._prompt,
                 self._slot_config,
                 self._session,
                 self._jobs,
                 self._swarm,
-                self._session_manager,
                 self._updater,
+                self._session_manager,
                 self._job_storage,
                 self._session_rotator,
+                doctor_runner=doctor_runner,
             )
             app.run()
             return success_response("TUI Session Closed.")
@@ -105,9 +99,6 @@ class InteractiveController:
         if cfg is None:
             return success_response("Exited.")
 
-        # C4: single shared dispatcher with the run subcommand.
-        # dispatch_run already returns the standard success/error envelope
-        # (result lives in `message`), so pass it through unchanged.
         from modules.cli.src.surface_cli_run_command import dispatch_run
 
-        return dispatch_run(cfg, self._direct, self._file_only, self._attachment)
+        return dispatch_run(cfg, self._prompt)

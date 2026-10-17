@@ -18,8 +18,8 @@ import pytest
 
 from modules.shared.src import utility_core_env as env_module
 from modules.shared.src.common.utility_core_env import REGISTERED_ENV, SENTRY_DSN, load_settings
-from modules.tui.src import surface_tui_settings as settings_mixin
-from modules.tui.src.surface_tui_app import QwenTuiApp
+from modules.tui.src import surface_tui_settings_view as settings_mixin
+from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
 # Names this module mutates through the screen, so the host environment is
 # restored no matter how a test ends.
@@ -56,9 +56,7 @@ def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 def _make_app() -> QwenTuiApp:
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),

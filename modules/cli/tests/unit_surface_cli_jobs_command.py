@@ -9,8 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
+from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
+from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 
 
 def _record(
@@ -208,32 +209,24 @@ class TestJobsList:
 
 class TestJobsCleanup:
     def test_cleanup_reports_removed_count(self, capsys) -> None:
-        storage = MagicMock()
-        storage.cleanup_stale_jobs.return_value = 3
+        jobs = MagicMock()
+        jobs.execute.return_value = JobResponse(removed=3)
         args = MagicMock()
         args.job_command = "cleanup"
         args.json = False
-        rc = handle_jobs_command(args, MagicMock(), storage)
+        rc = handle_jobs_command(args, jobs)
         assert rc == 0
         assert "3" in capsys.readouterr().out
 
     def test_cleanup_failure_returns_nonzero(self, capsys) -> None:
-        storage = MagicMock()
-        storage.cleanup_stale_jobs.side_effect = OSError("disk full")
+        jobs = MagicMock()
+        jobs.execute.return_value = JobResponse(error="disk full")
         args = MagicMock()
         args.job_command = "cleanup"
         args.json = False
-        rc = handle_jobs_command(args, MagicMock(), storage)
+        rc = handle_jobs_command(args, jobs)
         assert rc == 1
-        assert "Cleanup failed" in capsys.readouterr().err
-
-    def test_cleanup_without_storage_is_refused(self, capsys) -> None:
-        args = MagicMock()
-        args.job_command = "cleanup"
-        args.json = False
-        rc = handle_jobs_command(args, MagicMock(), None)
-        assert rc == 1
-        assert "Job storage not available" in capsys.readouterr().err
+        assert "disk full" in capsys.readouterr().err
 
 
 class TestJobsDispatch:

@@ -9,9 +9,10 @@ from modules.root_cli_main_entry import main
 
 
 def _make_controller() -> InteractiveController:
-    # AR-1: 5th positional arg is slot_config (ISlotRunPlanProtocol), now
-    # injected from the Root container instead of being constructed in the Surface.
-    return InteractiveController(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
+    # AR-1: 3rd positional arg is prompt (IPromptAggregate), 4th is slot_config (IConfigAggregate)
+    return InteractiveController(
+        MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()
+    )
 
 
 class TestInteractiveControllerRun:
@@ -63,8 +64,8 @@ class TestQwenTuiLogHandler:
     def test_emit_info_and_error_levels(self):
         import logging
 
-        from modules.tui.src.surface_tui_app import QwenTuiApp
-        from modules.tui.src.surface_tui_components import QwenTuiLogHandler
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+        from modules.tui.src.surface_tui_component import QwenTuiLogHandler
 
         mock_app = MagicMock(spec=QwenTuiApp)
         handler = QwenTuiLogHandler(mock_app)

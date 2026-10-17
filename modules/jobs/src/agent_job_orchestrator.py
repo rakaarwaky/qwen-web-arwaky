@@ -186,6 +186,11 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             # wait positional, cancel_futures keyword-only (ThreadPoolExecutor 3.9+).
             shutdown(False, cancel_futures=True)
             return JobResponse()
+        if request.verb == "cleanup_stale_jobs":
+            removed = self._storage.cleanup_stale_jobs()
+            return JobResponse(removed=removed)
+        # ``JobVerb`` is an exhaustive Literal, so every member is handled
+        # above; a trailing fallback would be unreachable (warn_unreachable).
 
     # Block 3: Dunder Methods, Factories, Helpers
 

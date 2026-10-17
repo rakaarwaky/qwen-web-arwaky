@@ -43,6 +43,7 @@ JobVerb = Literal[
     "get_job_status",
     "list_jobs",
     "shutdown",
+    "cleanup_stale_jobs",
 ]
 
 

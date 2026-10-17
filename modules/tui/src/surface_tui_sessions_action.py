@@ -1,9 +1,9 @@
 """Sessions pane: account-card actions, delete confirmation flow, pool loading,
 
-Split from ``modules/tui/src/surface_tui_main_handlers.py`` so every handler
+Split from ``modules/tui/src/surface_tui_main_action.py`` so every handler
 file stays on the AES surface complexity budget (AES406, 50 control-flow
 statements). The combined alias re-exports this mixin for
-:class:`~modules.tui.src.surface_tui_app.QwenTuiApp`.
+:class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, TabbedContent
 
-from modules.tui.src.surface_tui_components import (
+from modules.tui.src.surface_tui_component import (
     ConfirmModal,
 )
-from modules.tui.src.surface_tui_css import THEME
+from modules.tui.src.surface_tui_css_view import THEME
 
 
 class _TuiSessionsHandlerMixin:

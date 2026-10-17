@@ -32,8 +32,8 @@ from pathlib import Path
 
 from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
-from modules.cli.src.surface_cli_jobs_command import handle as handle_jobs_command
-from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
+from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
+from modules.cli.src.surface_cli_observability_command import handle_observability_command
 from modules.cli.src.surface_cli_run_command import handle as handle_run_command
 from modules.cli.src.surface_cli_sessions_command import handle_sessions, register_sessions_subparser
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
@@ -448,19 +448,25 @@ def _dispatch(
         # handler would write them straight to the terminal, corrupting the UI.
         container.observability.setup_observability(log_path=DEFAULT_LOG, attach_stderr=False)
 
+        # build_session_prompt_aggregate() composes the three prompt adapters
+        # into the single IPromptAggregate the interactive controller drives.
+        from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
+
+        prompt_aggregate = PromptOrchestrator(
+            direct=container.agent_direct_prompt_orchestrator,
+            file_only=container.agent_prompt_file_orchestrator,
+            attachment=container.agent_attachment_prompt_orchestrator,
+            cancel_registry=container.run_cancel_registry,
+            observability=container.observability,
+        )
         result = InteractiveController(
-            container.workspace,
-            container.agent_direct_prompt_orchestrator,
-            container.agent_prompt_file_orchestrator,
-            container.agent_attachment_prompt_orchestrator,
-            container.slot_plan,
-            container.agent_session_orchestrator,
-            container.agent_job_orchestrator,
-            container.agent_swarm_orchestrator,
-            container.session_manager,
-            container.updater_check,
-            container.job_storage,
-            container.session_rotator,
+            container.config,
+            prompt_aggregate,
+            container.config,
+            session=container.agent_session_orchestrator,
+            jobs=container.agent_job_orchestrator,
+            swarm=container.agent_swarm_orchestrator,
+            updater=container.agent_update_orchestrator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -473,7 +479,6 @@ def _dispatch(
             json_output=bool(getattr(args, "json", False)),
             smoke=bool(getattr(args, "smoke", False)),
             session=container.agent_session_orchestrator,
-            session_manager=container.session_manager,
         )
 
     if action == "init":
@@ -483,17 +488,17 @@ def _dispatch(
     if action == "update":
         if getattr(args, "rollback", None):
             return handle_rollback(args, container.agent_update_orchestrator)
-        result = handle_update_command(args, container.updater_check, container.updater_verify)
+        result = handle_update_command(args, container.agent_update_orchestrator)
         return _result_exit_code(result, json_output=json_output)
 
     if action == "job":
-        return handle_jobs_command(args, container.agent_job_orchestrator, container.job_storage)
+        return handle_jobs_command(args, container.agent_job_orchestrator)
 
     if action == "swarm":
         return handle_swarm_command(args, container.agent_swarm_orchestrator)
 
     if action == "observability":
-        return handle_observability_command(args, container.agent_logging_orchestrator, container.metrics)
+        return handle_observability_command(args, container.agent_logging_orchestrator)
 
     if action == "session":
         return handle_sessions(args)

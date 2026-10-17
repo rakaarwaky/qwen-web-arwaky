@@ -30,6 +30,7 @@ ObservabilityVerb: TypeAlias = Literal[
     "setup_observability",
     "write_status",
     "write_quality_report",
+    "metrics_snapshot",
 ]
 
 #: The counter totals a ``MetricsSnapshot`` carries, keyed by counter name.
@@ -83,11 +84,13 @@ class ObservabilityResponse:
     ``success`` is ``False`` with ``error`` set when the operation could
     not complete, so a bootstrap problem in file-only mode degrades the
     run instead of aborting it. ``report_path`` carries the written
-    quality-report path for the report verb.
+    quality-report path for the report verb. ``metrics`` carries the
+    :class:`MetricsSnapshot` for the ``metrics_snapshot`` verb.
     """
 
     success: bool = True
     report_path: FilePath | Path | None = None
+    metrics: MetricsSnapshot | None = None
     error: str | None = None
 
 

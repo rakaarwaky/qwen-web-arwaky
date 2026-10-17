@@ -9,15 +9,13 @@ from unittest.mock import MagicMock, patch
 from textual.widgets import TabbedContent
 from textual.worker import WorkerFailed
 
-from modules.tui.src.surface_tui_app import QwenTuiApp
+from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
 
 def _make_app() -> QwenTuiApp:
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=MagicMock(),
         session=MagicMock(),
         jobs=MagicMock(),

@@ -31,12 +31,10 @@ pytestmark = pytest.mark.uat
 def tools_and_mocks(tmp_path, monkeypatch):
     """Build an McpToolCommand whose aggregates are all mocks."""
     monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
-    mocks = {name: MagicMock() for name in ("direct", "file_only", "attachment", "session", "workspace")}
+    mocks = {name: MagicMock() for name in ("prompt", "session", "workspace")}
     jobs = MagicMock()
     tools = McpToolCommand(
-        direct=mocks["direct"],
-        file_only=mocks["file_only"],
-        attachment=mocks["attachment"],
+        prompt=mocks["prompt"],
         session=mocks["session"],
         workspace=mocks["workspace"],
         jobs=jobs,
@@ -125,7 +123,7 @@ def test_uat_mcp_007_empty_prompt_is_rejected(tools_and_mocks) -> None:
     assert payload["success"] is False
     assert payload["error"]["code"] == "VALIDATION_ERROR"
     assert payload["error"]["field"] == "prompt"
-    mocks["direct"].process_direct_prompt.assert_not_called()
+    mocks["prompt"].execute.assert_not_called()
 
 
 def test_uat_mcp_008_setup_session_error_carries_actionable_hint(tools_and_mocks) -> None:
@@ -144,7 +142,7 @@ def test_uat_mcp_008_setup_session_error_carries_actionable_hint(tools_and_mocks
 def test_uat_mcp_009_unwritable_init_workspace_target_is_reported(tools_and_mocks, tmp_path) -> None:
     """UAT-MCP-009: init_workspace on an unwritable target reports the error path."""
     tools, mocks, _ = tools_and_mocks
-    mocks["workspace"].init_workspace.side_effect = PermissionError(f"{tmp_path}: permission denied")
+    mocks["workspace"].execute.side_effect = PermissionError(f"{tmp_path}: permission denied")
 
     payload = json.loads(tools.init_workspace(str(tmp_path)))
 

@@ -1,0 +1,334 @@
+/* ═══ Mockup parity: LOGIN (session pool) ═══════════════════════════════ */
+/* The mockup's SESSION POOL STATUS card holds three equal metric tiles and a
+   full-width primary action, then one card per registered account. */
+
+.screen-body {
+    height: 1fr;
+    width: 100%;
+    padding: 1 2;
+    background: $bg_base;
+    overflow-y: auto;
+}
+
+/* Vertical's default is height: 1fr with overflow hidden, so a card would take
+   an equal share of the pane and clip everything past its first rows. Cards
+   size to their content and let .screen-body scroll instead. */
+.screen-card {
+    height: auto;
+    background: $bg_overlay;
+    border: solid $border;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+.screen-card-title {
+    color: $fg_muted;
+    text-style: bold;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+/* Mockup parity: the Overview telemetry card is two raised tiles — ACTIVE
+   ACCOUNTS and MODEL — with the SLOTS / DONE / SESSION cluster tucked into
+   the right tile's trailing edge. Each tile is two content rows (caption
+   over value), and the tiles are split by a one-column gap that shows the
+   card behind them. No vertical card padding: the tiles sit edge to edge so
+   the banner stays four rows tall, as in the mockup. */
+.screen-card.metric-card {
+    padding: 0 2;
+}
+
+.metric-tiles {
+    layout: horizontal;
+    width: 100%;
+    height: 2;
+    margin-bottom: 0;
+    align: left middle;
+}
+
+.metric-tile {
+    layout: vertical;
+    width: 1fr;
+    height: 2;
+    margin-right: 1;
+    padding: 0 1;
+    background: $bg_raised;
+    align: left middle;
+}
+
+.metric-tile-label {
+    width: auto;
+    height: 1;
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.metric-tile-value {
+    layout: horizontal;
+    width: auto;
+    height: 1;
+    align: left middle;
+}
+
+.metric-tile-number {
+    width: auto;
+    color: $fg_primary;
+    text-style: bold;
+    margin-right: 1;
+}
+
+.metric-tile-unit {
+    width: auto;
+    color: $fg_muted;
+}
+
+/* The model tile is the trailing one, so it carries no gap on its right. */
+.metric-tile-model {
+    margin-right: 0;
+}
+
+/* The mockup prints the routed model in primary-fixed, the one tinted
+   monospace value in the banner. */
+.metric-tile-model-value {
+    color: $primary_fixed;
+}
+
+/* Three-up metric strip (REGISTERED / ACTIVE / LIMITED). The overview strip is
+   a single row of label/value pairs, so it sizes to its content — a fixed
+   height would add blank rows inside an already bordered card. The login grid
+   stacks label over value inside a tile, so it overrides the height for two
+   content rows. */
+.login-metric-row {
+    layout: horizontal;
+    width: 100%;
+    height: auto;
+    margin-bottom: 0;
+}
+
+.login-metric-row.login-metric-grid {
+    height: 4;
+}
+
+.login-metric-cell {
+    layout: vertical;
+    width: 1fr;
+    height: 6;
+    background: $surface;
+    border: solid $border;
+    border-right: none;
+    padding: 1 1 0 1;
+    margin-right: 1;
+    content-align: left middle;
+}
+
+.login-metric-cell:last-child {
+    border-right: solid $border;
+}
+
+.login-metric-label {
+    color: $text_muted;
+    text-style: bold;
+    height: 1;
+    width: auto;
+}
+
+.login-metric-value {
+    color: $fg_accent;
+    text-style: bold;
+    height: 3;
+    width: auto;
+    content-align: left middle;
+}
+
+/* Contained ADD SESSION button at the top-right of the table panel (problem 5):
+   a single 1-row slim call-to-action, not a full-width band. The spacer fills
+   the left side so the button hugs the right edge. */
+.session-add-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+.session-add-spacer {
+    width: 1fr;
+    height: 3;
+}
+
+.btn-session-add-contained {
+    width: auto;
+    min-width: 14;
+    height: 3;
+    background: $accent;
+    color: $text;
+    border: none;
+    text-style: bold;
+    padding: 0 2;
+    content-align: center middle;
+}
+
+.btn-session-add-contained:hover {
+    background: $fg_accent;
+    color: $bg_base;
+}
+
+/* Full-width primary call-to-action ("ADD ACCOUNT"). Kept for other panes;
+   the Sessions pane now uses the contained variant above. */
+.btn-primary-full {
+    width: 100%;
+    height: 3;
+    background: $accent;
+    color: $fg_on_accent;
+    border: solid $accent;
+    text-style: bold;
+}
+
+.btn-primary-full:hover {
+    background: $bg_base;
+    color: $accent;
+}
+
+.btn-ghost {
+    width: auto;
+    height: 1;
+    background: $bg_base;
+    color: $fg_muted;
+    border: none;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.btn-ghost:hover {
+    color: $fg_accent;
+}
+
+/* The session table: one static head row (NAME / STATUS / ACTIONS) and one
+   row per account. Every row carries the same three cells plus the three
+   action buttons, so the columns line up because the widths are fixed. */
+/* The session table fills the pane's remaining height so there is no dead
+   space below the last row: the card owns 1fr and the row list scrolls. */
+#session-table {
+    height: 1fr;
+    min-height: 4;
+}
+
+#session-rows {
+    height: 1fr;
+    overflow-y: auto;
+}
+
+/* The empty-state line: informative, centred, muted. */
+.session-empty {
+    color: $text_muted;
+    text-style: italic;
+    padding: 2 1;
+    width: 100%;
+    content-align: center middle;
+}
+
+.session-row {
+    layout: horizontal;
+    width: 100%;
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+/* Keyboard-first selection: a focused row gets the hover surface plus a 1px
+   accent left edge, so the operator always sees which row the cursor is on. */
+.session-row.session-row-selected {
+    background: $bg_hover;
+    border-left: solid $accent;
+}
+
+.session-row:focus-within {
+    background: $bg_hover;
+}
+
+.session-row-head {
+    background: $bg_active;
+    border-bottom: solid $border;
+}
+
+.session-row .session-cell {
+    height: 1;
+    content-align: left middle;
+}
+
+.session-cell-name {
+    width: 1fr;
+    color: $fg_primary;
+    text-style: bold;
+}
+
+.session-cell-status {
+    width: 12;
+    color: $fg_muted;
+    text-style: bold;
+}
+
+.session-row-head .session-cell {
+    color: $fg_accent;
+    text-style: bold;
+}
+
+.session-cell-actions {
+    width: 16;
+    color: $fg_muted;
+}
+
+.session-cell.state-active {
+    color: $status_ok;
+}
+
+.session-cell.state-limited {
+    color: $status_err;
+}
+
+/* The row's three per-account action buttons: ↻ (refresh) reloads the pool
+   from disk, 🧪 (health) runs the pool health check (same probe as
+   'qwa session health'), 🗑 (trash) deletes the pool entry + profile (same
+   logic as 'qwa session remove'). Icon-only, 4 cells wide. */
+.account-btn {
+    width: 4;
+    min-width: 4;
+    height: 2;
+    border: none;
+    background: $bg_hover;
+    text-style: bold;
+    content-align: center middle;
+    margin-right: 1;
+}
+
+.account-btn-refresh {
+    color: $fg_accent;
+}
+
+.account-btn-health {
+    color: $accent;
+}
+
+/* Focus ring for every row action: a 1px accent outline so the keyboard
+   cursor is visible on a button. */
+.account-btn:focus {
+    border: solid $focus_ring;
+    background: $bg_active;
+}
+
+/* Delete is subtle by default — tinted text on a dark red wash — and only
+   goes strong-red on focus, matching the confirm modal's danger fill. */
+.account-btn-delete {
+    color: $danger_soft_fg;
+    background: $danger_soft_bg;
+    margin-right: 0;
+}
+
+.account-btn-delete:focus {
+    background: $danger_bg;
+    color: $danger_fg;
+}
+
+.account-btn:hover {
+    background: $bg_active;
+}

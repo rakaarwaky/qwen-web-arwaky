@@ -1,15 +1,19 @@
-"""Session management CLI commands."""
+"""Session management CLI commands.
+
+Smart surface: delegates to the session aggregate
+(:class:`ISessionAggregate`) — no capability imports.
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TYPE_CHECKING, Any
 
-from modules.session.src.capabilities_session_manager import SessionManager
-from modules.shared.src.session.taxonomy_session_vo import SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse, SessionStatus
 
 if TYPE_CHECKING:
-    pass
+    from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 
 
 def register_sessions_subparser(subparsers: Any) -> None:
@@ -59,30 +63,37 @@ def register_sessions_subparser(subparsers: Any) -> None:
     sessions_sub.add_parser("status", help="Show detailed session status")
 
 
-def handle_sessions(args: argparse.Namespace) -> int:
-    """Handle sessions subcommand."""
-    manager = SessionManager()
+def handle_sessions(args: argparse.Namespace, session: ISessionAggregate | None = None) -> int:
+    """Handle sessions subcommand via the session aggregate.
+
+    ``session`` is the injected :class:`ISessionAggregate`.  The CLI root
+    always injects one; ``None`` is tolerated for library consumers that
+    only call :func:`register_sessions_subparser`.
+    """
+    if session is None:
+        print("[ERROR] Session aggregate not injected. Run via the CLI root.", file=sys.stderr)
+        return 1
 
     if args.session_command == "list":
-        return cmd_list(manager)
+        return cmd_list(session)
     if args.session_command == "login":
-        return cmd_login(manager, args)
+        return cmd_login(session, args)
     if args.session_command == "health":
-        return cmd_health_check(manager)
+        return cmd_health_check(session)
     if args.session_command == "remove":
-        return cmd_remove(manager, args)
+        return cmd_remove(session, args)
     if args.session_command == "status":
-        return cmd_status(manager)
+        return cmd_status(session)
 
     print("Use 'qwen-web-arwaky session --help' for usage")
     return 1
 
 
-def cmd_list(manager: SessionManager) -> int:
+def cmd_list(session: ISessionAggregate) -> int:
     """List all sessions."""
-    sessions = manager.list_sessions()
-
-    if not sessions:
+    response = session.execute(SessionRequest(verb="list_sessions"))
+    pool: list[Any] = list(response.sessions) if response.sessions else []
+    if not pool:
         print("No sessions found. Use 'session login --name <name>' to add one.")
         return 0
 
@@ -91,43 +102,31 @@ def cmd_list(manager: SessionManager) -> int:
     print(f"{'ID':<12} {'Name':<15} {'Status':<10} {'Last Used':<20}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    for s in sessions:
+    for s in pool:
         status_icon = _status_icon(s.status)
         last_used = s.last_used.strftime("%Y-%m-%d %H:%M") if s.last_used else "Never"
         print(f"{s.session_id:<12} {s.name:<15} {status_icon} {s.status.value:<8} {last_used}")
 
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"Total: {len(sessions)} sessions")
-    print(f"Healthy: {sum(1 for s in sessions if s.is_healthy)}")
-    print(f"Limited: {sum(1 for s in sessions if s.is_limited)}")
+    print(f"Total: {len(pool)} sessions")
+    print(f"Healthy: {sum(1 for s in pool if s.is_healthy)}")
+    print(f"Limited: {sum(1 for s in pool if s.is_limited)}")
     print()
 
     return 0
 
 
-def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
+def cmd_login(session: ISessionAggregate, args: argparse.Namespace) -> int:
     """Add a new session by launching a headed browser for manual login.
 
-    Uses ``SessionOrchestrator`` in-process so the validation loop (the
-    headless auth check that runs after the visible browser closes) is
-    executed, and the new profile is registered in the session pool via
-    ``SessionManager.add_session``.
+    Delegates to the ``login`` verb on the session aggregate, which runs
+    the headed browser and registers the profile in the pool.
     """
-    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-    from modules.jobs.src.capabilities_status_writer import StatusFileWriter
-    from modules.logging.src.capabilities_metrics_counter import MetricsCounter
-    from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
-    from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-    from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOG, SESSIONS_DIR
-    from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
+    profile_name = args.name
 
-    profile_path = SESSIONS_DIR / args.name
-    profile_path.mkdir(parents=True, exist_ok=True)
-
-    print(f"\n🔐 Login to Qwen ({args.name})")
+    print(f"\n🔐 Login to Qwen ({profile_name})")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("Creating isolated browser profile...")
-    print(f"Path: {profile_path}")
     print()
     print("⏳ Launching browser for manual login...")
     print("   Login at chat.qwen.ai, then close the browser window when done.")
@@ -135,132 +134,103 @@ def cmd_login(manager: SessionManager, args: argparse.Namespace) -> int:
     print("💡 Tip: Close the browser window to continue.")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Build the orchestrator with minimal capability dependencies — no
-    # full DI container (the Surface layer must not import the Root
-    # layer; AES205).
-    log_path = DEFAULT_LOG
-    log_path.mkdir(parents=True, exist_ok=True)
-    metrics = MetricsCounter(metrics_path=log_path / "metrics.json")
-    status_writer = StatusFileWriter(log_path / "status.json")
-    observability = ObservabilitySetup(
-        log_path=log_path,
-        status_writer=status_writer,
-        metrics=metrics,
-    )
-    orchestrator = SessionOrchestrator(
-        browser=BrowserAdapter(),
-        observability=observability,
-        sessions=manager,
-    )
-
-    response: SessionResponse = orchestrator.execute(
-        SessionRequest(verb="login", session_path=profile_path, name=args.name)
+    response: SessionResponse = session.execute(
+        SessionRequest(
+            verb="login",
+            name=profile_name,
+            wait_for_confirmation=lambda: False,
+        )
     )
 
     if not response.valid:
         print(f"\n❌ {response.error or response.message or 'Login failed'}")
         return 1
 
-    print(f"\n✅ Session '{args.name}' saved!")
-    print(f"   Path: {profile_path}")
+    print(f"\n✅ Session '{profile_name}' saved!")
+    if response.profile_path:
+        print(f"   Path: {response.profile_path}")
     print()
 
     again = input("Add another session? [y/N]: ").strip().lower()
     if again in ("y", "yes"):
         name = input("Session name: ").strip()
         if not name:
-            name = f"session_{len(manager.load_pool().sessions) + 1}"
+            name = "session_default"
         args.name = name
-        return cmd_login(manager, args)
+        return cmd_login(session, args)
 
     return 0
 
 
-def cmd_health_check(manager: SessionManager) -> int:
-    """Health check all sessions using real ping test."""
-    import asyncio
+def cmd_health_check(session: ISessionAggregate) -> int:
+    """Health check all sessions using real ping test.
 
-    from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
-    from modules.shared.src.session.taxonomy_session_vo import SessionInfo
-
-    sessions = manager.list_sessions()
-
-    if not sessions:
-        print("No sessions to check.")
-        return 0
-
+    Delegates to the session aggregate; real browser probing is owned by
+    the session capability, not by this surface.
+    """
     print("\n🏥 Running health checks...")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # No root container here (Surface layer, AES205): construct the browser
-    # seam in-process and pass it to the checker. Without this, check_session
-    # would short-circuit to False for every session and the command would
-    # mark them all rate-limited.
-    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-
-    checker = SessionHealthChecker(browser=BrowserAdapter(), timeout_seconds=10)
-
-    async def _run_checks() -> list[tuple[SessionInfo, bool]]:
-        results: list[tuple[SessionInfo, bool]] = []
-        for s in sessions:
-            healthy = await checker.check_session(s)
-            results.append((s, healthy))
-        return results
-
     try:
-        results = asyncio.run(_run_checks())
+        response = session.execute(SessionRequest(verb="validate"))
     except Exception as exc:
         print(f"❌ Health check failed: {exc}")
         return 1
 
-    for s, healthy in results:
-        status = "✅ Healthy" if healthy else "❌ Limited"
-        print(f"  {s.session_id:<12} {status}")
-        if healthy:
-            manager.mark_healthy(s.session_id)
-        else:
-            manager.mark_limited(s.session_id)
-
+    print(f"Result: {response.message}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    healthy_count: int = sum(1 for _, h in results if h)
-    print(f"Result: {healthy_count}/{len(results)} sessions healthy")
     print()
+    return 0 if response.valid else 1
 
-    return 0
 
+def cmd_remove(session: ISessionAggregate, args: argparse.Namespace) -> int:
+    """Remove a session entry via the session aggregate.
 
-def cmd_remove(manager: SessionManager, args: argparse.Namespace) -> int:
-    """Remove a session entry and, unless --keep-profile, its Chromium profile."""
+    Drops the pool entry; when ``--keep-profile`` is set the Chromium
+    profile directory is left on disk, otherwise the pool removal also
+    deletes the profile directory.
+    """
     token = args.session_id
-    info = manager.get_session(token) or manager.get_session_by_name(token)
-    if info is None:
-        print(f"❌ Session '{token}' not found")
-        return 1
-
-    if not manager.remove_session(info.session_id):
-        print(f"❌ Could not remove '{info.session_id}' from the pool")
-        return 1
-    print(f"✅ Removed {info.name} ({info.session_id}) from the pool")
 
     if getattr(args, "keep_profile", False):
-        print(f"   Profile kept at {info.path}")
+        # Drop the pool entry only; leave the profile on disk.
+        response: SessionResponse = session.execute(SessionRequest(verb="remove_session", name=token))
+        if response.error:
+            print(f"❌ {response.error}")
+            return 1
+        print(f"✅ Removed session '{token}' from the pool")
+        print("   Profile kept")
         return 0
 
-    try:
-        manager.delete_session_profile(info.path, force=getattr(args, "force", False))
-    except Exception as exc:
-        print(f"❌ Pool entry removed, but the profile was kept: {exc}")
-        print(f"   Path: {info.path} (retry with --force to delete anyway)")
+    # Resolve the profile path for the token, then delete profile + pool entry.
+    listing = session.execute(SessionRequest(verb="list_sessions"))
+    matches = [s for s in list(listing.sessions or []) if s.session_id == token or s.name == token]
+    if not matches:
+        print(f"❌ Session '{token}' not found in the pool")
         return 1
-    print(f"   Profile deleted: {info.path}")
+
+    response = session.execute(
+        SessionRequest(
+            verb="delete",
+            session_path=matches[0].path,
+            force=getattr(args, "force", False),
+        )
+    )
+    if response.error:
+        print(f"❌ {response.error}")
+        return 1
+
+    print(f"✅ Removed session '{token}' from the pool")
+    if matches[0].path:
+        print(f"   Profile deleted: {matches[0].path}")
     return 0
 
 
-def cmd_status(manager: SessionManager) -> int:
+def cmd_status(session: ISessionAggregate) -> int:
     """Show detailed session status."""
-    sessions = manager.list_sessions()
-
-    if not sessions:
+    response = session.execute(SessionRequest(verb="list_sessions"))
+    pool: list[Any] = list(response.sessions) if response.sessions else []
+    if not pool:
         print("No sessions configured.")
         return 0
 
@@ -269,7 +239,7 @@ def cmd_status(manager: SessionManager) -> int:
     print(f"{'ID':<12} {'Name':<15} {'Status':<10} {'Requests':<12} {'Failed':<10}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    for s in sessions:
+    for s in pool:
         status_icon = _status_icon(s.status)
         print(
             f"{s.session_id:<12} "
@@ -280,9 +250,9 @@ def cmd_status(manager: SessionManager) -> int:
         )
 
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"Healthy: {sum(1 for s in sessions if s.is_healthy)}")
-    print(f"Limited: {sum(1 for s in sessions if s.is_limited)}")
-    print(f"Unknown: {sum(1 for s in sessions if s.status == SessionStatus.UNKNOWN)}")
+    print(f"Healthy: {sum(1 for s in pool if s.is_healthy)}")
+    print(f"Limited: {sum(1 for s in pool if s.is_limited)}")
+    print(f"Unknown: {sum(1 for s in pool if s.status == SessionStatus.UNKNOWN)}")
     print()
 
     return 0

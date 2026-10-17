@@ -23,7 +23,7 @@ from modules.logging.src.capabilities_observability_setup import effective_telem
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.config.utility_config_app_factory import build_app_config
-from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
@@ -320,29 +320,27 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
 
 
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:
-    """build_smoke_gate(session_manager=…) threads the pool check into the gate triples."""
+    """build_smoke_gate(session=…) threads the pool check into the gate triples."""
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
-    from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 
     # A mock pool with one healthy session so _check_session takes the multi-account path
-    pool = MagicMock()
-    pool.total_count = 1
-    pool.healthy_count = 1
-    pool.limited_count = 0
     session = MagicMock()
     session.session_id = "abc"
     session.name = "default"
     session.is_healthy = True
+    session.is_limited = False
     session.status.value = "healthy"
-    pool.sessions = [session]
-    manager = MagicMock(spec=ISessionManagerProtocol)
-    manager.load_pool.return_value = pool
+    aggregate = MagicMock()
+    aggregate.execute.return_value = SessionResponse(
+        sessions=SessionList([session]),
+        message="1 session(s)",
+    )
 
-    gate = build_smoke_gate(session_manager=manager)
+    gate = build_smoke_gate(session=aggregate)
     results = gate()
     names = {name for name, _, _ in results}
     assert "Session Authentication Token" in names
-    manager.load_pool.assert_called_once()
+    aggregate.execute.assert_called_once()
 
 
 def test_root_container_wires_the_doctor_gate_into_the_updater() -> None:

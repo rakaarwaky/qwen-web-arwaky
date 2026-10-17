@@ -21,8 +21,9 @@ from modules.mcp.src.surface_mcp_tool_command import (
     McpToolCommand,
 )
 from modules.shared.src.common.taxonomy_core_error import RateLimitError
-from modules.shared.src.common.taxonomy_core_vo import ErrorReason, JobRecord
+from modules.shared.src.common.taxonomy_core_vo import ErrorReason, JobRecord, ResponseText
 from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse
 
 
 def _job_record(**overrides) -> JobRecord:
@@ -42,12 +43,10 @@ def _job_record(**overrides) -> JobRecord:
 def tools_and_mocks(tmp_path, monkeypatch):
     """Build an McpToolCommand whose aggregates are all mocks."""
     monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(tmp_path))
-    mocks = {name: MagicMock() for name in ("direct", "file_only", "attachment", "session", "setup", "workspace")}
+    mocks = {name: MagicMock() for name in ("prompt", "session", "setup", "workspace")}
     jobs = MagicMock()
     tools = McpToolCommand(
-        direct=mocks["direct"],
-        file_only=mocks["file_only"],
-        attachment=mocks["attachment"],
+        prompt=mocks["prompt"],
         session=mocks["session"],
         setup=mocks["setup"],
         workspace=mocks["workspace"],
@@ -87,7 +86,7 @@ def test_async_submission_carries_accepted_status(tools_and_mocks, tmp_path, sub
 def test_sync_execution_carries_success_status(tools_and_mocks, tmp_path) -> None:
     """The synchronous path keeps returning the SUCCESS envelope."""
     tools, mocks, _ = tools_and_mocks
-    mocks["file_only"].process_prompt_file_only.return_value = "answer text"
+    mocks["prompt"].execute.return_value = PromptResponse(response_text=ResponseText("answer text"))
 
     payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path)), async_run=False))
 
@@ -99,7 +98,7 @@ def test_sync_and_async_envelopes_share_a_discriminator(tools_and_mocks, tmp_pat
     """A consumer reading `status` must never encounter a missing key."""
     tools, mocks, jobs = tools_and_mocks
     jobs.execute.return_value = JobResponse(record=_job_record())
-    mocks["file_only"].process_prompt_file_only.return_value = "answer text"
+    mocks["prompt"].execute.return_value = PromptResponse(response_text=ResponseText("answer text"))
     prompt = str(_prompt(tmp_path))
 
     async_payload = json.loads(tools.process_prompt_file_only(prompt))
@@ -160,12 +159,13 @@ def test_rate_limited_submission_returns_retry_hint(tools_and_mocks, tmp_path) -
 def test_direct_prompt_forwards_output_file(tools_and_mocks, tmp_path) -> None:
     """CLI parity: `output_file` must reach the aggregate and the envelope."""
     tools, mocks, _ = tools_and_mocks
-    mocks["direct"].process_direct_prompt.return_value = "answer"
+    mocks["prompt"].execute.return_value = PromptResponse(response_text=ResponseText("answer"))
     destination = tmp_path / "result.md"
 
     payload = json.loads(tools.process_direct_prompt("hello", output_file=str(destination)))
 
-    assert mocks["direct"].process_direct_prompt.call_args.kwargs["output_file"] == destination.resolve()
+    request = mocks["prompt"].execute.call_args.args[0]
+    assert request.output_file == destination.resolve()
     assert payload["output_path"] == str(destination.resolve())
     assert payload["status"] == STATUS_SUCCESS
 

@@ -27,10 +27,12 @@ from modules.shared.src.config.utility_config_app_factory import build_app_confi
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
+    ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRenewalProtocol,
 )
 from modules.shared.src.session.taxonomy_session_vo import (
+    SessionList,
     SessionRequest,
     SessionResponse,
 )
@@ -52,11 +54,13 @@ class SessionOrchestrator(ISessionAggregate):
         observability: IObservabilityProtocol,
         sessions: ISessionManagerProtocol | None = None,
         renewer: ISessionRenewalProtocol | None = None,
+        health_checker: ISessionHealthCheckerProtocol | None = None,
     ) -> None:
         self._browser = browser
         self._observability = observability
         self._sessions = sessions
         self._renewer = renewer
+        self._health_checker = health_checker
 
     # Block 2: Protocol Method Implementation
 
@@ -66,8 +70,10 @@ class SessionOrchestrator(ISessionAggregate):
         Routes on ``request.verb``: ``validate`` runs the headless auth
         check and returns the verdict; ``delete`` runs the path-safety
         guard then removes the profile; ``login`` mirrors the setup flow
-        via the session-verb spelling. All I/O is delegated to the browser
-        capability — this agent only routes and wraps results.
+        via the session-verb spelling; ``list_sessions`` returns the whole
+        pool in pool order; ``remove_session`` drops one pool entry by
+        path or name. All I/O is delegated to the capability seams —
+        this agent only routes and wraps results.
         """
         if request.verb == "validate":
             valid, message = self._validate(request.session_path)
@@ -89,6 +95,34 @@ class SessionOrchestrator(ISessionAggregate):
                 message=str(outcome["message"] or outcome["error"] or ""),
                 error=error_val,
                 profile_path=profile_val_typed,
+            )
+        if request.verb == "list_sessions":
+            pool = self._sessions.load_pool() if self._sessions is not None else None
+            sessions = list(pool.sessions) if pool is not None else []
+            return SessionResponse(sessions=SessionList(sessions), message=f"{len(sessions)} session(s)")
+        if request.verb == "remove_session":
+            if self._sessions is None:
+                return SessionResponse(error="no session pool available")
+            found = self._sessions.get_session_by_name(request.name) if request.name else None
+            if found is None:
+                return SessionResponse(error="session not found", removed=False)
+            if not self._sessions.remove_session(found.session_id):
+                return SessionResponse(error="could not remove session from pool", removed=False)
+            return SessionResponse(
+                removed=True,
+                message=f"removed {found.name} ({found.session_id})",
+                profile_path=found.path,
+            )
+        if request.verb == "check_health":
+            if self._sessions is None or self._health_checker is None:
+                return SessionResponse(error="session health checker not wired")
+            pool = self._sessions.load_pool()
+            results = self._health_checker.check_pool_sync(pool, self._sessions)
+            healthy_count, total = self._health_checker.summarize_pool_results(results)
+            return SessionResponse(
+                message=f"{healthy_count}/{total} session(s) healthy",
+                health_healthy=healthy_count,
+                health_total=total,
             )
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
 

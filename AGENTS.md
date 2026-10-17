@@ -21,7 +21,7 @@ locally. Built on the AES 7-layer architecture, enforced in CI by
 
 ```bash
 python --version
-export UV_PROJECT_ENVIRONMENT="$HOME/.local/share/qwen-web-arwaky/venv" && uv sync
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv" && uv sync
 uv run python -m playwright install chromium
 ```
 

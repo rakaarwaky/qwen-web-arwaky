@@ -18,8 +18,8 @@ import asyncio
 from textual.app import App
 from textual.screen import ModalScreen
 
-from modules.tui.src.surface_tui_components import AddSessionModal, TemplatePickerModal
-from modules.tui.src.surface_tui_css import TUI_CSS
+from modules.tui.src.surface_tui_component import AddSessionModal, TemplatePickerModal
+from modules.tui.src.surface_tui_css_view import TUI_CSS
 
 _OPTIONS = [
     ("Default", "default"),

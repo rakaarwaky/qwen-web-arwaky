@@ -274,6 +274,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                         headless=request.headless,
                         cancel_event=request.cancel_event,
                         event_observer=request.event_observer,
+                        session_resolver=request.session_resolver,
                     )
                 )
             except Exception as exc:

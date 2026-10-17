@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from modules.cli.src.surface_cli_observability_command import handle as handle_observability_command
+from modules.cli.src.surface_cli_observability_command import handle_observability_command
 from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot
 
 
@@ -30,6 +30,13 @@ def _metrics_mock(snapshot: MetricsSnapshot) -> MagicMock:
     metrics = MagicMock()
     metrics.snapshot.return_value = snapshot
     return metrics
+
+
+def _orchestrator_mock(snapshot: MetricsSnapshot | None = None) -> MagicMock:
+    """Mock an IObservabilityAggregate whose metrics_snapshot verb returns a Snapshot."""
+    orchestrator = MagicMock()
+    orchestrator.execute.return_value = MagicMock(success=True, metrics=snapshot)
+    return orchestrator
 
 
 class TestObservabilityReport:
@@ -72,7 +79,7 @@ class TestObservabilityStatus:
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(), MagicMock(), None)
+            rc = handle_observability_command(_status_args(), MagicMock())
         assert rc == 0
         out = capsys.readouterr().out
         assert "idle" in out
@@ -83,18 +90,18 @@ class TestObservabilityStatus:
         log_dir.mkdir()
         status_file = log_dir / "status.json"
         status_file.write_text(json.dumps({}), encoding="utf-8")
-
         snapshot = MetricsSnapshot(
             counters={"run_count": 5},
             total_executions=5,
             successful_executions=4,
             success_rate=0.8,
         )
+
         with (
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
+            rc = handle_observability_command(_status_args(), _orchestrator_mock(snapshot))
         assert rc == 0
         out = capsys.readouterr().out
         assert "Total executions" in out
@@ -107,12 +114,11 @@ class TestObservabilityStatus:
         status_file = log_dir / "status.json"
         status_file.write_text(json.dumps({}), encoding="utf-8")
 
-        snapshot = MetricsSnapshot(counters={}, total_executions=0, successful_executions=0, success_rate=None)
         with (
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(json_output=True), MagicMock(), _metrics_mock(snapshot))
+            rc = handle_observability_command(_status_args(json_output=True), _orchestrator_mock(MetricsSnapshot()))
         assert rc == 0
         payload = json.loads(capsys.readouterr().out)
         assert payload["success"] is True
@@ -124,12 +130,11 @@ class TestObservabilityStatus:
         log_dir.mkdir()
         status_file = log_dir / "status.json"
         status_file.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
-        snapshot = MetricsSnapshot()
         with (
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
+            rc = handle_observability_command(_status_args(), MagicMock())
         assert rc == 0
         out = capsys.readouterr().out
         assert "idle" in out
@@ -141,12 +146,11 @@ class TestObservabilityStatus:
         log_dir.mkdir()
         status_file = log_dir / "status.json"
         status_file.write_text("{not valid json", encoding="utf-8")
-        snapshot = MetricsSnapshot()
         with (
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(), MagicMock(), _metrics_mock(snapshot))
+            rc = handle_observability_command(_status_args(), MagicMock())
         assert rc == 0
         out = capsys.readouterr().out
         # Invalid JSON means status_map stays None; the output falls back to
@@ -164,7 +168,7 @@ class TestObservabilityStatus:
             patch("modules.shared.src.common.utility_core_status.status_path_for", return_value=status_file),
             patch("modules.shared.src.common.taxonomy_core_constant.DEFAULT_LOG", log_dir),
         ):
-            rc = handle_observability_command(_status_args(), MagicMock(), None)
+            rc = handle_observability_command(_status_args(), MagicMock())
         assert rc == 0
         out = capsys.readouterr().out
         assert "no status file present" in out

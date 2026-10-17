@@ -17,16 +17,14 @@ from textual.widgets import Input, Label
 
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.shared.src.common.utility_core_prompt_template import load_prompt_template
-from modules.tui.src.surface_tui_app import QwenTuiApp
-from modules.tui.src.surface_tui_navlog_handler import _attachment_label
+from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+from modules.tui.src.surface_tui_navlog_action import _attachment_label
 
 
 def _make_app(tmp_path: Path) -> QwenTuiApp:
     return QwenTuiApp(
         workspace=MagicMock(),
-        direct=MagicMock(),
-        file_only=MagicMock(),
-        attachment=MagicMock(),
+        prompt=MagicMock(),
         slot_config=SlotRunPlanResolver(),
         session=MagicMock(),
         jobs=MagicMock(),

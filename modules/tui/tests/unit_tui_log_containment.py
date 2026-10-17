@@ -37,8 +37,8 @@ from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.shared.src.common.utility_core_status import status_path_for
-from modules.tui.src.surface_tui_app import NUM_SLOTS, QwenTuiApp
-from modules.tui.src.surface_tui_components import QwenTuiLogHandler
+from modules.tui.src.surface_tui_app_screen import NUM_SLOTS, QwenTuiApp
+from modules.tui.src.surface_tui_component import QwenTuiLogHandler
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -96,9 +96,7 @@ def _stderr_handlers(root: logging.Logger) -> list[logging.Handler]:
 def _make_app() -> QwenTuiApp:
     return QwenTuiApp(
         workspace=_NoOp(),
-        direct=_NoOp(),
-        file_only=_NoOp(),
-        attachment=_NoOp(),
+        prompt=_NoOp(),
         slot_config=_NoOp(),
         session=_NoOp(),
         jobs=_NoOp(),
@@ -361,7 +359,7 @@ def test_tui_app_contains_browser_logs_in_panels() -> None:
         async with app.run_test(size=(100, 30)) as pilot:
             await pilot.pause()
             # Attach exactly like _deferred_startup does.
-            from modules.tui.src.surface_tui_components import QwenTuiLogHandler
+            from modules.tui.src.surface_tui_component import QwenTuiLogHandler
 
             handler = QwenTuiLogHandler(app)
             logging.getLogger().addHandler(handler)
