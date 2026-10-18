@@ -22,16 +22,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
     RotatorResponse,
+    SessionHealthResult,
     SessionId,
     SessionInfo,
     SessionList,
     SessionName,
     SessionPool,
+    SessionReason,
 )
 
 
@@ -109,13 +112,18 @@ class ISessionManagerProtocol(ABC):
         ...
 
     @abstractmethod
-    def mark_limited(self, session_id: SessionId) -> None:
-        """Mark the session as rate-limited."""
+    def mark_limited(self, session_id: SessionId, reason: SessionReason | None = None) -> None:
+        """Mark the session as rate-limited, with the sub-cause reason."""
         ...
 
     @abstractmethod
     def mark_healthy(self, session_id: SessionId) -> None:
         """Mark the session as healthy."""
+        ...
+
+    @abstractmethod
+    def mark_auth_required(self, session_id: SessionId, reason: SessionReason | None = None) -> None:
+        """Mark the session as requiring re-authentication or setup."""
         ...
 
 
@@ -124,7 +132,12 @@ class ISessionHealthCheckerProtocol(ABC):
 
     @abstractmethod
     async def check_session(self, session: SessionInfo) -> bool:
-        """Return True when *session* is healthy, False when rate-limited."""
+        """Return True when *session* is healthy, False when not."""
+        ...
+
+    @abstractmethod
+    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Probe *session* and return the reasoned SessionHealthResult."""
         ...
 
     @abstractmethod
@@ -137,12 +150,12 @@ class ISessionHealthCheckerProtocol(ABC):
         self,
         pool: SessionPool,
         session_manager: ISessionManagerProtocol,
-    ) -> list[tuple[SessionInfo, bool]]:
-        """Synchronously ping every session and mark manager state; returns ``(session, healthy)`` pairs."""
+    ) -> list[tuple[SessionInfo, SessionHealthResult]]:
+        """Synchronously probe every session and mark manager state; returns ``(session, result)`` pairs."""
         ...
 
     @abstractmethod
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, bool]]) -> tuple[int, int]:
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, Any]]) -> tuple[int, int]:
         """Return ``(healthy_count, total)`` for a pool-check result list."""
         ...
 

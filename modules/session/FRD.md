@@ -33,14 +33,26 @@ pool, health checking, rotation, renewal, deletion, and login.
 
 ### FR-SESSION-002: Keep and rotate the session pool
 
-- **Description**: Track the known sessions and pick the next one a run should use.
+- **Description**: Track the known sessions and pick the next one a run should use; report reasoned health verdicts with sub-cause and recovery.
 - **Input**: A rotation request naming the current session and the pool's health verdicts.
-- **Output**: The next session to use, or the reason none is available.
+- **Output**: The next session to use, or the reason none is available (`no_eligible_session` with `reason` and `recovery_action`); or a `SessionHealthResult` with status (`ACTIVE`, `LIMITED`, `AUTH_REQUIRED`), reason, evidence, and recovery action.
 - **Business Rules**:
-  - A rate-limited session is skipped in favor of a healthy one; a pool with only rate-limited sessions rotates back to the first and reports the throttle.
+  - `ACTIVE` only from a successful authenticated probe.
+  - `LIMITED` only from observed provider-limit evidence (limit banner/signal with `QUOTA` reason); a probe failure MUST NOT overwrite a confirmed LIMITED verdict with invented quota evidence.
+  - `AUTH_REQUIRED` for any other failed probe: expired login (`EXPIRED`), browser launch failure (`LAUNCH_FAILURE`), network error (`NETWORK`), or timeout (`TIMEOUT`).
+  - A rate-limited session is skipped. If no eligible session remains, return an explicit `no_eligible_session` outcome without submitting; never submit through a known-LIMITED profile.
   - The pool order is deterministic so a run resolves the same session under the same pool state.
-- **Edge Cases**: A pool with one session rotates to that session rather than failing.
-- **Error Handling**: A pool that cannot be read surfaces an error naming the pool path.
+  - Cross-account rotation on quota is permitted for authorized accounts only (owned/controlled by the operator). See `docs/MULTI_ACCOUNT_ROTATION.md` policy gate (2026-10-18).
+  - A CAPTCHA or provider access-control stop halts immediately; no bypass attempt is made.
+  - No promise that a provider quota resets by a specific time; the operator decides when to retry.
+- **Edge Cases**:
+  - An empty pool returns `no_eligible_session` with reason `empty_pool`.
+  - A single-limited pool returns `no_eligible_session` with reason `all_sessions_limited`.
+  - An all-limited pool returns `no_eligible_session` with reason `all_sessions_limited`.
+  - A pool where every session is in `exclude_ids` returns `no_eligible_session` with reason `all_sessions_excluded`.
+  - A mixed pool (some healthy, some limited) returns the next healthy session.
+  - A session that is `UNKNOWN` (not yet probed) and whose probe fails transiently is reported `AUTH_REQUIRED`, never `LIMITED`.
+- **Error Handling**: A pool that cannot be read surfaces an error naming the pool path. Missing browser configuration reports `AUTH_REQUIRED` with `LAUNCH_FAILURE` reason.
 
 ### FR-SESSION-003: Delete a session safely
 
@@ -77,7 +89,8 @@ pool, health checking, rotation, renewal, deletion, and login.
 | `add_session` | session info | session pool | file error | none | Add one session to the pool. |
 | `remove_session` | session identifier | session pool | file error | none | Remove one session from the pool. |
 | `mark_healthy` | session identifier | session pool | file error | none | Mark one session usable. |
-| `mark_limited` | session identifier | session pool | file error | none | Mark one session rate limited. |
+| `mark_limited` | session identifier, optional reason | session pool | file error | none | Mark one session rate limited. |
+| `mark_auth_required` | session identifier, optional reason | session pool | file error | none | Mark one session as requiring re-authentication. |
 | `get_next_healthy_session` | none | session info | no-healthy-session error | none | Return the next usable session. |
 
 ### Aggregate API

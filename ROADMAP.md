@@ -87,15 +87,25 @@ Every feature directory is indexed here; implementation detail remains in its ba
 
 | ID | Item | Priority | Spec | Backlog | State | Health | Owner | Next | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| `modules/core` | Core Automation Engine | P0 | [FRD](modules/core/FRD.md) | [BACKLOG](modules/core/BACKLOG.md) | QA | At Risk | — | `CORE-01` | 2026-09-24 |
-| `modules/cli` | CLI and Textual TUI | P1 | [FRD](modules/cli/FRD.md) | [BACKLOG](modules/cli/BACKLOG.md) | Refinement | At Risk | — | `CLI-01` | 2026-09-24 |
-| `modules/mcp` | MCP Server Surface | P1 | [FRD](modules/mcp/FRD.md) | [BACKLOG](modules/mcp/BACKLOG.md) | Refinement | At Risk | — | `MCP-01` | 2026-09-24 |
+| `modules/prompt` | Prompt execution and attachment | P0 | [FRD](modules/prompt/FRD.md) | [BACKLOG](modules/prompt/BACKLOG.md) | QA | At Risk | — | `PROMPT-01` | 2026-09-24 |
+| `modules/session` | Session pool and rotation | P0 | [FRD](modules/session/FRD.md) | [BACKLOG](modules/session/BACKLOG.md) | In Review | On Track | — | `SESSION-02` | 2026-10-18 |
+| `modules/jobs` | Async job and folder compilation | P1 | [FRD](modules/jobs/FRD.md) | [BACKLOG](modules/jobs/BACKLOG.md) | Refinement | At Risk | — | `JOB-01` | 2026-09-24 |
+| `modules/swarm` | Swarm execution | P1 | [FRD](modules/swarm/FRD.md) | [BACKLOG](modules/swarm/BACKLOG.md) | Refinement | At Risk | — | `SWARM-01` | 2026-09-24 |
+| `modules/logging` | Observability and metrics | P1 | [DESIGN](modules/logging/DESIGN.md) | [BACKLOG](modules/logging/BACKLOG.md) | Refinement | At Risk | — | `LOG-01` | 2026-09-24 |
+| `modules/browser` | Browser adapter | P0 | [FRD](modules/browser/FRD.md) | [BACKLOG](modules/browser/BACKLOG.md) | Refinement | At Risk | — | `BROWSER-01` | 2026-09-24 |
+| `modules/config` | Configuration | P1 | [DESIGN](modules/config/DESIGN.md) | [BACKLOG](modules/config/BACKLOG.md) | Refinement | On Track | — | `CFG-01` | 2026-09-24 |
+| `modules/update` | Product update | P2 | [DESIGN](modules/update/DESIGN.md) | [BACKLOG](modules/update/BACKLOG.md) | Deferred | At Risk | — | `UPDATE-01` | 2026-09-24 |
+| `modules/cli` | CLI and Textual TUI | P1 | [DESIGN](modules/cli/DESIGN.md) + [BACKLOG](modules/cli/BACKLOG.md) | [BACKLOG](modules/cli/BACKLOG.md) | Refinement | At Risk | — | `CLI-01` | 2026-09-24 |
+| `modules/tui` | Textual TUI | P1 | [BACKLOG](modules/tui/BACKLOG.md) | [BACKLOG](modules/tui/BACKLOG.md) | Refinement | At Risk | — | `TUI-01` | 2026-09-24 |
+| `modules/mcp` | MCP Server Surface | P1 | [DESIGN](modules/mcp/DESIGN.md) + [BACKLOG](modules/mcp/BACKLOG.md) | [BACKLOG](modules/mcp/BACKLOG.md) | Refinement | At Risk | — | `MCP-01` | 2026-09-24 |
+
+Note: `modules/core` was removed during the AES module split. Its feature rows are now owned by `modules/prompt` and `modules/session`; the legacy `CORE-*` identifiers in the risk register map to `PROMPT-*` and `SESSION-*` respectively.
 
 ## Risk Register
 
 - Risk: roadmap state drifts from feature detail and engineers act on stale status. Mitigation: `WS-01`.
 - Risk: competing benchmark branches merge incompatible repository layouts or leave CI red. Mitigation: `WS-02`.
-- Risk: attachment parsing or resend behavior triggers `SendDispatchError` or anti-bot verification in a release. Mitigation: `WS-03`, `CORE-01`.
-- Risk: unresolved security and operations reports ship without current reproduction or explicit acceptance. Mitigation: `WS-04`, `CORE-05`, `CORE-06`, `MCP-02`.
-- Risk: Qwen UI or model changes invalidate selectors, completion detection, or hardcoded model verification. Mitigation: `CORE-01`, `CORE-03`.
-- Risk: async job and swarm concurrency leak resources or stall callers. Mitigation: `CORE-02`, `MCP-01`.
+- Risk: attachment parsing or resend behavior triggers `SendDispatchError` or anti-bot verification in a release. Mitigation: `WS-03`, `PROMPT-01`.
+- Risk: unresolved security and operations reports ship without current reproduction or explicit acceptance. Mitigation: `WS-04`, `PROMPT-05`, `PROMPT-06`, `MCP-02`.
+- Risk: Qwen UI or model changes invalidate selectors, completion detection, or hardcoded model verification. Mitigation: `PROMPT-01`, `PROMPT-03`.
+- Risk: async job and swarm concurrency leak resources or stall callers. Mitigation: `PROMPT-02`, `MCP-01`.

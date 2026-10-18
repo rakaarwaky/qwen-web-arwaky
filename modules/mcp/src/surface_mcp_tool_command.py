@@ -587,21 +587,24 @@ class McpToolCommand:
         """Check status and validity of saved browser session tokens.
 
         Returns:
-            JSON string with session_valid flag and recommended next action.
+            JSON string with session_valid flag, status, reason, and recommended next action.
         """
         try:
             from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
             response = self._session.execute(SessionRequest(verb="validate"))
-            return json.dumps(
-                {
-                    "success": True,
-                    "session_valid": bool(response.valid),
-                    "message": str(response.message),
-                    "next_action": None if response.valid else "setup_session",
-                },
-                indent=2,
-            )
+            payload: dict[str, Any] = {
+                "success": True,
+                "session_valid": bool(response.valid),
+                "status": response.status or ("active" if response.valid else "auth_required"),
+                "message": str(response.message),
+                "next_action": None if response.valid else "setup_session",
+            }
+            if response.reason:
+                payload["reason"] = response.reason
+            if response.recovery_action:
+                payload["recovery_action"] = response.recovery_action
+            return json.dumps(payload, indent=2)
         except Exception as exc:
             return _format_error_payload(
                 code="SESSION_CHECK_FAILED",

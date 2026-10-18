@@ -22,10 +22,12 @@
 2. Back off the schedule; let the queued jobs drain.
 3. Investigate whether the rate limit is host-bound (per-cookie) or account-bound
    (per-user). The latter requires reducing concurrency across all profiles.
-4. Resume normal concurrency once the counter clears.
+4. If quota-triggered rotation is needed, switch to another **authorized** account owned by the operator — cross-account rotation is permitted only on accounts the operator owns and controls (see `docs/MULTI_ACCOUNT_ROTATION.md` policy gate, 2026-10-18).
+5. Resume normal concurrency once the counter clears.
 
 ## Prevention
 
 - Set `QWEN_SWARM_CONCURRENCY` below the default 10 when the account is shared.
 - Monitor `qwen-web-arwaky doctor --json` host capacity line; keep concurrent workers
   under the budgeted count.
+- Do not add unauthorized or uncontrolled accounts to the pool; rotation is limited to owned/authorized accounts only.

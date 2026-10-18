@@ -17,7 +17,7 @@ Last Updated: 2026-10-05
 | ID | Priority | State | Health | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
 | SESSION-01 | P0 | Ready | At Risk | `SHARED-01` | Add an acceptance scenario proving a backup write failure refuses the deletion and leaves the master profile in place. | 2026-10-05 |
-| SESSION-02 | P1 | Ready | On Track | None | Specify rotation behavior when every pooled session is rate limited. | 2026-10-05 |
+| SESSION-02 | P1 | Done | On Track | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). | 2026-10-18 |
 | SESSION-03 | P2 | Ready | On Track | `BROWSER-03` | Specify the session-directory permission repair when the browser launches the context under a different user. | 2026-10-05 |
 
 ## Scenario Evidence

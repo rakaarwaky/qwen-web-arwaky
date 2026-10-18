@@ -38,7 +38,9 @@ def test_acceptance_an_attachment_over_the_ceiling_is_rejected(tmp_path: Path) -
     with pytest.raises(Exception) as excinfo:
         FileUploader().validate_file(oversized, max_size_mb=1.0)
 
-    assert "1.0" in str(excinfo.value), f"the rejection must name the limit, got: {excinfo.value}"
+    assert "exceeds maximum limit of 1048576 bytes" in str(excinfo.value), (
+        f"the rejection must name the limit in bytes, got: {excinfo.value}"
+    )
 
 
 def test_acceptance_a_missing_attachment_is_rejected_at_validation(tmp_path: Path) -> None:

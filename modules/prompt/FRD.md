@@ -42,9 +42,11 @@ surfaces and job runners see one pipeline.
 - **Input**: A prompt request naming the prompt text, the attachment path, the run configuration, and the optional output path.
 - **Output**: A prompt response carrying the saved path and the extraction verdict.
 - **Business Rules**:
-  - The attachment must pass the size and type limits the upload seam enforces before the send.
+  - The attachment must satisfy the Product-approved format and exact-byte size matrix linked to F-003; each rejected boundary case has a specified validation stage and stable failure reason.
+  - The byte ceiling is exactly `104857600` bytes (`100 * 1024 * 1024`), not a mixed MB/MiB limit.
+  - The supported extension allowlist is enforced by the shared validation utility; unsupported or mismatched content is rejected at pre-flight, before any browser launch.
   - An attachment that uploads but fails mid-stream still reports the response file when the extraction recovers.
-- **Edge Cases**: An attachment that exceeds the upload ceiling is rejected at upload with the limit named.
+- **Edge Cases**: An attachment that exceeds the upload ceiling is rejected at pre-flight validation with the exact byte limit named; zero-byte, unsupported-format, unreadable, and type/content-mismatch inputs each fail at the specified stage with a stable reason and no accidental provider submission.
 - **Error Handling**: An attachment failure surfaces an upload error naming the file; the pipeline does not retry the send.
 
 ### FR-PROMPT-004: Cancel a running prompt

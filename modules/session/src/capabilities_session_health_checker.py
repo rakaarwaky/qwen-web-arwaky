@@ -7,9 +7,17 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.session.contract_session_protocol import ISessionHealthCheckerProtocol, ISessionManagerProtocol
-from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import (
+    HealthReason,
+    SessionHealthResult,
+    SessionId,
+    SessionInfo,
+    SessionPool,
+    SessionStatus,
+)
 
 if TYPE_CHECKING:
     from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
@@ -46,32 +54,93 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
     async def check_session(self, session: SessionInfo) -> bool:
         """Return True when *session* is healthy (auth valid and not rate-limited).
 
-        Launches a fresh Chromium context on *session*'s stored profile via the
-        injected browser seam and runs the read-only liveness probe in a worker
-        thread so the asyncio event loop is never blocked by Playwright's
-        synchronous API. Any exception — auth-required (expired token / login
-        redirect), rate-limit banner, or a launch stall past ``timeout_seconds``
-        — marks the session unhealthy and is swallowed to ``False``.
+        Delegates to :meth:`diagnose_session` and checks for ACTIVE status.
         """
+        verdict = await self.diagnose_session(session)
+        return verdict.is_healthy
+
+    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Probe *session* and return the reasoned SessionHealthResult.
+
+        Follows locked rules:
+        - ACTIVE only from successful authenticated probe.
+        - LIMITED only from observed provider-limit evidence (limit banner/signal).
+        - AUTH_REQUIRED for any other failed probe: expired login, browser launch
+          failure, network error, timeout.
+        - Probe failure MUST NOT overwrite a confirmed LIMITED verdict with invented
+          quota evidence (transient failure on LIMITED session leaves it LIMITED).
+        """
+        session_id = session.session_id
         if self._browser is None:
-            return False
+            if session.status == SessionStatus.LIMITED:
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.LIMITED,
+                    reason=session.reason or HealthReason.QUOTA.value,
+                    evidence="Retained prior quota limit during browser unconfigured state",
+                    recovery_action="Wait for quota reset or switch accounts.",
+                )
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=HealthReason.LAUNCH_FAILURE.value,
+                evidence="Browser seam not configured",
+                recovery_action="Configure Playwright Chromium browser seam.",
+            )
+
         cfg = self._build_cfg(session)
         loop = asyncio.get_running_loop()
-        probe = loop.run_in_executor(None, self._probe, cfg)
+        probe_task = loop.run_in_executor(
+            None,
+            self._probe_verdict,
+            cfg,
+            session.session_id,
+            session.status,
+            session.reason,
+        )
         try:
-            return await asyncio.wait_for(probe, timeout=self._timeout)
-        except (asyncio.TimeoutError, Exception):
-            return False
+            return await asyncio.wait_for(probe_task, timeout=self._timeout)
+        except asyncio.TimeoutError:
+            if session.status == SessionStatus.LIMITED:
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.LIMITED,
+                    reason=session.reason or HealthReason.QUOTA.value,
+                    evidence="Retained prior quota limit during transient probe timeout",
+                    recovery_action="Wait for quota reset or switch accounts.",
+                )
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=HealthReason.TIMEOUT.value,
+                evidence=f"Health probe timed out after {self._timeout}s",
+                recovery_action="Check network connection and responsiveness of chat.qwen.ai.",
+            )
+        except Exception as exc:
+            if session.status == SessionStatus.LIMITED:
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.LIMITED,
+                    reason=session.reason or HealthReason.QUOTA.value,
+                    evidence=f"Retained prior quota limit during transient probe failure: {exc}",
+                    recovery_action="Wait for quota reset or switch accounts.",
+                )
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=HealthReason.LAUNCH_FAILURE.value,
+                evidence=str(exc),
+                recovery_action="Verify Chromium installation and profile permissions.",
+            )
 
     async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
         """Health-check every session and return the updated pool."""
-        tasks = [self.check_session(s) for s in pool.sessions]
+        tasks = [self.diagnose_session(s) for s in pool.sessions]
         results = await asyncio.gather(*tasks)
 
         updated = []
-        for session, healthy in zip(pool.sessions, results, strict=True):
-            new_status = SessionStatus.ACTIVE if healthy else SessionStatus.LIMITED
-            updated.append(session.with_status(new_status))
+        for session, verdict in zip(pool.sessions, results, strict=True):
+            updated.append(session.with_status(verdict.status, reason=verdict.reason))
 
         return SessionPool(sessions=updated, current_index=pool.current_index)
 
@@ -79,26 +148,30 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         self,
         pool: SessionPool,
         session_manager: ISessionManagerProtocol,
-    ) -> list[tuple[SessionInfo, bool]]:
+    ) -> list[tuple[SessionInfo, SessionHealthResult]]:
         """Synchronous convenience wrapper: check all sessions and update manager state."""
         import asyncio as _asyncio
 
-        async def _run() -> list[tuple[SessionInfo, bool]]:
-            results: list[tuple[SessionInfo, bool]] = []
+        async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
+            results: list[tuple[SessionInfo, SessionHealthResult]] = []
             for s in pool.sessions:
-                healthy = await self.check_session(s)
-                results.append((s, healthy))
-                if healthy:
+                verdict = await self.diagnose_session(s)
+                results.append((s, verdict))
+                if verdict.status == SessionStatus.ACTIVE:
                     session_manager.mark_healthy(s.session_id)
+                elif verdict.status == SessionStatus.LIMITED:
+                    session_manager.mark_limited(s.session_id, reason=verdict.reason)
                 else:
-                    session_manager.mark_limited(s.session_id)
+                    session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
             return results
 
         return _asyncio.run(_run())
 
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, bool]]) -> tuple[int, int]:
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, Any]]) -> tuple[int, int]:
         """Return ``(healthy_count, total)`` for a pool-check result list."""
-        healthy_count = sum(1 for _, h in results if h)
+        healthy_count = sum(
+            1 for _, h in results if (h is True or (isinstance(h, SessionHealthResult) and h.is_healthy))
+        )
         return healthy_count, len(results)
 
     # Block 3: Dunder Methods, Factories, Helpers
@@ -137,6 +210,98 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
             inline_prompt_text=base.inline_prompt_text,
         )
 
+    def _probe_verdict(
+        self,
+        cfg: AppConfig,
+        session_id: SessionId,
+        prior_status: SessionStatus,
+        prior_reason: str | None,
+    ) -> SessionHealthResult:
+        """Synchronous probe returning a reasoned SessionHealthResult.
+
+        Runs on a worker thread to keep the asyncio event loop unblocked.
+        """
+        if self._browser is None:
+            if prior_status == SessionStatus.LIMITED:
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.LIMITED,
+                    reason=prior_reason or HealthReason.QUOTA.value,
+                    evidence="Retained prior quota limit",
+                    recovery_action="Wait for quota reset or switch accounts.",
+                )
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=HealthReason.LAUNCH_FAILURE.value,
+                evidence="Browser seam not configured",
+                recovery_action="Install Chromium via 'python -m playwright install chromium'.",
+            )
+
+        try:
+            with self._browser.health_probe_page(cfg) as page:
+                if self._body_is_rate_limited(page):
+                    evidence = self._extract_limit_evidence(page)
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.LIMITED,
+                        reason=HealthReason.QUOTA.value,
+                        evidence=evidence or "Provider daily limit reached",
+                        recovery_action="Session is rate-limited. Switch accounts or reduce request throughput.",
+                    )
+
+                if not self._page_is_usable(page):
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.AUTH_REQUIRED,
+                        reason=HealthReason.EXPIRED.value,
+                        evidence="Chat input / composer not usable or login prompt displayed",
+                        recovery_action="Run 'qwen-web-arwaky session login' to authenticate.",
+                    )
+
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.ACTIVE,
+                    reason=None,
+                    evidence=None,
+                    recovery_action=None,
+                )
+        except AuthRequiredError as exc:
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=HealthReason.EXPIRED.value,
+                evidence=str(exc),
+                recovery_action="Session expired. Run 'qwen-web-arwaky session login' to re-authenticate.",
+            )
+        except Exception as exc:
+            err_msg = str(exc)
+            err_lower = err_msg.lower()
+            if prior_status == SessionStatus.LIMITED:
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.LIMITED,
+                    reason=prior_reason or HealthReason.QUOTA.value,
+                    evidence=f"Retained prior quota limit during probe error: {err_msg}",
+                    recovery_action="Wait for quota reset or switch accounts.",
+                )
+            if "timeout" in err_lower:
+                reason = HealthReason.TIMEOUT.value
+                action = "Check network responsiveness of chat.qwen.ai."
+            elif any(net_kw in err_lower for net_kw in ("net::", "connection", "dns", "network", "refused", "resolve")):
+                reason = HealthReason.NETWORK.value
+                action = "Check network connection to chat.qwen.ai."
+            else:
+                reason = HealthReason.LAUNCH_FAILURE.value
+                action = "Verify browser launch and profile directory permissions."
+            return SessionHealthResult(
+                session_id=session_id,
+                status=SessionStatus.AUTH_REQUIRED,
+                reason=reason,
+                evidence=err_msg,
+                recovery_action=action,
+            )
+
     def _probe(self, cfg: AppConfig) -> bool:
         """Synchronous liveness probe: open the page, assert auth, scan for limits.
 
@@ -144,15 +309,21 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         Returns True only when the chat page is authenticated AND its body does
         not carry a rate-limit notice.
         """
-        if self._browser is None:
-            return False
+        verdict = self._probe_verdict(cfg, "probe", SessionStatus.AUTH_REQUIRED, None)
+        return verdict.is_healthy
+
+    @staticmethod
+    def _extract_limit_evidence(page: Any) -> str | None:
+        """Extract matching rate-limit evidence from page body text."""
         try:
-            with self._browser.health_probe_page(cfg) as page:
-                if not self._page_is_usable(page):
-                    return False
-                return not self._body_is_rate_limited(page)
+            body = page.inner_text("body") or ""
+            for pattern in _compiled_patterns:
+                match = pattern.search(body)
+                if match:
+                    return match.group(0)
         except Exception:
-            return False
+            pass
+        return None
 
     @staticmethod
     def _page_is_usable(page: Any) -> bool:

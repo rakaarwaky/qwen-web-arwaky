@@ -1,5 +1,16 @@
 # Multi-Account Rate Limit Rotation System
 
+## Policy Gate (2026-10-18, Raka / project owner)
+
+**Provider policy decision:** Quota-triggered cross-account rotation on authorized accounts is permitted. All configured accounts must be accounts the operator owns and controls. This decision was recorded 2026-10-18 with approver Raka, project owner.
+
+Rules:
+- Quota-triggered rotation across owned/authorized accounts is approved and supported.
+- A CAPTCHA or any provider access-control stop halts immediately with no bypass attempt.
+- Reduce-throughput remains the documented non-rotation recovery guidance.
+- Do not represent the feature as unapproved; it is the approved boundary described above.
+- Unconditional "add more accounts" recovery advice is removed; state the authorized-accounts-only rule instead.
+
 ## Problem Statement
 
 Qwen API has daily usage limits. When a session hits the limit, all subsequent requests fail with:
@@ -19,8 +30,16 @@ This blocks:
 
 1. **Session Pool**: Multiple Qwen login sessions stored and managed
 2. **Health Check**: Quick ping test to detect rate limits before expensive operations
-3. **Auto-Rotation**: Transparent switching between sessions on limit detection
-4. **Fallback Chain**: Try Session 1 → Session 2 → Session 3 until success
+3. **Quota-triggered rotation**: When a session hits its daily limit, rotation moves to the next authorized session in the pool
+4. **Fallback Chain**: Try Session 1 → Session 2 → Session 3 until success; if all are limited, return an explicit `no_eligible_session` outcome before submitting
+
+### Policy gate
+
+- Quota-triggered cross-account rotation is an **approved** boundary as of 2026-10-18, approved by Raka.
+- All configured accounts must be accounts the operator owns and controls.
+- CAPTCHA / access-control halts stop the flow immediately — no bypass is attempted.
+- If no session is eligible, the adapter reports `no_eligible_session` and the pipeline does not submit through a known-LIMITED profile.
+- No claim is made that a provider quota resets by a specific time; the operator decides when to retry.
 
 ### Architecture
 
@@ -162,41 +181,73 @@ class SessionHealthChecker:
 
 ```python
 class SessionRotator:
-    """Transparent session rotation for API calls."""
+    """Session rotation for API calls with quota-triggered rotation."""
 
     def __init__(self, session_pool: SessionPool):
         self.pool = session_pool
         self.failed_sessions: set[str] = set()
 
-    async def execute_with_rotation(self, prompt: str, attachment: Path | None = None) -> ExecutionResult:
-        """Try sessions in order until success or all exhausted."""
-        sessions_to_try = self.pool.get_ordered_sessions()
+    async def rotate(self, request: RotatorRequest) -> RotatorResponse:
+        """Return the next eligible session or an explicit no_eligible_session outcome.
 
-        for session in sessions_to_try:
-            # First, run health check
-            if not await self.health_checker.check_session(session):
-                self.pool.mark_limited(session.session_id)
-                self.failed_sessions.add(session.session_id)
+        - Skips sessions already tried in this turn (request.exclude_ids).
+        - Uses diagnosed health verdicts (ACTIVE, LIMITED, AUTH_REQUIRED).
+        - Never submits through a known-LIMITED profile.
+        - When no eligible session remains, returns RotatorResponse(outcome="no_eligible_session")
+          with reason ("all_sessions_limited" / "empty_pool" / "all_sessions_excluded").
+        """
+        pool = self.pool
+        excluded = set(request.exclude_ids)
+
+        for candidate in pool.sessions:
+            if candidate.session_id in excluded:
                 continue
+            verdict = await self.health_checker.diagnose_session(candidate)
+            if verdict.is_healthy:
+                return RotatorResponse(session=candidate, outcome="success")
+            if verdict.status == SessionStatus.LIMITED:
+                self.pool.mark_limited(candidate.session_id, reason=verdict.reason)
 
-            # Session is healthy, try the actual request
-            try:
-                result = await self._execute(prompt, attachment, session)
-                self.pool.mark_healthy(session.session_id)
-                self.failed_sessions.discard(session.session_id)
-                return result
-            except Exception as e:
-                if "rate limit" in str(e).lower():
-                    self.pool.mark_limited(session.session_id)
-                    self.failed_sessions.add(session.session_id)
-                    continue
-                raise
-
-        # All sessions exhausted
-        raise AllSessionsLimitedError(
-            f"All {len(sessions_to_try)} sessions are rate-limited. Wait until tomorrow or add more sessions."
+        # No eligible session: fail fast, explicit outcome, no submission
+        all_excluded = bool(excluded) and all(s.session_id in excluded for s in pool.sessions)
+        reason = "all_sessions_excluded" if all_excluded else "all_sessions_limited"
+        return RotatorResponse(
+            session=None,
+            outcome="no_eligible_session",
+            reason=reason,
+            recovery_action="Reduce request throughput or add authorized accounts (owned/controlled only).",
         )
 ```
+
+**No submission through a known-limited profile.** An exhausted pool returns an explicit `no_eligible_session` outcome before submission. There is no promise that a provider quota resets by a specific time; the operator decides when to retry.
+
+**CAPTCHA / access-control stop:** A CAPTCHA or any provider access-control stop halts immediately. No bypass is attempted. The affected session is marked `AUTH_REQUIRED` with reason `EXPIRED` or `NETWORK` as appropriate.
+
+### Session Management Commands
+
+```bash
+# List all sessions
+qwen-web-arwaky session list
+
+# Add a new session (via login) — authorized accounts only
+qwen-web-arwaky session login --name "personal"
+
+# Remove a session
+qwen-web-arwaky session remove session_2
+
+# Test session health (ping test)
+qwen-web-arwaky session health
+
+# Show rotation status
+qwen-web-arwaky session status
+```
+
+### Recovery Guidance
+
+- **Reduce throughput:** Set `QWEN_WEB_MAX_WORKERS=2` and `QWEN_SWARM_CONCURRENCY=2` when limits are active.
+- **Authorized accounts only:** All configured accounts must be owned and controlled by the operator. Do not add unowned or uncontrolled accounts.
+- **CAPTCHA or access-control stop:** Halts immediately. No bypass attempt is made; re-authenticate or contact the provider.
+- **No reset-time promise:** The system does not claim a quota resets by a specific time. Use the operator's judgment.
 
 ### Workflow for Swarm
 

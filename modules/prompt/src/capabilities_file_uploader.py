@@ -159,11 +159,10 @@ class FileUploader(IUploadProtocol):
             )
         return True
 
-    def validate_file(self, filepath: Path, max_size_mb: float = 100.0) -> FileSizeBytes:
+    def validate_file(self, filepath: Path, max_size_mb: MaxFileSizeMb | None = None) -> FileSizeBytes:
         """Public protocol method — pre-flight validation returning size in bytes."""
-        if max_size_mb != float(self.max_file_size_mb):
-            self.max_file_size_mb = MaxFileSizeMb(max_size_mb)
-        return FileSizeBytes(validate_file(filepath, float(self.max_file_size_mb)))
+        limit_mb = max_size_mb if max_size_mb is not None else float(self.max_file_size_mb)
+        return FileSizeBytes(validate_file(filepath, float(limit_mb)))
 
     # Block 3: Dunder Methods, Factories, Helpers
 

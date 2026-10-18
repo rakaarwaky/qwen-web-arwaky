@@ -16,6 +16,7 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionId,
     SessionInfo,
     SessionPool,
+    SessionStatus,
 )
 
 if TYPE_CHECKING:
@@ -33,12 +34,12 @@ class RotationMetrics:
 
 
 class AllSessionsLimitedError(Exception):
-    """Raised when all sessions are rate-limited."""
+    """Deprecated exception: callers branch on RotatorResponse.outcome == 'no_eligible_session'."""
 
-    def __init__(self, pool: SessionPool) -> None:
-        self.pool = pool
+    def __init__(self, pool: SessionPool | None = None) -> None:
+        count = pool.total_count if pool else 0
         super().__init__(
-            f"All {pool.total_count} sessions are rate-limited. Please wait until tomorrow or add more sessions."
+            f"All {count} sessions are rate-limited. Please reduce request throughput or add authorized accounts."
         )
 
 
@@ -61,61 +62,60 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
 
     async def get_next_session(self) -> SessionInfo | None:
         """Get next healthy session with fallback."""
-        pool = self._manager.load_pool()
-
-        # Try round-robin
-        session = pool.get_next_session()
-        if session:
-            # Verify health
-            checker = self._ensure_checker()
-            is_healthy = await checker.check_session(session)
-            if is_healthy:
-                self._manager.mark_healthy(session.session_id)
-                self._metrics.successful_rotations += 1
-                return session
-            else:
-                self._manager.mark_limited(session.session_id)
-
-        # Try all sessions
-        checker = self._ensure_checker()
-        for s in pool.sessions:
-            is_healthy = await checker.check_session(s)
-            if is_healthy:
-                self._manager.mark_healthy(s.session_id)
-                self._metrics.successful_rotations += 1
-                return s
-            else:
-                self._manager.mark_limited(s.session_id)
-
-        # All exhausted
-        self._metrics.sessions_exhausted += 1
-        return None
+        resp = await self.rotate(RotatorRequest())
+        return resp.session
 
     async def rotate(self, request: RotatorRequest) -> RotatorResponse:
         """Return the next healthy session, skipping ones already tried.
 
         ``request.exclude_ids`` lists sessions a caller has already attempted
         in this turn, so a rotation that hits a rate-limited session moves on
-        rather than re-picking the one that just failed. When the entire pool
-        is exhausted the response carries ``session=None`` with no error —
-        "every session is limited" is a state to report, not a fault.
+        rather than re-picking the one that just failed. When no eligible session
+        remains, returns an explicit `no_eligible_session` outcome BEFORE
+        submitting; never submits through a known-LIMITED profile.
         """
         self._metrics.total_attempts += 1
         pool = self._manager.load_pool()
+        if not pool.sessions:
+            self._metrics.sessions_exhausted += 1
+            return RotatorResponse(
+                session=None,
+                outcome="no_eligible_session",
+                reason="empty_pool",
+                recovery_action=(
+                    "No sessions configured. Run 'qwen-web-arwaky session login --name <name>' "
+                    "to add an authorized session."
+                ),
+            )
+
         excluded = set(request.exclude_ids)
         checker = self._ensure_checker()
 
         for candidate in pool.sessions:
             if candidate.session_id in excluded:
                 continue
-            if await checker.check_session(candidate):
+            verdict = await checker.diagnose_session(candidate)
+            if verdict.is_healthy:
                 self._manager.mark_healthy(candidate.session_id)
                 self._metrics.successful_rotations += 1
-                return RotatorResponse(session=candidate)
-            self._manager.mark_limited(candidate.session_id)
+                return RotatorResponse(session=candidate, outcome="success")
+            elif verdict.status == SessionStatus.LIMITED:
+                self._manager.mark_limited(candidate.session_id, reason=verdict.reason)
+            else:
+                self._manager.mark_auth_required(candidate.session_id, reason=verdict.reason)
 
         self._metrics.sessions_exhausted += 1
-        return RotatorResponse()
+        all_excluded = bool(excluded) and all(s.session_id in excluded for s in pool.sessions)
+        reason = "all_sessions_excluded" if all_excluded else "all_sessions_limited"
+        return RotatorResponse(
+            session=None,
+            outcome="no_eligible_session",
+            reason=reason,
+            recovery_action=(
+                "All sessions in the pool are rate-limited or excluded. "
+                "Reduce request throughput or add authorized accounts."
+            ),
+        )
 
     async def mark_limited(self, session_id: SessionId) -> None:
         """Mark session as rate-limited."""
@@ -129,22 +129,24 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
         self,
         prompt: str,
         attachment: object | None = None,
-    ) -> tuple[str, SessionInfo]:
+    ) -> tuple[str, SessionInfo | None]:
         """Execute request with automatic session rotation.
 
-        Returns (response, used_session).
+        Returns (response, used_session). When no eligible session exists,
+        returns an explicit error outcome without submitting.
         """
         self._metrics.total_attempts += 1
 
-        session = await self.get_next_session()
-        if session is None:
-            pool = self._manager.load_pool()
-            raise AllSessionsLimitedError(pool)
+        rot_resp = await self.rotate(RotatorRequest())
+        if rot_resp.session is None or rot_resp.outcome == "no_eligible_session":
+            return (
+                f"ERROR: no_eligible_session [{rot_resp.reason}]: {rot_resp.recovery_action}",
+                None,
+            )
 
-        # Execute with session (real implementation would use browser adapter)
+        session = rot_resp.session
         response = await self._execute_request(prompt, attachment, session)
 
-        # Track usage
         pool = self._manager.load_pool()
         updated = session.with_usage(success=True)
         pool.sessions = [updated if s.session_id == session.session_id else s for s in pool.sessions]
