@@ -80,6 +80,20 @@ class ISessionManagerProtocol(ABC):
         ...
 
     @abstractmethod
+    def find_pool_profile_with_content(self) -> Path | None:
+        """Return the first pool session path holding real Chromium content.
+
+        Pool entries are registered metadata, not a guarantee the profile
+        directory still exists: a session can be registered while its
+        ``Local State`` / ``Default/Cookies`` files were removed. Scanning
+        the pool for the first entry whose path is a directory with either
+        marker file is filesystem I/O that belongs to the storage
+        capability, not to an agent. Returns ``None`` when the pool has no
+        on-disk profile.
+        """
+        ...
+
+    @abstractmethod
     def list_sessions(self) -> SessionList:
         """Return every session in the pool."""
         ...

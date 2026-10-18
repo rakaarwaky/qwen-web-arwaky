@@ -8,7 +8,9 @@ supports headless single-file execution when a config is supplied.
 
 from __future__ import annotations
 
+import asyncio
 import sys
+from pathlib import Path
 from typing import Any
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -101,4 +103,21 @@ class InteractiveController:
 
         from modules.cli.src.surface_cli_run_command import dispatch_run
 
-        return dispatch_run(cfg, self._prompt)
+        def _pick() -> Path | None:
+            """Resolve a pool session for the headless run.
+
+            The headless path builds its own AppConfig, so without a
+            resolver the pool selection would be dropped and an empty
+            default session used instead of a logged-in profile.
+            """
+            if self._session_rotator is None:
+                return None
+            try:
+                from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
+
+                response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
+                return response.session.path if response.session else None
+            except Exception:
+                return None
+
+        return dispatch_run(cfg, self._prompt, session_resolver=_pick)

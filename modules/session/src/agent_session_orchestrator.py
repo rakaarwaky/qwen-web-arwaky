@@ -237,6 +237,22 @@ class SessionOrchestrator(ISessionAggregate):
             "profile_path": None,
         }
 
+    def _resolve_profile(self, session_path: Path | None) -> Path | None:
+        """Resolve the profile directory to act on.
+
+        An explicit ``session_path`` always wins. Otherwise the session
+        manager locates the first pool session whose directory still holds
+        real Chromium content, so a logged-in pool profile is preferred
+        over the empty ``DEFAULT_SESSION`` fallback. Returns ``None`` when
+        no pool manager is wired or the pool has no on-disk profile, which
+        keeps the caller's existing default behaviour unchanged.
+        """
+        if session_path is not None:
+            return session_path
+        if self._sessions is None:
+            return None
+        return self._sessions.find_pool_profile_with_content()
+
     def _validate(self, session_path: Path | None) -> tuple[bool, str]:
         """Validate an existing saved Qwen browser session in headless mode.
 
@@ -246,11 +262,12 @@ class SessionOrchestrator(ISessionAggregate):
         refresh token are dead, raises ``AuthRequiredError`` so the
         caller can surface the actionable message.
         """
+        resolved = self._resolve_profile(session_path)
         cfg = build_app_config(
             mode="session-check",
             input_path=DEFAULT_OUTPUT,
             output_path=DEFAULT_OUTPUT,
-            session_path=session_path,
+            session_path=resolved,
             headless=True,
         )
         if not cfg.session_path.is_dir():
@@ -273,7 +290,7 @@ class SessionOrchestrator(ISessionAggregate):
             mode="session-check",
             input_path=DEFAULT_OUTPUT,
             output_path=DEFAULT_OUTPUT,
-            session_path=session_path,
+            session_path=self._resolve_profile(session_path),
             headless=True,
         )
         if self._sessions is None:

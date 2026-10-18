@@ -23,7 +23,7 @@ from modules.cli.src.surface_cli_interactive_controller import InteractiveContro
 from modules.root_cli_main_entry import main
 
 
-def _fake_container(session_manager: MagicMock) -> MagicMock:
+def _fake_container(session_manager: MagicMock, session_rotator: MagicMock | None = None) -> MagicMock:
     """Container double exposing only the seams ``main()`` reads.
 
     Attribute children are pre-assigned so the assertion compares the exact
@@ -31,6 +31,7 @@ def _fake_container(session_manager: MagicMock) -> MagicMock:
     """
     container = MagicMock()
     container.session_manager = session_manager
+    container.session_rotator = session_rotator if session_rotator is not None else MagicMock()
     container.agent_session_orchestrator = MagicMock(name="session_aggregate")
     container.agent_job_orchestrator = MagicMock()
     container.agent_swarm_orchestrator = MagicMock()
@@ -86,3 +87,37 @@ def test_interactive_controller_receives_the_session_manager(tmp_path: Path) -> 
         assert main() == 0
 
     assert captured.get("session_manager") is session_manager
+
+
+def test_interactive_controller_receives_the_session_rotator(tmp_path: Path) -> None:
+    """The headless TUI path needs the rotator or it reverts to the default session.
+
+    ``InteractiveController``'s headless branch builds its own AppConfig, so
+    without an injected rotator the pool selection is dropped and an empty
+    default session is used instead of a logged-in profile.
+    """
+    session_manager = MagicMock()
+    rotator = MagicMock(name="session_rotator")
+    captured: dict[str, object] = {}
+
+    original_init = InteractiveController.__init__
+
+    def _capture(self: InteractiveController, *args: object, **kwargs: object) -> None:
+        captured.update(kwargs)
+        original_init(self, *args, **kwargs)
+
+    with (
+        patch("sys.argv", ["qwen-web-arwaky"]),
+        patch("sys.stdin.isatty", return_value=True),
+        patch("modules.root_cli_main_entry._default_container") as container_fn,
+        patch(
+            "modules.cli.src.surface_cli_interactive_controller.InteractiveController.run",
+            return_value={"success": True, "message": "TUI Session Closed."},
+        ),
+        patch.object(InteractiveController, "__init__", _capture),
+    ):
+        container = _fake_container(session_manager, rotator)
+        container_fn.return_value = container
+        assert main() == 0
+
+    assert captured.get("session_rotator") is rotator

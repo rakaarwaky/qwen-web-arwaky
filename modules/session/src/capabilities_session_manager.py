@@ -197,6 +197,23 @@ class SessionManager(ISessionManagerProtocol):
                 "Deletion may be partial — remove the remaining directory manually."
             ) from exc
 
+    def find_pool_profile_with_content(self) -> Path | None:
+        """Return the first pool session path holding real Chromium content.
+
+        Pool entries are registered metadata, not a guarantee the profile
+        directory still exists: a session can stay registered after its
+        ``Local State`` / ``Default/Cookies`` files were removed. The first
+        entry whose path is a directory carrying either marker file wins;
+        ``None`` means the pool has no usable on-disk profile.
+        """
+        for s in self.load_pool().sessions:
+            profile_dir = Path(s.path)
+            if profile_dir.is_dir() and (
+                (profile_dir / "Local State").is_file() or (profile_dir / "Default" / "Cookies").is_file()
+            ):
+                return profile_dir
+        return None
+
     def list_sessions(self) -> SessionList:
         """List all sessions."""
         return SessionList(self.load_pool().sessions)

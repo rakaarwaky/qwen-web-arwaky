@@ -172,7 +172,7 @@ def cmd_health_check(session: ISessionAggregate) -> int:
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     try:
-        response = session.execute(SessionRequest(verb="validate"))
+        response = session.execute(SessionRequest(verb="check_health"))
     except Exception as exc:
         print(f"❌ Health check failed: {exc}")
         return 1
@@ -180,7 +180,10 @@ def cmd_health_check(session: ISessionAggregate) -> int:
     print(f"Result: {response.message}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()
-    return 0 if response.valid else 1
+    if response.error:
+        print(f"❌ {response.error}")
+        return 1
+    return 0
 
 
 def cmd_remove(session: ISessionAggregate, args: argparse.Namespace) -> int:
