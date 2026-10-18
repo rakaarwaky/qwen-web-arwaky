@@ -59,80 +59,8 @@
     width: 1;
 }
 
-/* Chat transcript: user prompt on the right, agent response on the left.
-   It sizes to its own content up to a cap instead of taking 1fr, so an idle
-   slot hands its rows to the log card below instead of leaving a void. */
-.chat-stream {
-    width: 100%;
-    height: auto;
-    max-height: 12;
-    background: $bg_base;
-    padding: 1 2;
-    overflow-y: auto;
-}
-
-.msg {
-    width: 100%;
-    margin-bottom: 1;
-}
-
-.msg-user {
-    align-horizontal: right;
-}
-
-.msg-agent {
-    align-horizontal: left;
-}
-
-.msg-author {
-    color: $fg_accent;
-    text-style: bold;
-    width: 100%;
-    margin-bottom: 0;
-}
-
-.msg-bubble {
-    width: auto;
-    max-width: 80%;
-    height: auto;
-    background: $bg_raised;
-    border: solid $border;
-    padding: 0 1;
-    color: $fg_primary;
-}
-
-.msg-bubble.msg-bubble-user {
-    background: $accent;
-    color: $fg_on_accent;
-    border: solid $accent;
-}
-
-.msg-chip {
-    color: $fg_muted;
-    background: $bg_active;
-    text-style: bold;
-    padding: 0 1;
-}
-
-.msg-time {
-    color: $status_muted;
-    width: 100%;
-    margin-bottom: 0;
-}
-
-.msg-time.msg-time-user {
-    text-align: right;
-}
-
-.msg-attach {
-    width: auto;
-    height: auto;
-    background: $bg_raised;
-    color: $fg_muted;
-    border: solid $border;
-    padding: 0 1;
-    margin-top: 0;
-}
+/* Bubble transcript removed (v6.6.1): the per-slot EVENT LOG already echoes
+   the prompt and the response, so the console keeps one read-out. */
 
 .code-block {
     width: 100%;
@@ -212,10 +140,9 @@
     text-style: bold;
 }
 
-/* The console shell: a vertical stack of carousel, telemetry header,
-   transcript, log card, action pills, and composer. The transcript takes the
-   slack (1fr) while the log card keeps a fixed block so a chatty run cannot
-   squeeze the composer off the pane. */
+/* The console shell: a vertical stack of carousel, telemetry header, log
+   card, action pills, and composer. The log card takes the slack (1fr) so
+   chatty output cannot squeeze the composer off the pane. */
 .chat-screen {
     layout: vertical;
     width: 100%;
@@ -224,23 +151,10 @@
     padding: 1 2;
 }
 
-.chat-hint {
-    width: 100%;
-    height: auto;
-    color: $fg_muted;
-    text-style: italic;
-    text-align: center;
-}
-
-.msg-author.msg-author-right {
-    text-align: right;
-}
-
 /* EVENT LOG [SLOT #N] card: header row, the buffer, and the trailing clock. */
 /* The log card is the pane's 1fr child: it takes every row the carousel,
-   header, transcript and composer leave, so the console always fills the
-   screen exactly, and min-height 10 keeps the buffer readable when the
-   terminal is short. */
+   header and composer leave, so the console always fills the screen exactly,
+   and min-height 10 keeps the buffer readable when the terminal is short. */
 .event-log-card {
     layout: vertical;
     width: 100%;
