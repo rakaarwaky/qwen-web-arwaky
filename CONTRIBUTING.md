@@ -5,13 +5,15 @@
 - Read [`AGENTS.md`](AGENTS.md) before changing code. Architecture and naming rules are defined in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - Keep each change focused: one problem, one pull request.
 - A change is not done until the gates in [Quality Verification & PR Process](#quality-verification--pr-process) pass locally.
+- Editable installation (`pip install -e .`) is strictly forbidden. The runtime must remain decoupled and immutable from the repository working tree.
 
 ## Development Setup
 
-Follow the root [`README.md`](README.md) Quick Start, then install the development tools used by CI:
+For development dependencies and testing, sync via `uv` or use an isolated venv with immutable installation:
 
 ```bash
-python -m pip install pytest pytest-asyncio pytest-cov pytest-mock ruff mypy bandit build
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+uv sync
 ```
 
 The command succeeds when pip ends with a `Successfully installed` line (or reports that every package is already satisfied).
