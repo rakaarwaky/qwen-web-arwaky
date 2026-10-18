@@ -54,6 +54,9 @@ class TestAttachmentBoundaryMatrix:
             validate_file(f)
 
     def test_unreadable_file_fails(self, tmp_path: Path) -> None:
+        # Posix root (uid 0) bypasses standard DAC read permission checks
+        # (os.access(..., os.R_OK) returns True even for mode 000). Containerised
+        # CI runners executing as root intentionally skip this matrix cell.
         if os.getuid() == 0:
             pytest.skip("root bypasses filesystem permission checks")
         f = tmp_path / "locked.md"

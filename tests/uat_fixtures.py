@@ -13,12 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# ─── Goal-to-Scenario Evidence Helpers ────────────────────────────────────────────
-
-
-def utc_now_iso() -> str:
-    """Return current UTC time in ISO-8601 format for exercise timestamps."""
-    return datetime.now(timezone.utc).isoformat()
+# ─── Shared record plumbing ────────────────────────────────────────────────────────
 
 
 def _load_or_create_exercise_record(
@@ -40,7 +35,7 @@ def _load_or_create_exercise_record(
         "commit": commit,
         "environment": {"os": "linux", "python": "3.12"},
         "tier_region": None,
-        "timestamps": {"started": utc_now_iso()},
+        "timestamps": {"started": datetime.now(timezone.utc).isoformat()},
         "run_ids": [],
         "exclusions": [],
         "measured_values": {},
@@ -51,6 +46,59 @@ def _load_or_create_exercise_record(
     record_file.parent.mkdir(parents=True, exist_ok=True)
     record_file.write_text(json.dumps(record, indent=2), encoding="utf-8")
     return record
+
+
+def _finish(record: dict[str, Any], uat_id: str, fixture_dir: Path, passed: bool) -> dict[str, Any]:
+    """Set the release disposition from *passed* and persist the record file."""
+    record["release_disposition"] = "passed" if passed else "failed"
+    (fixture_dir / f"{uat_id}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return record
+
+
+# ─── Goal 1: Reliability Sample ────────────────────────────────────────────────────
+
+
+def record_reliability_sample(
+    successes: int,
+    exclusions: list[dict[str, Any]],
+    protocol_approval: dict[str, Any],
+    fixture_dir: Path,
+    commit: str | None = None,
+    total: int = 100,
+) -> dict[str, Any]:
+    """UAT-BA-009: Record the 100-run reliability sample for Goal 1.
+
+    *successes* is the count of successful runs out of *total* (100 by default).
+    *exclusions* carries one entry per excluded run, each with a recorded
+    reason. *protocol_approval* is the QA-approved sampling protocol record
+    (``{"approved": bool, "reviewer": str, "note": str}``); UAT.md and PRD
+    Goal 1 make protocol approval a dependency of this exercise, so this
+    helper fails fast when it is missing or not approved rather than
+    recording a sample that cannot be marked passed.
+    """
+    if not protocol_approval or not protocol_approval.get("approved"):
+        raise ValueError(
+            "UAT-BA-009 requires an approved sampling protocol on record "
+            "before the reliability exercise can be recorded"
+        )
+
+    record = _load_or_create_exercise_record(fixture_dir, "UAT-BA-009", goal=1, commit=commit)
+    record["protocol_approval"] = protocol_approval
+    record["measured_values"] = {
+        "total_runs": total,
+        "successful_runs": successes,
+        "excluded_runs": len(exclusions),
+        "success_rate": successes / total if total else 0.0,
+        "exclusions": exclusions,
+        "threshold_success_count": 99,
+    }
+    passed = (
+        total == 100
+        and successes >= 99
+        and total - successes == len(exclusions)
+        and all(e.get("reason") for e in exclusions)
+    )
+    return _finish(record, "UAT-BA-009", fixture_dir, passed)
 
 
 # ─── Goal 2: Result / Run-Record Reconciliation ────────────────────────────────────
@@ -80,15 +128,14 @@ def reconcile_results(
         else:
             unmatched.append(rr.get("run_id", "unknown"))
 
+    total_successful = sum(1 for rr in run_records if rr.get("status") in ("completed", "successful"))
     record["measured_values"] = {
-        "total_successful_runs": sum(1 for rr in run_records if rr.get("status") in ("completed", "successful")),
+        "total_successful_runs": total_successful,
         "matched": matched,
         "unmatched": unmatched,
-        "match_rate": matched / max(sum(1 for rr in run_records if rr.get("status") in ("completed", "successful")), 1),
+        "match_rate": matched / max(total_successful, 1),
     }
-    record["release_disposition"] = "passed" if record["measured_values"]["match_rate"] == 1.0 else "failed"
-    (fixture_dir / "UAT-BA-010.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    return _finish(record, "UAT-BA-010", fixture_dir, record["measured_values"]["match_rate"] == 1.0)
 
 
 # ─── Goal 3: CLI/MCP Parity for Three Workflows ────────────────────────────────────
@@ -130,9 +177,7 @@ def check_cli_mcp_parity(
         "mismatches": mismatches,
         "parity": len(mismatches) == 0,
     }
-    record["release_disposition"] = "passed" if record["measured_values"]["parity"] else "failed"
-    (fixture_dir / "UAT-BA-011.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    return _finish(record, "UAT-BA-011", fixture_dir, record["measured_values"]["parity"])
 
 
 # ─── Goal 4: Asynchronous p95 Acknowledgement ───────────────────────────────────────
@@ -157,23 +202,20 @@ def measure_async_p95(
     n = len(sorted_vals)
     if n == 0:
         record["measured_values"] = {"p95_ms": None, "trials": 0, "threshold_ms": 2000.0, "pass": False}
-        record["release_disposition"] = "failed"
-    else:
-        p95_index = min(int(0.95 * n), n - 1)
-        p95_ms = sorted_vals[p95_index]
-        pass_ = p95_ms <= 2000.0
-        record["measured_values"] = {
-            "trials": n,
-            "p95_index": p95_index,
-            "p95_ms": p95_ms,
-            "threshold_ms": 2000.0,
-            "pass": pass_,
-            "p95_calculation": f"p95 = sorted([{len(sorted_vals)} values])[{p95_index}] = {p95_ms} ms (<= 2000 ms threshold)",
-        }
-        record["release_disposition"] = "passed" if pass_ else "failed"
+        return _finish(record, "UAT-BA-012", fixture_dir, passed=False)
 
-    (fixture_dir / "UAT-BA-012.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    p95_index = min(int(0.95 * n), n - 1)
+    p95_ms = sorted_vals[p95_index]
+    pass_ = p95_ms <= 2000.0
+    record["measured_values"] = {
+        "trials": n,
+        "p95_index": p95_index,
+        "p95_ms": p95_ms,
+        "threshold_ms": 2000.0,
+        "pass": pass_,
+        "p95_calculation": f"p95 = sorted([{n} values])[{p95_index}] = {p95_ms} ms (<= 2000 ms threshold)",
+    }
+    return _finish(record, "UAT-BA-012", fixture_dir, pass_)
 
 
 # ─── Goal 5: Ten-Run Fault Isolation ────────────────────────────────────────────────
@@ -202,9 +244,7 @@ def check_ten_run_isolation(
         "unaffected_reached_terminal": unaffected_reached,
         "isolation_held": unaffected_reached == len(unaffected) and len(unaffected) == 9,
     }
-    record["release_disposition"] = "passed" if record["measured_values"]["isolation_held"] else "failed"
-    (fixture_dir / "UAT-BA-013.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    return _finish(record, "UAT-BA-013", fixture_dir, record["measured_values"]["isolation_held"])
 
 
 # ─── BA-2-001: Session Health Verdict Classification ────────────────────────────────
@@ -232,9 +272,7 @@ def record_health_verdict_exercise(
         "mismatched": mismatched,
         "all_correct": not mismatched,
     }
-    record["release_disposition"] = "passed" if record["measured_values"]["all_correct"] else "failed"
-    (fixture_dir / "UAT-BA-015.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    return _finish(record, "UAT-BA-015", fixture_dir, record["measured_values"]["all_correct"])
 
 
 # ─── BA-2-002: Rotation Outcome Evidence ────────────────────────────────────────────
@@ -259,6 +297,4 @@ def record_rotation_outcome_exercise(
         "failed_conditions": failures,
         "all_passed": not failures,
     }
-    record["release_disposition"] = "passed" if record["measured_values"]["all_passed"] else "failed"
-    (fixture_dir / "UAT-BA-016.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+    return _finish(record, "UAT-BA-016", fixture_dir, record["measured_values"]["all_passed"])

@@ -22,7 +22,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     DropdownTimeoutMs,
     FileChooserTimeoutMs,
     FileSizeBytes,
-    MaxFileSizeMb,
+    MaxFileSizeBytes,
     MaxRetries,
     OptionTimeoutMs,
     UploadConfig,
@@ -45,7 +45,7 @@ class FileUploader(IUploadProtocol):
         else:
             self.config = DEFAULT_UPLOAD_CONFIG
 
-        self.max_file_size_mb = MaxFileSizeMb(float(self.config.max_file_size_mb))
+        self.max_size_bytes = MaxFileSizeBytes(self.config.max_size_bytes)
         self.dropdown_timeout_ms = DropdownTimeoutMs(int(self.config.dropdown_timeout_ms))
         self.option_timeout_ms = OptionTimeoutMs(int(self.config.option_timeout_ms))
         self.file_chooser_timeout_ms = FileChooserTimeoutMs(int(self.config.file_chooser_timeout_ms))
@@ -78,14 +78,14 @@ class FileUploader(IUploadProtocol):
             raise RuntimeError("Cannot upload attachment: web page loading (EVENT_WEB_LOADED) is incomplete")
 
         if config:
-            self.max_file_size_mb = MaxFileSizeMb(config.get("max_file_size_mb", float(self.max_file_size_mb)))
+            self.max_size_bytes = MaxFileSizeBytes(int(config.get("max_size_bytes", self.max_size_bytes)))
             self.max_retries = MaxRetries(config.get("max_retries", int(self.max_retries)))
 
         self.last_error = None
 
         # ── Step 1: Validate file pre-flight ──
         try:
-            size_bytes = FileSizeBytes(validate_file(filepath, float(self.max_file_size_mb)))
+            size_bytes = FileSizeBytes(validate_file(filepath, max_size_bytes=self.max_size_bytes))
         except FileValidationError as e:
             self.last_error = e
             log.error("Pre-flight validation failed: %s", e)
@@ -159,10 +159,10 @@ class FileUploader(IUploadProtocol):
             )
         return True
 
-    def validate_file(self, filepath: Path, max_size_mb: MaxFileSizeMb | None = None) -> FileSizeBytes:
+    def validate_file(self, filepath: Path, max_size_bytes: MaxFileSizeBytes | None = None) -> FileSizeBytes:
         """Public protocol method — pre-flight validation returning size in bytes."""
-        limit_mb = max_size_mb if max_size_mb is not None else float(self.max_file_size_mb)
-        return FileSizeBytes(validate_file(filepath, float(limit_mb)))
+        limit = max_size_bytes if max_size_bytes is not None else self.max_size_bytes
+        return FileSizeBytes(validate_file(filepath, max_size_bytes=limit))
 
     # Block 3: Dunder Methods, Factories, Helpers
 
@@ -342,6 +342,6 @@ class FileUploader(IUploadProtocol):
     def __repr__(self) -> str:
         """Return string representation of FileUploader."""
         return (
-            f"FileUploader(max_size={self.max_file_size_mb}, retries={self.max_retries}, "
+            f"FileUploader(max_size_bytes={self.max_size_bytes}, retries={self.max_retries}, "
             f"backoff={self.backoff_delay_sec})"
         )

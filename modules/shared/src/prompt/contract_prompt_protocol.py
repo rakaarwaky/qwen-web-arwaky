@@ -37,7 +37,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     FileSizeBytes,
     HeadlessFlag,
     InjectorConfig,
-    MaxFileSizeMb,
+    MaxFileSizeBytes,
     MessageCount,
     MinTextLength,
     OutputChars,
@@ -276,7 +276,7 @@ class IUploadProtocol(ABC):
         """Attach a file as an attachment. Returns True on success."""
 
     @abstractmethod
-    def validate_file(self, filepath: Path, max_size_mb: MaxFileSizeMb | None = None) -> FileSizeBytes:
+    def validate_file(self, filepath: Path, max_size_bytes: MaxFileSizeBytes | None = None) -> FileSizeBytes:
         """Pre-flight validation; returns file size in bytes."""
 
 

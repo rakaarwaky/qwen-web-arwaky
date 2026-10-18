@@ -39,7 +39,9 @@ class HealthReason(str, Enum):
 
 SessionId: TypeAlias = str
 SessionName: TypeAlias = str
-SessionReason: TypeAlias = HealthReason | str
+#: Sub-cause reason for a health verdict, e.g. ``"QUOTA"`` or ``"EXPIRED"``.
+#: Values are the :class:`HealthReason` constants; stored as plain strings.
+SessionReason: TypeAlias = str
 
 
 @dataclass(frozen=True)
@@ -156,7 +158,7 @@ class SessionPool:
         return None
 
     def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
-        """Mark a session as rate-limited with reason."""
+        """Mark a session as rate-limited; ``None`` is persisted as ``"QUOTA"``."""
         for i, s in enumerate(self.sessions):
             if s.session_id == session_id:
                 self.sessions[i] = s.with_status(SessionStatus.LIMITED, reason=reason)
@@ -278,8 +280,12 @@ class SessionRequest:
 class SessionResponse:
     """What a session verb produced.
 
-    ``valid`` carries the auth verdict for ``validate``; ``message`` carries
-    the human-readable outcome of either verb; ``deleted`` reports whether
+    ``valid`` carries the auth verdict for ``validate`` (True when the
+    profile is authenticated and usable) and the pool availability flag for
+    ``check_health`` (True when at least one session in the pool is
+    healthy and ready to accept requests; False when the pool is empty or
+    every session is rate-limited/unauthenticated). ``message`` carries
+    the human-readable outcome of any verb; ``deleted`` reports whether
     ``delete`` removed a profile. ``error`` names the reason a request could
     not be answered at all. ``profile_path`` carries the resolved profile
     directory after a successful ``login`` so callers that receive the
@@ -316,10 +322,10 @@ __all__ = [
     "SessionInfo",
     "SessionList",
     "SessionPool",
-    "SessionReason",
     "SessionRequest",
     "SessionResponse",
     "SessionStatus",
     "SessionId",
     "SessionName",
+    "SessionReason",
 ]

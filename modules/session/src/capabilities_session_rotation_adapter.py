@@ -43,6 +43,16 @@ class AllSessionsLimitedError(Exception):
         )
 
 
+#: Caller-facing recovery prose for the ``no_eligible_session`` reasons
+#: that share one action (``empty_pool`` carries its own).
+_NO_ELIGIBLE_RECOVERY: dict[str, str] = {
+    reason: (
+        "All sessions in the pool are rate-limited or excluded. Reduce request throughput or add authorized accounts."
+    )
+    for reason in ("all_sessions_limited", "all_sessions_excluded")
+}
+
+
 # Block 1: Class Definition & Constructor
 
 
@@ -111,10 +121,7 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
             session=None,
             outcome="no_eligible_session",
             reason=reason,
-            recovery_action=(
-                "All sessions in the pool are rate-limited or excluded. "
-                "Reduce request throughput or add authorized accounts."
-            ),
+            recovery_action=_NO_ELIGIBLE_RECOVERY[reason],
         )
 
     async def mark_limited(self, session_id: SessionId) -> None:

@@ -258,6 +258,11 @@ MaxPerMinute = NewType("MaxPerMinute", int)
 # ─── Brand types: stream & file validation config ────────────
 FileSizeBytes = NewType("FileSizeBytes", int)
 
+# ─── Brand types: attachment size ceilings ────────────────────
+#: Brand type for an exact-byte file-size ceiling (the single locked knob for
+#: attachment uploads, 104857600 = 100 MiB).
+MaxFileSizeBytes = NewType("MaxFileSizeBytes", int)
+
 # ─── Brand types: observability & logging config ─────────────
 LoggerName = NewType("LoggerName", str)
 ExitCode = NewType("ExitCode", int)
@@ -455,7 +460,8 @@ def _validate_min(name: str, value: float | int, minimum: float | int) -> None:
 class UploadConfig:
     """Configuration options for file upload behavior."""
 
-    max_file_size_mb: float = 100.0
+    #: The single locked attachment-size ceiling, in exact bytes (104857600 = 100 MiB).
+    max_size_bytes: MaxFileSizeBytes = MaxFileSizeBytes(104_857_600)
     dropdown_timeout_ms: int = 5000
     option_timeout_ms: int = 3000
     file_chooser_timeout_ms: int = 8000
@@ -791,6 +797,7 @@ __all__ = [
     "WindowSec",
     "MaxPerMinute",
     "FileSizeBytes",
+    "MaxFileSizeBytes",
     "LoggerName",
     "ExitCode",
     "VersionString",

@@ -235,7 +235,7 @@ class SessionManager(ISessionManagerProtocol):
         return self.load_pool().get_next_session()
 
     def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
-        """Mark session as rate-limited."""
+        """Mark session as rate-limited; a ``None`` reason normalises to ``"QUOTA"``."""
         pool = self.load_pool()
         pool.mark_limited(session_id, reason=reason)
         self.save_pool(pool)

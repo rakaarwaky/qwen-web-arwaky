@@ -22,7 +22,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.session.taxonomy_session_vo import (
@@ -113,7 +112,14 @@ class ISessionManagerProtocol(ABC):
 
     @abstractmethod
     def mark_limited(self, session_id: SessionId, reason: SessionReason | None = None) -> None:
-        """Mark the session as rate-limited, with the sub-cause reason."""
+        """Mark the session as rate-limited, with the sub-cause reason.
+
+        ``SessionPool.mark_limited`` persists ``None`` unchanged, but the
+        capability implementation defaults to ``"QUOTA"`` and
+        ``SessionInfo`` readers treat a missing reason as ``"QUOTA"``, so
+        implementors that pass ``None`` still surface a quota reason on
+        read.
+        """
         ...
 
     @abstractmethod
@@ -155,7 +161,7 @@ class ISessionHealthCheckerProtocol(ABC):
         ...
 
     @abstractmethod
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, Any]]) -> tuple[int, int]:
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
         """Return ``(healthy_count, total)`` for a pool-check result list."""
         ...
 

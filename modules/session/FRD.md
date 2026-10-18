@@ -52,6 +52,7 @@ pool, health checking, rotation, renewal, deletion, and login.
   - A pool where every session is in `exclude_ids` returns `no_eligible_session` with reason `all_sessions_excluded`.
   - A mixed pool (some healthy, some limited) returns the next healthy session.
   - A session that is `UNKNOWN` (not yet probed) and whose probe fails transiently is reported `AUTH_REQUIRED`, never `LIMITED`.
+  - For the `check_health` verb, `SessionResponse.valid` indicates pool availability (`healthy_count > 0`): True when at least one session in the pool is ready to accept requests; False when the pool is empty or every session is limited or unauthenticated.
 - **Error Handling**: A pool that cannot be read surfaces an error naming the pool path. Missing browser configuration reports `AUTH_REQUIRED` with `LAUNCH_FAILURE` reason.
 
 ### FR-SESSION-003: Delete a session safely

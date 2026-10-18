@@ -35,11 +35,7 @@ This blocks:
 
 ### Policy gate
 
-- Quota-triggered cross-account rotation is an **approved** boundary as of 2026-10-18, approved by Raka.
-- All configured accounts must be accounts the operator owns and controls.
-- CAPTCHA / access-control halts stop the flow immediately — no bypass is attempted.
-- If no session is eligible, the adapter reports `no_eligible_session` and the pipeline does not submit through a known-LIMITED profile.
-- No claim is made that a provider quota resets by a specific time; the operator decides when to retry.
+See the [Policy Gate](#policy-gate-2026-10-18-raka--project-owner) section at the top of this document for the approved boundary and its rules. The rotation logic below implements it: no submission through a known-LIMITED profile, and a CAPTCHA or access-control stop halts immediately.
 
 ### Architecture
 
@@ -197,6 +193,17 @@ class SessionRotator:
           with reason ("all_sessions_limited" / "empty_pool" / "all_sessions_excluded").
         """
         pool = self.pool
+        if not pool.sessions:
+            return RotatorResponse(
+                session=None,
+                outcome="no_eligible_session",
+                reason="empty_pool",
+                recovery_action=(
+                    "No sessions configured. Run 'qwen-web-arwaky session login --name <name>' "
+                    "to add an authorized session."
+                ),
+            )
+
         excluded = set(request.exclude_ids)
 
         for candidate in pool.sessions:
@@ -207,6 +214,8 @@ class SessionRotator:
                 return RotatorResponse(session=candidate, outcome="success")
             if verdict.status == SessionStatus.LIMITED:
                 self.pool.mark_limited(candidate.session_id, reason=verdict.reason)
+            else:
+                self.pool.mark_auth_required(candidate.session_id, reason=verdict.reason)
 
         # No eligible session: fail fast, explicit outcome, no submission
         all_excluded = bool(excluded) and all(s.session_id in excluded for s in pool.sessions)
@@ -215,11 +224,14 @@ class SessionRotator:
             session=None,
             outcome="no_eligible_session",
             reason=reason,
-            recovery_action="Reduce request throughput or add authorized accounts (owned/controlled only).",
+            recovery_action=(
+                "All sessions in the pool are rate-limited or excluded. "
+                "Reduce request throughput or add authorized accounts."
+            ),
         )
 ```
 
-**No submission through a known-limited profile.** An exhausted pool returns an explicit `no_eligible_session` outcome before submission. There is no promise that a provider quota resets by a specific time; the operator decides when to retry.
+The code sample above mirrors `SessionRotationAdapter.rotate` in `modules/session/src/capabilities_session_rotation_adapter.py`, including the `empty_pool` early return and the verdict-marking branches; it omits only the metrics counters.
 
 **CAPTCHA / access-control stop:** A CAPTCHA or any provider access-control stop halts immediately. No bypass is attempted. The affected session is marked `AUTH_REQUIRED` with reason `EXPIRED` or `NETWORK` as appropriate.
 
@@ -245,8 +257,7 @@ qwen-web-arwaky session status
 ### Recovery Guidance
 
 - **Reduce throughput:** Set `QWEN_WEB_MAX_WORKERS=2` and `QWEN_SWARM_CONCURRENCY=2` when limits are active.
-- **Authorized accounts only:** All configured accounts must be owned and controlled by the operator. Do not add unowned or uncontrolled accounts.
-- **CAPTCHA or access-control stop:** Halts immediately. No bypass attempt is made; re-authenticate or contact the provider.
+- **Authorized accounts only:** Per the policy gate at the top of this document — add only accounts the operator owns and controls.
 - **No reset-time promise:** The system does not claim a quota resets by a specific time. Use the operator's judgment.
 
 ### Workflow for Swarm
@@ -359,8 +370,10 @@ def test_all_sessions_limited():
     for s in pool.sessions:
         pool.mark_limited(s.session_id)
     rotator = SessionRotator(pool)
-    with pytest.raises(AllSessionsLimitedError):
-        rotator.execute_with_rotation("ping")
+    response = rotator.rotate(RotatorRequest())
+    assert response.session is None
+    assert response.outcome == "no_eligible_session"
+    assert response.reason == "all_sessions_limited"
 ```
 
 ### Metrics to Track

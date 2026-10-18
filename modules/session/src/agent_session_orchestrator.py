@@ -137,11 +137,38 @@ class SessionOrchestrator(ISessionAggregate):
                 if r.recovery_action:
                     line += f" -> {r.recovery_action}"
                 lines.append(line)
+
+            # Synthesize aggregate pool verdict for callers consuming status/reason/recovery
+            if total == 0:
+                agg_status = "auth_required"
+                agg_reason = "empty_pool"
+                agg_action = "No sessions configured. Run 'qwen-web-arwaky session login' to add one."
+            elif healthy_count == total:
+                agg_status = "active"
+                agg_reason = None
+                agg_action = None
+            elif healthy_count == 0:
+                all_limited = all(r.status == SessionStatus.LIMITED for r in health_results)
+                agg_status = "limited" if all_limited else "auth_required"
+                agg_reason = "all_sessions_limited" if all_limited else "all_sessions_unhealthy"
+                agg_action = (
+                    "All sessions in the pool are rate-limited. Reduce throughput or add authorized accounts."
+                    if all_limited
+                    else "Re-authenticate expired sessions via 'qwen-web-arwaky session login'."
+                )
+            else:
+                agg_status = "active"
+                agg_reason = f"{total - healthy_count}_sessions_degraded"
+                agg_action = "Pool is operational; check degraded sessions."
+
             return SessionResponse(
                 valid=healthy_count > 0,
                 message="\n".join(lines),
                 health_healthy=healthy_count,
                 health_total=total,
+                status=agg_status,
+                reason=agg_reason,
+                recovery_action=agg_action,
                 health_results=health_results,
             )
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")

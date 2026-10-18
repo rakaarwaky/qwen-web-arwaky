@@ -150,7 +150,6 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         session_manager: ISessionManagerProtocol,
     ) -> list[tuple[SessionInfo, SessionHealthResult]]:
         """Synchronous convenience wrapper: check all sessions and update manager state."""
-        import asyncio as _asyncio
 
         async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
             results: list[tuple[SessionInfo, SessionHealthResult]] = []
@@ -165,13 +164,11 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
                     session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
             return results
 
-        return _asyncio.run(_run())
+        return asyncio.run(_run())
 
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, Any]]) -> tuple[int, int]:
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
         """Return ``(healthy_count, total)`` for a pool-check result list."""
-        healthy_count = sum(
-            1 for _, h in results if (h is True or (isinstance(h, SessionHealthResult) and h.is_healthy))
-        )
+        healthy_count = sum(1 for _, verdict in results if verdict.is_healthy)
         return healthy_count, len(results)
 
     # Block 3: Dunder Methods, Factories, Helpers
@@ -301,16 +298,6 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
                 evidence=err_msg,
                 recovery_action=action,
             )
-
-    def _probe(self, cfg: AppConfig) -> bool:
-        """Synchronous liveness probe: open the page, assert auth, scan for limits.
-
-        Runs on a worker thread (Playwright's sync API is thread-blocking).
-        Returns True only when the chat page is authenticated AND its body does
-        not carry a rate-limit notice.
-        """
-        verdict = self._probe_verdict(cfg, "probe", SessionStatus.AUTH_REQUIRED, None)
-        return verdict.is_healthy
 
     @staticmethod
     def _extract_limit_evidence(page: Any) -> str | None:

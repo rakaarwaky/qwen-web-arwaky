@@ -593,10 +593,13 @@ class McpToolCommand:
             from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
             response = self._session.execute(SessionRequest(verb="validate"))
+            # For the 'validate' verb response.status is populated; the
+            # fallback preserves backward compatibility with older session responses.
+            status_val = response.status or ("active" if response.valid else "auth_required")
             payload: dict[str, Any] = {
                 "success": True,
                 "session_valid": bool(response.valid),
-                "status": response.status or ("active" if response.valid else "auth_required"),
+                "status": status_val,
                 "message": str(response.message),
                 "next_action": None if response.valid else "setup_session",
             }
