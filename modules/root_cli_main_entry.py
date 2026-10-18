@@ -467,6 +467,7 @@ def _dispatch(
             jobs=container.agent_job_orchestrator,
             swarm=container.agent_swarm_orchestrator,
             updater=container.agent_update_orchestrator,
+            session_manager=container.session_manager,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 
@@ -501,7 +502,7 @@ def _dispatch(
         return handle_observability_command(args, container.agent_logging_orchestrator)
 
     if action == "session":
-        return handle_sessions(args)
+        return handle_sessions(args, container.agent_session_orchestrator)
 
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
