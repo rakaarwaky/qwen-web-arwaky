@@ -1,0 +1,44 @@
+[
+  {
+    "id": "BA-1-001-20261018T075054Z",
+    "title": "Define the controlled-service acceptance environment",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/601"
+  },
+  {
+    "id": "BA-2-001-20261018T075054Z",
+    "title": "Distinguish session expiry and probe failures from rate limiting",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/602"
+  },
+  {
+    "id": "BA-2-002-20261018T075054Z",
+    "title": "Resolve contradictory all-sessions-exhausted behavior",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/603"
+  },
+  {
+    "id": "BA-3-001-20261018T075054Z",
+    "title": "Publish a testable supported-document contract for F-003",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/604"
+  },
+  {
+    "id": "BA-4-001-20261018T075054Z",
+    "title": "Approve provider-policy boundaries before automatic account rotation",
+    "severity": "CRITICAL",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/605"
+  },
+  {
+    "id": "BA-4-002-20261018T075054Z",
+    "title": "Restore the requirement ownership chain after the module split",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/606"
+  },
+  {
+    "id": "BA-5-001-20261018T075054Z",
+    "title": "Add release UAT coverage for the current five measurable goals",
+    "severity": "WARNING",
+    "url": "https://github.com/rakaarwaky/qwen-web-arwaky/issues/607"
+  }
+]
