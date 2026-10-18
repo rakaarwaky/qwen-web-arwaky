@@ -12,6 +12,7 @@ import json
 import sys
 from pathlib import Path
 
+from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
 from modules.shared.src.common.utility_core_path_validation import (
     validate_attachment_path,
@@ -46,11 +47,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     else:
         validated_path, error = validate_prompt_path(prompt_raw, field="prompt_file")
         if error is not None:
-            if json_output:
-                print(json.dumps({"success": False, "error": error}, indent=2))
-            else:
-                print(f"[ERROR] {error['message']}", file=sys.stderr)
-            return 1
+            return _fail_json(error["message"], "cli-400", json_output)
         prompt_path = validated_path
 
     # Validate attachment path if provided
@@ -59,11 +56,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     if attachment_raw:
         validated_attachment, error = validate_attachment_path(attachment_raw, field="attachment_file")
         if error is not None:
-            if json_output:
-                print(json.dumps({"success": False, "error": error}, indent=2))
-            else:
-                print(f"[ERROR] {error['message']}", file=sys.stderr)
-            return 1
+            return _fail_json(error["message"], "cli-400", json_output)
         attachment_path = validated_attachment
 
     # Validate output path if provided
@@ -72,11 +65,7 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
     if output_raw:
         validated_output, error = validate_output_path(output_raw, field="output_file")
         if error is not None:
-            if json_output:
-                print(json.dumps({"success": False, "error": error}, indent=2))
-            else:
-                print(f"[ERROR] {error['message']}", file=sys.stderr)
-            return 1
+            return _fail_json(error["message"], "cli-400", json_output)
         output_path = validated_output
 
     # Build request
@@ -101,27 +90,18 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
                 )
             )
     except Exception as exc:
-        if json_output:
-            print(json.dumps({"success": False, "error": str(exc)}, indent=2))
-        else:
-            print(f"[ERROR] Job submission failed: {exc}", file=sys.stderr)
-        return 1
+        return _fail_json(f"Job submission failed: {exc}", "cli-500", json_output)
 
     if response.error:
-        if json_output:
-            print(json.dumps({"success": False, "error": response.error}, indent=2))
-        else:
-            print(f"[ERROR] Job submission failed: {response.error}", file=sys.stderr)
-        return 1
+        return _fail_json(f"Job submission failed: {response.error}", "cli-500", json_output)
 
     record = response.record
     if record is None:
-        print("[ERROR] Job submission returned no record", file=sys.stderr)
-        return 1
+        return _fail_json("Job submission returned no record", "cli-500", json_output)
     if json_output:
         print(json.dumps({"success": True, "job_id": str(record.job_id)}, indent=2))
     else:
-        print(f"✅ Job queued: {record.job_id}")
+        print(f"{status_glyph('ok')} Job queued: {record.job_id}")
         print(f"Poll with: qwen-web-arwaky job status {record.job_id}")
     return 0
 

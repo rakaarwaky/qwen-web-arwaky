@@ -84,7 +84,7 @@ class TestInteractiveControllerRun:
         resolver = dispatch.call_args.kwargs["session_resolver"]
         assert resolver() is None
 
-    def test_headless_run_resolver_survives_a_rotator_failure(self):
+    def test_headless_run_resolver_survives_a_rotator_failure(self, capsys):
         controller = _controller_with_rotator(MagicMock(), raises=True)
         with patch("modules.cli.src.surface_cli_run_command.dispatch_run") as dispatch:
             dispatch.return_value = {"success": True}
@@ -92,6 +92,9 @@ class TestInteractiveControllerRun:
 
         resolver = dispatch.call_args.kwargs["session_resolver"]
         assert resolver() is None
+        captured = capsys.readouterr()
+        assert "[WARN] Session rotation failed" in captured.err
+        assert "falling back to the default session" in captured.err
 
 
 class TestMain:

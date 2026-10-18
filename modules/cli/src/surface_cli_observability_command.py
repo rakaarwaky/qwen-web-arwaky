@@ -12,6 +12,7 @@ import json
 import sys
 from typing import Any
 
+from modules.cli.src.surface_cli_json_hook import _fail_json
 from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.logging.taxonomy_logging_vo import (
     MetricsSnapshot,
@@ -59,11 +60,7 @@ def _cmd_status(args: argparse.Namespace, orchestrator: IObservabilityAggregate)
             "hint": f"Status file must be under {workspace_root}",
             "field": "status_file",
         }
-        if json_output:
-            print(json.dumps({"success": False, "error": error}, indent=2))
-        else:
-            print(f"[ERROR] {error['message']}", file=sys.stderr)
-        return 1
+        return _fail_json(error["message"], "cli-400", json_output)
 
     status_map: dict[str, Any] | None = None
     if status_path.exists():

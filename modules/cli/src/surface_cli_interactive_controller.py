@@ -77,10 +77,15 @@ class InteractiveController:
 
             doctor_runner = self._doctor_runner
             if doctor_runner is None:
-                from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+                from modules.cli.src.surface_cli_doctor_command import _StubSessionAggregate, run_doctor_checks
+
+                aggregate = self._session if self._session is not None else _StubSessionAggregate()
 
                 def doctor_runner() -> list[dict[str, Any]]:
-                    return run_doctor_checks()
+                    # The pool is the doctor's single source of truth, so the
+                    # runner always carries a session aggregate: the real one
+                    # when wired, a pool-only stub otherwise.
+                    return run_doctor_checks(session=aggregate)
 
             app = QwenTuiApp(
                 self._workspace,
@@ -117,7 +122,10 @@ class InteractiveController:
 
                 response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
                 return response.session.path if response.session else None
-            except Exception:
+            except Exception as exc:
+                from modules.cli.src.surface_cli_json_hook import print_warn
+
+                print_warn(f"Session rotation failed; falling back to the default session: {exc}")
                 return None
 
         return dispatch_run(cfg, self._prompt, session_resolver=_pick)

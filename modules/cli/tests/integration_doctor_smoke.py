@@ -22,6 +22,12 @@ def test_parse_args_accepts_smoke_flag() -> None:
     assert getattr(_parse_args(["doctor"]), "smoke", False) is False
 
 
+def test_parse_args_accepts_deep_flag() -> None:
+    """`doctor --deep` is a first-class flag; the default is off."""
+    assert getattr(_parse_args(["doctor", "--deep"]), "deep", False) is True
+    assert getattr(_parse_args(["doctor"]), "deep", False) is False
+
+
 def test_smoke_appends_sixth_check_and_maps_result(capsys) -> None:
     """A valid session yields a sixth passing check (issue #322 acceptance)."""
     session = MagicMock()
@@ -74,7 +80,7 @@ def test_smoke_aggregate_exception_reports_failure(capsys) -> None:
 
 def test_smoke_without_session_injection_fails_cleanly(capsys) -> None:
     """Calling the surface directly without an aggregate must not crash."""
-    run_doctor(json_output=True, smoke=True, session=None)
+    run_doctor(json_output=True, smoke=True)
 
     data = json.loads(capsys.readouterr().out)
     names = [check["name"] for check in data["checks"]]

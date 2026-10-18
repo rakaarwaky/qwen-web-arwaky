@@ -42,6 +42,32 @@ def test_mcp_entry_is_importable() -> None:
     assert callable(main)
 
 
+def test_cli_barrel_re_exports_every_surface() -> None:
+    """The CLI barrel must name all ten surface modules in ``__all__``.
+
+    A surface added without the barrel row silently breaks the
+    single-import entry-point contract, so the module count and every
+    name are pinned here.
+    """
+    import modules.cli.src as cli_barrel
+
+    expected = [
+        "surface_cli_doctor_command",
+        "surface_cli_init_command",
+        "surface_cli_interactive_controller",
+        "surface_cli_jobs_command",
+        "surface_cli_observability_command",
+        "surface_cli_json_hook",
+        "surface_cli_run_command",
+        "surface_cli_sessions_command",
+        "surface_cli_swarm_command",
+        "surface_cli_update_command",
+    ]
+    assert cli_barrel.__all__ == expected
+    for name in expected:
+        assert hasattr(cli_barrel, name), f"barrel missing {name}"
+
+
 def test_cli_parse_args_verbose_flag() -> None:
     """The CLI entry point must parse -v and --verbose flags correctly."""
     from modules.root_cli_main_entry import _build_config, _parse_args

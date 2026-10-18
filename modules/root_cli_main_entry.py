@@ -79,6 +79,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_doctor = sub.add_parser("doctor", help="Run system environment and health diagnostics", parents=[parent])
     p_doctor.add_argument("--json", action="store_true", help="Format diagnostic output as JSON")
     p_doctor.add_argument(
+        "--deep",
+        action="store_true",
+        help="Run the heavy Playwright probe (alias: QWEN_DOCTOR_DEEP=1)",
+    )
+    p_doctor.add_argument(
         "--smoke",
         action="store_true",
         help="Run headless browser smoke test (requires valid saved session)",
@@ -494,6 +499,7 @@ def _dispatch(
         return run_doctor(
             json_output=bool(getattr(args, "json", False)),
             smoke=bool(getattr(args, "smoke", False)),
+            deep=bool(getattr(args, "deep", False)),
             session=container.agent_session_orchestrator,
         )
 

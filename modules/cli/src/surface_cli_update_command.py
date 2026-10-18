@@ -6,9 +6,9 @@ Smart surface: maps parsed args to the IUpdateAggregate verbs
 
 from __future__ import annotations
 
-import json
 import sys
 
+from modules.cli.src.surface_cli_json_hook import STATUS_GLYPHS, _fail_json, status_glyph
 from modules.shared.src.common.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
@@ -25,8 +25,8 @@ _DIVIDER = "─" * 58
 def _step_icon(step: UpdateStepResult) -> str:
     """Return the terminal status icon for one pipeline step."""
     if not step.executed:
-        return "[–]"
-    return "[✓]" if step.success else "[✗]"
+        return STATUS_GLYPHS["pending"]
+    return status_glyph("ok") if step.success else status_glyph("fail")
 
 
 def _step_detail(step: UpdateStepResult) -> str:
@@ -88,7 +88,7 @@ def _format_report(report: UpdateReport) -> str:
         for check in report.health_checks:
             lines.append(f"    {_step_icon(check)} {check.name}: {_step_detail(check)}")
     lines.append(_DIVIDER)
-    lines.append(f"{'✅' if report.healthy else '⚠️'} {report.message}")
+    lines.append(f"{status_glyph('ok') if report.healthy else status_glyph('warn')} {report.message}")
     if report.healthy and report.changed:
         lines.append("")
         lines.append(
@@ -147,12 +147,7 @@ def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
     response = orchestrator.execute(UpdateRequest(verb="rollback_to", previous_version=version))
 
     if response.error:
-        msg = f"Rollback failed: {response.error}"
-        if json_output:
-            print(json.dumps({"success": False, "error": response.error}, indent=2))
-        else:
-            print(f"❌ {msg}", file=sys.stderr)
-        return 1
+        return _fail_json(f"Rollback failed: {response.error}", "cli-500", json_output)
 
     if response.steps:
         lines = ["", "↩️  Rolling back to " + version, _DIVIDER]
@@ -161,7 +156,7 @@ def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
         lines.append(_DIVIDER)
         report = "\n".join(lines)
     else:
-        report = f"✅ Rollback to {version} completed."
+        report = f"{status_glyph('ok')} Rollback to {version} completed."
 
     print(report)
     return 0

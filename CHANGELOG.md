@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [6.7.0] - 2026-10-18
+
+### Added
+
+- feat(cli): add a `--json` flag to the `session` group (`list` / `status` / `health` / `remove`); every subcommand emits the standard envelope, and `session remove` reports `Removed session 'X'`.
+- feat(cli): `doctor` gains a first-class `--deep` flag (alias: `QWEN_DOCTOR_DEEP=1`); a stderr notice now precedes the heavy Playwright probe.
+- feat(cli): add the `surface_cli_json_hook` module centralizing the failure envelope, the `[ERROR]` / `[WARN]` stderr channels, the status-glyph vocabulary, and terminal-fitted table rendering.
+- feat(cli): the `modules/cli/src/__init__.py` barrel re-exports all ten surface modules.
+
+### Changed
+
+- refactor(cli): route every `--json` failure in the `job`, `swarm`, `observability`, `update`, and `session` surfaces through `_fail_json`, so the envelope shape and channel are identical everywhere.
+- refactor(cli): `doctor` reports the session pool exclusively; the legacy `DEFAULT_SESSION` filesystem probe is removed and `run_doctor_checks` takes a required `ISessionAggregate`.
+- refactor(cli): `session login`'s re-prompt loop is iterative (via `_login_once`) instead of recursive, so a long add-another sequence cannot hit Python's recursion limit.
+
+### Fixed
+
+- fix(cli): `doctor --json` no longer marks a healthy sandbox / capacity check as `severity: "error"`; the sentinel for a passing check is `"ok"`.
+- fix(cli): `update --rollback` failure emits the envelope (`{"success": false, "message": …, "error_code": "cli-500"}`) with the `[ERROR]` prefix instead of `{"success": false, "error": …}` / `❌`.
+- fix(cli): a rotation failure in the headless controller prints `[WARN] Session rotation failed; falling back to the default session: {cause}` to stderr instead of silently degrading.
+- docs(cli): document `cli-422` and `cli-502` and the canonical success JSON schemas in `modules/cli/DESIGN.md`.
+
+### Tests
+
+- test(cli): `unit_surface_cli_sessions_command.py` — in-memory aggregate stub, `--json` payloads, the destructive `remove` path, the iterative login re-prompt, and the terminal-fit table helpers.
+- test(cli): `contract_json_envelope.py` — the fixed-key `{success, message, error_code}` envelope for one forced failure per surface under `--json`, plus a healthy-doctor JSON assertion that passing records never carry `severity: "error"`.
+- test(cli): `unit_surface_cli_doctor_sandbox.py` — sandbox-detection branches, the env-flag precedence matrix, and the `--deep` / `QWEN_DOCTOR_DEEP` alias.
+
+## [6.5.0] - 2026-09-24
+
 ### Fixed
 
 - fix(jobs): skip `test/`, `tests/`, and `benches/` directories during folder

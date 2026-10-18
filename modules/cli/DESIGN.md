@@ -41,15 +41,16 @@ text unless `--json` is set; the TUI visual token set lives in
 
 ### Subcommand Flag Matrix
 
-Flags shared by every subcommand in the `prompt`, `job`, `swarm`, and
-`observability` groups are registered on the shared parent parser and are
-therefore uniformly available:
+Flags shared by every subcommand in the `prompt`, `job`, `swarm`,
+`observability`, and `session` groups are registered on the shared parent
+parser (or the group-level parser) and are uniformly available:
 
 | Flag | Default | Notes |
 |---|---|---|
-| `--json` | off | Print the response envelope verbatim as JSON on stdout. |
+| `--json` | off | Print the response envelope verbatim as JSON on stdout. Available on every `job`, `swarm`, `observability`, and `session` subcommand. |
 | `--headless` / `--no-headless` | on | BooleanOptionalAction; off (headed) mode opens a visible browser. |
 | `-o FILE` / `--output-path` | `None` | Destination for the Markdown response; omitted only for `job submit` which stores the record in the jobs folder. |
+| `--deep` | off | On `doctor` only; runs the heavy Playwright probe (alias: `QWEN_DOCTOR_DEEP=1`). |
 
 `session login` is the only interactive subcommand that opens a browser;
 all other subcommands are non-interactive.
@@ -83,20 +84,58 @@ Error reference codes used by the CLI surface:
 
 | `error_code` | Meaning |
 |---|---|
-| `cli-400` | Validation failure (missing required argument, bad path). |
+| `cli-400` | Validation failure (missing required argument, bad path, unknown id). |
+| `cli-422` | Processing failure: the request was well formed but the pipeline could not complete it (prompt processing, a failed self-update). |
 | `cli-500` | Unhandled runtime failure (default from `error_response`). |
+| `cli-502` | Update-specific failure: the check or rollback machinery itself errored; routes to the update runbook, not the generic one. |
 | `auth-required` | Session has expired; re-run `qwen-web-arwaky session login`. |
 
 ### Output Formats
 
 | Format | Trigger | Shape |
 |---|---|---|
-| Plain text (default) | No `--json` | One-line status per operation; `doctor` prints a multi-line check table with `PASS`/`WARN`/`FAIL` prefixes. |
+| Plain text (default) | No `--json` | One-line status per operation; `doctor` prints a multi-line check table with `✓` / `⚠` / `✗` glyphs; tables fit `shutil.get_terminal_size()` with `…` truncation. |
 | JSON envelope | `--json` | `{"success": bool, "message": str, "error_code"?: str}` on stdout; failures also log a one-line summary to stderr. |
 | Markdown file | `-o FILE` on prompt subcommands | The response text, written as Markdown to the named path; not emitted to stdout. |
 | Jobs status table | `job list` / `job status` | Human-readable table with `RUNNING` / `COMPLETED` / `FAILED` status per record; `--json` prints the raw `JobRecord` dict. |
-| Swarm progress report | `swarm start` / `swarm status` | Compact multi-line report with `⌬ Swarm` header, per-agent status icons (`✓` / `✗` / `⋯`), and progress counts; `--json` prints the `SwarmSnapshot` dict. |
-| Update report | `update` / `update --check` | Step list with `[✓]` / `[✗]` / `[–]` icons and detail lines; `--json` prints the `UpdateReport` dict. |
+| Swarm progress report | `swarm start` / `swarm status` | Compact multi-line report with `⌬ Swarm` header, per-agent status icons (`✓` / `✗` / `…`), and progress counts; `--json` prints the `SwarmSnapshot` dict. |
+| Update report | `update` / `update --check` | Step list with `✓` / `✗` / `…` icons and detail lines; `--json` prints the `UpdateReport` dict. |
+
+Canonical success JSON schemas (the `--json` payloads; failure payloads are
+always the fixed-key envelope above):
+
+```json
+// job submit
+{"success": true, "job_id": "<id>"}
+// job list
+{"success": true, "total": <int>, "jobs": [{"job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>, "input_file": "<path>", "output_file": "<path>"}]}
+// job status
+{"success": true, "job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>}
+// swarm start
+{"success": true, "swarm_id": "<id>", "status": "<status>", "input_path": "<path>", "root_path": "<path>", "browser_concurrency": <int>, "completed_count": <int>, "failed_count": <int>, "agents": [{"agent_id": "<id>", "status": "<status>", "attempt": <int>, "error": "<string|null>"}]}
+// swarm status
+{"success": true, "swarm_id": "<id>", "status": "<status>", "completed_count": <int>, "failed_count": <int>, "agents": [{"agent_id": "<id>", "status": "<status>", "attempt": <int>, "error": "<string|null>"}]}
+// swarm cancel
+{"success": true, "swarm_id": "<id>", "status": "<status>"}
+// observability report
+{"success": true, "report_path": "<path>"}
+// observability status
+{"success": true, "status_path": "<path>", "status"?: <object>, "metrics"?: {"total_executions": <int>, "successful_executions": <int>, "success_rate": <number>, "counters": {<key>: <int>}}}
+// update check / update / update --rollback
+{"success": true, "message": "<formatted report>"}
+// session list
+{"success": true, "sessions": [{"session_id": "<id>", "name": "<name>", "status": "active|limited|unknown", "is_healthy": <bool>, "is_limited": <bool>, "last_used": "<iso8601|null>"}]}
+// session status
+{"success": true, "sessions": [{"session_id": "<id>", "name": "<name>", "status": "active|limited|unknown", "total_requests": <int>, "failed_requests": <int>}], "healthy": <int>, "limited": <int>, "unknown": <int>}
+// session health
+{"success": true, "message": "<summary>", "states": [{"session_id": "<id>", "status": "active|limited|unknown", "is_healthy": <bool>}]}
+// session remove
+{"success": true, "message": "Removed session 'X'"}
+```
+
+Status glyphs (`surface_cli_json_hook.STATUS_GLYPHS`): `✓` / `✗` / `⚠`
+for results, `●` / `◐` / `○` for health, `…` pending. ANSI color is
+applied only when the stream is a TTY and `NO_COLOR` is unset.
 
 ## Reference
 

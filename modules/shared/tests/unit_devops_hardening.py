@@ -317,6 +317,9 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
     assert "Host Capacity" in names
     assert "Chromium Sandbox" in names
     assert "Browser Smoke Test" not in names
+    # The pool is the single source of truth: no aggregate injected means
+    # the check reports the empty pool, not a legacy filesystem probe.
+    assert "Session Authentication Token" in names
 
 
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:
