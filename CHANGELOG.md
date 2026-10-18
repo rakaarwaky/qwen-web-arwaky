@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- fix(jobs): skip `test/`, `tests/`, and `benches/` directories during folder
+  attachment compilation so project folder uploads stay source-only.
 - fix(tui): the Attach pill on the chat console stores its picked file or
   folder in per-slot attachment state and routes the run through the
   attachment pipeline. It previously wrote the path into the composer,
