@@ -37,6 +37,7 @@ include = ["modules*"]
 [tool.setuptools.package-data]
 "modules.shared.templates" = ["*.md"]
 "modules.shared.skills" = ["SKILL.md"]
+"modules.tui.src" = ["*.css"]
 
 [tool.ruff]
 line-length = 120
