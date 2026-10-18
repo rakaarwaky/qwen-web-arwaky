@@ -255,7 +255,7 @@ def cmd_status(session: ISessionAggregate) -> int:
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"Healthy: {sum(1 for s in pool if s.is_healthy)}")
     print(f"Limited: {sum(1 for s in pool if s.is_limited)}")
-    print(f"Unknown: {sum(1 for s in pool if s.status == SessionStatus.UNKNOWN)}")
+    print(f"Auth Required: {sum(1 for s in pool if s.is_auth_required)}")
     print()
 
     return 0
@@ -266,7 +266,7 @@ def _status_icon(status: SessionStatus) -> str:
     icons = {
         SessionStatus.ACTIVE: "🟢",
         SessionStatus.LIMITED: "🟡",
-        SessionStatus.UNKNOWN: "🔵",
+        SessionStatus.AUTH_REQUIRED: "🔴",
     }
     return icons.get(status, "⚪")
 

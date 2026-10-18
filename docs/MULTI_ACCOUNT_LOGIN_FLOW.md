@@ -351,11 +351,12 @@ Session 1 → ❌ Limited
 Session 2 → ❌ Limited
 Session 3 → ❌ Limited
                     ↓
-            Raise AllSessionsLimitedError
+            RotatorResponse(outcome="no_eligible_session",
+                            reason="all_sessions_limited")
                     ↓
             User sees:
-            "All 3 sessions are rate-limited. Please wait until 
-             tomorrow or add more sessions."
+            "All sessions in the pool are rate-limited or excluded.
+             Reduce request throughput or add authorized accounts."
                     ↓
             Suggest: qwen-web-arwaky session login --name "backup"
 ```

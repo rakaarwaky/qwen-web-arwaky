@@ -4,7 +4,8 @@ A missing or stale ``sessions.json`` must not force the user to re-login
 when Chromium profile directories already exist on disk: ``load_pool``
 scans ``SESSIONS_DIR`` for profile-shaped subdirectories (``Default``
 with a ``Cookies`` file, or a ``Local State`` file) and registers the
-missing ones as ``SessionStatus.UNKNOWN``.
+missing ones as ``SessionStatus.AUTH_REQUIRED`` (``UNKNOWN`` remains a
+deprecated read-only alias for legacy pool files).
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ def test_load_pool_missing_pool_file_discovers_profiles(
 
     assert pool.total_count == 2
     assert {s.name for s in pool.sessions} == {"default", "arwaky007"}
-    assert all(s.status == SessionStatus.UNKNOWN for s in pool.sessions)
+    assert all(s.status == SessionStatus.AUTH_REQUIRED for s in pool.sessions)
     assert pool_file.exists()
     data = json.loads(pool_file.read_text())
     assert len(data["sessions"]) == 2
@@ -113,7 +114,7 @@ def test_load_pool_existing_file_new_profile_dir_on_disk(
     names = {s.name for s in pool.sessions}
     assert names == {"default", "manual"}
     manual = next(s for s in pool.sessions if s.name == "manual")
-    assert manual.status == SessionStatus.UNKNOWN
+    assert manual.status == SessionStatus.AUTH_REQUIRED
 
 
 def test_load_pool_existing_file_matching_dirs_no_change(
@@ -129,9 +130,29 @@ def test_load_pool_existing_file_matching_dirs_no_change(
 
     assert pool.total_count == 1
     assert pool.sessions[0].path == default
-    assert pool.sessions[0].status == SessionStatus.UNKNOWN
+    assert pool.sessions[0].status == SessionStatus.AUTH_REQUIRED
     sessions_after = json.loads(pool_file.read_text())["sessions"]
     assert sessions_after == sessions_before
+
+
+def test_load_pool_legacy_unknown_status_maps_to_auth_required(
+    manager: SessionManager, patch_session_paths: tuple[Path, Path]
+) -> None:
+    """A legacy pool file writing ``"status": "unknown"`` loads as AUTH_REQUIRED
+    with the stored reason intact (SessionStatus._missing_ read hook)."""
+    sessions_dir, pool_file = patch_session_paths
+    default = _make_profile(sessions_dir, "default")
+    manager.add_session("default", default)
+    data = json.loads(pool_file.read_text())
+    data["sessions"][0]["status"] = "unknown"
+    data["sessions"][0]["reason"] = "LEGACY"
+    pool_file.write_text(json.dumps(data))
+
+    pool = manager.load_pool()
+
+    session = pool.sessions[0]
+    assert session.status == SessionStatus.AUTH_REQUIRED
+    assert session.reason == "LEGACY"
 
 
 def test_load_pool_ignores_non_profile_dirs(manager: SessionManager, patch_session_paths: tuple[Path, Path]) -> None:

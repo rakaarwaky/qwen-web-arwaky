@@ -157,6 +157,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
             self._observability.attach_run_log(job_name=JobName(p_path.stem), run_id=RunId(ctx.run_id))
 
             att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
+            self._uploader.validate_file(att_path)
             p_path, out_path = resolve_pipeline_output_path(p_path, output_file, attachment_path=att_path)
 
             cfg = build_app_config(
