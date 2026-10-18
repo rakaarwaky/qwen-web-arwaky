@@ -322,3 +322,161 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
     login_call = build.mock_calls[0]
     assert login_call.kwargs["headless"] is False, "login config must be headed"
     validate.assert_called_once()
+
+
+# ── Regression: pool profile must win over the empty default session ────────
+
+
+def _orchestrator_with_pool(tmp_path: Path, pool_sessions: list[tuple[str, Path]]) -> SessionOrchestrator:
+    """Build an orchestrator whose session manager reports ``pool_sessions``.
+
+    ``(name, path)`` pairs become the pool entries. ``load_pool`` answers the
+    listing and ``find_pool_profile_with_content`` applies the same on-disk
+    rule the real capability uses (first entry whose directory carries
+    ``Local State`` or ``Default/Cookies``), so the resolver's selection is
+    asserted against the pool order rather than a hardcoded winner.
+    """
+    from datetime import datetime
+
+    from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
+
+    pool = SessionPool(
+        sessions=[
+            SessionInfo(
+                session_id=name,
+                name=name,
+                path=path,
+                status=SessionStatus.ACTIVE,
+                created_at=datetime(2026, 1, 1),
+            )
+            for name, path in pool_sessions
+        ]
+    )
+    resolved: Path | None = None
+    for s in pool.sessions:
+        if s.path.is_dir() and ((s.path / "Local State").is_file() or (s.path / "Default" / "Cookies").is_file()):
+            resolved = s.path
+            break
+    sessions = MagicMock()
+    sessions.load_pool.return_value = pool
+    sessions.find_pool_profile_with_content.return_value = resolved
+    return SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=sessions)
+
+
+def test_validate_none_uses_pool_profile_with_chromium_content(tmp_path: Path) -> None:
+    """``validate`` with no path must use the logged-in pool profile.
+
+    ``build_app_config(session_path=None)`` falls back to ``DEFAULT_SESSION``,
+    which is empty while the pool holds a real registered profile — so the
+    orchestrator must resolve the pool profile itself before building the
+    config.
+    """
+    profile = tmp_path / "sessions" / "arwaky007"
+    (profile / "Default").mkdir(parents=True)
+    (profile / "Default" / "Cookies").write_text("token", encoding="utf-8")
+    empty_default = tmp_path / "sessions" / "default"
+    empty_default.mkdir()
+    orch = _orchestrator_with_pool(tmp_path, [("arwaky007", profile), ("default", empty_default)])
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = profile
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True):
+            valid, message = orch._validate(None)
+
+    assert valid is True
+    build.assert_called_once()
+    assert build.call_args.kwargs["session_path"] == profile
+    assert build.call_args.kwargs["session_path"] is not None
+
+
+def test_validate_none_prefers_local_state_profile(tmp_path: Path) -> None:
+    """A pool profile carrying ``Local State`` is also accepted."""
+    profile = tmp_path / "sessions" / "arwaky007"
+    profile.mkdir(parents=True)
+    (profile / "Local State").write_text("{}", encoding="utf-8")
+    orch = _orchestrator_with_pool(tmp_path, [("arwaky007", profile)])
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = profile
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True):
+            orch._validate(None)
+
+    assert build.call_args.kwargs["session_path"] == profile
+
+
+def test_validate_none_keeps_default_session_for_an_empty_pool(tmp_path: Path) -> None:
+    """An empty pool must keep the DEFAULT_SESSION fallback untouched."""
+    orch = _orchestrator_with_pool(tmp_path, [])
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = tmp_path / "absent"
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
+            valid, _ = orch._validate(None)
+
+    assert valid is False
+    # No pool profile existed, so the resolver handed build_app_config None
+    # and the DEFAULT_SESSION fallback stays in charge.
+    assert build.call_args.kwargs["session_path"] is None
+
+
+def test_validate_none_skips_pool_entry_without_chromium_content(tmp_path: Path) -> None:
+    """A pool entry pointing at a directory without Chromium content is skipped."""
+    bare = tmp_path / "sessions" / "ghost"
+    bare.mkdir(parents=True)
+    orch = _orchestrator_with_pool(tmp_path, [("ghost", bare)])
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = tmp_path / "absent"
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
+            orch._validate(None)
+
+    assert build.call_args.kwargs["session_path"] is None
+
+
+def test_delete_none_uses_pool_profile_with_chromium_content(tmp_path: Path) -> None:
+    """``delete`` with no path must also resolve the pool profile first."""
+    profile = tmp_path / "sessions" / "arwaky007"
+    (profile / "Default").mkdir(parents=True)
+    (profile / "Default" / "Cookies").write_text("token", encoding="utf-8")
+    orch = _orchestrator_with_pool(tmp_path, [("arwaky007", profile)])
+    delete_profile = MagicMock()
+    assert orch._sessions is not None
+    orch._sessions.delete_session_profile = delete_profile
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = profile
+        result = orch.execute(SessionRequest(verb="delete"))
+
+    assert "deleted successfully" in str(result)
+    build.assert_called_once()
+    assert build.call_args.kwargs["session_path"] == profile
+    delete_profile.assert_called_once_with(profile, force=False)
+
+
+def test_validate_explicit_path_bypasses_the_pool(tmp_path: Path) -> None:
+    """An explicit ``session_path`` must be used verbatim, pool or not."""
+    explicit = tmp_path / "explicit"
+    explicit.mkdir()
+    profile = tmp_path / "sessions" / "arwaky007"
+    profile.mkdir(parents=True)
+    (profile / "Local State").write_text("{}", encoding="utf-8")
+    orch = _orchestrator_with_pool(tmp_path, [("arwaky007", profile)])
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = explicit
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True):
+            orch._validate(explicit)
+
+    assert build.call_args.kwargs["session_path"] == explicit
+
+
+def test_validate_none_without_session_manager_keeps_the_default(tmp_path: Path) -> None:
+    """No session manager means no pool to resolve: fallback untouched."""
+    orch = SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=None)
+
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+        build.return_value.session_path = tmp_path / "absent"
+        with patch.object(SessionOrchestrator, "_validate_saved_session", return_value=False):
+            orch._validate(None)
+
+    assert build.call_args.kwargs["session_path"] is None

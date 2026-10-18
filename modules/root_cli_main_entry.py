@@ -250,7 +250,9 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
     Only runs for the `prompt` command (direct/file/attach). Picks a healthy
     session from the pool and overrides cfg.session_path. Skips only when the
     pool is empty — a single-session pool must still resolve so a logged-in
-    profile is used instead of an empty default.
+    profile is used instead of an empty default. When rotation yields nothing,
+    falls back to the first pool session whose path still holds Chromium
+    content on disk.
     """
     if getattr(args, "action", None) != "prompt":
         return
@@ -267,6 +269,18 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
         session_path = asyncio.run(_pick())
     except Exception:
         session_path = None
+
+    if session_path is None:
+        # Rotation found nothing usable (or the rotator raised): fall back to
+        # the first pool session whose path still holds real Chromium content,
+        # so a logged-in profile is used instead of an empty default session.
+        for s in pool.sessions:
+            candidate = Path(s.path)
+            if candidate.is_dir() and (
+                (candidate / "Local State").is_file() or (candidate / "Default" / "Cookies").is_file()
+            ):
+                session_path = candidate
+                break
 
     if session_path is not None and session_path != DEFAULT_SESSION:
         args._session_override = session_path
@@ -468,6 +482,7 @@ def _dispatch(
             swarm=container.agent_swarm_orchestrator,
             updater=container.agent_update_orchestrator,
             session_manager=container.session_manager,
+            session_rotator=container.session_rotator,
         ).run()
         return _result_exit_code(result, json_output=json_output)
 

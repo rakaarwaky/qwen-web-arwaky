@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_cli_main_entry import main
@@ -13,6 +14,24 @@ def _make_controller() -> InteractiveController:
     return InteractiveController(
         MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()
     )
+
+
+def _controller_with_rotator(response: object, *, raises: bool = False) -> InteractiveController:
+    rotator = MagicMock()
+    if raises:
+        rotator.rotate = AsyncMock(side_effect=RuntimeError("rotation failed"))
+    else:
+        rotator.rotate = AsyncMock(return_value=response)
+    return InteractiveController(MagicMock(), MagicMock(), MagicMock(), session_rotator=rotator)
+
+
+def _rotator_response(path: Path | None) -> MagicMock:
+    response = MagicMock()
+    if path is None:
+        response.session = None
+    else:
+        response.session = MagicMock(path=path)
+    return response
 
 
 class TestInteractiveControllerRun:
@@ -27,6 +46,52 @@ class TestInteractiveControllerRun:
     def test_explicit_exit_returns_success(self):
         result = _make_controller().run(cfg=None, prompt=False)
         assert result == {"success": True, "message": "Exited."}
+
+    def test_headless_run_passes_a_session_resolver_function(self):
+        """The headless path must hand ``dispatch_run`` a pool resolver.
+
+        The pipeline builds its own AppConfig, so without the resolver the
+        pool selection is dropped and an empty default session is used instead
+        of a logged-in profile. The function (not its result) must be passed,
+        so the pipeline can resolve on demand.
+        """
+        controller = _make_controller()
+        with patch("modules.cli.src.surface_cli_run_command.dispatch_run") as dispatch:
+            dispatch.return_value = {"success": True}
+            controller.run(MagicMock(), prompt=False)
+
+        resolver = dispatch.call_args.kwargs["session_resolver"]
+        assert callable(resolver)
+        # No rotator injected: the resolver reports no override.
+        assert resolver() is None
+
+    def test_headless_run_resolver_returns_the_rotated_pool_session(self):
+        pool_path = Path("/home/user/.local/share/qwen-web-arwaky/sessions/arwaky007")
+        controller = _controller_with_rotator(_rotator_response(pool_path))
+        with patch("modules.cli.src.surface_cli_run_command.dispatch_run") as dispatch:
+            dispatch.return_value = {"success": True}
+            controller.run(MagicMock(), prompt=False)
+
+        resolver = dispatch.call_args.kwargs["session_resolver"]
+        assert resolver() == pool_path
+
+    def test_headless_run_resolver_falls_back_to_none_without_a_pool_session(self):
+        controller = _controller_with_rotator(_rotator_response(None))
+        with patch("modules.cli.src.surface_cli_run_command.dispatch_run") as dispatch:
+            dispatch.return_value = {"success": True}
+            controller.run(MagicMock(), prompt=False)
+
+        resolver = dispatch.call_args.kwargs["session_resolver"]
+        assert resolver() is None
+
+    def test_headless_run_resolver_survives_a_rotator_failure(self):
+        controller = _controller_with_rotator(MagicMock(), raises=True)
+        with patch("modules.cli.src.surface_cli_run_command.dispatch_run") as dispatch:
+            dispatch.return_value = {"success": True}
+            controller.run(MagicMock(), prompt=False)
+
+        resolver = dispatch.call_args.kwargs["session_resolver"]
+        assert resolver() is None
 
 
 class TestMain:
