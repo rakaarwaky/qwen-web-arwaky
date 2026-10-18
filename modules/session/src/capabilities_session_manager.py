@@ -87,7 +87,7 @@ class SessionManager(ISessionManagerProtocol):
                     session_id=f"session_{len(pool.sessions) + 1}",
                     name=name,
                     path=profile_dir,
-                    status=SessionStatus.UNKNOWN,
+                    status=SessionStatus.AUTH_REQUIRED,
                 )
             )
             known.add(profile_dir.resolve())
@@ -148,7 +148,7 @@ class SessionManager(ISessionManagerProtocol):
             session_id=session_id,
             name=name,
             path=profile_path,
-            status=SessionStatus.UNKNOWN,
+            status=SessionStatus.AUTH_REQUIRED,
         )
         pool.add_session(info)
         self.save_pool(pool)
