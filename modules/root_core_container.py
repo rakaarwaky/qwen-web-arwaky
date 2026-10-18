@@ -149,13 +149,21 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
-        # Session rotation infrastructure is composed before the update
-        # pipeline so the doctor smoke gate can be wired against the session
-        # aggregate at construction time (mirrors the pre-refactor ordering).
+        # Session rotation infrastructure is composed before the session
+        # aggregate so the orchestrator can be wired with the rotator (the
+        # ``rotate`` verb) and the doctor smoke gate can be wired against the
+        # session aggregate at construction time (mirrors the pre-refactor
+        # ordering).
         self.session_health_checker = SessionHealthChecker(browser=self.browser)
         self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
             browser=self.browser,
             observability=self.observability,
+        )
+        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+
+        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
+            session_manager=self.session_manager,
+            health_checker=self.session_health_checker,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
@@ -163,6 +171,7 @@ class SharedContainer:
             sessions=self.session_manager,
             renewer=self.session_renewer,
             health_checker=self.session_health_checker,
+            rotator=self.session_rotator,
         )
         self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
         self.updater_upgrade: IUpdateUpgradeProtocol = UpdateUpgradeCapability(DEFAULT_PACKAGE_NAME)
@@ -247,13 +256,8 @@ class SharedContainer:
             folder_adapter=self.folder_adapter,
             cancel=self.run_cancel_registry,
         )
-        # Session rotation infrastructure
-        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
-
-        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
-            session_manager=self.session_manager,
-            health_checker=self.session_health_checker,
-        )
+        # Session rotation infrastructure is composed above with the session
+        # aggregate; nothing left to wire here.
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(

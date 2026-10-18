@@ -71,13 +71,14 @@ class ISessionManagerProtocol(ABC):
         ...
 
     @abstractmethod
-    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
+    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> bool:
         """Remove the saved Chromium profile directory at *profile_path*.
 
         The target must be an existing directory that clears every rule in
         ``is_safe_session_target``, and deletion is refused while no backup
         generation is retained unless *force* is set. Raise ``QwenCliError``
-        when a partial removal leaves residue behind.
+        when a partial removal leaves residue behind. Returns True when the
+        profile was removed, False when the target did not exist.
         """
         ...
 
@@ -183,6 +184,16 @@ class ISessionRotatorProtocol(ABC):
         """Pick the next healthy session by round-robin order.
 
         Returns None once every pooled session is rate-limited.
+        """
+        ...
+
+    @abstractmethod
+    def rotate_sync(self, request: RotatorRequest) -> RotatorResponse:
+        """Synchronously select the next healthy session.
+
+        Owns the event-loop handling inside the capability so a sync
+        caller (the orchestrator's ``execute`` seam) never calls
+        ``asyncio.run`` inline.
         """
         ...
 

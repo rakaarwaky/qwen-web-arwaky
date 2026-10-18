@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 #: Seconds added to the Chromium epoch to produce a future expiry.
 _FUTURE_EXPIRY_OFFSET_SEC: int = 3600
@@ -93,6 +94,14 @@ def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
     return SessionOrchestrator(browser=browser, observability=observability)
 
 
+def _login_verdict(orchestrator, **kwargs) -> str:
+    """Drive the ``login`` verb and return its outcome string."""
+    response = orchestrator.execute(SessionRequest(verb="login", **kwargs))
+    if response.error is not None:
+        return str(f"{response.message} {response.error}" if response.message else response.error)
+    return str(response.message or response.profile_path or "")
+
+
 def test_existing_valid_session_still_opens_headed_browser(tmp_path: Path) -> None:
     """A valid profile still opens the headed browser for the login verb.
 
@@ -111,7 +120,8 @@ def test_existing_valid_session_still_opens_headed_browser(tmp_path: Path) -> No
     browser = _BrowserHarness([True])
     confirmation = MagicMock()
 
-    result = _orchestrator(browser).setup_session(
+    result = _login_verdict(
+        _orchestrator(browser),
         wait_for_confirmation=confirmation,
         session_path=session_path,
     )
@@ -129,7 +139,8 @@ def test_manual_login_keeps_browser_open_until_confirmation(tmp_path: Path) -> N
     session_path = tmp_path / "session"
     browser = _BrowserHarness([True])
 
-    result = _orchestrator(browser).setup_session(
+    result = _login_verdict(
+        _orchestrator(browser),
         wait_for_confirmation=True,
         session_path=session_path,
     )
@@ -154,7 +165,8 @@ def test_invalid_saved_session_falls_back_to_manual_login(tmp_path: Path) -> Non
     browser = _BrowserHarness([True])  # post-login check returns True
     confirmation = MagicMock(side_effect=lambda: _assert_browser_active(browser))
 
-    result = _orchestrator(browser).setup_session(
+    result = _login_verdict(
+        _orchestrator(browser),
         wait_for_confirmation=confirmation,
         session_path=session_path,
     )
@@ -168,10 +180,8 @@ def test_manual_login_reports_invalid_final_state(tmp_path: Path) -> None:
     The mock's check_session returns False (first result), so login fails with message."""
     browser = _BrowserHarness([False])
 
-    result = _orchestrator(browser).setup_session(
-        wait_for_confirmation=True,
-        session_path=tmp_path / "session",
-    )
+    result = _login_verdict(_orchestrator(browser), wait_for_confirmation=True,
+        session_path=tmp_path / "session",)
 
     assert "did not produce a valid" in str(result)
 
@@ -201,7 +211,7 @@ def test_browser_check_session_requires_authenticated_chat_ui() -> None:
 
 
 def test_manual_login_delays_check_session_after_confirmation(tmp_path: Path) -> None:
-    """After wait_for_confirmation, setup_session waits before checking session.
+    """After wait_for_confirmation, the login verb waits before checking the session.
 
     This prevents the browser from being checked while the page is still
     stabilizing after a manual login — which previously caused a hang.
@@ -210,7 +220,8 @@ def test_manual_login_delays_check_session_after_confirmation(tmp_path: Path) ->
     browser = _BrowserHarness([True])
     confirmation = MagicMock()
 
-    result = _orchestrator(browser).setup_session(
+    result = _login_verdict(
+        _orchestrator(browser),
         wait_for_confirmation=confirmation,
         session_path=session_path,
     )

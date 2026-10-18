@@ -1,3 +1,36 @@
+# ISSUE: Open findings from the session-hardening pass (2026-10-18)
+
+## ISSUE-001: owner-only `0700` session directory NFR is not enforced anywhere
+
+`modules/session/FRD.md` (NFR table) and `modules/config/FRD.md` (FR-CONFIG
+init) both state that session directories are created owner-only (`0700`)
+because they hold live login cookies. Neither module enforces it:
+
+- `modules/session/src/capabilities_session_manager.py` `SessionManager._ensure_dirs`
+  calls `self._base_dir.mkdir(parents=True, exist_ok=True)` with **no mode
+  argument** — the directory is created with the process umask's default
+  (typically `0755`), and no `chmod` ever follows.
+- `modules/config/src/capabilities_workspace_provisioner.py` uses bare
+  `mkdir(parents=True, exist_ok=True)` for every XDG directory; only the
+  shared *backup snapshot* path (`utility_core_session_backup._harden`) and
+  the *ephemeral clone* path (`utility_session_cloner`) force `0700`.
+
+Risk: on a shared or multi-user host, a session profile created by
+`session login` is world-readable until the operator notices. The NFR's own
+measurement method ("mode check after creation") has no enforcing code.
+
+Scope guard: per the session-hardening plan, Phase C only *records* this —
+the fix belongs to `modules/config` (workspace init) together with
+`modules/session` (pool directory creation), because the NFR is declared in
+both FRDs. Do not add the mode check to the session module alone.
+
+Suggested fix (both sites): `mkdir(parents=True, exist_ok=True, mode=0o700)`
+plus an explicit `path.chmod(0o700)` afterwards (umask can strip the mode on
+some filesystems, mirroring `utility_core_session_backup._harden`), and a
+CI test asserting `stat.S_IMODE(dir.st_mode) & 0o077 == 0` after init.
+
+---
+
 # ISSUE: Large-attachment send regresi (main vs v6.3.0)
 
 ## Status ter-verify (manual, non-headless, attachment 16KB = swarm input)

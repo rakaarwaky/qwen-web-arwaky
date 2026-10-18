@@ -30,9 +30,12 @@ from modules.shared.src.session.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRenewalProtocol,
+    ISessionRotatorProtocol,
 )
 from modules.shared.src.session.taxonomy_session_vo import (
     HealthReason,
+    RotatorRequest,
+    SessionId,
     SessionList,
     SessionRequest,
     SessionResponse,
@@ -43,11 +46,11 @@ from modules.shared.src.session.taxonomy_session_vo import (
 class SessionOrchestrator(ISessionAggregate):
     """Orchestrates Qwen session checking, deletion, and manual login.
 
-    Implements :class:`ISessionAggregate` (``execute``) for all three verbs:
-    ``validate``, ``delete``, and ``login``. The ``login`` verb is the
-    interactive manual-authentication flow; consumers call it via
-    ``SessionRequest(verb="login", ...)`` on the single session aggregate
-    seam.
+    Implements :class:`ISessionAggregate` (``execute``) for the session
+    verbs: ``validate``, ``inspect``, ``rotate``, ``delete``, ``login``,
+    ``list_sessions``, ``remove_session``, and ``check_health``. The
+    ``login`` verb is the interactive manual-authentication flow; the
+    ``rotate`` verb needs a rotator wired through the container.
     """
 
     def __init__(
@@ -57,12 +60,14 @@ class SessionOrchestrator(ISessionAggregate):
         sessions: ISessionManagerProtocol | None = None,
         renewer: ISessionRenewalProtocol | None = None,
         health_checker: ISessionHealthCheckerProtocol | None = None,
+        rotator: ISessionRotatorProtocol | None = None,
     ) -> None:
         self._browser = browser
         self._observability = observability
         self._sessions = sessions
         self._renewer = renewer
         self._health_checker = health_checker
+        self._rotator = rotator
 
     # Block 2: Protocol Method Implementation
 
@@ -88,8 +93,10 @@ class SessionOrchestrator(ISessionAggregate):
                 recovery_action=recovery_action,
             )
         if request.verb == "delete":
-            message = self._delete(request.session_path, force=request.force)
+            message = self._delete(request.session_path, force=request.force, name=request.name)
             return SessionResponse(deleted=True, message=message)
+        if request.verb == "inspect":
+            return self._inspect(request.session_path, request.name)
         if request.verb == "login":
             outcome = self._login(
                 request.session_path,
@@ -112,14 +119,16 @@ class SessionOrchestrator(ISessionAggregate):
         if request.verb == "remove_session":
             if self._sessions is None:
                 return SessionResponse(error="no session pool available")
-            found = self._sessions.get_session_by_name(request.name) if request.name else None
+            if not request.name:
+                return SessionResponse(error="remove_session requires request.name", removed=False)
+            found = self._sessions.get_session_by_name(request.name)
             if found is None:
                 return SessionResponse(error="session not found", removed=False)
             if not self._sessions.remove_session(found.session_id):
                 return SessionResponse(error="could not remove session from pool", removed=False)
             return SessionResponse(
                 removed=True,
-                message=f"removed {found.name} ({found.session_id})",
+                message=f"removed {found.name} ({found.session_id}) from pool; profile retained at {found.path}",
                 profile_path=found.path,
             )
         if request.verb == "check_health":
@@ -151,30 +160,9 @@ class SessionOrchestrator(ISessionAggregate):
                 status=agg_status,
                 health_results=health_results,
             )
+        if request.verb == "rotate":
+            return self._rotate(request.exclude_ids)
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
-
-    def setup_session(
-        self,
-        wait_for_confirmation: Callable[[], bool] | None = None,
-        session_path: Path | None = None,
-    ) -> str:
-        """Return the login outcome as text, delegating to the ``login`` verb.
-
-        Thin convenience wrapper over the manual-login flow so callers that
-        only need a string verdict do not have to build a ``SessionRequest``
-        themselves. On failure the message and error are reported together,
-        matching the setup flow's single-sentence guidance.
-        """
-        response = self.execute(
-            SessionRequest(
-                verb="login",
-                session_path=session_path,
-                wait_for_confirmation=wait_for_confirmation,
-            )
-        )
-        if response.error is not None:
-            return str(f"{response.message} {response.error}" if response.message else response.error)
-        return str(response.message or response.profile_path or "")
 
     # Block 3: Dunder Methods, Factories, Helpers
 
@@ -265,7 +253,7 @@ class SessionOrchestrator(ISessionAggregate):
         }
 
     def _resolve_profile(self, session_path: Path | None) -> Path | None:
-        """Resolve the profile directory to act on.
+        """Resolve the profile directory to act on for read-only verbs.
 
         An explicit ``session_path`` always wins. Otherwise the session
         manager locates the first pool session whose directory still holds
@@ -273,6 +261,9 @@ class SessionOrchestrator(ISessionAggregate):
         over the empty ``DEFAULT_SESSION`` fallback. Returns ``None`` when
         no pool manager is wired or the pool has no on-disk profile, which
         keeps the caller's existing default behaviour unchanged.
+
+        Destructive verbs never use this fallback: implicit target
+        selection is only safe for read-only operations.
         """
         if session_path is not None:
             return session_path
@@ -318,27 +309,102 @@ class SessionOrchestrator(ISessionAggregate):
         valid, message, _, _ = self._validate_with_reason(session_path)
         return valid, message
 
-    def _delete(self, session_path: Path | None, *, force: bool) -> str:
-        """Delete the saved Chromium profile for *session_path*.
+    def _inspect(self, session_path: Path | None, name: str | None) -> SessionResponse:
+        """Return the pool metadata of one session without probing it.
 
-        Every safety rule lives in the session manager that owns the profile
-        on disk: the target must be an existing directory that clears
-        ``is_safe_session_target`` (never a filesystem root, a near-root path
-        such as ``/etc``, or a path outside the allow-list), and deletion is
-        refused while no backup generation is retained unless the caller passes
-        ``force=True`` (issue #300).
+        ``inspect`` is a read-only verb: it resolves the entry by explicit
+        ``session_path`` or by pool ``name`` and never falls back to an
+        inferred pool profile, so a caller always inspects what it named.
         """
-        cfg = build_app_config(
-            mode="session-check",
-            input_path=DEFAULT_OUTPUT,
-            output_path=DEFAULT_OUTPUT,
-            session_path=self._resolve_profile(session_path),
-            headless=True,
+        if self._sessions is None:
+            return SessionResponse(error="no session pool available")
+        if session_path is None and not name:
+            return SessionResponse(error="inspect requires request.name or session_path")
+        if session_path is not None:
+            wanted = session_path.resolve()
+            found = next(
+                (s for s in self._sessions.load_pool().sessions if s.path.resolve() == wanted),
+                None,
+            )
+        else:
+            found = self._sessions.get_session_by_name(name or "")
+        if found is None:
+            return SessionResponse(error="session not found")
+        return SessionResponse(
+            sessions=SessionList([found]),
+            message=f"session {found.name} ({found.session_id}) status={found.status.value}",
         )
+
+    def _rotate(self, exclude_ids: tuple[SessionId, ...]) -> SessionResponse:
+        """Rotate to the next healthy session via the wired rotator.
+
+        Mirrors ``check_health``: the rotator capability owns the
+        event-loop handling (``rotate_sync``), so the sync ``execute``
+        seam never calls ``asyncio.run`` inline (which would crash inside
+        an already-running loop).
+        """
+        if self._rotator is None:
+            return SessionResponse(error="session rotator not wired")
+        response = self._rotator.rotate_sync(RotatorRequest(exclude_ids=exclude_ids))
+        if response.session is not None:
+            return SessionResponse(sessions=SessionList([response.session]), message="rotation selected a session")
+        if response.throttled:
+            return SessionResponse(
+                throttled=True,
+                status=SessionStatus.LIMITED.value,
+                reason=response.reason,
+                recovery_action=response.recovery_action,
+                message="all sessions are rate-limited; rotation exhausted",
+                error=response.error,
+            )
+        return SessionResponse(error=response.error or "rotation produced no session")
+
+    def _delete(self, session_path: Path | None, *, force: bool, name: str | None = None) -> str:
+        """Delete the saved Chromium profile for an explicit target.
+
+        An explicit ``session_path`` always wins (the CLI passes only a
+        path; ``request.name`` may still carry its default), so the verb
+        never retargets a path-named deletion onto ``default``. Only when
+        no path is given is ``name`` resolved through the pool. A delete
+        naming neither refuses instead of inferring a target from pool
+        order (BE-1-003). After a successful deletion, the pool entry is
+        dropped whichever key named the target — by name, or by path
+        match — so ``sessions.json`` never keeps a dangling reference.
+
+        Every safety rule lives in the session manager that owns the
+        profile on disk: the target must be an existing directory that
+        clears ``is_safe_session_target`` (never a filesystem root, a
+        near-root path such as ``/etc``, or a path outside the
+        allow-list), and deletion is refused while no backup generation
+        is retained unless the caller passes ``force=True`` (issue #300).
+        """
         if self._sessions is None:
             raise QwenCliError("Session manager not available for delete")
-        delete_profile = self._sessions.delete_session_profile
-        delete_profile(cfg.session_path, force=force)
+        drop_by_name: str | None = None
+        if session_path is not None:
+            resolved = session_path
+        elif name:
+            found = self._sessions.get_session_by_name(name)
+            if found is None:
+                raise QwenCliError(f"delete could not resolve session name {name!r}: session not found")
+            resolved = found.path
+            drop_by_name = name
+        else:
+            raise QwenCliError(
+                "delete requires an explicit session_path or name; refusing to infer a deletion target from the pool"
+            )
+        removed = self._sessions.delete_session_profile(resolved, force=force)
+        if drop_by_name is not None:
+            self._sessions.remove_session_by_name(drop_by_name)
+        else:
+            # Dropped by path: remove any pool entry pointing at the target.
+            resolved_path = Path(resolved).resolve()
+            for entry in self._sessions.load_pool().sessions:
+                if Path(entry.path).resolve() == resolved_path:
+                    self._sessions.remove_session(entry.session_id)
+                    break
+        if not removed:
+            return f"Session profile not present at {resolved}; nothing deleted."
         return "Session deleted successfully."
 
     def _validate_saved_session(self, cfg: AppConfig) -> bool:

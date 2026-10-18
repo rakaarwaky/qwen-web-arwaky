@@ -149,13 +149,19 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         pool: SessionPool,
         session_manager: ISessionManagerProtocol,
     ) -> list[tuple[SessionInfo, SessionHealthResult]]:
-        """Synchronous convenience wrapper: check all sessions and update manager state."""
+        """Synchronous convenience wrapper: check all sessions and update manager state.
+
+        The probes run concurrently (``asyncio.gather``) because each opens
+        an independent browser process; the manager writes stay sequential
+        afterwards so pool mutation never races (BE-4-001).
+        """
 
         async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
-            results: list[tuple[SessionInfo, SessionHealthResult]] = []
-            for s in pool.sessions:
-                verdict = await self.diagnose_session(s)
-                results.append((s, verdict))
+            verdicts = await asyncio.gather(*(self.diagnose_session(s) for s in pool.sessions))
+            results: list[tuple[SessionInfo, SessionHealthResult]] = list(
+                zip(pool.sessions, verdicts, strict=True)
+            )
+            for s, verdict in results:
                 if verdict.status == SessionStatus.ACTIVE:
                     session_manager.mark_healthy(s.session_id)
                 elif verdict.status == SessionStatus.LIMITED:

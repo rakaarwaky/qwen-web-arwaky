@@ -155,7 +155,7 @@ def test_delete_session_refuses_session_named_dir_under_home(tmp_path: Path) -> 
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.execute(SessionRequest(verb="delete"))
+            orchestrator.execute(SessionRequest(verb="delete", session_path=target, name=""))
 
     assert (target / "keepme.txt").exists()
 
@@ -170,7 +170,7 @@ def test_delete_session_refuses_qwen_session_named_dir_under_home(tmp_path: Path
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = target
         with pytest.raises(QwenCliError, match="Refusing to delete unsafe session path"):
-            orchestrator.execute(SessionRequest(verb="delete"))
+            orchestrator.execute(SessionRequest(verb="delete", session_path=target, name=""))
 
     assert target.exists()
 
@@ -189,7 +189,7 @@ def test_delete_session_accepts_default_session(tmp_path: Path) -> None:
         patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
     ):
         build.return_value.session_path = fake_default
-        result = orchestrator.execute(SessionRequest(verb="delete"))
+        result = orchestrator.execute(SessionRequest(verb="delete", session_path=fake_default, name=""))
 
     assert "deleted successfully" in str(result)
     assert not fake_default.exists()

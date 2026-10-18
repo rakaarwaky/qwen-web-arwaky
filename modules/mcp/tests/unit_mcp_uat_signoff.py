@@ -65,7 +65,7 @@ def test_uat_mcp_004_delete_session_without_confirm_is_refused(tools_and_mocks) 
     """UAT-MCP-004: delete_session(confirm=False) is rejected, session intact."""
     tools, mocks, _ = tools_and_mocks
 
-    payload = json.loads(tools.delete_session(confirm=False))
+    payload = json.loads(tools.delete_session(session_name="default", confirm=False))
 
     assert payload["success"] is False
     assert payload["error"]["code"] == "CONFIRMATION_REQUIRED"
@@ -73,11 +73,22 @@ def test_uat_mcp_004_delete_session_without_confirm_is_refused(tools_and_mocks) 
     mocks["session"].execute.assert_not_called()
 
 
+def test_uat_mcp_004b_delete_session_without_name_is_refused(tools_and_mocks) -> None:
+    """UAT-MCP-004b: a deletion target must be named, never inferred."""
+    tools, mocks, _ = tools_and_mocks
+
+    payload = json.loads(tools.delete_session(session_name="", confirm=True))
+
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "SESSION_NAME_REQUIRED"
+    mocks["session"].execute.assert_not_called()
+
+
 def test_uat_mcp_005_delete_session_with_confirm_succeeds(tools_and_mocks) -> None:
     """UAT-MCP-005: delete_session(confirm=True) delegates and reports success."""
     tools, mocks, _ = tools_and_mocks
 
-    payload = json.loads(tools.delete_session(confirm=True))
+    payload = json.loads(tools.delete_session(session_name="default", confirm=True))
 
     assert payload["success"] is True
     assert payload["next_action"] == "setup_session"
