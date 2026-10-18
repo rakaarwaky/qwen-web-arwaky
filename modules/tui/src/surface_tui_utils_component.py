@@ -12,12 +12,11 @@ import contextlib
 import logging
 import os
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from rich.markup import escape
 from rich.text import Text
-from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.containers import Horizontal, Vertical
 from textual.content import Content
 from textual.css.query import NoMatches
 from textual.widgets import Button, Label, Static, TabbedContent
@@ -217,25 +216,6 @@ def _empty_cluster_bar_markup(n_slots: int) -> str:
     return _cluster_bar_markup(n_slots, {})
 
 
-# Transcript budget: one entry is capped so a single huge model answer cannot
-# blow up a Static, and the pane keeps only its newest messages so the
-# fixed-height chat console never accumulates unbounded widgets.
-_MAX_TRANSCRIPT_CHARS = 4000
-_MAX_TRANSCRIPT_MESSAGES = 40
-
-
-def _attachment_chip(path_str: str) -> str:
-    """Format an attachment the way the mockup's chip does (name, size, tick)."""
-    path = Path(path_str)
-    label = path.name or path_str
-    try:
-        if path.is_file():
-            label = f"{label} ({path.stat().st_size // 1024}KB)"
-    except OSError:
-        pass
-    return f"📄 {label} ✓ ATTACHED"
-
-
 class _TuiUtilsMixin:
     """Mixin for UI utility helpers: table, metrics, status badges, logging."""
 
@@ -272,8 +252,6 @@ class _TuiUtilsMixin:
     _metric_threads_bar: Any
     _log_handler: logging.Handler
     _log_views: dict[int, QwenTuiRichLog]
-    _chat_scrolls: dict[int, ScrollableContainer]
-    _chat_hints: dict[int, Static]
     _slot_log_times: dict[int, Label]
     _swarm_id: str | None
     _swarm: Any
@@ -505,63 +483,6 @@ class _TuiUtilsMixin:
         label = getattr(self, "_slot_log_times", {}).get(slot_id)
         if label is not None:
             label.update(time.strftime("%H:%M:%S"))
-
-    def _append_chat_message(
-        self,
-        slot_id: int,
-        role: str,
-        text: str,
-        attachment: str = "",
-    ) -> None:
-        """Render one transcript entry in a slot's chat console.
-
-        ``role`` is ``user`` (right-aligned operator prompt) or ``agent``
-        (left-aligned Qwen answer). The empty-state hint sits in the
-        transcript until the first message replaces it, and the transcript
-        keeps only its newest entries so a long session cannot grow without
-        bound in a fixed-height pane.
-        """
-        # The caches are populated in ``on_mount``; a worker can outlive the
-        # mount (or a test can drive the mixin without one), so a missing
-        # cache means there is no transcript to write to — not an error.
-        scroll = getattr(self, "_chat_scrolls", {}).get(slot_id)
-        if scroll is None:
-            return
-        hint = getattr(self, "_chat_hints", {}).pop(slot_id, None)
-        if hint is not None and hint.is_attached:
-            with contextlib.suppress(Exception):
-                hint.remove()
-        stamp = time.strftime("%H:%M:%S")
-        if len(text) > _MAX_TRANSCRIPT_CHARS:
-            text = text[: _MAX_TRANSCRIPT_CHARS - 1] + "…"
-        body = escape(text)
-        if role == "user":
-            blocks: list[Static] = [
-                Static("DEV OPERATOR", classes="msg-author msg-author-right"),
-                Static(body, classes="msg-bubble msg-bubble-user"),
-            ]
-            if attachment:
-                blocks.append(Static(_attachment_chip(attachment), classes="msg-attach"))
-            blocks.append(Static(stamp, classes="msg-time msg-time-user"))
-            message = Vertical(*blocks, classes="msg msg-user")
-        else:
-            message = Vertical(
-                Static("QWEN3.8-MAX", classes="msg-author"),
-                Static(body, classes="msg-bubble"),
-                Static(stamp, classes="msg-time"),
-                classes="msg msg-agent",
-            )
-        with contextlib.suppress(Exception):
-            scroll.mount(message)
-            # Removal is deferred by one message pump, so stop as soon as the
-            # head of the list stops changing instead of looping on a stale
-            # children tuple.
-            while len(scroll.children) > _MAX_TRANSCRIPT_MESSAGES:
-                head = scroll.children[0]
-                head.remove()
-                if head in scroll.children:
-                    break
-            scroll.scroll_end(animate=False)
 
     # ── Sessions: mockup account cards ───────────────────────────────────
 

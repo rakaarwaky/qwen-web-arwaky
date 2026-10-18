@@ -33,7 +33,6 @@ class _TuiChatLogHandlerMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
-    _append_chat_message: Any
     _run_composer_slot: Any
     query: Any
     query_one: Any
@@ -87,11 +86,9 @@ class _TuiChatLogHandlerMixin:
                     title=f"Slot {slot_id}",
                 )
             return
-        attachment = ""
         # Issue #341: the attachment comes from the Attach pill's picker
         # state, not a composer field (the chat console has no file input).
         attachment = getattr(self, "_slot_attachments", {}).get(slot_id, "")
-        self._append_chat_message(slot_id, "user", text, attachment=attachment)
         self._run_composer_slot(slot_id, text, attachment=attachment)
 
 

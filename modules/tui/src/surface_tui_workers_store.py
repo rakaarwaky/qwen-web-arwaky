@@ -73,7 +73,6 @@ class _TuiWorkersMixin:
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
-    _append_chat_message: Any
     _render_account_cards: Any
     query_one: Any
     notify: Any
@@ -145,7 +144,6 @@ class _TuiWorkersMixin:
             task_text = prompt_val
             if is_prompt_role(prompt_val):
                 task_text = load_prompt_template(prompt_val)
-            self._append_chat_message(slot_id, "user", prompt_val, attachment=attachment_val)
             self._run_composer_slot_with_attachment(slot_id, task_text, attachment_val, bool(headless_val), out_val)
             return
         if attachment_val and not prompt_val:
@@ -171,10 +169,6 @@ class _TuiWorkersMixin:
 
         cfg: AppConfig = plan.config
         p_name = plan.prompt_path.name
-
-        # The chat console's transcript mirrors what this slot was asked to
-        # do, so a run started from the composer shows up in the Chat view.
-        self._append_chat_message(slot_id, "user", prompt_val or p_name)
 
         # AR-2/FE-1: create a per-slot cancel event so cancelling one slot
         # never touches another slot's in-flight browser context.
@@ -618,7 +612,6 @@ class _TuiWorkersMixin:
                     "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
-                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", prompt_name, dur, True, gen)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
@@ -685,7 +678,6 @@ class _TuiWorkersMixin:
                     "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
-                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", filename, dur, True, gen)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
@@ -774,7 +766,6 @@ class _TuiWorkersMixin:
                     "[bold {}][Slot {}] SUCCESS:[/] {}".format(THEME["ok"], slot_id, escape(res_str)),
                     slot_id,
                 )
-                self.call_from_thread(self._append_chat_message, slot_id, "agent", res_str)
                 self.call_from_thread(self._finalize_slot, slot_id, "SUCCESS", filename, dur, True, gen)
         except Exception as exc:
             dur = round(time.perf_counter() - start_t, 1)
