@@ -18,7 +18,10 @@ class SessionStatus(str, Enum):
     ACTIVE = "active"  # Healthy, can send requests
     LIMITED = "limited"  # Hit rate limit
     AUTH_REQUIRED = "auth_required"  # Authentication required or probe failure
-    UNKNOWN = "auth_required"  # Backward-compatible alias
+    # Read-only alias for legacy pool files; ``SessionStatus._missing_`` maps
+    # a persisted ``"unknown"`` to AUTH_REQUIRED on load, and the next
+    # ``save_pool`` rewrites the pool JSON in place as ``"auth_required"``.
+    UNKNOWN = "auth_required"
 
     @classmethod
     def _missing_(cls, value: object) -> SessionStatus | None:

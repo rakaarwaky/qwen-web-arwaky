@@ -161,5 +161,5 @@ class TestUploadAttachment:
             patch("modules.prompt.src.capabilities_file_uploader.time"),
             patch.object(FileUploader, "_wait_for_parse_ready"),
         ):
-            result = FileUploader().upload_attachment(page, f, config=None)
+            result = FileUploader().upload_attachment(page, f)
             assert result is True

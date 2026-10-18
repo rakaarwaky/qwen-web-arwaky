@@ -269,7 +269,6 @@ class IUploadProtocol(ABC):
         self,
         page: Page,
         filepath: Path,
-        config: Any | None = None,
         emitter: LifecycleEmitter | None = None,
         web_loaded: HeadlessFlag = HeadlessFlag(True),
     ) -> bool:

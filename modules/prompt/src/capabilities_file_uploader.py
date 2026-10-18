@@ -64,7 +64,6 @@ class FileUploader(IUploadProtocol):
         self,
         page: Page,
         filepath: Path,
-        config: dict[str, Any] | None = None,
         emitter: LifecycleEmitter | None = None,
         web_loaded: bool = True,
     ) -> bool:
@@ -76,10 +75,6 @@ class FileUploader(IUploadProtocol):
         """
         if not web_loaded:
             raise RuntimeError("Cannot upload attachment: web page loading (EVENT_WEB_LOADED) is incomplete")
-
-        if config:
-            self.max_size_bytes = MaxFileSizeBytes(int(config.get("max_size_bytes", self.max_size_bytes)))
-            self.max_retries = MaxRetries(config.get("max_retries", int(self.max_retries)))
 
         self.last_error = None
 

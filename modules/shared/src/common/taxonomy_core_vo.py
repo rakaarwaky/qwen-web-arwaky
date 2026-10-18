@@ -228,7 +228,6 @@ StabilityChecks = NewType("StabilityChecks", int)
 MinTextLength = NewType("MinTextLength", int)
 
 # ─── Brand types: upload config ───────────────────────────────
-MaxFileSizeMb = NewType("MaxFileSizeMb", float)
 DropdownTimeoutMs = NewType("DropdownTimeoutMs", int)
 OptionTimeoutMs = NewType("OptionTimeoutMs", int)
 FileChooserTimeoutMs = NewType("FileChooserTimeoutMs", int)
@@ -776,7 +775,6 @@ __all__ = [
     "MaxRetries",
     "StabilityChecks",
     "MinTextLength",
-    "MaxFileSizeMb",
     "DropdownTimeoutMs",
     "OptionTimeoutMs",
     "FileChooserTimeoutMs",

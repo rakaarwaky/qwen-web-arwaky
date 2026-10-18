@@ -155,8 +155,8 @@ The class is named in the Description column.
 | `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. (IRunCancelProtocol) |
 | `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run and close its browser context. (IRunCancelProtocol) |
 | `cancel_by_event` | original ``threading.Event`` | cancelled verdict | none | none | Cancel the run registered with the original event. (IRunCancelProtocol) |
-| `upload_attachment` | page, filepath, config, emitter, web_loaded | accepted flag | upload error | file uploaded | Attach a file as an attachment. (IUploadProtocol) |
-| `validate_file` | filepath, max_size_mb | file size in bytes | file error | none | Pre-flight validation of an attachment. (IUploadProtocol) |
+| `upload_attachment` | page, filepath, emitter, web_loaded | accepted flag | upload error | file uploaded | Attach a file as an attachment. (IUploadProtocol) |
+| `validate_file` | filepath, max_size_bytes | file size in bytes | file error | none | Pre-flight validation of an attachment. (IUploadProtocol) |
 | `compile_folder` | folder path, output path, max_depth, import_depth | compiled markdown path | file error | document parsed | Compile folder contents to a single markdown file. (IFolderCompileProtocol) |
 | `resolve_to_attachment` | path, max_depth, import_depth | attachment-ready path | file error | none | Resolve a path to an attachment-ready file. (IFolderToAttachmentProtocol) |
 | `is_folder` | path | directory flag | none | none | Check whether a path is a directory. (IFolderToAttachmentProtocol) |

@@ -9,6 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from tests.uat_fixtures import (
     WorkflowResult,
     check_cli_mcp_parity,
@@ -16,6 +18,7 @@ from tests.uat_fixtures import (
     measure_async_p95,
     reconcile_results,
     record_health_verdict_exercise,
+    record_reliability_sample,
     record_rotation_outcome_exercise,
 )
 
@@ -180,4 +183,68 @@ def test_rotation_outcome_exercise_with_failure(tmp_path: Path) -> None:
     }
     record = record_rotation_outcome_exercise(outcomes, tmp_path)
     assert record["measured_values"]["all_passed"] is False
+    assert record["release_disposition"] == "failed"
+
+
+# ─── UAT-BA-009: Reliability Sample ──────────────────────────────────────────────
+
+
+def test_reliability_sample_unapproved_protocol_raises(tmp_path: Path) -> None:
+    """UAT-BA-009: an unapproved sampling protocol must fail fast (gate)."""
+    with pytest.raises(ValueError, match="approved sampling protocol"):
+        record_reliability_sample(
+            successes=99,
+            exclusions=[],
+            protocol_approval={"approved": False},
+            fixture_dir=tmp_path,
+        )
+
+
+def test_reliability_sample_missing_protocol_approval_raises(tmp_path: Path) -> None:
+    """UAT-BA-009: a missing protocol approval record must fail fast."""
+    with pytest.raises(ValueError, match="approved sampling protocol"):
+        record_reliability_sample(
+            successes=99,
+            exclusions=[],
+            protocol_approval={},
+            fixture_dir=tmp_path,
+        )
+
+
+def test_reliability_sample_clean_99_100_passes(tmp_path: Path) -> None:
+    """UAT-BA-009: 99/100 with one reasoned exclusion → passed."""
+    record = record_reliability_sample(
+        successes=99,
+        exclusions=[{"run_id": "r42", "reason": "AUTH_REQUIRED"}],
+        protocol_approval={"approved": True, "reviewer": "qa"},
+        fixture_dir=tmp_path,
+    )
+    assert record["measured_values"]["success_rate"] == 0.99
+    assert record["measured_values"]["excluded_runs"] == 1
+    assert record["release_disposition"] == "passed"
+
+
+def test_reliability_sample_98_100_fails(tmp_path: Path) -> None:
+    """UAT-BA-009: 98/100 success rate is below the 99/100 threshold → failed."""
+    record = record_reliability_sample(
+        successes=98,
+        exclusions=[
+            {"run_id": "r7", "reason": "TIMEOUT"},
+            {"run_id": "r13", "reason": "NETWORK"},
+        ],
+        protocol_approval={"approved": True, "reviewer": "qa"},
+        fixture_dir=tmp_path,
+    )
+    assert record["measured_values"]["success_rate"] == 0.98
+    assert record["release_disposition"] == "failed"
+
+
+def test_reliability_sample_exclusion_without_reason_fails(tmp_path: Path) -> None:
+    """UAT-BA-009: an exclusion lacking a recorded reason invalidates the sample."""
+    record = record_reliability_sample(
+        successes=99,
+        exclusions=[{"run_id": "r9"}],  # no reason key
+        protocol_approval={"approved": True, "reviewer": "qa"},
+        fixture_dir=tmp_path,
+    )
     assert record["release_disposition"] == "failed"

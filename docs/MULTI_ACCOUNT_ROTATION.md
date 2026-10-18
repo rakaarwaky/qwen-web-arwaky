@@ -85,7 +85,7 @@ See the [Policy Gate](#policy-gate-2026-10-18-raka--project-owner) section at th
 class SessionInfo:
     session_id: str  # "session_1", "session_2", etc.
     path: Path  # ~/.local/share/qwen-web-arwaky/sessions/session_1/
-    status: SessionStatus  # active, limited, unknown
+    status: SessionStatus  # active, limited, auth_required
     last_used: datetime | None
     total_requests: int = 0
     failed_requests: int = 0
@@ -94,7 +94,8 @@ class SessionInfo:
 class SessionStatus(str, Enum):
     ACTIVE = "active"  # Healthy, can send requests
     LIMITED = "limited"  # Hit rate limit
-    UNKNOWN = "unknown"  # Not tested yet
+    AUTH_REQUIRED = "auth_required"  # Authentication required or probe failure
+    UNKNOWN = "auth_required"  # Read-only alias for legacy pool files; the next save_pool rewrites it as "auth_required"
 
 
 @dataclass
@@ -106,8 +107,8 @@ class SessionPool:
         """Round-robin with fallback to healthy sessions."""
         ...
 
-    def mark_limited(self, session_id: str) -> None:
-        """Mark session as rate-limited."""
+    def mark_limited(self, session_id: str, reason: str = "QUOTA") -> None:
+        """Mark session as rate-limited; a None reason normalises to "QUOTA"."""
         ...
 
     def mark_healthy(self, session_id: str) -> None:
@@ -358,7 +359,7 @@ def test_ping_detects_healthy():
 # Test rotation
 def test_rotation_fallback():
     pool = create_pool_with_3_sessions()
-    pool.mark_limited("session_1")
+    pool.mark_limited("session_1", reason="QUOTA")
     rotator = SessionRotator(pool)
     result = rotator.execute_with_rotation("ping")
     assert result.used_session == "session_2"
@@ -368,7 +369,7 @@ def test_rotation_fallback():
 def test_all_sessions_limited():
     pool = create_pool_with_3_sessions()
     for s in pool.sessions:
-        pool.mark_limited(s.session_id)
+        pool.mark_limited(s.session_id, reason="QUOTA")
     rotator = SessionRotator(pool)
     response = rotator.rotate(RotatorRequest())
     assert response.session is None
