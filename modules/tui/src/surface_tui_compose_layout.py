@@ -237,11 +237,10 @@ class _TuiComposeMixin:
                                 classes="slot-chip slot-chip-active" if i == s else "slot-chip",
                             )
 
-                    # Telemetry header: Event/System switch, live badge, beacon.
+                    # Telemetry header: live badge and beacon. The mockup's
+                    # Event/System log switch is gone: one panel, one buffer,
+                    # so there is nothing for the operator to pick between.
                     with Horizontal(classes="telemetry-header"):
-                        with Horizontal(classes="seg-switch"):
-                            yield Button("Event Log", id=f"btn-slot-event-{s}", classes="seg-btn seg-active")
-                            yield Button("System Log", id=f"btn-slot-system-{s}", classes="seg-btn")
                         yield Static("", classes="telemetry-spacer")
                         yield Label(
                             self._format_status("IDLE", "badge"),
@@ -278,16 +277,6 @@ class _TuiComposeMixin:
                             max_lines=2000,
                             wrap=True,
                         )
-                        system_log = QwenTuiRichLog(
-                            id=f"log-view-{s}-system",
-                            highlight=True,
-                            markup=True,
-                            classes="slot-log-view",
-                            max_lines=1000,
-                            wrap=True,
-                        )
-                        system_log.display = False
-                        yield system_log
                         yield Label("--:--:--", id=f"slot-log-time-{s}", classes="slot-log-time")
 
                     # Action pill row: design/slot_chat_automation_console bottom dock.
@@ -349,20 +338,11 @@ class _TuiComposeMixin:
                         classes="swarm-browse-chip",
                     )
 
-                # View toggle: OUTPUT INSPECTION caption, switch on the right.
+                # View toggle: OUTPUT INSPECTION caption. The mockup's
+                # Event/System switch is gone: the card keeps a single log
+                # buffer, so the caption stands alone on the row.
                 with Horizontal(classes="output-inspection"):
                     yield Label("OUTPUT INSPECTION", classes="card-caption")
-                    with Horizontal(classes="seg-switch swarm-seg"):
-                        yield Button(
-                            "Event Log",
-                            id="btn-swarm-event",
-                            classes="seg-btn seg-active",
-                        )
-                        yield Button(
-                            "log system",
-                            id="btn-swarm-system",
-                            classes="seg-btn",
-                        )
 
                 # Log card. Both streams live in this one panel, so the toggle
                 # swaps them in place and the card keeps its height.
@@ -386,17 +366,6 @@ class _TuiComposeMixin:
                         auto_scroll=True,
                         wrap=True,
                     )
-                    system_log = QwenTuiRichLog(
-                        id="log-view-swarm-system",
-                        highlight=True,
-                        markup=True,
-                        classes="swarm-log-view",
-                        max_lines=2000,
-                        auto_scroll=True,
-                        wrap=True,
-                    )
-                    system_log.display = False
-                    yield system_log
                     with Horizontal(classes="swarm-log-foot"):
                         yield Label(">", classes="swarm-caret")
                         yield Label(
@@ -522,19 +491,16 @@ class _TuiComposeMixin:
         with contextlib.suppress(NoMatches):
             self._log_views[-1] = self.query_one("#log-view-swarm", QwenTuiRichLog)
 
-        # Mockup parity: each chat console caches its transcript container, its
-        # system-log twin, its clock label, and the empty-state hint that the
-        # first message replaces. All four sit on the per-slot hot paths, so
-        # they are resolved once here instead of per write.
-        self._system_log_views: dict[int, QwenTuiRichLog] = {}
+        # Mockup parity: each chat console caches its transcript container,
+        # its clock label, and the empty-state hint that the first message
+        # replaces. All three sit on the per-slot hot paths, so they are
+        # resolved once here instead of per write.
         self._chat_scrolls: dict[int, ScrollableContainer] = {}
         self._chat_hints: dict[int, Static] = {}
         self._slot_log_times: dict[int, Label] = {}
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
-            with contextlib.suppress(NoMatches):
-                self._system_log_views[s] = self.query_one(f"#log-view-{s}-system", QwenTuiRichLog)
             with contextlib.suppress(NoMatches):
                 self._chat_scrolls[s] = self.query_one(f"#chat-scroll-{s}", ScrollableContainer)
             with contextlib.suppress(NoMatches):

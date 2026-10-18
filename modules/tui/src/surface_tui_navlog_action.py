@@ -94,8 +94,6 @@ class _TuiNavLogHandlerMixin:
     def _refresh_nav_dock(self) -> None:
         """Update the bottom nav dock's active indicator to match the tab bar."""
         with contextlib.suppress(Exception):
-            from textual.widgets import Button
-
             tabs = self.query_one(TabbedContent)
             active = tabs.active or ""
             overview_btn = self.query_one("#nav-overview", Button)
@@ -186,20 +184,13 @@ class _TuiNavLogHandlerMixin:
         self._copy_rich_log(view)
 
     def _copy_slot_log(self, slot_id: int) -> None:
-        """Copy whichever of the slot's two log buffers is on screen."""
+        """Copy the slot's log buffer."""
         log_views: dict[Any, Any] = getattr(self, "_log_views", {})
-        system_views: dict[Any, Any] = getattr(self, "_system_log_views", {})
         view = log_views.get(slot_id)
-        system_view = system_views.get(slot_id)
-        if view is not None and not view.display:
-            view = None
-        if system_view is not None and not system_view.display:
-            system_view = None
-        target = view or system_view
-        if target is None:
+        if view is None:
             self._log_msg(f"[yellow]Slot {slot_id} log view not found.[/]")
             return
-        self._copy_rich_log(target)
+        self._copy_rich_log(view)
 
     def _copy_rich_log(self, view: QwenTuiRichLog) -> None:
         text = view.copy_text()
@@ -248,21 +239,6 @@ class _TuiNavLogHandlerMixin:
             focusable = [widget for widget in pane.query("*") if widget.focusable]
             self.set_focus(focusable[0] if focusable else None, scroll_visible=False)
         self._refresh_nav_dock()
-
-    def _show_slot_log(self, slot_id: int, show_system: bool) -> None:
-        """Swap a chat console between the slot's Event log and System log.
-
-        The two share one panel, so exactly one view stays visible and only
-        the pressed button keeps the active fill.
-        """
-        with contextlib.suppress(NoMatches):
-            self.query_one(f"#log-view-{slot_id}", QwenTuiRichLog).display = not show_system
-            self.query_one(f"#log-view-{slot_id}-system", QwenTuiRichLog).display = show_system
-        with contextlib.suppress(NoMatches):
-            event_btn = self.query_one(f"#btn-slot-event-{slot_id}", Button)
-            system_btn = self.query_one(f"#btn-slot-system-{slot_id}", Button)
-            event_btn.set_class(show_system, "seg-active")
-            system_btn.set_class(not show_system, "seg-active")
 
     def action_switch_tab_slot(self, slot_id: int) -> None:
         """Switch to the tab of *slot_id* (alt+1..9, ctrl+alt+0..9)."""

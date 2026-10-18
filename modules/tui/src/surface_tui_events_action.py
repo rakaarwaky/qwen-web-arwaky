@@ -108,13 +108,6 @@ class _TuiEventsMixin:
             if button_id.startswith(prefix):
                 handler(button_id.removeprefix(prefix))
                 return
-        # Chat console: Event/System segmented switch over the slot's logs.
-        if button_id.startswith("btn-slot-event-"):
-            self._show_slot_log(int(button_id.removeprefix("btn-slot-event-")), False)
-            return
-        if button_id.startswith("btn-slot-system-"):
-            self._show_slot_log(int(button_id.removeprefix("btn-slot-system-")), True)
-            return
         # Chat console action pills: prompt picker, attachment picker, and the
         # template selector. The job-config card the fields live in stays
         # hidden until a pill asks for it, so each pill reveals it first.

@@ -63,8 +63,8 @@ paint order:
 | `TabbedContent` | panes: Overview, Sessions, Slot 1…N (one Chat console each), Swarm, Settings |
 | Overview screen | telemetry banner (ACTIVE ACCOUNTS + routed MODEL tiles), swarm status card, session-pool card, streaming log card |
 | Sessions screen | session-pool card with metric tiles and one row per account; Add / Refresh / Edit / Delete actions |
-| Chat screen (per slot) | brand row, slot-carousel pill row, telemetry header (Event/System switch, live badge, beacon), transcript scroll, event-log card, action pills (Prompt, Attach, Templates, Headless toggle), composer input with send trigger |
-| Swarm screen | attachment card (file + Browse chip), output-inspection toggle, swarm log card, Run / Stop / Restart deck |
+| Chat screen (per slot) | brand row, slot-carousel pill row, telemetry header (live badge, beacon), transcript scroll, event-log card, action pills (Prompt, Attach, Templates, Headless toggle), composer input with send trigger |
+| Swarm screen | attachment card (file + Browse chip), output-inspection caption, swarm log card, Run / Stop / Restart deck |
 | Settings screen | runtime-override card: one row per registered environment value with Apply / Reset |
 | Nav dock (docked footer) | icon + caption cells per screen, key-hint line, always visible |
 
@@ -114,7 +114,7 @@ selection does not crash the frame.
 | Field | Role |
 |---|---|
 | slot-carousel pill row | jump between slot consoles; this pane's slot is filled |
-| telemetry header | Event/System log switch, slot status badge, live beacon |
+| telemetry header | slot status badge, live beacon |
 | transcript scroll | streaming assistant text; blinking accent cursor while streaming |
 | event-log card | slot event stream with timestamp; copy-to-clipboard action |
 | action pill row | Prompt, Attach, Templates, Headless toggle |

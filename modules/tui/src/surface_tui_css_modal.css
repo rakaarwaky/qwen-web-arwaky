@@ -38,9 +38,8 @@
     text-style: bold;
 }
 
-/* Telemetry header: segmented Event/System log switch plus the live beacon.
-   The switch sits on the left as in the mockup; an auto-width spacer carries
-   the badge and beacon to the right edge. */
+/* Telemetry header: the live badge and the beacon. An auto-width spacer
+   carries the badge and beacon to the right edge. */
 .telemetry-header {
     layout: horizontal;
     width: 100%;
@@ -52,32 +51,6 @@
 .telemetry-spacer {
     width: 1fr;
     height: 1;
-}
-
-/* Frameless: the two segments abut, so the container only supplies the
-   backing colour. A border would leave the buttons a one-row viewport. */
-.seg-switch {
-    layout: horizontal;
-    width: auto;
-    height: 3;
-    background: $bg_hover;
-    margin-right: 1;
-}
-
-.seg-btn {
-    width: auto;
-    min-width: 12;
-    height: 3;
-    background: $bg_hover;
-    color: $fg_muted;
-    border: none;
-    padding: 0 1;
-    text-style: bold;
-}
-
-.seg-btn.seg-active {
-    background: $accent;
-    color: $fg_on_accent;
 }
 
 .live-beacon {
@@ -372,9 +345,7 @@
     color: $fg_primary;
 }
 
-/* View toggle row: caption on the left, segmented switch on the right. The
-   swarm switch is one row (the mockup's pill pair); the chat console keeps
-   its taller switch under .telemetry-header. */
+/* View toggle row: the OUTPUT INSPECTION caption stands alone on the row. */
 .output-inspection {
     layout: horizontal;
     width: 100%;
@@ -387,15 +358,6 @@
     width: 1fr;
     color: $status_muted;
     text-style: bold;
-}
-
-.swarm-seg {
-    height: 1;
-}
-
-.swarm-seg .seg-btn {
-    height: 1;
-    min-width: 10;
 }
 
 /* Log card: the path header with its hairline, the stream, and the socket

@@ -7,6 +7,7 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
+import pytest
 from textual.widgets import Label, RichLog, TabbedContent
 
 from modules.tui.src.surface_tui_app_screen import NUM_SLOTS, QwenTuiApp
@@ -352,41 +353,32 @@ def test_flush_metrics_writes_engine_readouts() -> None:
     asyncio.run(_run())
 
 
-def test_swarm_toggle_buttons_drive_log_views() -> None:
-    """Event / System toggle buttons swap exactly one log view per press."""
+def test_slot_and_swarm_consoles_have_one_log_panel() -> None:
+    """One log buffer per console: no Event/System toggle, no hidden twin.
+
+    Regresses the removal of the segmented log switch: the chat console and
+    the Swarm screen each keep exactly one log view, and the ids the toggle
+    used to address must stay gone so a stale query fails loudly.
+    """
+    from textual.css.query import NoMatches
+
     app = _make_app()
 
     async def _run() -> None:
-        async with app.run_test(size=(100, 40)) as pilot:
-            from textual.widgets import Button
+        async with app.run_test(size=(100, 40)):
+            # Chat console: a single EVENT LOG panel, no hidden system buffer.
+            slot_log = app.query_one("#log-view-1", RichLog)
+            assert slot_log.display is not False
+            for removed_id in ("#log-view-1-system", "#btn-slot-event-1", "#btn-slot-system-1"):
+                with pytest.raises(NoMatches):
+                    app.query_one(removed_id)
 
-            event_btn = app.query_one("#btn-swarm-event", Button)
-            system_btn = app.query_one("#btn-swarm-system", Button)
-            event_log = app.query_one("#log-view-swarm", RichLog)
-            system_log = app.query_one("#log-view-swarm-system", RichLog)
-            assert event_log.display is True
-            assert system_log.display is False
-
-            # Press the system button: only the system log becomes visible and
-            # its button carries the active style.
-            system_btn.press()
-            await pilot.pause()
-            for _ in range(4):
-                await pilot.pause()
-            assert event_log.display is False
-            assert system_log.display is True
-            assert "toggle-active" in system_btn.classes
-            assert "toggle-active" not in event_btn.classes
-
-            # Press the event button: it flips back.
-            event_btn.press()
-            await pilot.pause()
-            for _ in range(4):
-                await pilot.pause()
-            assert event_log.display is True
-            assert system_log.display is False
-            assert "toggle-active" in event_btn.classes
-            assert "toggle-active" not in system_btn.classes
+            # Swarm screen: a single log panel, no hidden twin behind a toggle.
+            swarm_log = app.query_one("#log-view-swarm", RichLog)
+            assert swarm_log.display is not False
+            for removed_id in ("#log-view-swarm-system", "#btn-swarm-event", "#btn-swarm-system"):
+                with pytest.raises(NoMatches):
+                    app.query_one(removed_id)
 
     asyncio.run(_run())
 
