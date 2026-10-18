@@ -77,10 +77,9 @@ class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
                     "install",
                     "--no-input",
                     "--disable-pip-version-check",
-                    "-e",
                     str(editable_dir),
                 ]
-                mode_desc = f"git pull & editable reinstall from {editable_dir}"
+                mode_desc = f"git pull & immutable reinstall from {editable_dir}"
             else:
                 repo_url = resolve_github_pinned_url(target_version)
                 if repo_url is None:

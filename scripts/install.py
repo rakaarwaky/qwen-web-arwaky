@@ -89,33 +89,8 @@ def get_local_bin_dir() -> Path:
     return Path.home() / ".local" / "bin"
 
 
-def setup_project_venv_symlink(venv_dir: Path) -> None:
-    """Create symlinks in PROJECT_ROOT (.venv and venv) pointing to XDG venv for IDE/editor support."""
-    if sys.platform == "win32":
-        return
-    for name in (".venv", "venv"):
-        target = PROJECT_ROOT / name
-        if target.is_symlink():
-            try:
-                if target.resolve() == venv_dir.resolve():
-                    continue
-                target.unlink()
-            except OSError:
-                target.unlink(missing_ok=True)
-        elif target.exists():
-            if target.is_dir():
-                shutil.rmtree(target, ignore_errors=True)
-            else:
-                target.unlink(missing_ok=True)
-        try:
-            target.symlink_to(venv_dir)
-            log(f"🔗 [install] Created project venv symlink: {target} -> {venv_dir}")
-        except OSError as err:
-            log(f"⚠ [install] Could not create {target} symlink: {err}")
-
-
 def uninstall_previous(python_bin: Path) -> None:
-    """Remove earlier package installs, entry-point links, and venv symlinks."""
+    """Remove earlier package installs, entry-point links, and legacy venv symlinks."""
     log("🧹 [install] Removing any previous qwen-web-arwaky installation...")
     subprocess.run(
         [str(python_bin), "-m", "pip", "uninstall", "-y", "qwen-web", "qwen-web-cli", "qwen-web-arwaky"],
@@ -133,13 +108,29 @@ def uninstall_previous(python_bin: Path) -> None:
             target = PROJECT_ROOT / name
             if target.is_symlink():
                 with contextlib.suppress(OSError):
-                    target.unlink()
+                    if target.resolve() == get_venv_dir().resolve():
+                        target.unlink()
 
 
 def install_package(python_bin: Path) -> None:
-    """Pip-install the project into the managed venv and clean build artifacts."""
-    log("📦 [install] Installing Python package (immutable mode)...")
-    subprocess.run([str(python_bin), "-m", "pip", "install", str(PROJECT_ROOT)], check=True)
+    """Pip-install the project into the managed venv and clean build artifacts.
+
+    Installation is strictly immutable: copies files into the XDG virtual
+    environment site-packages. Editable mode (`-e` / `--editable`) is forbidden.
+    """
+    log("📦 [install] Installing Python package (immutable XDG mode)...")
+    subprocess.run(
+        [
+            str(python_bin),
+            "-m",
+            "pip",
+            "install",
+            "--no-input",
+            "--disable-pip-version-check",
+            str(PROJECT_ROOT),
+        ],
+        check=True,
+    )
     # Cleanup build artifacts
     build_dir = PROJECT_ROOT / "build"
     if build_dir.exists():
@@ -417,6 +408,15 @@ def setup_bin_links(python_bin: Path) -> None:
             with bashrc.open("a", encoding="utf-8") as f:
                 f.write(f"\n# qwen-web-arwaky global CLI PATH\n{path_line}\n")
 
+    fish_config = Path.home() / ".config" / "fish" / "config.fish"
+    if fish_config.exists() or fish_config.parent.exists():
+        fish_config.parent.mkdir(parents=True, exist_ok=True)
+        content = fish_config.read_text(encoding="utf-8", errors="ignore") if fish_config.exists() else ""
+        if str(local_bin) not in content and "$HOME/.local/bin" not in content:
+            log(f"📝 [install] Adding {local_bin} to PATH in ~/.config/fish/config.fish...")
+            with fish_config.open("a", encoding="utf-8") as f:
+                f.write(f"\n# qwen-web-arwaky global CLI PATH\nfish_add_path {local_bin}\n")
+
 
 def main() -> None:
     """Run the full install pipeline: venv, package, browser, dirs, links."""
@@ -424,7 +424,6 @@ def main() -> None:
     os.chdir(PROJECT_ROOT)
 
     python_bin = ensure_venv()
-    setup_project_venv_symlink(get_venv_dir())
     uninstall_previous(python_bin)
     install_package(python_bin)
     install_playwright(python_bin)

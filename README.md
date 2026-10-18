@@ -13,15 +13,29 @@ No Node.js installation or Qwen API key is required.
 
 ## Quick Start
 
-The commands below use an isolated virtual environment and work on Linux and macOS:
+### Recommended: Production XDG Installation
+
+Install immutably to user XDG directories (`~/.local/share/qwen-web-arwaky/venv/` and `~/.local/bin/`):
+
+```bash
+git clone https://github.com/rakaarwaky/qwen-web-arwaky.git && cd qwen-web-arwaky
+./scripts/install.sh
+qwa --help
+```
+
+### Standalone Virtual Environment Installation
+
+For an isolated virtual environment (Linux and macOS):
 
 ```bash
 git clone https://github.com/rakaarwaky/qwen-web-arwaky.git && cd qwen-web-arwaky
 python3 -m venv .venv && source .venv/bin/activate
-python -m pip install -e .
+python -m pip install .
 python -m playwright install chromium
 qwen-web-arwaky --help
 ```
+
+> **Installation Policy**: Editable installation (`pip install -e .`) is strictly forbidden. The application runtime must never execute directly from the repository source tree (`modules/`). All installations must copy the package code immutably into the destination environment.
 
 Success looks like this:
 
