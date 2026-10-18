@@ -1,4 +1,4 @@
-"""Swarm screen: start/cancel routing and event/system log toggle.
+"""Swarm screen: start/cancel routing and log maintenance.
 
 Split from ``modules/tui/src/surface_tui_main_action.py`` so every handler
 file stays on the AES surface complexity budget (AES406, 50 control-flow
@@ -12,7 +12,6 @@ import contextlib
 from typing import Any
 
 from textual.css.query import NoMatches
-from textual.widgets import Button
 
 from modules.tui.src.surface_tui_component import (
     QwenTuiRichLog,
@@ -21,7 +20,7 @@ from modules.tui.src.surface_tui_css_view import THEME
 
 
 class _TuiSwarmHandlerMixin:
-    """Swarm screen: start/cancel routing and event/system log toggle."""
+    """Swarm screen: start/cancel routing and log maintenance."""
 
     """Mixin that owns all Textual event handlers and action bindings."""
 
@@ -85,39 +84,13 @@ class _TuiSwarmHandlerMixin:
             self._cancel_swarm()
         elif button_id == "btn-browse-swarm-file":
             self._open_picker("input-swarm-file", select_directories=True)
-        elif button_id in ("btn-swarm-event", "btn-swarm-system"):
-            self._show_swarm_log(button_id == "btn-swarm-system")
         elif button_id == "btn-clear-swarm-log":
             self._clear_swarm_log()
 
-    def _show_swarm_log(self, show_system: bool) -> None:
-        """Switch the Swarm tab between the Event log and the System log.
-
-        The mockup presents these as a segmented toggle over one panel, so
-        exactly one of the two RichLog views stays visible and the toggle
-        buttons carry matching active/inactive styling.
-        """
-        with contextlib.suppress(NoMatches):
-            event_log = self.query_one("#log-view-swarm", QwenTuiRichLog)
-            system_log = self.query_one("#log-view-swarm-system", QwenTuiRichLog)
-            event_log.display = not show_system
-            system_log.display = show_system
-        with contextlib.suppress(NoMatches):
-            event_btn = self.query_one("#btn-swarm-event", Button)
-            system_btn = self.query_one("#btn-swarm-system", Button)
-            # Add/remove one class at a time. set_classes() would also drop
-            # the -style-default class that Textual's own Button CSS hangs
-            # its default rendering off, leaving the button unstyled.
-            event_btn.set_class(not show_system, "toggle-active")
-            event_btn.set_class(show_system, "toggle-inactive")
-            system_btn.set_class(show_system, "toggle-active")
-            system_btn.set_class(not show_system, "toggle-inactive")
-
     def _clear_swarm_log(self) -> None:
-        """Empty whichever Swarm log view is currently on screen."""
+        """Empty the Swarm log view and leave the flush notice behind."""
         with contextlib.suppress(NoMatches):
-            system_visible = self.query_one("#log-view-swarm-system", QwenTuiRichLog).display
-            view = self.query_one("#log-view-swarm-system" if system_visible else "#log-view-swarm", QwenTuiRichLog)
+            view = self.query_one("#log-view-swarm", QwenTuiRichLog)
             view.clear()
             self._log_swarm_msg(
                 "[{}]Swarm log cleared.[/]".format(THEME["muted"]),

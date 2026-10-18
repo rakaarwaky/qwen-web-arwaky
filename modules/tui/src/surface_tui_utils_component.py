@@ -272,7 +272,6 @@ class _TuiUtilsMixin:
     _metric_threads_bar: Any
     _log_handler: logging.Handler
     _log_views: dict[int, QwenTuiRichLog]
-    _system_log_views: dict[int, QwenTuiRichLog]
     _chat_scrolls: dict[int, ScrollableContainer]
     _chat_hints: dict[int, Static]
     _slot_log_times: dict[int, Label]
@@ -484,21 +483,18 @@ class _TuiUtilsMixin:
         overview = views.get(0)
         if overview is not None:
             overview.write(msg)
-        # Mockup parity: a chat console carries two buffers. Slot-scoped
-        # writes above feed the EVENT LOG; unscoped application records feed
-        # the SYSTEM LOG of whichever slot is on screen.
         active = self._get_active_slot_id()
-        system = getattr(self, "_system_log_views", {}).get(active)
-        if system is not None:
-            system.write(msg)
+        active_view = views.get(active)
+        if active_view is not None:
+            active_view.write(msg)
         self._stamp_slot_log(active)
 
     def _log_swarm_msg(self, msg: str | Text) -> None:
         """Write one line to the Swarm console's own log panel.
 
-        ``_log_msg`` fans unscoped records out to the Overview and the chat
-        console's System log. The swarm worker's progress belongs in the panel
-        the operator is watching, which the mockup gives a single log.
+        ``_log_msg`` fans unscoped records out to the Overview and the active
+        chat console's log panel. The swarm worker's progress belongs in the
+        panel the operator is watching, which the mockup gives a single log.
         """
         view = getattr(self, "_log_views", {}).get(-1)
         if view is not None:

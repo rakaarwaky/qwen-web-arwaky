@@ -45,6 +45,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **BREAKING (CLI)**: drop the top-level `login` command. Use
   `qwen-web-arwaky session login --name <name>`, which registers the account in
   the session pool instead of overwriting a single shared profile.
+- fix(tui): remove the Event/System log toggle from the Chat and Swarm
+  screens. Each console now keeps a single log panel — every record the
+  application emits lands there, so there is no second buffer to switch to.
+  The hidden per-slot and Swarm system log views, the segmented switch
+  buttons, and their routing are gone with it; app-level log records now
+  reach the active chat console's panel directly instead of a system-only
+  buffer. The Clear chip on the Swarm log card empties that one panel.
 
 ## [6.6.0] - 2026-10-06
 
