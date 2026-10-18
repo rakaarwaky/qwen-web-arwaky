@@ -504,6 +504,9 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
         ".qwen-web-arwaky",
         "target",
         ".cache",
+        "test",
+        "tests",
+        "benches",
     }
 )
 

@@ -460,3 +460,34 @@ class TestImportBoundaryConfinement:
 
         files = collect_folder_files(target)
         assert [f.name for f in files] == ["main.py"]
+
+    def test_excludes_junk_dirs(self, tmp_path: Path) -> None:
+        """Excluded directories (including test, tests, benches) are skipped during compilation."""
+        target = tmp_path / "app"
+        target.mkdir(parents=True)
+        _write(target / "src" / "main.py", "print('main')\n")
+        _write(target / "tests" / "test_ok.py", "def test_ok(): pass\n")
+        _write(target / "test" / "test_ok.py", "def test_ok(): pass\n")
+        _write(target / "benches" / "bench_ok.py", "def bench_ok(): pass\n")
+        _write(target / "node_modules" / "junk.js", "console.log(1)\n")
+        _write(target / ".git" / "config.txt", "git config\n")
+
+        files = collect_folder_files(target)
+        rel_paths = {f.relative_to(target).as_posix() for f in files}
+        assert "src/main.py" in rel_paths
+        assert "tests/test_ok.py" not in rel_paths
+        assert "test/test_ok.py" not in rel_paths
+        assert "benches/bench_ok.py" not in rel_paths
+        assert rel_paths == {"src/main.py"}
+
+    @pytest.mark.parametrize("root_name", ["tests", "test", "benches"])
+    def test_scan_root_named_excluded_dir_compiles_files(self, tmp_path: Path, root_name: str) -> None:
+        """A scan root whose own name is test/tests/benches still compiles files under that root."""
+        root = tmp_path / root_name
+        root.mkdir(parents=True)
+        _write(root / "main.py", "print('root')\n")
+        _write(root / "pkg" / "helper.py", "print('pkg')\n")
+
+        files = collect_folder_files(root)
+        rel_names = sorted(f.relative_to(root).as_posix() for f in files)
+        assert rel_names == ["main.py", "pkg/helper.py"]
