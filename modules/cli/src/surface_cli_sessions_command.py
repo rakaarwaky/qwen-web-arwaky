@@ -17,14 +17,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import unicodedata
 from typing import TYPE_CHECKING, Any
 
 from modules.cli.src.surface_cli_json_hook import (
     EXIT_FAILURE,
     _fail_json,
-    _fit,
-    display_width,
-    print_error,
     status_glyph,
 )
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse, SessionStatus
@@ -39,6 +38,56 @@ _LIST_FLOORS = (6, 8, 8, 10)
 _STATUS_COLUMNS = ("ID", "Name", "Status", "Requests", "Failed")
 _STATUS_FLOORS = (6, 8, 8, 8, 6)
 _PAD = 2
+
+#: Glyphs that render two columns wide in the CLI's monospaced fonts even
+#: though ``unicodedata.east_asian_width`` reports them ``A`` (ambiguous):
+#: the geometric health glyphs and the heavy box-drawing rule. Named here so
+#: :func:`display_width` matches the terminal, not the Unicode property
+#: table. The ellipsis ``…`` and the result markers ``✓ / ✗ / ⚠`` render one
+#: column and stay out of the table so :func:`_fit` can trade one column of
+#: content for the marker.
+_TWO_COLUMN_CHARS = frozenset("●◐○━")
+
+_WIDE_CATEGORIES = ("W", "F")
+
+
+def _char_width(char: str) -> int:
+    """Return the terminal columns one character occupies (2 for wide glyphs)."""
+    if char in _TWO_COLUMN_CHARS:
+        return 2
+    return 2 if unicodedata.east_asian_width(char) in _WIDE_CATEGORIES else 1
+
+
+def display_width(text: str) -> int:
+    """Return the number of terminal columns *text* occupies.
+
+    ``len()`` undercounts wide glyphs (``●``, ``◐``, ``━``, CJK): each renders
+    two columns while counting as one character, so a width computed from the
+    character count overflows the terminal.
+    """
+    return sum(_char_width(char) for char in text)
+
+
+def _fit(text: str, width: int) -> str:
+    """Return *text* clamped to *width* display columns with a ``…`` marker.
+
+    The marker is itself one display column, so a fitted string's display
+    width is exactly *width* (``width - 1`` of content plus ``…``).
+    """
+    if width <= 0:
+        return ""
+    if display_width(text) <= width:
+        return text
+    if width == 1:
+        return "…"
+    # Reserve one column for the marker: consume width - 1 columns of content.
+    consumed = 0
+    limit = width - 1
+    for index, char in enumerate(text):
+        if consumed + _char_width(char) > limit:
+            return text[:index] + "…"
+        consumed += _char_width(char)
+    return text
 
 
 def register_sessions_subparser(subparsers: Any) -> None:
@@ -155,7 +204,7 @@ def render_pool_table(
     built per column set, so a header and a row always carry the same cell
     count.
     """
-    available = _terminal_columns() if budget is None else max(20, int(budget))
+    available = max(20, shutil.get_terminal_size(fallback=(80, 24)).columns) if budget is None else max(20, int(budget))
     gapless = available - _PAD * (len(columns) - 1)
     rows: list[tuple[str, ...]] = [tuple(columns)] + [_pool_row(s, columns) for s in pool]
     widths = _column_widths(rows, floors, gapless)
@@ -199,16 +248,6 @@ def _column_widths(rows: list[tuple[str, ...]], floors: tuple[int, ...], budget:
             if widths[widest] <= 1:
                 shrinkable.remove(widest)
     return widths
-
-
-def _terminal_columns() -> int:
-    """Return the terminal width, defaulting to 80 when it cannot be read."""
-    import shutil
-
-    try:
-        return max(20, shutil.get_terminal_size().columns)
-    except Exception:
-        return 80
 
 
 def cmd_list(session: ISessionAggregate, json_output: bool = False) -> int:
@@ -268,20 +307,22 @@ def _login_once(session: ISessionAggregate, name: str, json_output: bool = False
         print("💡 Tip: Close the browser window to continue.")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    response: SessionResponse = session.execute(
-        SessionRequest(
-            verb="login",
-            name=name,
-            wait_for_confirmation=lambda: False,
+    try:
+        response: SessionResponse = session.execute(
+            SessionRequest(
+                verb="login",
+                name=name,
+                wait_for_confirmation=lambda: False,
+            )
         )
-    )
+    except Exception as exc:
+        # An aggregate exception must not escape as a traceback under --json;
+        # emit the same failure envelope every other surface honors.
+        return _fail_json(f"Login failed: {exc}", "cli-500", json_output)
 
     if not response.valid:
         message = f"Login failed: {response.error or response.message or 'login failed'}"
-        if json_output:
-            return _fail_json(message, "cli-500", True)
-        print_error(message)
-        return EXIT_FAILURE
+        return _fail_json(message, "cli-500", json_output)
 
     if json_output:
         print(json.dumps({"success": True, "message": f"Session '{name}' saved"}, indent=2))

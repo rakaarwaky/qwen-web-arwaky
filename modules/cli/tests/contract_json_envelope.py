@@ -318,7 +318,7 @@ def test_session_remove_missing_token_is_the_fixed_envelope(capsys) -> None:
     args.keep_profile = False
     args.force = False
     aggregate = MagicMock()
-    aggregate.execute.return_value = SessionResponse(valid=True, sessions=[])
+    aggregate.execute.return_value = SessionResponse(valid=True, sessions=SessionList([]))
 
     assert cmd_remove(aggregate, args, True) == 1
     payload = _envelope(capsys)

@@ -19,13 +19,15 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src import surface_cli_sessions_command as sessions
-from modules.cli.src.surface_cli_json_hook import _fit, display_width
+from modules.cli.src.surface_cli_json_hook import EXIT_FAILURE
 from modules.cli.src.surface_cli_sessions_command import (
+    _fit,
     cmd_health_check,
     cmd_list,
     cmd_login,
     cmd_remove,
     cmd_status,
+    display_width,
     handle_sessions,
     render_pool_table,
 )
@@ -296,6 +298,51 @@ def test_login_saves_the_session_and_stops(capsys) -> None:
     assert aggregate.logins == ["work"]
 
 
+def test_login_json_emits_the_envelope_once(capsys) -> None:
+    """session login --json: exactly one login, the fixed-key success envelope
+    on stdout, no banner, no input() re-prompt, exit 0 (issue 2)."""
+    aggregate = InMemorySessions()
+    args = _args("login", name="work", json=True)
+    input_called = False
+
+    def _input(prompt: str) -> str:
+        nonlocal input_called
+        input_called = True
+        raise AssertionError("input() must not be called under --json")
+
+    with patch("builtins.input", side_effect=_input):
+        assert cmd_login(aggregate, args, json_output=True) == 0
+
+    # Exactly one login; no re-prompt offered under --json.
+    assert aggregate.logins == ["work"]
+    assert not input_called
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload == {"success": True, "message": "Session 'work' saved"}
+    # No banner text reaches stdout under --json.
+    assert "Login to Qwen" not in captured.out
+
+
+def test_login_json_emits_the_failure_envelope_on_exception(capsys) -> None:
+    """session login --json: an aggregate exception emits the cli-500 envelope,
+    never a traceback (issue 3)."""
+    aggregate = InMemorySessions()
+
+    def _boom(request: SessionRequest) -> SessionResponse:
+        raise RuntimeError("oidc provider unreachable")
+
+    aggregate.execute = _boom
+    args = _args("login", name="work", json=True)
+
+    assert cmd_login(aggregate, args, json_output=True) == EXIT_FAILURE
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["success"] is False
+    assert payload["error_code"] == "cli-500"
+    assert "oidc provider unreachable" in payload["message"]
+
+
 def test_login_eof_exits_the_re_prompt_loop(capsys) -> None:
     """Ctrl+D at the re-prompt exits the loop instead of raising a traceback (issue 9)."""
     aggregate = InMemorySessions()
@@ -546,7 +593,7 @@ def test_status_table_under_columns_60_never_overflows(capsys, monkeypatch) -> N
 
 
 def test_register_sessions_subparser_exposes_group_json_flag() -> None:
-    """--json is registered on the reporting subcommands; login carries none."""
+    """--json is registered on the reporting subcommands (login carries it too, honored end to end)."""
     from modules.root_cli_main_entry import _parse_args
 
     assert _parse_args(["session", "list", "--json"]).json is True

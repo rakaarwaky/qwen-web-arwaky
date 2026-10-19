@@ -163,9 +163,8 @@ class InteractiveController:
                 response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
                 return response.session.path if response.session else None
             except Exception as exc:
-                from modules.cli.src.surface_cli_json_hook import print_warn
-
-                print_warn(f"Session rotation failed; falling back to the default session: {exc}")
+                # Degradation is non-fatal: warn on stderr and keep the default session.
+                print(f"[WARN] Session rotation failed; falling back to the default session: {exc}", file=sys.stderr)
                 return None
 
         return dispatch_run(cfg, self._prompt, session_resolver=_pick)

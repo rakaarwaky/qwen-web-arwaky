@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
-- fix(cli): `surface_cli_json_hook` table helpers measure cells in display columns (`display_width`, `_fit`, `_display_slice`) instead of characters, so wide glyphs (`●`, `◐`, CJK) no longer overflow the terminal; `session list` / `session status` render a single rule-bordered table instead of duplicating each pool row in two formats.
+- fix(cli): `surface_cli_json_hook` table helpers measure cells in display columns (`display_width`, `_fit`, `_display_slice`) instead of characters, so wide glyphs (`●`, `◐`, CJK) no longer overflow the terminal; `session list` / `session status` render a single rule-bordered table instead of duplicating each pool row in two formats. The width helpers moved out of the hook into `surface_cli_sessions_command.py`, leaving the hook as envelope + stderr channel + glyph vocabulary.
 - fix(cli): `session login --json` runs exactly one login and emits `{"success": true, "message": "Session 'X' saved"}` — no banner, no `input()` re-prompt — so non-interactive callers never block.
 - fix(cli): `job list` / `job status` / `job cleanup` failures and the missing-record branch route through `_fail_json` (`job status` reports `cli-400` for `Job not found`), and the contract test pins one forced failure per jobs verb.
 - fix(cli): `doctor` capacity severity polarity — an override above the derived limit (memory oversubscription) serializes `severity: "warning"`; under-configuration stays `"ok"`.

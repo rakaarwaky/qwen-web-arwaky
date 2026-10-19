@@ -69,7 +69,7 @@ def _format_report(report: UpdateReport) -> str:
     """Format a full update run (steps + health checks) into a terminal report."""
     lines = [
         "",
-        "🔄 Qwen Web Automation Self-Update & Environment Synchronization",
+        "Qwen Web Automation Self-Update & Environment Synchronization",
         _DIVIDER,
         f"  Package          : {report.package_name}",
         f"  Previous version : {report.previous_version}",
@@ -153,7 +153,7 @@ def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
         return _fail_json(f"Rollback failed: {response.error}", "cli-500", json_output)
 
     if response.steps:
-        lines = ["", "↩️  Rolling back to " + version, _DIVIDER]
+        lines = ["", f"{status_glyph('pending')} Rolling back to {version}", _DIVIDER]
         for step in response.steps:
             lines.append(f"  {_step_icon(step)} {step.name}: {_step_detail(step)}")
         lines.append(_DIVIDER)

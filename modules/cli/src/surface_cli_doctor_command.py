@@ -394,14 +394,10 @@ def build_smoke_gate(
     ``session_manager.load_pool()``. ``None`` raises rather than reporting a
     confidently empty pool from a wiring gap.
     """
-    if session is None:
-        raise ValueError(
-            "build_smoke_gate requires a session aggregate (ISessionAggregate) to read the session pool; "
-            "pass one explicitly, e.g. build_smoke_gate(session_manager.load_pool())."
-        )
+    aggregate = _required_session(session, "build_smoke_gate")
 
     def _gate() -> tuple[tuple[str, bool, str], ...]:
-        checks = run_doctor_checks(session=session)
+        checks = run_doctor_checks(session=aggregate)
         return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
 
     return _gate
@@ -414,7 +410,7 @@ def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]],
     return not failed, failed, warned
 
 
-def _required_session(session: ISessionAggregate | None) -> ISessionAggregate:
+def _required_session(session: ISessionAggregate | None, caller: str = "run_doctor") -> ISessionAggregate:
     """Return *session* or raise the dependency error for the unwired case.
 
     An unwired aggregate is a wiring gap; reporting an empty pool from it
@@ -422,8 +418,8 @@ def _required_session(session: ISessionAggregate | None) -> ISessionAggregate:
     """
     if session is None:
         raise ValueError(
-            "run_doctor requires a session aggregate (ISessionAggregate) to read the session pool; "
-            "pass one explicitly, e.g. run_doctor(session=session_manager.load_pool())."
+            f"{caller} requires a session aggregate (ISessionAggregate) to read the session pool; "
+            f"pass one explicitly, e.g. {caller}(session_manager.load_pool())."
         )
     return session
 
@@ -480,13 +476,11 @@ def run_doctor(
 
     print(RULE)
     if failed:
-        print(f"⚠️ {len(failed)} diagnostic check(s) failed. Fix the items marked {status_glyph('fail')} above.")
+        print(f"{status_glyph('warn')} {len(failed)} check(s) failed; fix items marked {status_glyph('fail')} above.")
         print(f"   Operator runbooks: {RUNBOOK_ROOT} (keyed by ErrorCategory)\n")
         return 1
     if warned:
-        print(
-            f"⚠️ All checks passed with {len(warned)} warning(s); review the items marked {status_glyph('warn')} above."
-        )
+        print(f"{status_glyph('warn')} All checks passed with {len(warned)} warning(s); runbooks at {RUNBOOK_ROOT}")
         print(f"   Operator runbooks: {RUNBOOK_ROOT} (keyed by ErrorCategory)\n")
         return 0
     print(f"{status_glyph('ok')} All diagnostic checks passed! System is healthy and ready for execution.\n")
