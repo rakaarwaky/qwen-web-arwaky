@@ -18,6 +18,18 @@ Start `qwen-web-mcp`, list tools, and invoke `init`, `check_session`, and `list_
 
 Run `qwen-web-arwaky doctor` and `qwen-web-arwaky update --check`. Diagnostics must be readable without mutating the workspace.
 
+## Manual verification scenarios
+
+The following scenarios need a live human at the browser (CAPTCHA, 2FA, or a
+visual confirmation step), so they are not automated. Run them from a clean
+workspace and record the outcome in the release notes.
+
+| ID | Scenario | Expected evidence |
+|---|---|---|
+| UAT-MAN-001 | `qwen-web-arwaky session login --name <name>` interactive round-trip | A headed browser opens at `chat.qwen.ai`; after a manual login the window closes, the session is registered in the pool, and the "Add another session?" re-prompt loops correctly (answering `y` asks for another name; `N` exits 0). Confirm with `qwen-web-arwaky session list` and `session status`. |
+| UAT-MAN-002 | `qwen-web-arwaky session remove <name>` destructive removal | The pool entry and the Chromium profile directory are removed; `--keep-profile` leaves the profile on disk. Verify with `session list` and the profile directory. |
+| UAT-MAN-003 | `qwen-web-arwaky doctor --deep --json` | The heavy Playwright probe runs after a stderr notice; the JSON report's checks carry `severity: "ok"` for passing records. |
+
 ## BA verification scenarios
 
 The deterministic scenarios below and goal-linked acceptance exercises for Goals 1–5 are required for release sign-off; each records its commit, preconditions, measured result, evidence and reviewer disposition.

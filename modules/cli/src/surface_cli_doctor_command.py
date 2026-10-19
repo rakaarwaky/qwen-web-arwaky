@@ -1,17 +1,17 @@
 """CLI surface: doctor command — system diagnostic checks (AES406).
 
 Audits environment health: Python version, Playwright Chromium, workspace
-initialization, session profile (presence, age, re-login recommendation, and
-retained backup generations), output writability, host capacity for the
-browser fan-out, the effective Chromium sandbox mode, and the environment
-variable contract. With ``--smoke``, a final check runs a headless browser
-round-trip on the saved session to verify the full pipeline end-to-end
-(issue #322).
+initialization, the session pool (the single source of truth for session
+state), output writability, host capacity for the browser fan-out, the
+effective Chromium sandbox mode, and the environment variable contract.
+With ``--smoke``, a final check runs a headless browser round-trip on the
+saved session to verify the full pipeline end-to-end (issue #322).
 
-:func:`run_doctor_checks` is the library form. The Root layer injects
-:func:`build_smoke_gate` into the update pipeline so a post-upgrade smoke gate
-reuses these exact checks (issue #294), and the failure footer points at the
-operator runbooks (issue #299).
+:func:`run_doctor_checks` is the library form; every caller — the CLI
+report and the update pipeline's postflight gate — injects a session
+aggregate, so doctor and ``session list`` can never disagree about the
+pool (issue #294). The failure footer points at the operator runbooks
+(issue #299).
 """
 
 from __future__ import annotations
@@ -21,12 +21,12 @@ import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from modules.cli.src.surface_cli_json_hook import status_glyph
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT,
-    DEFAULT_SESSION,
     LOCAL_WS_DIR,
     SESSIONS_DIR,
 )
@@ -40,12 +40,8 @@ from modules.shared.src.common.utility_core_env import (
     validate_env,
 )
 from modules.shared.src.common.utility_core_paths import get_playwright_browsers_path
-from modules.shared.src.common.utility_core_session_backup import has_session_backup, snapshots_count
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
-from modules.shared.src.session.utility_session_cloner import session_age_warning
-
-if TYPE_CHECKING:
-    from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -111,8 +107,14 @@ def _sandbox_mode() -> str:
     return "sandboxed"
 
 
-def _check(name: str, passed: bool, detail: str, severity: str = "error") -> dict[str, Any]:
-    """Build one diagnostic record; *severity* marks a non-fatal warning."""
+def _check(name: str, passed: bool, detail: str, severity: str = "ok") -> dict[str, Any]:
+    """Build one diagnostic record.
+
+    Severity vocabulary: ``"ok"`` for a passing check, ``"warning"`` for a
+    check that passes with a concern worth surfacing (a host limitation or an
+    operator misconfiguration), and ``"error"`` only for ``passed=False`` —
+    so a report consumer can tell a hard failure from a soft concern.
+    """
     return {"name": name, "passed": passed, "detail": detail, "severity": severity}
 
 
@@ -130,8 +132,8 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     """Report whether a Chromium binary is reachable for Playwright to launch.
 
     A cache hit or a trusted system binary is enough for the common path. The
-    expensive ``sync_playwright`` cold-start probe runs only when
-    ``QWEN_DOCTOR_DEEP=1`` so the default report stays fast.
+    expensive ``sync_playwright`` cold-start probe runs only when the deep
+    probe is on so the default report stays fast.
     """
     from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
@@ -149,8 +151,9 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
         return _check(
             "Playwright Chromium Browser",
             False,
-            "Chromium binary not found in cache or PATH (set QWEN_DOCTOR_DEEP=1 for a full probe)",
+            "Chromium binary not found in cache or PATH (run with --deep for a full probe)",
         )
+    print("Running a deep Playwright probe (cold start); this can take a while...", file=sys.stderr)
     try:
         from playwright.sync_api import sync_playwright
 
@@ -189,49 +192,40 @@ def _check_workspace() -> dict[str, Any]:
     )
 
 
-def _check_session(session: ISessionAggregate | None = None) -> dict[str, Any]:
+def _check_session(session: ISessionAggregate) -> dict[str, Any]:
     """Report session pool status.
 
-    Uses the session aggregate (list_sessions verb) so the surface never
-    imports the manager protocol directly.
+    The pool is the single source of truth: an empty pool is reported as
+    "no session", so doctor and ``session list`` can never disagree about a
+    legacy ``DEFAULT_SESSION`` profile that the pool does not know about.
     """
-    pool = session.execute(SessionRequest(verb="list_sessions")).sessions if session else None
+    pool = session.execute(SessionRequest(verb="list_sessions")).sessions
+    entries = list(pool) if pool else []
 
-    # Multi-account pool: report per-session status
-    if pool is not None and len(pool) > 0:
-        lines = [f"Session pool: {len(pool)} account(s) under {SESSIONS_DIR}"]
-        for s in pool:
-            icon = "✅" if s.is_healthy else ("⚠️" if s.is_limited else "🔵")
+    if entries:
+        lines = [f"Session pool: {len(entries)} account(s) under {SESSIONS_DIR}"]
+        for s in entries:
+            icon = (
+                status_glyph("health_ok")
+                if s.is_healthy
+                else (
+                    status_glyph("health_limited")
+                    if s.is_limited
+                    else (status_glyph("health_auth") if s.is_auth_required else status_glyph("health_unknown"))
+                )
+            )
             lines.append(f"  {icon} {s.session_id} ({s.name}): {s.status.value}")
-        healthy = sum(1 for s in pool if s.is_healthy)
-        limited = sum(1 for s in pool if s.is_limited)
+        healthy = sum(1 for s in entries if s.is_healthy)
+        limited = sum(1 for s in entries if s.is_limited)
         detail = f"{healthy} healthy, {limited} limited"
         severity = "warning" if healthy == 0 else "ok"
         return _check("Session Authentication Token", healthy > 0, detail, severity=severity)
 
-    # Single-account / empty pool: check DEFAULT_SESSION profile
-    exists = DEFAULT_SESSION.exists() and any(DEFAULT_SESSION.iterdir())
-    if not exists:
-        return _check(
-            "Session Authentication Token",
-            False,
-            f"No active session found in {DEFAULT_SESSION} (run: qwen-web-arwaky session login --name default)",
-        )
-    retained = snapshots_count(DEFAULT_SESSION)
-    detail = f"Saved session found at {DEFAULT_SESSION}"
-    if not has_session_backup(DEFAULT_SESSION):
-        return _check(
-            "Session Authentication Token",
-            True,
-            f"{detail}; NO BACKUP retained — losing it forces an interactive CAPTCHA re-login "
-            "(runbook: docs/session-corruption.md)",
-            severity="warning",
-        )
-    result = _check("Session Authentication Token", True, f"{detail}; {retained} backup generation(s) retained")
-    age_warning = session_age_warning(DEFAULT_SESSION)
-    if age_warning:
-        result["detail"] = f"{result['detail']} | {age_warning}"
-    return result
+    return _check(
+        "Session Authentication Token",
+        False,
+        f"No session in the pool under {SESSIONS_DIR} (run: qwen-web-arwaky session login --name default)",
+    )
 
 
 def _check_output_writable() -> dict[str, Any]:
@@ -255,17 +249,21 @@ def _check_capacity() -> dict[str, Any]:
 
     The limit is derived from available memory rather than a fixed constant, so
     the reported number matches what the job executor will actually use
-    (issue #291).
+    (issue #291). The severity vocabulary: ``"ok"`` for the derived limit or a
+    deliberate under-configuration, ``"warning"`` only for an override that
+    exceeds the derived limit — memory oversubscription, the dangerous case,
+    must not read as healthy.
     """
     configured = _env("QWEN_WEB_MAX_WORKERS")
     derived = recommended_max_workers()
     detail = describe_capacity()
     if configured.isdigit():
+        oversubscribed = int(configured) > derived
         return _check(
             "Host Capacity",
             True,
             f"{detail}; QWEN_WEB_MAX_WORKERS={configured} overrides the derived limit",
-            severity="warning" if int(configured) > derived else "error",
+            severity="warning" if oversubscribed else "ok",
         )
     return _check("Host Capacity", True, detail)
 
@@ -282,7 +280,7 @@ def _check_sandbox() -> dict[str, Any]:
         detail += " — every non-login job runs without Chromium's process sandbox"
         severity = "warning"
     else:
-        severity = "error"
+        severity = "ok"
     return _check("Chromium Sandbox", True, detail, severity=severity)
 
 
@@ -340,10 +338,11 @@ def _smoke_check(session: ISessionAggregate | None) -> tuple[bool, str]:
 
     Delegates to ``ISessionAggregate.execute()`` so the surface reuses
     the Core launch → navigate → textarea-check → close pipeline with no new
-    capability code. The aggregate is injected by the Root container.
+    capability code. Every caller injects the aggregate; a missing one is
+    a wiring gap, reported as such rather than as a synthetic failure.
     """
     if session is None:
-        return False, "Smoke test requires a session aggregate; run it through `qwen-web-arwaky doctor --smoke`."
+        return False, "No session aggregate is available; the smoke gate is not wired for this run."
     try:
         from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -357,13 +356,14 @@ def run_doctor_checks(
     *,
     include_heavy: bool = False,
     smoke: bool = False,
-    session: ISessionAggregate | None = None,
+    session: ISessionAggregate,
 ) -> list[dict[str, Any]]:
     """Run every diagnostic check and return the records as plain dictionaries.
 
     The library form of ``doctor``: the post-update smoke gate injected by the
     Root layer calls the same function, so the interactive report and the
-    postflight gate cannot disagree (issue #294).
+    postflight gate cannot disagree (issue #294). The session aggregate is
+    required: the pool is doctor's single source of truth for session state.
     """
     checks: list[dict[str, Any]] = [
         _check_python(),
@@ -383,7 +383,7 @@ def run_doctor_checks(
 
 
 def build_smoke_gate(
-    session: ISessionAggregate | None = None,
+    session: ISessionAggregate,
 ) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
     """Return a callable the update pipeline runs as its postflight functional gate.
 
@@ -392,10 +392,15 @@ def build_smoke_gate(
     depends only on an injected callable, never on a Surface. The checks run
     at gate-execution time (not container-construction time) so the post-update
     gate reflects the post-upgrade state (issue #506).
+
+    Pass the aggregate, e.g. ``session_manager.load_pool()`` or a production
+    ``ISessionAggregate`` — there is no default, so a wiring gap cannot
+    masquerade as an empty pool.
     """
+    aggregate = session
 
     def _gate() -> tuple[tuple[str, bool, str], ...]:
-        checks = run_doctor_checks(session=session)
+        checks = run_doctor_checks(session=aggregate)
         return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
 
     return _gate
@@ -409,17 +414,21 @@ def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]],
 
 
 def run_doctor(
+    session: ISessionAggregate,
     json_output: bool = False,
     smoke: bool = False,
-    session: ISessionAggregate | None = None,
+    deep: bool = False,
 ) -> int:
     """Perform system health diagnostics and print a formatted report or JSON summary.
 
     With *smoke* enabled, a final check runs a headless browser session round-trip
     through the injected session aggregate; it needs a saved session and Chromium.
+    ``--deep`` (or the ``QWEN_DOCTOR_DEEP`` alias) runs the heavy Playwright
+    probe; *deep* and the flag are OR-ed, the env var is only an alias.
     """
+    include_heavy = deep or _flag("QWEN_DOCTOR_DEEP")
     checks = run_doctor_checks(
-        include_heavy=_flag("QWEN_DOCTOR_DEEP"),
+        include_heavy=include_heavy,
         smoke=smoke,
         session=session,
     )
@@ -446,24 +455,24 @@ def run_doctor(
     print("\n🔍 Qwen Web Automation System Health Diagnostic\n" + RULE)
     for check in checks:
         if not check["passed"]:
-            icon = "  [✗]"
+            icon = status_glyph("fail")
         elif check.get("severity") == "warning":
-            icon = "  [⚠]"
+            icon = status_glyph("warn")
         else:
-            icon = "  [✓]"
-        print(f"{icon} {check['name']}")
+            icon = status_glyph("ok")
+        print(f"  {icon} {check['name']}")
         print(f"      {check['detail']}")
 
     print(RULE)
     if failed:
-        print(f"⚠️ {len(failed)} diagnostic check(s) failed. Fix the items marked [✗] above.")
+        print(f"{status_glyph('warn')} {len(failed)} check(s) failed; fix items marked {status_glyph('fail')} above.")
         print(f"   Operator runbooks: {RUNBOOK_ROOT} (keyed by ErrorCategory)\n")
         return 1
     if warned:
-        print(f"⚠️ All checks passed with {len(warned)} warning(s); review the items marked [⚠] above.")
+        print(f"{status_glyph('warn')} All checks passed with {len(warned)} warning(s); runbooks at {RUNBOOK_ROOT}")
         print(f"   Operator runbooks: {RUNBOOK_ROOT} (keyed by ErrorCategory)\n")
         return 0
-    print("✅ All diagnostic checks passed! System is healthy and ready for execution.\n")
+    print(f"{status_glyph('ok')} All diagnostic checks passed! System is healthy and ready for execution.\n")
     return 0
 
 

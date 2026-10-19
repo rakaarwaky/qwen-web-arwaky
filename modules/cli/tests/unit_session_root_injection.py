@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.root_cli_main_entry import main
+from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse
 
 
 def _fake_container(session_manager: MagicMock, session_rotator: MagicMock | None = None) -> MagicMock:
@@ -55,6 +56,11 @@ def test_session_subcommand_receives_the_session_aggregate(tmp_path: Path) -> No
         patch("modules.cli.src.surface_cli_sessions_command.print"),
     ):
         container = _fake_container(MagicMock())
+        # A listing verb must answer with an empty pool, not a MagicMock
+        # whose truthy ``error`` turns every session command into a failure.
+        container.agent_session_orchestrator.execute.return_value = SessionResponse(
+            sessions=SessionList([]), message="0 sessions"
+        )
         container_fn.return_value = container
         assert main() == 0
 
