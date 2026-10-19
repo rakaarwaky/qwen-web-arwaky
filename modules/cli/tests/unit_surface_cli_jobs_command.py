@@ -165,7 +165,9 @@ class TestJobsStatus:
         args.json = False
         rc = handle_jobs_command(args, jobs)
         assert rc == 1
-        assert "Job not found" in capsys.readouterr().out
+        # The missing record is the canonical failure: the envelope under
+        # --json, the [ERROR] line on stderr otherwise.
+        assert "Job not found" in capsys.readouterr().err
 
 
 class TestJobsList:

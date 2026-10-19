@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 
+from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
 from modules.shared.src.common.utility_core_path_validation import (
     validate_swarm_id,
     validate_swarm_input_path,
@@ -34,7 +34,11 @@ def _render_snapshot(snapshot: SwarmSnapshot) -> None:
     if snapshot.agents:
         print("   Agents:")
         for agent in snapshot.agents:
-            icon = "✓" if agent.status == "completed" else ("✗" if agent.status == "failed" else "⋯")
+            icon = (
+                status_glyph("ok")
+                if agent.status == "completed"
+                else (status_glyph("fail") if agent.status == "failed" else status_glyph("pending"))
+            )
             extra = f" · {agent.error}" if agent.error else ""
             print(f"     {icon} {agent.agent_id:<24} {agent.status:<10} attempt {agent.attempt}{extra}")
 
@@ -45,16 +49,11 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
 
     input_path, error = validate_swarm_input_path(args.input)
     if error is not None:
-        if json_output:
-            print(json.dumps({"success": False, "error": error}, indent=2))
-        else:
-            print(f"[ERROR] {error['message']}", file=sys.stderr)
-        return 1
+        return _fail_json(error["message"], "cli-400", json_output)
 
     response = swarm.execute(SwarmRequest(verb="start", input_path=input_path))
     if response.error:
-        print(f"[ERROR] {response.error}", file=sys.stderr)
-        return 1
+        return _fail_json(str(response.error), "cli-500", json_output)
     snapshot = response.snapshot
     assert snapshot is not None
 
@@ -81,7 +80,7 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
         )
     else:
         _render_snapshot(snapshot)
-        print(f"\n✅ Swarm started. Poll with: qwen-web-arwaky swarm status {snapshot.swarm_id}")
+        print(f"\n{status_glyph('ok')} Swarm started. Poll with: qwen-web-arwaky swarm status {snapshot.swarm_id}")
     return 0
 
 
@@ -90,21 +89,14 @@ def _cmd_status(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     swarm_id = args.swarm_id
     error = validate_swarm_id(swarm_id)
     if error is not None:
-        json_output = bool(getattr(args, "json", False))
-        if json_output:
-            print(json.dumps({"success": False, "error": error}, indent=2))
-        else:
-            print(f"[ERROR] {error['message']}", file=sys.stderr)
-        return 1
+        return _fail_json(error["message"], "cli-400", bool(getattr(args, "json", False)))
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="snapshot", swarm_id=swarm_id))
     if response.error:
-        print(f"[ERROR] {response.error}", file=sys.stderr)
-        return 1
+        return _fail_json(str(response.error), "cli-500", json_output)
     snapshot = response.snapshot
     if snapshot is None:
-        print(f"[ERROR] No Swarm found with ID: {swarm_id}", file=sys.stderr)
-        return 1
+        return _fail_json(f"No Swarm found with ID: {swarm_id}", "cli-400", json_output)
 
     if json_output:
         print(
@@ -134,17 +126,11 @@ def _cmd_cancel(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     swarm_id = args.swarm_id
     error = validate_swarm_id(swarm_id)
     if error is not None:
-        json_output = bool(getattr(args, "json", False))
-        if json_output:
-            print(json.dumps({"success": False, "error": error}, indent=2))
-        else:
-            print(f"[ERROR] {error['message']}", file=sys.stderr)
-        return 1
+        return _fail_json(error["message"], "cli-400", bool(getattr(args, "json", False)))
     json_output = bool(getattr(args, "json", False))
     response = swarm.execute(SwarmRequest(verb="cancel", swarm_id=swarm_id))
     if response.error:
-        print(f"[ERROR] {response.error}", file=sys.stderr)
-        return 1
+        return _fail_json(str(response.error), "cli-500", json_output)
     snapshot = response.snapshot
     if json_output:
         print(
@@ -155,7 +141,7 @@ def _cmd_cancel(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
         )
     else:
         status = snapshot.status if snapshot else "cancelled"
-        print(f"✅ Swarm {swarm_id} cancelled (status: {status}).")
+        print(f"{status_glyph('ok')} Swarm {swarm_id} cancelled (status: {status}).")
     return 0
 
 

@@ -6,9 +6,7 @@ Smart surface: maps parsed args to the IUpdateAggregate verbs
 
 from __future__ import annotations
 
-import json
-import sys
-
+from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
 from modules.shared.src.common.taxonomy_core_vo import (
     ForceFlag,
     UpdateCheckResult,
@@ -25,8 +23,8 @@ _DIVIDER = "─" * 58
 def _step_icon(step: UpdateStepResult) -> str:
     """Return the terminal status icon for one pipeline step."""
     if not step.executed:
-        return "[–]"
-    return "[✓]" if step.success else "[✗]"
+        return status_glyph("pending")
+    return status_glyph("ok") if step.success else status_glyph("fail")
 
 
 def _step_detail(step: UpdateStepResult) -> str:
@@ -56,11 +54,13 @@ def _format_check_result(res: UpdateCheckResult) -> str:
         lines.append(f"  Update available : {'yes' if res.update_available else 'no'}")
     lines.append(_DIVIDER)
     if res.latest_version is None:
-        lines.append("⚠️ Could not determine the latest published version. Check network access and retry.")
+        lines.append(
+            f"{status_glyph('warn')} Could not determine the latest published version. Check network access and retry."
+        )
     elif res.update_available:
-        lines.append(f"⬆️ Run `qwen-web-arwaky update` to upgrade to {res.latest_version}.")
+        lines.append(f"{status_glyph('warn')} Run `qwen-web-arwaky update` to upgrade to {res.latest_version}.")
     else:
-        lines.append("✅ You are already running the latest version.")
+        lines.append(f"{status_glyph('ok')} You are already running the latest version.")
     lines.append("")
     return "\n".join(lines)
 
@@ -69,7 +69,7 @@ def _format_report(report: UpdateReport) -> str:
     """Format a full update run (steps + health checks) into a terminal report."""
     lines = [
         "",
-        "🔄 Qwen Web Automation Self-Update & Environment Synchronization",
+        "Qwen Web Automation Self-Update & Environment Synchronization",
         _DIVIDER,
         f"  Package          : {report.package_name}",
         f"  Previous version : {report.previous_version}",
@@ -88,7 +88,7 @@ def _format_report(report: UpdateReport) -> str:
         for check in report.health_checks:
             lines.append(f"    {_step_icon(check)} {check.name}: {_step_detail(check)}")
     lines.append(_DIVIDER)
-    lines.append(f"{'✅' if report.healthy else '⚠️'} {report.message}")
+    lines.append(f"{status_glyph('ok') if report.healthy else status_glyph('warn')} {report.message}")
     if report.healthy and report.changed:
         lines.append("")
         lines.append(
@@ -139,29 +139,27 @@ def handle(
 def handle_rollback(args: object, orchestrator: IUpdateAggregate) -> int:
     """Handle the --rollback subcommand of update: restore a previous version."""
     version = str(getattr(args, "rollback", "")).strip()
-    if not version:
-        print("[ERROR] --rollback requires a version, e.g. 'qwen-web-arwaky update --rollback 6.3.0'", file=sys.stderr)
-        return 1
-
     json_output = bool(getattr(args, "json", False))
+    if not version:
+        return _fail_json(
+            "--rollback requires a version, e.g. 'qwen-web-arwaky update --rollback 6.3.0'",
+            "cli-400",
+            json_output,
+        )
+
     response = orchestrator.execute(UpdateRequest(verb="rollback_to", previous_version=version))
 
     if response.error:
-        msg = f"Rollback failed: {response.error}"
-        if json_output:
-            print(json.dumps({"success": False, "error": response.error}, indent=2))
-        else:
-            print(f"❌ {msg}", file=sys.stderr)
-        return 1
+        return _fail_json(f"Rollback failed: {response.error}", "cli-500", json_output)
 
     if response.steps:
-        lines = ["", "↩️  Rolling back to " + version, _DIVIDER]
+        lines = ["", f"{status_glyph('pending')} Rolling back to {version}", _DIVIDER]
         for step in response.steps:
             lines.append(f"  {_step_icon(step)} {step.name}: {_step_detail(step)}")
         lines.append(_DIVIDER)
         report = "\n".join(lines)
     else:
-        report = f"✅ Rollback to {version} completed."
+        report = f"{status_glyph('ok')} Rollback to {version} completed."
 
     print(report)
     return 0

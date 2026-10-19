@@ -4,7 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [6.7.0] - 2026-10-18
+
+### Added
+
+- feat(cli): add a `--json` flag to the `session` group (`list` / `status` / `health` / `login` / `remove`); every subcommand emits the standard envelope, and `session remove` reports `Removed session 'X'`.
+- feat(cli): `doctor` gains a first-class `--deep` flag (alias: `QWEN_DOCTOR_DEEP=1`); a stderr notice now precedes the heavy Playwright probe.
+- feat(cli): add the `surface_cli_json_hook` module centralizing the failure envelope, the `[ERROR]` / `[WARN]` stderr channels, the status-glyph vocabulary, and display-width-aware table fitting.
+- feat(cli): the `modules/cli/src/__init__.py` barrel re-exports all ten surface modules.
+
+### Changed
+
+- refactor(cli): route every `--json` failure in the `job`, `swarm`, `observability`, `update`, and `session` surfaces through `_fail_json`, so the envelope shape and channel are identical everywhere.
+- refactor(cli): `doctor` reports the session pool exclusively; the legacy `DEFAULT_SESSION` filesystem probe is removed and `run_doctor_checks` takes a required `ISessionAggregate`.
+- refactor(cli): `session login`'s re-prompt loop is iterative (via `_login_once`) instead of recursive, so a long add-another sequence cannot hit Python's recursion limit.
+
+### Fixed
+
+- fix(cli): `doctor --json` no longer marks a healthy sandbox / capacity check as `severity: "error"`; the sentinel for a passing check is `"ok"`.
+- fix(cli): `update --rollback` failure emits the envelope (`{"success": false, "message": …, "error_code": "cli-500"}`) with the `[ERROR]` prefix instead of `{"success": false, "error": …}` / `❌`.
+- fix(cli): a rotation failure in the headless controller prints `[WARN] Session rotation failed; falling back to the default session: {cause}` to stderr instead of silently degrading.
+- fix(cli): `session login --json` runs exactly one login and emits `{"success": true, "message": "Session 'X' saved"}` — no banner, no `input()` re-prompt — so non-interactive callers never block.
+- fix(cli): `job list` / `job status` / `job cleanup` failures and the missing-record branch route through `_fail_json` (`job status` reports `cli-400` for `Job not found`), and the contract test pins one forced failure per jobs verb.
+- fix(cli): `run_doctor` / `build_smoke_gate` / the interactive controller's doctor pane require a session aggregate and raise a `ValueError` naming the dependency otherwise; the production `_StubSessionAggregate` default is removed so a wiring gap cannot masquerade as an empty pool.
+- fix(cli): `_fail_json` returns the named `EXIT_FAILURE` constant; `doctor`'s session-pool rows use `status_glyph("health_*")` instead of `✅` / `⚠️` / `🔵`.
+- docs(cli): document `cli-422` and `cli-502` and the canonical success JSON schemas in `modules/cli/DESIGN.md`.
+- refactor(cli): drop the speculative `_table_widths` / `_render_table` generic layout engine and the unused ANSI colorization layer (`_colorize`, `_GLYPH_ANSI`, `_color_enabled`, the `stream` seam) from `surface_cli_json_hook`; the sessions tables render through `render_pool_table` in the sessions surface.
+- refactor(cli): remove `print_warn` (its single caller inlines the `[WARN]` line) and drop `print_error` from `__all__`.
+- chore(deps): `uv.lock` revision bumped 3 → 5 by uv's own schema migration; no dependency changed.
+
+### Tests
+
+- test(cli): `unit_surface_cli_sessions_command.py` — in-memory aggregate stub, `--json` payloads, the destructive `remove` path, the iterative login re-prompt, and the display-width-aware table helpers.
+- test(cli): `contract_json_envelope.py` — the fixed-key `{success, message, error_code}` envelope for one forced failure per jobs verb and per `--json` surface, plus a healthy-doctor JSON run pinned at exit 0.
+- test(cli): `unit_surface_cli_doctor_sandbox.py` — sandbox-detection branches, the env-flag precedence matrix, and the `--deep` / `QWEN_DOCTOR_DEEP` alias.
+
+## [6.5.0] - 2026-09-24
 
 ### Fixed
 

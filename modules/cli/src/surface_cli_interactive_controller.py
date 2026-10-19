@@ -79,8 +79,21 @@ class InteractiveController:
             if doctor_runner is None:
                 from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
 
+                # The pool is the doctor's single source of truth, so the
+                # runner always carries the wired session aggregate — never a
+                # stub that answers an empty pool without consulting disk
+                # (issue 5). A missing aggregate is a wiring gap; raising here
+                # surfaces as an error envelope under @safe_handle.
+                if self._session is None:
+                    raise ValueError(
+                        "InteractiveController requires a session aggregate (ISessionAggregate) for the "
+                        "doctor pane; pass session= or doctor_runner=."
+                    )
+
                 def doctor_runner() -> list[dict[str, Any]]:
-                    return run_doctor_checks()
+                    # Narrowed: the guard above raised when _session is None.
+                    assert self._session is not None
+                    return run_doctor_checks(session=self._session)
 
             app = QwenTuiApp(
                 self._workspace,
@@ -117,7 +130,9 @@ class InteractiveController:
 
                 response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
                 return response.session.path if response.session else None
-            except Exception:
+            except Exception as exc:
+                # Degradation is non-fatal: warn on stderr and keep the default session.
+                print(f"[WARN] Session rotation failed; falling back to the default session: {exc}", file=sys.stderr)
                 return None
 
         return dispatch_run(cfg, self._prompt, session_resolver=_pick)
