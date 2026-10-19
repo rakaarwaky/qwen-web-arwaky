@@ -20,8 +20,8 @@ class ISessionAggregate(ABC):
     """Single entry point over the session feature.
 
     Exactly one method: the door consumers knock on. The session verbs are
-    ``validate``, ``delete``, ``login``, ``list_sessions``, and
-    ``remove_session`` (pool-entry removal without profile cleanup); each
+    ``validate``, ``inspect``, ``rotate``, ``delete``, ``login``,
+    ``list_sessions``, ``remove_session``, and ``check_health``; each
     routes on ``SessionRequest.verb``.
     """
 

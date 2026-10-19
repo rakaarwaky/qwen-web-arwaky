@@ -9,9 +9,9 @@
 
 The session feature owns the saved browser sessions: keeping the pool that
 tracks them, checking which are still signed in, rotating to the next
-healthy one when one is rate limited, and deleting one safely. It owns two
-orchestrators: the session aggregate the surfaces call, and the setup
-aggregate that runs the manual login sequence.
+healthy one when one is rate limited, and deleting one safely. It owns one
+aggregate the surfaces call — the session aggregate — which implements all
+eight session verbs, including the setup flow's manual login.
 
 Workspace initialization (XDG directories, `.qwen-web-arwaky` symlinks, SKILL.md
 provisioning, `.gitignore` management) moved to the config feature
@@ -27,14 +27,14 @@ pool, health checking, rotation, renewal, deletion, and login.
 - **Input**: A session request naming the session path.
 - **Output**: A session response carrying the validity verdict and the reason.
 - **Business Rules**:
-  - A session whose profile no longer authenticates is reported invalid rather than repaired, so the operator chooses to re-login.
+  - A session whose profile no longer authenticates is first offered a transparent token renewal (while the refresh token is still valid); only when renewal is impossible is it reported invalid, so the operator chooses to re-login.
 - **Edge Cases**: A session path that does not exist is reported invalid, not an error.
 - **Error Handling**: An inspection that cannot complete surfaces an error naming the path.
 
 ### FR-SESSION-002: Keep and rotate the session pool
 
 - **Description**: Track the known sessions and pick the next one a run should use; report reasoned health verdicts with sub-cause and recovery.
-- **Input**: A rotation request naming the current session and the pool's health verdicts.
+- **Input**: A rotation request naming the sessions already tried and the pool's health verdicts.
 - **Output**: The next session to use, or the reason none is available (`no_eligible_session` with `reason` and `recovery_action`); or a `SessionHealthResult` with status (`ACTIVE`, `LIMITED`, `AUTH_REQUIRED`), reason, evidence, and recovery action.
 - **Business Rules**:
   - `ACTIVE` only from a successful authenticated probe.
@@ -53,18 +53,20 @@ pool, health checking, rotation, renewal, deletion, and login.
   - A mixed pool (some healthy, some limited) returns the next healthy session.
   - A session that is `UNKNOWN` (not yet probed) and whose probe fails transiently is reported `AUTH_REQUIRED`, never `LIMITED`.
   - For the `check_health` verb, `SessionResponse.valid` indicates pool availability (`healthy_count > 0`): True when at least one session in the pool is ready to accept requests; False when the pool is empty or every session is limited or unauthenticated.
-- **Error Handling**: A pool that cannot be read surfaces an error naming the pool path. Missing browser configuration reports `AUTH_REQUIRED` with `LAUNCH_FAILURE` reason.
+- **Error Handling**: A transient read failure (OSError) surfaces an error naming the pool path without quarantining; only parse errors (JSONDecodeError/KeyError/TypeError/ValueError) quarantine to `sessions.json.corrupt-<timestamp>`, log a warning naming the path, and rebuild from on-disk profile directories. Missing browser configuration reports `AUTH_REQUIRED` with `LAUNCH_FAILURE` reason.
 
 ### FR-SESSION-003: Delete a session safely
 
 - **Description**: Remove a saved session after taking a backup.
-- **Input**: A session request naming the session path and whether to bypass the backup guard.
+- **Input**: A session request naming the session path or name, and whether to bypass the backup guard.
 - **Output**: A session response reporting the deletion and the backup taken, or the refusal.
 - **Business Rules**:
   - A master profile is never deleted without a backup; the guard refuses unless the operator forces it.
   - A backup is written before the profile is removed, so a failed deletion can still be restored.
-- **Edge Cases**: A session that is already absent is reported as deleted rather than an error.
-- **Error Handling**: A backup that cannot be written refuses the deletion rather than removing the profile unprotected.
+  - The deletion target is always explicit: `session_path` wins, else the pool entry is resolved by `name`. A delete naming neither refuses; a target is never inferred from pool order.
+  - `force=True` bypasses the guard, and the bypass is logged as a warning naming the target.
+- **Edge Cases**: A session that is already absent is reported as "nothing deleted" rather than a false success.
+- **Error Handling**: A backup that cannot be written (permission, ENOSPC, read-only filesystem) refuses the deletion rather than removing the profile unprotected.
 
 ### FR-SESSION-004: Run the manual login sequence
 
@@ -72,7 +74,7 @@ pool, health checking, rotation, renewal, deletion, and login.
 - **Input**: A setup request naming the profile path, the headless flag, and an optional confirmation wait.
 - **Output**: A setup response carrying the profile path and the outcome message.
 - **Business Rules**:
-  - An already-valid session short-circuits the sequence and says so, instead of opening a login window.
+  - The login verb always opens a visible browser window (AES205); the already-valid fast-path belongs to the validate/check_health verbs, and `validate` reports a valid session without launching a login window.
   - The confirmation wait is consulted while the page is live, so the operator's signal is not missed.
 - **Edge Cases**: A headless login has no operator to confirm, so it completes as soon as the page authenticates.
 - **Error Handling**: A sequence that cannot complete surfaces the reason and leaves the previous session intact.
@@ -83,11 +85,11 @@ pool, health checking, rotation, renewal, deletion, and login.
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `load_pool` | pool path | session pool | file error | none | Read the tracked session pool. |
-| `save_pool` | session pool | saved pool | file error | none | Persist the tracked session pool. |
+| `load_pool` | pool path | session pool | file error | none | Read the tracked session pool, quarantining a corrupt file and rebuilding from disk. |
+| `save_pool` | session pool | saved pool | file error | none | Persist the tracked session pool atomically (temp file + atomic swap). |
 | `list_sessions` | none | session list | none | none | List the tracked sessions. |
 | `get_session` | session identifier | session info | not-found error | none | Read one tracked session. |
-| `add_session` | session info | session pool | file error | none | Add one session to the pool. |
+| `add_session` | session info | session pool | file error | none | Add one session to the pool with a unique ID. |
 | `remove_session` | session identifier | session pool | file error | none | Remove one session from the pool. |
 | `mark_healthy` | session identifier | session pool | file error | none | Mark one session usable. |
 | `mark_limited` | session identifier, optional reason | session pool | file error | none | Mark one session rate limited. |
@@ -98,13 +100,26 @@ pool, health checking, rotation, renewal, deletion, and login.
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `execute` | session request naming the verb | session response carrying the validity verdict, the pool, or the deletion outcome | not-found, no-healthy-session, file error | none | Single entry point surfaces call to validate, inspect, rotate, or delete. |
+| `execute` | session request naming the verb | session response carrying the validity verdict, the pool entry, the rotation selection, the deletion outcome, or the health summary | not-found, no-healthy-session, file error | none | Single entry point surfaces call for every session verb: `validate` \| `inspect` \| `rotate` \| `delete` \| `login` \| `list_sessions` \| `remove_session` \| `check_health`. |
+
+Verb contracts (input → output → error), in dispatch order:
+
+| Verb | Input | Output | Error |
+|---|---|---|---|
+| `validate` | `session_path` | `valid`, `message`, `status`, `reason`, `recovery_action` | path that cannot be inspected |
+| `inspect` | `session_path` or `name` | the single pool entry in `sessions`, `message` | `session not found`; missing selector |
+| `rotate` | `exclude_ids` | the selected session in `sessions`, or `throttled` with `reason` and `recovery_action` | rotator not wired; rotation failure |
+| `delete` | `session_path` or `name`, `force` | `deleted`, `message` | `QwenCliError` naming the refused target |
+| `login` | `session_path` or `name`, `wait_for_confirmation` | `valid`, `profile_path`, `message` | login could not complete |
+| `list_sessions` | none | the whole pool in `sessions`, `message` | no pool available |
+| `remove_session` | `name` | `removed`, `message`, `profile_path` | missing `request.name`; `session not found` |
+| `check_health` | none | `health_healthy`, `health_total`, `message`, `status`, `health_results` (each carrying `status`, `reason`, `evidence`, `recovery_action`) | health checker not wired |
 
 ## Integration Points
 
 | System | Direction | Purpose | Failure mode |
 |---|---|---|---|
-| Surfaces | in | Validate, rotate, or delete a session | no-healthy-session -> surface prompts for a login |
+| Surfaces | in | Validate, inspect, rotate, or delete a session | no-healthy-session -> surface prompts for a login |
 | Prompt orchestrators | out | Obtain a healthy session per run | no-healthy-session -> run fails before the browser launch |
 | Login surfaces | in | Drive the manual login sequence | setup failure -> operator retries |
 | External monitors | out | Read the tracked pool's state | absent pool -> empty pool, not an error |
@@ -119,10 +134,13 @@ pool, health checking, rotation, renewal, deletion, and login.
 
 ## Test Scenarios
 
-- A session whose profile no longer authenticates is reported invalid rather than repaired.
+- A session whose profile no longer authenticates is transparently renewed first; only when renewal is impossible is it reported invalid.
 - A pool with one rate-limited and one healthy session rotates to the healthy one.
+- A pool with every session rate-limited returns `no_eligible_session` with reason `all_sessions_limited`; `execute_with_rotation` returns an explicit error outcome without submitting.
 - A master profile deletion is refused unless the operator forces it.
 - A backup write failure refuses the deletion and leaves the profile in place.
+- An inspect of a known session returns its pool entry; an inspect naming nothing reports the missing selector.
+- A delete of an already-absent profile reports "nothing deleted" rather than a false success.
 
 ## Assumptions & Constraints
 

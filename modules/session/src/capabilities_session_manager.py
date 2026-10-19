@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
@@ -22,9 +23,6 @@ from modules.shared.src.session.taxonomy_session_vo import (
 )
 
 log = get_logger("session_manager")
-
-if TYPE_CHECKING:
-    pass
 
 
 # Block 1: Class Definition & Constructor
@@ -56,23 +54,53 @@ class SessionManager(ISessionManagerProtocol):
         if not POOL_FILE.exists():
             return SessionPool.empty()
 
-        data = json.loads(POOL_FILE.read_text())
-        sessions = []
-        for s in data.get("sessions", []):
-            sessions.append(
-                SessionInfo(
-                    session_id=s["session_id"],
-                    name=s["name"],
-                    path=Path(s["path"]),
-                    status=SessionStatus(s["status"]),
-                    last_used=self._parse_datetime(s.get("last_used")),
-                    total_requests=s.get("total_requests", 0),
-                    failed_requests=s.get("failed_requests", 0),
-                    created_at=self._parse_datetime(s["created_at"]) or datetime.now().astimezone(),
-                    reason=s.get("reason"),
+        try:
+            raw = POOL_FILE.read_text()
+        except OSError as exc:
+            # A transient read failure (EMFILE etc.) is not corruption: surface
+            # a named-path error instead of quarantining a healthy file.
+            raise QwenCliError(f"Cannot read session pool at {POOL_FILE}: {exc}") from exc
+
+        try:
+            data = json.loads(raw)
+            sessions = []
+            for s in data.get("sessions", []):
+                sessions.append(
+                    SessionInfo(
+                        session_id=s["session_id"],
+                        name=s["name"],
+                        path=Path(s["path"]),
+                        status=SessionStatus(s["status"]),
+                        last_used=self._parse_datetime(s.get("last_used")),
+                        total_requests=s.get("total_requests", 0),
+                        failed_requests=s.get("failed_requests", 0),
+                        created_at=self._parse_datetime(s["created_at"]) or datetime.now().astimezone(),
+                        reason=s.get("reason"),
+                    )
                 )
-            )
-        return SessionPool(sessions=sessions, current_index=data.get("current_index", 0))
+            return SessionPool(sessions=sessions, current_index=data.get("current_index", 0))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            ts = int(datetime.now().astimezone().timestamp())
+            corrupt_file = POOL_FILE.with_name(f"{POOL_FILE.name}.corrupt-{ts}")
+            with contextlib.suppress(OSError):
+                os.replace(POOL_FILE, corrupt_file)
+            log.warning("session_pool_corrupt path=%s quarantined_to=%s error=%s", POOL_FILE, corrupt_file, exc)
+            return SessionPool.empty()
+
+    @staticmethod
+    def _next_session_id(existing_sessions: list[SessionInfo]) -> str:
+        """Derive the next unique session_id from the max numeric suffix among existing IDs.
+
+        ``max_num + 1`` is by construction the first integer past every
+        existing numeric suffix, so it cannot collide with any surviving ID.
+        """
+        max_num = 0
+        for s in existing_sessions:
+            if s.session_id.startswith("session_"):
+                suffix = s.session_id.removeprefix("session_")
+                if suffix.isdigit():
+                    max_num = max(max_num, int(suffix))
+        return f"session_{max_num + 1}"
 
     def _register_discovered_profiles(self, pool: SessionPool) -> int:
         """Register profile dirs on disk missing from *pool*; returns the count added."""
@@ -82,9 +110,10 @@ class SessionManager(ISessionManagerProtocol):
             if profile_dir.resolve() in known:
                 continue
             name = profile_dir.name
+            session_id = self._next_session_id(pool.sessions)
             pool.add_session(
                 SessionInfo(
-                    session_id=f"session_{len(pool.sessions) + 1}",
+                    session_id=session_id,
                     name=name,
                     path=profile_dir,
                     status=SessionStatus.AUTH_REQUIRED,
@@ -97,11 +126,17 @@ class SessionManager(ISessionManagerProtocol):
 
     @staticmethod
     def _iter_profile_dirs() -> list[Path]:
-        """Yield subdirectories of SESSIONS_DIR that look like Chromium profiles."""
+        """Yield subdirectories of SESSIONS_DIR that look like Chromium profiles.
+
+        Symbolic links are skipped: a symlink placed in the sessions
+        directory would adopt an arbitrary external profile.
+        """
         if not SESSIONS_DIR.is_dir():
             return []
         profiles: list[Path] = []
         for child in sorted(SESSIONS_DIR.iterdir()):
+            if child.is_symlink():
+                continue
             if not child.is_dir():
                 continue
             if (child / "Local State").is_file() or (child / "Default" / "Cookies").is_file():
@@ -109,7 +144,14 @@ class SessionManager(ISessionManagerProtocol):
         return profiles
 
     def save_pool(self, pool: SessionPool) -> None:
-        """Persist session pool to disk."""
+        """Persist session pool to disk atomically.
+
+        The pool is a local, single-writer state: the CLI is one process
+        at a time, and the MCP server is the only long-lived consumer, so
+        mutations are serialized on one process. A second concurrent writer
+        would lose one of the two, which is documented and not guarded
+        against (see ISSUE.md single-writer assumption note).
+        """
         data: dict[str, object] = {
             "sessions": [
                 {
@@ -127,7 +169,21 @@ class SessionManager(ISessionManagerProtocol):
             ],
             "current_index": pool.current_index,
         }
-        POOL_FILE.write_text(json.dumps(data, indent=2))
+        # A unique tmp name per write (pid) so two concurrent writers in
+        # different processes do not share a tmp target.
+        tmp = POOL_FILE.with_name(f"{POOL_FILE.name}.{os.getpid()}.tmp")
+        try:
+            # 0o600 so a previously restrictive pool file does not become
+            # world-readable after the swap.
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                os.write(fd, json.dumps(data, indent=2).encode("utf-8"))
+            finally:
+                os.close(fd)
+            os.replace(tmp, POOL_FILE)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def add_session(self, name: str, profile_path: Path) -> SessionInfo:
         """Create and save a new session, or update the existing entry with
@@ -143,7 +199,7 @@ class SessionManager(ISessionManagerProtocol):
                 pool.sessions[i] = s.with_name(name)
                 self.save_pool(pool)
                 return pool.sessions[i]
-        session_id = f"session_{len(pool.sessions) + 1}"
+        session_id = self._next_session_id(pool.sessions)
         info = SessionInfo(
             session_id=session_id,
             name=name,
@@ -179,7 +235,7 @@ class SessionManager(ISessionManagerProtocol):
             self.save_pool(pool)
         return removed
 
-    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> None:
+    def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> bool:
         """Remove the saved Chromium profile directory at *profile_path*.
 
         Safety checks run before anything is removed: the target must exist,
@@ -187,16 +243,21 @@ class SessionManager(ISessionManagerProtocol):
         near-root path, or a path outside the allow-list), and must have a
         retained backup generation unless *force* is set. A partial removal
         raises rather than silently leaving an inconsistent profile.
+
+        Returns True when the profile was removed, False when the target
+        did not exist (a no-op that the caller must not report as success).
         """
         target = profile_path.resolve()
         if not target.exists():
-            return
+            return False
         if not utility_session_guard.is_safe_session_target(target):
             raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
+        if force:
+            log.warning("session_delete_forced_backup_guard_bypassed target=%s", target)
         try:
             utility_core_session_backup.refuse_delete_without_backup(target, force=force)
-        except PermissionError as exc:
-            raise QwenCliError(str(exc)) from exc
+        except OSError as exc:
+            raise QwenCliError(f"Refusing to delete {target}: backup guard failed: {exc}") from exc
         try:
             shutil.rmtree(target)
         except Exception as exc:
@@ -204,6 +265,7 @@ class SessionManager(ISessionManagerProtocol):
                 f"Failed to delete session {target}: {exc}. "
                 "Deletion may be partial — remove the remaining directory manually."
             ) from exc
+        return True
 
     def find_pool_profile_with_content(self) -> Path | None:
         """Return the first pool session path holding real Chromium content.

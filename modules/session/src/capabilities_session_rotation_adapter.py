@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from modules.shared.src.session.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
@@ -18,9 +18,6 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionPool,
     SessionStatus,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -71,7 +68,12 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
     # Block 2: Protocol Method Implementation
 
     async def get_next_session(self) -> SessionInfo | None:
-        """Get next healthy session with fallback."""
+        """Get next healthy session with fallback.
+
+        Delegates to :meth:`rotate` so the two never drift: a single
+        ordered pass from ``pool.current_index`` probes each candidate
+        exactly once, so an all-limited pool of N sessions costs N probes.
+        """
         resp = await self.rotate(RotatorRequest())
         return resp.session
 
@@ -80,9 +82,13 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
 
         ``request.exclude_ids`` lists sessions a caller has already attempted
         in this turn, so a rotation that hits a rate-limited session moves on
-        rather than re-picking the one that just failed. When no eligible session
-        remains, returns an explicit `no_eligible_session` outcome BEFORE
-        submitting; never submits through a known-LIMITED profile.
+        rather than re-picking the one that just failed. Iteration starts at
+        ``pool.current_index`` and wraps, so the same pool state always
+        resolves the same candidate (FR-SESSION-002 determinism); each
+        candidate is probed exactly once. When no eligible session remains,
+        returns an explicit ``no_eligible_session`` outcome BEFORE
+        submitting (``throttled`` reads True on that outcome); never
+        submits through a known-LIMITED profile.
         """
         self._metrics.total_attempts += 1
         pool = self._manager.load_pool()
@@ -100,8 +106,9 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
 
         excluded = set(request.exclude_ids)
         checker = self._ensure_checker()
+        ordered = pool.sessions[pool.current_index :] + pool.sessions[: pool.current_index]
 
-        for candidate in pool.sessions:
+        for candidate in ordered:
             if candidate.session_id in excluded:
                 continue
             verdict = await checker.diagnose_session(candidate)
@@ -131,6 +138,15 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
     async def mark_healthy(self, session_id: SessionId) -> None:
         """Mark session as healthy."""
         self._manager.mark_healthy(session_id)
+
+    def rotate_sync(self, request: RotatorRequest) -> RotatorResponse:
+        """Synchronous wrapper that runs rotation on a fresh event loop.
+
+        Mirrors ``check_pool_sync``: the capability owns the event-loop
+        handling so the sync ``execute`` seam never calls ``asyncio.run``
+        inline (which would crash inside an already-running loop).
+        """
+        return asyncio.run(self.rotate(request))
 
     async def execute_with_rotation(
         self,

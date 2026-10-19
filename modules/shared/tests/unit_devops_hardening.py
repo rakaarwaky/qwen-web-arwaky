@@ -394,7 +394,7 @@ def test_delete_session_refuses_without_a_backup(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(session_guard, "SESSIONS_DIR", fake_sessions)
 
     with pytest.raises(Exception, match="no session backup is retained"):
-        orch.execute(SessionRequest(verb="delete", session_path=session))
+        orch.execute(SessionRequest(verb="delete", session_path=session, name=""))
 
 
 def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
@@ -409,7 +409,7 @@ def test_delete_session_proceeds_when_forced(tmp_path, monkeypatch) -> None:
     (session / "Cookies").write_text("x", encoding="utf-8")
     monkeypatch.setattr(session_guard, "SESSIONS_DIR", fake_sessions)
 
-    result = orch.execute(SessionRequest(verb="delete", session_path=session, force=True))
+    result = orch.execute(SessionRequest(verb="delete", session_path=session, force=True, name=""))
 
     assert "deleted successfully" in str(result)
     assert not session.exists()

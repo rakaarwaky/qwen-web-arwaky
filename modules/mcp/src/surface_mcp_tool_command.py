@@ -615,10 +615,12 @@ class McpToolCommand:
                 hint="Call setup_session to log in manually.",
             )
 
-    def delete_session(self, confirm: bool = False, force: bool = False) -> str:
+    def delete_session(self, session_name: str = "", confirm: bool = False, force: bool = False) -> str:
         """Delete saved browser session tokens. Requires confirm=True.
 
         Args:
+            session_name: Name of the pooled session whose profile is deleted.
+                Required: a deletion target is never inferred from the pool.
             confirm: Must be explicitly set to True to confirm session deletion.
             force: Bypass the backup-guard that prevents deleting the master
                 session when no snapshot is retained (issue #300).
@@ -630,13 +632,19 @@ class McpToolCommand:
             return _format_error_payload(
                 code="CONFIRMATION_REQUIRED",
                 message="Deleting session tokens requires explicit confirm=True.",
-                hint="Call delete_session(confirm=True) to proceed.",
+                hint="Call delete_session(session_name=..., confirm=True) to proceed.",
+            )
+        if not session_name:
+            return _format_error_payload(
+                code="SESSION_NAME_REQUIRED",
+                message="Deleting session tokens requires an explicit session_name.",
+                hint="Call delete_session(session_name='default', confirm=True) to proceed.",
             )
 
         try:
             from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
-            self._session.execute(SessionRequest(verb="delete", force=bool(force)))
+            self._session.execute(SessionRequest(verb="delete", name=session_name, force=bool(force)))
             return json.dumps(
                 {
                     "success": True,

@@ -235,7 +235,10 @@ class RotatorResponse:
     ``session`` carries the selected healthy session. When no healthy session
     remains, ``session`` is None and ``outcome`` is "no_eligible_session" with
     an explicit reason and recovery action; ``error`` is reserved for a
-    rotation that could not be attempted at all.
+    rotation that could not be attempted at all. ``throttled`` is a derived
+    view of the exhaustion outcome (``outcome == "no_eligible_session"``),
+    so the plan's exhaustion contract (``session=None, throttled=True``)
+    reads the same shape without duplicating state.
     """
 
     session: SessionInfo | None = None
@@ -243,6 +246,11 @@ class RotatorResponse:
     outcome: str = "success"
     reason: str | None = None
     recovery_action: str | None = None
+
+    @property
+    def throttled(self) -> bool:
+        """True when every pooled session was rate-limited or excluded."""
+        return self.outcome == "no_eligible_session"
 
 
 @dataclass(frozen=True)
@@ -262,13 +270,17 @@ class SessionRequest:
     must always open a visible browser, so the orchestrator ignores this
     flag on that path; it is kept in the shape for forward compatibility
     with other verbs that may prefer a headless browser.
+
+    ``exclude_ids`` is read only by the ``rotate`` verb, which forwards it
+    to the rotator so sessions already tried in this turn are skipped.
     """
 
     verb: str = "validate"
     session_path: Path | None = None
     force: bool = False
-    #: Named account the ``login`` verb registers in the pool. Ignored by
-    #: ``validate`` and ``delete``; defaults to "default".
+    #: Named account the ``login`` verb registers in the pool. ``delete``
+    #: also resolves it through the pool when no ``session_path`` is set, so
+    #: a deletion target is always explicit; ignored by ``validate``.
     name: str = "default"
     #: Wait loop for the interactive login flow. The agent consults this
     #: while the headed browser is still live; ``None`` ends the loop at
@@ -277,6 +289,9 @@ class SessionRequest:
     #: Login verb: always ``False`` in practice — the manual-login path
     #: forces a visible browser regardless of this flag.
     browser_headless: bool = False
+    #: Rotate verb: session IDs a caller already attempted in this turn,
+    #: forwarded to the rotator as the exclusion set.
+    exclude_ids: tuple[SessionId, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -295,6 +310,8 @@ class SessionResponse:
     response without reading the exception can still locate the persisted
     session. ``sessions`` carries the pool listing for ``list_sessions``;
     ``removed`` reports whether ``remove_session`` dropped a pool entry.
+    ``throttled`` reports whether the ``rotate`` verb found every pooled
+    session rate-limited.
     """
 
     valid: bool = False
@@ -315,6 +332,9 @@ class SessionResponse:
     reason: str | None = None
     recovery_action: str | None = None
     health_results: list[SessionHealthResult] | None = None
+    #: True when the ``rotate`` verb exhausted the pool (every session
+    #: rate-limited) instead of selecting one.
+    throttled: bool = False
 
 
 __all__ = [

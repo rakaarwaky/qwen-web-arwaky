@@ -261,16 +261,27 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="delete_session",
-        description="Delete saved browser session tokens. Requires confirm=True parameter to proceed.",
+        description="Delete saved browser session tokens for one named pooled session. Requires confirm=True and the session_name of the pool entry to delete.",
         input_schema={
             "type": "object",
             "properties": {
+                "session_name": {
+                    "type": "string",
+                    "description": "Name of the pooled session whose profile directory is deleted (e.g. 'default'). Never inferred.",
+                    "default": "",
+                },
                 "confirm": {
                     "type": "boolean",
                     "description": "Must be True to confirm deletion of saved session tokens.",
                     "default": False,
                 },
+                "force": {
+                    "type": "boolean",
+                    "description": "Bypass the backup guard that blocks deleting a profile with no retained snapshot.",
+                    "default": False,
+                },
             },
+            "required": ["session_name", "confirm"],
         },
     ),
     Tool(

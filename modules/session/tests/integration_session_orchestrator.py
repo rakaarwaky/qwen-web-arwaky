@@ -51,6 +51,8 @@ def test_integration_delete_absent_session_returns_error(tmp_path: Path) -> None
     )
     with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value.session_path = tmp_path / "absent-profile"
-        response = orchestrator.execute(SessionRequest(verb="delete", session_path=tmp_path / "absent-profile"))
+        response = orchestrator.execute(
+            SessionRequest(verb="delete", session_path=tmp_path / "absent-profile", name="")
+        )
     # Absent target: no exception, error field or deleted flag carries the outcome.
     assert response is not None
