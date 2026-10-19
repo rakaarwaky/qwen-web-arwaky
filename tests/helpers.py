@@ -119,9 +119,11 @@ def upload_attachment(page, filepath) -> bool:
     return FileUploader().upload_attachment(page, filepath)
 
 
-def validate_file(filepath, max_size_mb=100.0):
+def validate_file(filepath, max_size_bytes=None):
     """Standalone wrapper for utility function."""
-    return _util_validate_file(filepath, max_size_mb)
+    if max_size_bytes is None:
+        return _util_validate_file(filepath)
+    return _util_validate_file(filepath, max_size_bytes=max_size_bytes)
 
 
 def clean_stale_locks(user_data_dir: str) -> None:

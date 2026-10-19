@@ -6,6 +6,7 @@ Taxonomy layer (utility): stateless functions, taxonomy imports only.
 from __future__ import annotations
 
 import os
+import zipfile
 from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_constant import CHALLENGE_KEYWORDS, RATE_LIMIT_KEYWORDS
@@ -15,7 +16,7 @@ from modules.shared.src.common.taxonomy_core_error import (
     OutputValidationError,
     RateLimitError,
 )
-from modules.shared.src.common.taxonomy_core_vo import ErrorReason
+from modules.shared.src.common.taxonomy_core_vo import ErrorReason, MaxFileSizeBytes
 
 
 def validate_response_content(text: str) -> None:
@@ -33,6 +34,34 @@ def validate_response_content(text: str) -> None:
                 raise AuthRequiredError(f"CAPTCHA / Bot detection challenge detected: '{kw}'")
             raise OutputValidationError(f"Server error or challenge page detected in output: '{kw}'")
 
+
+MAX_ATTACHMENT_SIZE_BYTES: int = 104_857_600  # 100 * 1024 * 1024 exact bytes (100 MiB)
+
+SUPPORTED_ATTACHMENT_EXTENSIONS: tuple[str, ...] = (
+    ".txt",
+    ".md",
+    ".markdown",
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".csv",
+    ".tsv",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".xml",
+    ".html",
+    ".htm",
+    ".py",
+    ".js",
+    ".ts",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".rs",
+    ".go",
+)
 
 UNSUPPORTED_EXTENSIONS: tuple[str, ...] = (
     ".zip",
@@ -53,19 +82,22 @@ UNSUPPORTED_EXTENSIONS: tuple[str, ...] = (
 )
 
 
-def validate_file(filepath: object, max_size_mb: float = 100.0) -> int:
-    """Perform pre-flight sanity, extension gatekeeping, and security validation on file.
+def validate_file(
+    filepath: object,
+    max_size_bytes: MaxFileSizeBytes = MaxFileSizeBytes(MAX_ATTACHMENT_SIZE_BYTES),
+) -> int:
+    """Perform pre-flight sanity, extension allowlist, exact byte ceiling, and content validation.
 
     Args:
         filepath: Path to the target file.
-        max_size_mb: Maximum allowed file size in megabytes.
+        max_size_bytes: Maximum allowed file size in exact bytes (the single
+            locked ceiling, defaults to 104857600 = 100 MiB).
 
     Returns:
         File size in bytes.
 
     Raises:
-        FileValidationError: If the file is invalid, unsupported, or exceeds size limits.
-
+        FileValidationError: If the file is invalid, unsupported, empty, or exceeds size limits.
     """
     if not isinstance(filepath, (str, Path)):
         raise FileValidationError(f"Invalid path: {filepath}")
@@ -79,7 +111,7 @@ def validate_file(filepath: object, max_size_mb: float = 100.0) -> int:
         raise FileValidationError(f"File is not readable: {path}")
 
     ext = path.suffix.lower()
-    if ext in UNSUPPORTED_EXTENSIONS:
+    if ext in UNSUPPORTED_EXTENSIONS or ext not in SUPPORTED_ATTACHMENT_EXTENSIONS:
         raise FileValidationError(
             f"Extension '{ext}' is not supported as an attachment by Qwen Web UI ({path.name}). "
             f"Archive and binary formats like {ext} are rejected by Qwen. "
@@ -87,10 +119,36 @@ def validate_file(filepath: object, max_size_mb: float = 100.0) -> int:
         )
 
     size_bytes = path.stat().st_size
-    max_bytes = int(max_size_mb * 1024 * 1024)
-    if size_bytes > max_bytes:
+    if size_bytes == 0:
+        raise FileValidationError(f"File is empty (0 bytes): {path}")
+
+    if size_bytes > max_size_bytes:
         raise FileValidationError(
-            f"File size ({size_bytes / (1024 * 1024):.2f}MB) exceeds maximum limit of {max_size_mb:.2f}MB: {path}"
+            f"File size ({size_bytes} bytes) exceeds maximum limit of {max_size_bytes} bytes: {path}"
         )
 
+    _validate_type_content_match(path, ext)
+
     return size_bytes
+
+
+def _validate_type_content_match(path: Path, ext: str) -> None:
+    """Validate that the file header matches its claimed extension (rejects mismatches)."""
+    try:
+        with path.open("rb") as f:
+            header = f.read(512)
+    except Exception as exc:
+        raise FileValidationError(f"File is not readable: {path}") from exc
+
+    if ext == ".pdf":
+        if not header.startswith(b"%PDF-"):
+            raise FileValidationError(
+                f"Content does not match extension '{ext}' (expected PDF magic header %PDF-): {path}"
+            )
+    elif ext in {".txt", ".md", ".markdown", ".py", ".json", ".yaml", ".yml", ".xml", ".csv", ".tsv", ".html", ".htm"}:
+        if b"\x00" in header:
+            raise FileValidationError(
+                f"Content does not match extension '{ext}' (binary null byte detected in text format): {path}"
+            )
+    elif ext == ".docx" and not zipfile.is_zipfile(path):
+        raise FileValidationError(f"Content does not match extension '{ext}' (expected ZIP/OOXML archive): {path}")

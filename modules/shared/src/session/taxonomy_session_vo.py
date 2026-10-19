@@ -17,11 +17,50 @@ class SessionStatus(str, Enum):
 
     ACTIVE = "active"  # Healthy, can send requests
     LIMITED = "limited"  # Hit rate limit
-    UNKNOWN = "unknown"  # Not tested yet
+    AUTH_REQUIRED = "auth_required"  # Authentication required or probe failure
+    # Read-only alias for legacy pool files; ``SessionStatus._missing_`` maps
+    # a persisted ``"unknown"`` to AUTH_REQUIRED on load, and the next
+    # ``save_pool`` rewrites the pool JSON in place as ``"auth_required"``.
+    UNKNOWN = "auth_required"
+
+    @classmethod
+    def _missing_(cls, value: object) -> SessionStatus | None:
+        if isinstance(value, str) and value.lower() == "unknown":
+            return cls.AUTH_REQUIRED
+        return None
+
+
+class HealthReason(str, Enum):
+    """Sub-cause reason for a session health probe verdict."""
+
+    QUOTA = "QUOTA"
+    EXPIRED = "EXPIRED"
+    LAUNCH_FAILURE = "LAUNCH_FAILURE"
+    NETWORK = "NETWORK"
+    TIMEOUT = "TIMEOUT"
 
 
 SessionId: TypeAlias = str
 SessionName: TypeAlias = str
+#: Sub-cause reason for a health verdict, e.g. ``"QUOTA"`` or ``"EXPIRED"``.
+#: Values are the :class:`HealthReason` constants; stored as plain strings.
+SessionReason: TypeAlias = str
+
+
+@dataclass(frozen=True)
+class SessionHealthResult:
+    """Detailed reasoned verdict for a session health probe."""
+
+    session_id: SessionId
+    status: SessionStatus
+    reason: str | None = None
+    evidence: str | None = None
+    recovery_action: str | None = None
+
+    @property
+    def is_healthy(self) -> bool:
+        """True if session is ACTIVE and ready to serve requests."""
+        return self.status == SessionStatus.ACTIVE
 
 
 @dataclass(frozen=True)
@@ -31,11 +70,12 @@ class SessionInfo:
     session_id: SessionId
     name: SessionName
     path: Path
-    status: SessionStatus = SessionStatus.UNKNOWN
+    status: SessionStatus = SessionStatus.AUTH_REQUIRED
     last_used: datetime | None = field(default=None)
     total_requests: int = field(default=0)
     failed_requests: int = field(default=0)
     created_at: datetime = field(default_factory=lambda: datetime.now().astimezone())
+    reason: str | None = field(default=None)
 
     @property
     def is_healthy(self) -> bool:
@@ -48,15 +88,20 @@ class SessionInfo:
         return self.status == SessionStatus.LIMITED
 
     @property
+    def is_auth_required(self) -> bool:
+        """True if session requires authentication or login."""
+        return self.status == SessionStatus.AUTH_REQUIRED
+
+    @property
     def failure_rate(self) -> float:
         """Ratio of failed requests (0.0 to 1.0)."""
         if self.total_requests == 0:
             return 0.0
         return self.failed_requests / self.total_requests
 
-    def with_status(self, status: SessionStatus) -> SessionInfo:
-        """Return a copy with updated status (delegates to ``dataclasses.replace``)."""
-        return replace(self, status=status)
+    def with_status(self, status: SessionStatus, reason: SessionReason | None = None) -> SessionInfo:
+        """Return a copy with updated status and optional reason."""
+        return replace(self, status=status, reason=reason)
 
     def with_name(self, name: SessionName) -> SessionInfo:
         """Return a copy with an updated account name (delegates to ``dataclasses.replace``)."""
@@ -115,18 +160,25 @@ class SessionPool:
         # All sessions limited
         return None
 
-    def mark_limited(self, session_id: str) -> None:
-        """Mark a session as rate-limited."""
+    def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
+        """Mark a session as rate-limited; ``None`` is persisted as ``"QUOTA"``."""
         for i, s in enumerate(self.sessions):
             if s.session_id == session_id:
-                self.sessions[i] = s.with_status(SessionStatus.LIMITED)
+                self.sessions[i] = s.with_status(SessionStatus.LIMITED, reason=reason)
                 return
 
     def mark_healthy(self, session_id: str) -> None:
-        """Mark a session as healthy after successful request."""
+        """Mark a session as healthy after successful request or probe."""
         for i, s in enumerate(self.sessions):
             if s.session_id == session_id:
-                self.sessions[i] = s.with_status(SessionStatus.ACTIVE)
+                self.sessions[i] = s.with_status(SessionStatus.ACTIVE, reason=None)
+                return
+
+    def mark_auth_required(self, session_id: str, reason: SessionReason | None = None) -> None:
+        """Mark a session as requiring re-authentication or setup."""
+        for i, s in enumerate(self.sessions):
+            if s.session_id == session_id:
+                self.sessions[i] = s.with_status(SessionStatus.AUTH_REQUIRED, reason=reason)
                 return
 
     def add_session(self, info: SessionInfo) -> None:
@@ -180,14 +232,17 @@ class RotatorRequest:
 class RotatorResponse:
     """What a rotation verb produced.
 
-    ``session`` carries the selected healthy session. It is ``None`` when
-    every pooled session is rate-limited, which is a normal exhausted
-    result rather than a failure; ``error`` is reserved for a rotation
-    that could not be attempted at all.
+    ``session`` carries the selected healthy session. When no healthy session
+    remains, ``session`` is None and ``outcome`` is "no_eligible_session" with
+    an explicit reason and recovery action; ``error`` is reserved for a
+    rotation that could not be attempted at all.
     """
 
     session: SessionInfo | None = None
     error: str | None = None
+    outcome: str = "success"
+    reason: str | None = None
+    recovery_action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -228,8 +283,12 @@ class SessionRequest:
 class SessionResponse:
     """What a session verb produced.
 
-    ``valid`` carries the auth verdict for ``validate``; ``message`` carries
-    the human-readable outcome of either verb; ``deleted`` reports whether
+    ``valid`` carries the auth verdict for ``validate`` (True when the
+    profile is authenticated and usable) and the pool availability flag for
+    ``check_health`` (True when at least one session in the pool is
+    healthy and ready to accept requests; False when the pool is empty or
+    every session is rate-limited/unauthenticated). ``message`` carries
+    the human-readable outcome of any verb; ``deleted`` reports whether
     ``delete`` removed a profile. ``error`` names the reason a request could
     not be answered at all. ``profile_path`` carries the resolved profile
     directory after a successful ``login`` so callers that receive the
@@ -251,11 +310,18 @@ class SessionResponse:
     #: Session count for the ``check_health`` verb (healthy / total).
     health_healthy: int | None = None
     health_total: int | None = None
+    #: Reasoned verdict fields for health checks
+    status: str | None = None
+    reason: str | None = None
+    recovery_action: str | None = None
+    health_results: list[SessionHealthResult] | None = None
 
 
 __all__ = [
+    "HealthReason",
     "RotatorRequest",
     "RotatorResponse",
+    "SessionHealthResult",
     "SessionInfo",
     "SessionList",
     "SessionPool",
@@ -264,4 +330,5 @@ __all__ = [
     "SessionStatus",
     "SessionId",
     "SessionName",
+    "SessionReason",
 ]

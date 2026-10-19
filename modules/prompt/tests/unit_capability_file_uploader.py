@@ -39,6 +39,8 @@ class TestValidateFile:
             FileUploader().validate_file(tmp_path)
 
     def test_unreadable_file(self, tmp_path):
+        # Skip under root (containerised CI runs as root): root bypasses the
+        # filesystem permission check this case exercises.
         if os.getuid() == 0:
             pytest.skip("root bypasses filesystem permission checks")
         f = tmp_path / "locked.md"
@@ -54,7 +56,7 @@ class TestValidateFile:
         f = tmp_path / "big.md"
         f.write_text("x" * 1024)
         with pytest.raises(FileValidationError, match="exceeds maximum"):
-            FileUploader().validate_file(f, max_size_mb=0.0001)
+            FileUploader().validate_file(f, max_size_bytes=512)
 
 
 class TestCloseDropdownIfOpen:
@@ -159,5 +161,5 @@ class TestUploadAttachment:
             patch("modules.prompt.src.capabilities_file_uploader.time"),
             patch.object(FileUploader, "_wait_for_parse_ready"),
         ):
-            result = FileUploader().upload_attachment(page, f, config=None)
+            result = FileUploader().upload_attachment(page, f)
             assert result is True

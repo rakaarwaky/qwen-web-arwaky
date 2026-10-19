@@ -208,7 +208,11 @@ def _check_session(session: ISessionAggregate) -> dict[str, Any]:
             icon = (
                 status_glyph("health_ok")
                 if s.is_healthy
-                else (status_glyph("health_limited") if s.is_limited else status_glyph("health_unknown"))
+                else (
+                    status_glyph("health_limited")
+                    if s.is_limited
+                    else (status_glyph("health_auth") if s.is_auth_required else status_glyph("health_unknown"))
+                )
             )
             lines.append(f"  {icon} {s.session_id} ({s.name}): {s.status.value}")
         healthy = sum(1 for s in entries if s.is_healthy)

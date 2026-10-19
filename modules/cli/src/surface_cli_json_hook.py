@@ -24,6 +24,7 @@ STATUS_GLYPHS: dict[str, str] = {
     "pending": "…",
     "health_ok": "●",
     "health_limited": "◐",
+    "health_auth": "⛔",
     "health_unknown": "○",
 }
 

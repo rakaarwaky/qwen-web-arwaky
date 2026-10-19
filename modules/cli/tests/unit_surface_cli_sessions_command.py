@@ -169,7 +169,7 @@ def test_status_counts_per_pool(capsys) -> None:
     assert "Session Pool Status" in out
     assert "Healthy: 1" in out
     assert "Limited: 1" in out
-    assert "Unknown: 1" in out
+    assert "Auth Required: 1" in out
 
 
 def test_status_json_payload_carries_counts(capsys) -> None:

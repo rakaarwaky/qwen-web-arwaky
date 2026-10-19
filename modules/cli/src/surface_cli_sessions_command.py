@@ -26,7 +26,7 @@ from modules.cli.src.surface_cli_json_hook import (
     _fail_json,
     status_glyph,
 )
-from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 
 if TYPE_CHECKING:
     from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
@@ -46,7 +46,7 @@ _PAD = 2
 #: table. The ellipsis ``…`` and the result markers ``✓ / ✗ / ⚠`` render one
 #: column and stay out of the table so :func:`_fit` can trade one column of
 #: content for the marker.
-_TWO_COLUMN_CHARS = frozenset("●◐○━")
+_TWO_COLUMN_CHARS = frozenset("●◐○━⛔")
 
 _WIDE_CATEGORIES = ("W", "F")
 
@@ -176,7 +176,11 @@ def handle_sessions(args: argparse.Namespace, session: ISessionAggregate | None 
 
 def _pool_row(s: Any, columns: tuple[str, ...]) -> tuple[str, ...]:
     """One pool row: the cell for each column of either table."""
-    key = "health_ok" if s.is_healthy else ("health_limited" if s.is_limited else "health_unknown")
+    key = (
+        "health_ok"
+        if s.is_healthy
+        else ("health_limited" if s.is_limited else ("health_auth" if s.is_auth_required else "health_unknown"))
+    )
     values = {
         "ID": str(s.session_id),
         "Name": str(s.name),
@@ -470,7 +474,7 @@ def cmd_status(session: ISessionAggregate, json_output: bool = False) -> int:
             ],
             "healthy": sum(1 for s in pool if s.is_healthy),
             "limited": sum(1 for s in pool if s.is_limited),
-            "unknown": sum(1 for s in pool if s.status == SessionStatus.UNKNOWN),
+            "auth_required": sum(1 for s in pool if s.is_auth_required),
         }
         print(json.dumps(payload, indent=2, default=str))
         return 0
@@ -483,7 +487,7 @@ def cmd_status(session: ISessionAggregate, json_output: bool = False) -> int:
     print(render_pool_table(pool, _STATUS_COLUMNS, _STATUS_FLOORS))
     print(f"Healthy: {sum(1 for s in pool if s.is_healthy)}")
     print(f"Limited: {sum(1 for s in pool if s.is_limited)}")
-    print(f"Unknown: {sum(1 for s in pool if s.status == SessionStatus.UNKNOWN)}")
+    print(f"Auth Required: {sum(1 for s in pool if s.is_auth_required)}")
     print()
 
     return 0

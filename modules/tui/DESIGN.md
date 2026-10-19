@@ -63,7 +63,7 @@ paint order:
 | `TabbedContent` | panes: Overview, Sessions, Slot 1…N (one Chat console each), Swarm, Settings |
 | Overview screen | telemetry banner (ACTIVE ACCOUNTS + routed MODEL tiles), swarm status card, session-pool card, streaming log card |
 | Sessions screen | session-pool card with metric tiles and one row per account; Add / Refresh / Edit / Delete actions |
-| Chat screen (per slot) | brand row, slot-carousel pill row, telemetry header (live badge, beacon), transcript scroll, event-log card, action pills (Prompt, Attach, Templates, Headless toggle), composer input with send trigger |
+| Chat screen (per slot) | brand row, slot-carousel pill row, telemetry header (live badge, beacon), event-log card, action pills (Prompt, Attach, Templates, Headless toggle), composer input with send trigger |
 | Swarm screen | attachment card (file + Browse chip), output-inspection caption, swarm log card, Run / Stop / Restart deck |
 | Settings screen | runtime-override card: one row per registered environment value with Apply / Reset |
 | Nav dock (docked footer) | icon + caption cells per screen, key-hint line, always visible |
@@ -115,7 +115,7 @@ selection does not crash the frame.
 |---|---|
 | slot-carousel pill row | jump between slot consoles; this pane's slot is filled |
 | telemetry header | slot status badge, live beacon |
-| transcript scroll | streaming assistant text; blinking accent cursor while streaming |
+| event-log card | prompt echo, streaming pipeline events, and the response text |
 | event-log card | slot event stream with timestamp; copy-to-clipboard action |
 | action pill row | Prompt, Attach, Templates, Headless toggle |
 | composer | input + send trigger; send dispatches the slot's run |
@@ -150,7 +150,7 @@ Global bindings (from `QwenTuiApp.BINDINGS`):
 | State | Where | Rendering |
 |---|---|---|
 | No sessions | Sessions card | `session-empty` placeholder row |
-| Idle slot | Chat console | transcript hint (empty-state guidance), badge `● READY` |
+| Idle slot | Chat console | composer placeholder (empty-state guidance), badge `● READY` |
 | No swarm file attached | Swarm card | `swarm-file-name` reads "No file attached" |
 | Run failed | Chat event log | `danger`-token error envelope with hint; badge `FAILED` |
 | Session expired | Sessions / Chat | `warning`-token EXPIRED badge; destructive re-login from the action menu |

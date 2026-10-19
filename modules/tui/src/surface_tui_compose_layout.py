@@ -249,15 +249,10 @@ class _TuiComposeMixin:
                         )
                         yield Label(_TuiUtilsMixin._glyph("live"), id=f"live-beacon-{s}", classes="live-beacon")
 
-                    # Transcript: prompts right-aligned, answers left-aligned.
-                    with ScrollableContainer(classes="chat-stream", id=f"chat-scroll-{s}"):
-                        yield Static(
-                            "Pick a prompt file, or type a task below to get started.",
-                            id=f"chat-transcript-{s}",
-                            classes="chat-hint",
-                        )
-
                     # Event log block: mockup's "EVENT LOG [SLOT #N]" card.
+                    # The bubble transcript is gone (v6.6.1): this log already
+                    # echoed both the prompt and the response, so the console
+                    # keeps one read-out instead of two stacked message surfaces.
                     with Vertical(classes="event-log-card"):
                         with Horizontal(classes="event-log-head"):
                             yield Label("EVENT LOG", classes="event-log-title")
@@ -491,20 +486,12 @@ class _TuiComposeMixin:
         with contextlib.suppress(NoMatches):
             self._log_views[-1] = self.query_one("#log-view-swarm", QwenTuiRichLog)
 
-        # Mockup parity: each chat console caches its transcript container,
-        # its clock label, and the empty-state hint that the first message
-        # replaces. All three sit on the per-slot hot paths, so they are
-        # resolved once here instead of per write.
-        self._chat_scrolls: dict[int, ScrollableContainer] = {}
-        self._chat_hints: dict[int, Static] = {}
+        # Mockup parity: each chat console caches its clock label, resolved
+        # once here instead of per write (the per-slot hot paths).
         self._slot_log_times: dict[int, Label] = {}
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 self._log_views[s] = self.query_one(f"#log-view-{s}", QwenTuiRichLog)
-            with contextlib.suppress(NoMatches):
-                self._chat_scrolls[s] = self.query_one(f"#chat-scroll-{s}", ScrollableContainer)
-            with contextlib.suppress(NoMatches):
-                self._chat_hints[s] = self.query_one(f"#chat-transcript-{s}", Static)
             with contextlib.suppress(NoMatches):
                 self._slot_log_times[s] = self.query_one(f"#slot-log-time-{s}", Label)
 
@@ -548,9 +535,9 @@ class _TuiComposeMixin:
         )
         self._log_msg(f"[{muted}]Each slot runs an independent Chromium process sharing login state.[/]")
 
-        # U5: the per-slot event logs start empty — the transcript hint above
-        # carries the empty-state guidance, so nothing is seeded here beyond
-        # the auto-scroll the streaming path depends on.
+        # U5: the per-slot event logs start empty; the console's empty-state
+        # guidance is the composer's placeholder, and the auto_scroll the
+        # streaming path depends on is set here.
         for s in range(1, self._NUM_SLOTS + 1):
             with contextlib.suppress(NoMatches):
                 log_view = self.query_one(f"#log-view-{s}", QwenTuiRichLog)

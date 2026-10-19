@@ -26,8 +26,9 @@ __pycache__/
 dist/
 build/
 
-# Virtual Environments
+# Virtual Environments (both the directory form and the bare symlink form)
 .venv/
+.venv
 venv/
 env/
 

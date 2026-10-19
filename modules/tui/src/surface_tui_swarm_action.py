@@ -37,7 +37,6 @@ class _TuiSwarmHandlerMixin:
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
     _cancel_slot: Any
-    _append_chat_message: Any
     _run_composer_slot: Any
     query: Any
     query_one: Any

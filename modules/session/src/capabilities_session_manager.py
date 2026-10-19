@@ -13,7 +13,13 @@ from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
-from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionList, SessionPool, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import (
+    SessionInfo,
+    SessionList,
+    SessionPool,
+    SessionReason,
+    SessionStatus,
+)
 
 log = get_logger("session_manager")
 
@@ -63,6 +69,7 @@ class SessionManager(ISessionManagerProtocol):
                     total_requests=s.get("total_requests", 0),
                     failed_requests=s.get("failed_requests", 0),
                     created_at=self._parse_datetime(s["created_at"]) or datetime.now().astimezone(),
+                    reason=s.get("reason"),
                 )
             )
         return SessionPool(sessions=sessions, current_index=data.get("current_index", 0))
@@ -80,7 +87,7 @@ class SessionManager(ISessionManagerProtocol):
                     session_id=f"session_{len(pool.sessions) + 1}",
                     name=name,
                     path=profile_dir,
-                    status=SessionStatus.UNKNOWN,
+                    status=SessionStatus.AUTH_REQUIRED,
                 )
             )
             known.add(profile_dir.resolve())
@@ -110,6 +117,7 @@ class SessionManager(ISessionManagerProtocol):
                     "name": s.name,
                     "path": str(s.path),
                     "status": s.status.value,
+                    "reason": s.reason,
                     "last_used": s.last_used.isoformat() if s.last_used else None,
                     "total_requests": s.total_requests,
                     "failed_requests": s.failed_requests,
@@ -140,7 +148,7 @@ class SessionManager(ISessionManagerProtocol):
             session_id=session_id,
             name=name,
             path=profile_path,
-            status=SessionStatus.UNKNOWN,
+            status=SessionStatus.AUTH_REQUIRED,
         )
         pool.add_session(info)
         self.save_pool(pool)
@@ -226,16 +234,22 @@ class SessionManager(ISessionManagerProtocol):
         """Get next healthy session for rotation."""
         return self.load_pool().get_next_session()
 
-    def mark_limited(self, session_id: str) -> None:
-        """Mark session as rate-limited."""
+    def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
+        """Mark session as rate-limited; a ``None`` reason normalises to ``"QUOTA"``."""
         pool = self.load_pool()
-        pool.mark_limited(session_id)
+        pool.mark_limited(session_id, reason=reason)
         self.save_pool(pool)
 
     def mark_healthy(self, session_id: str) -> None:
         """Mark session as healthy."""
         pool = self.load_pool()
         pool.mark_healthy(session_id)
+        self.save_pool(pool)
+
+    def mark_auth_required(self, session_id: str, reason: SessionReason | None = None) -> None:
+        """Mark session as requiring authentication or setup."""
+        pool = self.load_pool()
+        pool.mark_auth_required(session_id, reason=reason)
         self.save_pool(pool)
 
     # Block 3: Dunder Methods, Factories & Helpers

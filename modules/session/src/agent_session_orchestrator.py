@@ -32,9 +32,11 @@ from modules.shared.src.session.contract_session_protocol import (
     ISessionRenewalProtocol,
 )
 from modules.shared.src.session.taxonomy_session_vo import (
+    HealthReason,
     SessionList,
     SessionRequest,
     SessionResponse,
+    SessionStatus,
 )
 
 
@@ -76,8 +78,15 @@ class SessionOrchestrator(ISessionAggregate):
         this agent only routes and wraps results.
         """
         if request.verb == "validate":
-            valid, message = self._validate(request.session_path)
-            return SessionResponse(valid=valid, message=message)
+            valid, message, reason, recovery_action = self._validate_with_reason(request.session_path)
+            status = SessionStatus.ACTIVE.value if valid else SessionStatus.AUTH_REQUIRED.value
+            return SessionResponse(
+                valid=valid,
+                message=message,
+                status=status,
+                reason=reason,
+                recovery_action=recovery_action,
+            )
         if request.verb == "delete":
             message = self._delete(request.session_path, force=request.force)
             return SessionResponse(deleted=True, message=message)
@@ -119,10 +128,28 @@ class SessionOrchestrator(ISessionAggregate):
             pool = self._sessions.load_pool()
             results = self._health_checker.check_pool_sync(pool, self._sessions)
             healthy_count, total = self._health_checker.summarize_pool_results(results)
+            health_results = [r for _, r in results]
+            lines = [f"{healthy_count}/{total} session(s) healthy"]
+            for s, r in results:
+                line = f"  - {s.name} ({s.session_id}): {r.status.value}"
+                if r.reason:
+                    line += f" [{r.reason}]"
+                if r.recovery_action:
+                    line += f" -> {r.recovery_action}"
+                lines.append(line)
+
+            # Pool availability for callers consuming `status` (mirrors `valid` semantics).
+            # Per-session verdicts (reasons, recovery actions) are in health_results;
+            # do not synthesize pool-level reason strings here.
+            agg_status = SessionStatus.ACTIVE.value if healthy_count > 0 else SessionStatus.AUTH_REQUIRED.value
+
             return SessionResponse(
-                message=f"{healthy_count}/{total} session(s) healthy",
+                valid=healthy_count > 0,
+                message="\n".join(lines),
                 health_healthy=healthy_count,
                 health_total=total,
+                status=agg_status,
+                health_results=health_results,
             )
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
 
@@ -253,15 +280,8 @@ class SessionOrchestrator(ISessionAggregate):
             return None
         return self._sessions.find_pool_profile_with_content()
 
-    def _validate(self, session_path: Path | None) -> tuple[bool, str]:
-        """Validate an existing saved Qwen browser session in headless mode.
-
-        Runs the browser check first; on failure attempts a transparent
-        token renewal so the user does not have to re-login while the
-        ``refresh_token`` is still valid. When both the session and the
-        refresh token are dead, raises ``AuthRequiredError`` so the
-        caller can surface the actionable message.
-        """
+    def _validate_with_reason(self, session_path: Path | None) -> tuple[bool, str, str | None, str | None]:
+        """Validate profile and return (valid, message, reason, recovery_action)."""
         resolved = self._resolve_profile(session_path)
         cfg = build_app_config(
             mode="session-check",
@@ -271,10 +291,32 @@ class SessionOrchestrator(ISessionAggregate):
             headless=True,
         )
         if not cfg.session_path.is_dir():
-            return False, "Session not found. Please log in first."
+            return (
+                False,
+                "Session not found. Please log in first.",
+                HealthReason.LAUNCH_FAILURE.value,
+                "Run 'qwen-web-arwaky session login' to create a session.",
+            )
         if self._validate_saved_session(cfg):
-            return True, "Saved Qwen session is valid and ready to use."
-        return False, "Saved Qwen session is invalid or expired. Please log in again."
+            return True, "Saved Qwen session is valid and ready to use.", None, None
+        return (
+            False,
+            "Saved Qwen session is invalid or expired. Please log in again.",
+            HealthReason.EXPIRED.value,
+            "Run 'qwen-web-arwaky session login' to re-authenticate.",
+        )
+
+    def _validate(self, session_path: Path | None) -> tuple[bool, str]:
+        """Validate an existing saved Qwen browser session in headless mode.
+
+        Runs the browser check first; on failure attempts a transparent
+        token renewal so the user does not have to re-login while the
+        ``refresh_token`` is still valid. When both the session and the
+        refresh token are dead, raises ``AuthRequiredError`` so the
+        caller can surface the actionable message.
+        """
+        valid, message, _, _ = self._validate_with_reason(session_path)
+        return valid, message
 
     def _delete(self, session_path: Path | None, *, force: bool) -> str:
         """Delete the saved Chromium profile for *session_path*.
