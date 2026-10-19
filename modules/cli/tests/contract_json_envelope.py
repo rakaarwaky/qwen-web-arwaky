@@ -270,3 +270,56 @@ def test_jobs_plain_text_failure_carries_the_error_prefix_on_stderr(command, exp
     assert captured.out == ""
     for line in captured.err.splitlines():
         assert line.startswith("[ERROR]")
+
+
+# ─── update --rollback: the converted failure branch ───────────────────────
+
+
+def test_update_rollback_failure_is_the_fixed_envelope(capsys) -> None:
+    """The rollback failure path emits the envelope on stdout, not a bare error."""
+    from modules.cli.src.surface_cli_update_command import handle_rollback
+
+    args = MagicMock()
+    args.rollback = "6.3.0"
+    args.json = True
+    orchestrator = MagicMock()
+    orchestrator.execute.return_value = MagicMock(error="release source unreachable", steps=[])
+
+    assert handle_rollback(args, orchestrator) == 1
+    payload = _envelope(capsys)
+    assert payload["error_code"] == "cli-500"
+
+
+def test_update_rollback_plain_text_failure_carries_the_error_prefix_on_stderr(capsys) -> None:
+    """Without --json the rollback failure is ``[ERROR] …`` on stderr."""
+    from modules.cli.src.surface_cli_update_command import handle_rollback
+
+    args = MagicMock()
+    args.rollback = "6.3.0"
+    args.json = False
+    orchestrator = MagicMock()
+    orchestrator.execute.return_value = MagicMock(error="release source unreachable", steps=[])
+
+    assert handle_rollback(args, orchestrator) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("[ERROR] ")
+
+
+# ─── session remove: the converted failure branch ──────────────────────────
+
+
+def test_session_remove_missing_token_is_the_fixed_envelope(capsys) -> None:
+    """A remove of an unknown token emits the envelope, never a ``❌`` line."""
+    from modules.cli.src.surface_cli_sessions_command import cmd_remove
+
+    args = MagicMock()
+    args.session_id = "missing"
+    args.keep_profile = False
+    args.force = False
+    aggregate = MagicMock()
+    aggregate.execute.return_value = SessionResponse(valid=True, sessions=[])
+
+    assert cmd_remove(aggregate, args, True) == 1
+    payload = _envelope(capsys)
+    assert payload["error_code"] == "cli-400"
