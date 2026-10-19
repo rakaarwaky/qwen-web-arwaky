@@ -338,13 +338,13 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
 
 
 def test_smoke_gate_builder_requires_an_aggregate() -> None:
-    """A wiring gap raises instead of reporting a confidently empty pool."""
+    """build_smoke_gate requires a session aggregate — no default."""
     import pytest
 
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
-    with pytest.raises(ValueError, match="session aggregate"):
-        build_smoke_gate(None)
+    with pytest.raises(TypeError, match="required positional argument: 'session'"):
+        build_smoke_gate()  # type: ignore[call-arg]  # deliberately omitting required session arg
 
 
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:

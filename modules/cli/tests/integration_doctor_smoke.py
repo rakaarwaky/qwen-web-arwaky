@@ -79,11 +79,13 @@ def test_smoke_aggregate_exception_reports_failure(capsys) -> None:
 
 
 def test_smoke_without_session_injection_fails_cleanly() -> None:
-    """Calling the surface without an aggregate raises the dependency error."""
+    """Calling the surface without an aggregate raises TypeError (required positional)."""
     import pytest
 
-    with pytest.raises(ValueError, match="session aggregate"):
-        run_doctor(json_output=True, smoke=True)
+    from modules.cli.src.surface_cli_doctor_command import run_doctor
+
+    with pytest.raises(TypeError, match="required positional argument: 'session'"):
+        run_doctor(json_output=True, smoke=True)  # type: ignore[call-arg]  # deliberately omitting the required session arg
 
 
 def test_smoke_disabled_keeps_five_checks(capsys) -> None:

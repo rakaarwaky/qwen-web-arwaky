@@ -379,7 +379,7 @@ def run_doctor_checks(
 
 
 def build_smoke_gate(
-    session: ISessionAggregate | None = None,
+    session: ISessionAggregate,
 ) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
     """Return a callable the update pipeline runs as its postflight functional gate.
 
@@ -389,12 +389,11 @@ def build_smoke_gate(
     at gate-execution time (not container-construction time) so the post-update
     gate reflects the post-upgrade state (issue #506).
 
-    *session* defaults to ``None`` for the library signature but the gate
-    needs one to read the pool: pass the aggregate or a loader such as
-    ``session_manager.load_pool()``. ``None`` raises rather than reporting a
-    confidently empty pool from a wiring gap.
+    Pass the aggregate, e.g. ``session_manager.load_pool()`` or a production
+    ``ISessionAggregate`` — there is no default, so a wiring gap cannot
+    masquerade as an empty pool.
     """
-    aggregate = _required_session(session, "build_smoke_gate")
+    aggregate = session
 
     def _gate() -> tuple[tuple[str, bool, str], ...]:
         checks = run_doctor_checks(session=aggregate)
@@ -410,25 +409,11 @@ def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]],
     return not failed, failed, warned
 
 
-def _required_session(session: ISessionAggregate | None, caller: str = "run_doctor") -> ISessionAggregate:
-    """Return *session* or raise the dependency error for the unwired case.
-
-    An unwired aggregate is a wiring gap; reporting an empty pool from it
-    would understate session state on a host with healthy sessions (issue #5).
-    """
-    if session is None:
-        raise ValueError(
-            f"{caller} requires a session aggregate (ISessionAggregate) to read the session pool; "
-            f"pass one explicitly, e.g. {caller}(session_manager.load_pool())."
-        )
-    return session
-
-
 def run_doctor(
+    session: ISessionAggregate,
     json_output: bool = False,
     smoke: bool = False,
     deep: bool = False,
-    session: ISessionAggregate | None = None,
 ) -> int:
     """Perform system health diagnostics and print a formatted report or JSON summary.
 
@@ -441,7 +426,7 @@ def run_doctor(
     checks = run_doctor_checks(
         include_heavy=include_heavy,
         smoke=smoke,
-        session=_required_session(session),
+        session=session,
     )
     all_passed, failed, warned = summarize(checks)
 

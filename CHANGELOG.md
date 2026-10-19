@@ -4,20 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Fixed
-
-- fix(cli): `surface_cli_json_hook` table helpers measure cells in display columns (`display_width`, `_fit`, `_display_slice`) instead of characters, so wide glyphs (`●`, `◐`, CJK) no longer overflow the terminal; `session list` / `session status` render a single rule-bordered table instead of duplicating each pool row in two formats. The width helpers moved out of the hook into `surface_cli_sessions_command.py`, leaving the hook as envelope + stderr channel + glyph vocabulary.
-- fix(cli): `session login --json` runs exactly one login and emits `{"success": true, "message": "Session 'X' saved"}` — no banner, no `input()` re-prompt — so non-interactive callers never block.
-- fix(cli): `job list` / `job status` / `job cleanup` failures and the missing-record branch route through `_fail_json` (`job status` reports `cli-400` for `Job not found`), and the contract test pins one forced failure per jobs verb.
-- fix(cli): `doctor` capacity severity polarity — an override above the derived limit (memory oversubscription) serializes `severity: "warning"`; under-configuration stays `"ok"`.
-- fix(cli): `run_doctor` / `build_smoke_gate` / the interactive controller's doctor pane require a session aggregate and raise a `ValueError` naming the dependency otherwise; the production `_StubSessionAggregate` default is removed so a wiring gap cannot masquerade as an empty pool.
-- fix(cli): `_fail_json` returns the named `EXIT_FAILURE` constant; `update` reports use `status_glyph("pending")` and the shared glyph vocabulary instead of `STATUS_GLYPHS[...]` and `✅` / `⚠️` / `⬆️` emoji; `doctor`'s session-pool rows use `status_glyph("health_*")` instead of `✅` / `⚠️` / `🔵`.
-- refactor(cli): drop the speculative `_table_widths` / `_render_table` generic layout engine and the unused ANSI colorization layer (`_colorize`, `_GLYPH_ANSI`, `_color_enabled`, the `stream` seam) from `surface_cli_json_hook`; the sessions tables render through `render_pool_table` in the sessions surface.
-- refactor(cli): remove `print_warn` (its single caller inlines the `[WARN]` line) and drop `print_error` from `__all__`.
-- chore(deps): `uv.lock` revision bumped 3 → 5 by uv's own schema migration; no dependency changed.
-
 ## [6.7.0] - 2026-10-18
 
 ### Added
@@ -38,7 +24,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - fix(cli): `doctor --json` no longer marks a healthy sandbox / capacity check as `severity: "error"`; the sentinel for a passing check is `"ok"`.
 - fix(cli): `update --rollback` failure emits the envelope (`{"success": false, "message": …, "error_code": "cli-500"}`) with the `[ERROR]` prefix instead of `{"success": false, "error": …}` / `❌`.
 - fix(cli): a rotation failure in the headless controller prints `[WARN] Session rotation failed; falling back to the default session: {cause}` to stderr instead of silently degrading.
+- fix(cli): `session login --json` runs exactly one login and emits `{"success": true, "message": "Session 'X' saved"}` — no banner, no `input()` re-prompt — so non-interactive callers never block.
+- fix(cli): `job list` / `job status` / `job cleanup` failures and the missing-record branch route through `_fail_json` (`job status` reports `cli-400` for `Job not found`), and the contract test pins one forced failure per jobs verb.
+- fix(cli): `run_doctor` / `build_smoke_gate` / the interactive controller's doctor pane require a session aggregate and raise a `ValueError` naming the dependency otherwise; the production `_StubSessionAggregate` default is removed so a wiring gap cannot masquerade as an empty pool.
+- fix(cli): `_fail_json` returns the named `EXIT_FAILURE` constant; `doctor`'s session-pool rows use `status_glyph("health_*")` instead of `✅` / `⚠️` / `🔵`.
 - docs(cli): document `cli-422` and `cli-502` and the canonical success JSON schemas in `modules/cli/DESIGN.md`.
+- refactor(cli): drop the speculative `_table_widths` / `_render_table` generic layout engine and the unused ANSI colorization layer (`_colorize`, `_GLYPH_ANSI`, `_color_enabled`, the `stream` seam) from `surface_cli_json_hook`; the sessions tables render through `render_pool_table` in the sessions surface.
+- refactor(cli): remove `print_warn` (its single caller inlines the `[WARN]` line) and drop `print_error` from `__all__`.
+- chore(deps): `uv.lock` revision bumped 3 → 5 by uv's own schema migration; no dependency changed.
 
 ### Tests
 

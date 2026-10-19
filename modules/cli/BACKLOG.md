@@ -7,7 +7,7 @@ Last Updated: 2026-10-18
 
 ## Current Condition
 
-- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 149 passed, at `<worktree HEAD>`, on 2026-10-18.
+- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 176 passed, at `b93d2ba`, on 2026-10-18.
 - In Progress: None.
 - Blocked: None.
 - Next Action: `CLIC-01`, track CLI-only surface issues as they surface.
@@ -50,7 +50,7 @@ None.
 
 | Area | Status | Notes |
 |---|---|---|
-| Tests | Done | `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 149 passed on 2026-10-18 |
+| Tests | Done | `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 176 passed on 2026-10-18 |
 | Scenario evidence | Done | 14 of 14 scenarios mapped |
 | Docs | Done | [DESIGN.md](DESIGN.md) is specification-only for the CLI surface. |
 
@@ -64,4 +64,4 @@ None.
 |---|---|---|
 | 2026-10-12 | Split TUI layer into `modules/tui`; CLI keeps command controllers and doctor/sessions/jobs/swarm/update surfaces | @rakaarwaky |
 | 2026-10-18 | Reworked BACKLOG.md to match aes-docs template: corrected section order, scenario evidence table format, release readiness table; re-based Done line on `73aee43` with 92-test count | @rakaarwaky |
-| 2026-10-18 | v6.7.0: JSON envelope + `session --json`, doctor pool-only session check with `--deep`, iterative login re-prompt, rotation `[WARN]`, glyph/table helpers, barrel completion; test count 92 → 149 | @rakaarwaky |
+| 2026-10-18 | v6.7.0: JSON envelope + `session --json`, doctor pool-only session check with `--deep`, iterative login re-prompt, rotation `[WARN]`, glyph/table helpers, barrel completion; test count 92 → 149; review rounds 1–3 closed on top (envelope contract, host-independent doctor fixture, run-surface failure pin, dead adapter removal, required session injection, `job cleanup` payload docs); count 149 → 176 at `b93d2ba` | @rakaarwaky |

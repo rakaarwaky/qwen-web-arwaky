@@ -19,40 +19,8 @@ from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.jobs.contract_jobs_aggregate import IJobManagerAggregate
 from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse
 from modules.shared.src.swarm.contract_swarm_aggregate import ISwarmAggregate
 from modules.shared.src.update.contract_update_aggregate import IUpdateAggregate
-
-
-def _pool_aggregate(session_manager: Any) -> ISessionAggregate | None:
-    """Adapt ``session_manager.load_pool()`` to the session aggregate contract.
-
-    The doctor reads the pool through ``ISessionAggregate.execute``; when no
-    orchestrator is wired the pool itself still answers the read verbs from
-    ``session_manager``, so the doctor's source of truth stays the disk pool
-    rather than a fabricated empty answer (issue 5). A host with no
-    ``session_manager`` wired keeps no pool source at all, so the caller
-    reports the wiring gap instead of pretending a pool exists.
-    """
-
-    class _PoolAggregate(ISessionAggregate):
-        """Pool-only aggregate: the read verbs answer from the live pool."""
-
-        def __init__(self, manager: Any) -> None:
-            self._manager = manager
-
-        def execute(self, request: SessionRequest) -> SessionResponse:
-            if request.verb == "list_sessions":
-                pool = self._manager.load_pool()
-                return SessionResponse(
-                    sessions=SessionList(list(pool.sessions)),
-                    message=f"{len(pool.sessions)} session(s)",
-                )
-            return SessionResponse(valid=False, message=f"No session orchestrator wired for {request.verb}.")
-
-    if session_manager is None:
-        return None
-    return _PoolAggregate(session_manager)
 
 
 class InteractiveController:
@@ -112,20 +80,20 @@ class InteractiveController:
                 from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
 
                 # The pool is the doctor's single source of truth, so the
-                # runner always carries a session aggregate: the wired one
-                # when the container built it, otherwise the pool itself read
-                # through ``session_manager.load_pool()`` — never a stub that
-                # answers an empty pool without consulting disk (issue 5).
-                aggregate = self._session if self._session is not None else _pool_aggregate(self._session_manager)
-                if aggregate is None:
+                # runner always carries the wired session aggregate — never a
+                # stub that answers an empty pool without consulting disk
+                # (issue 5). A missing aggregate is a wiring gap; raising here
+                # surfaces as an error envelope under @safe_handle.
+                if self._session is None:
                     raise ValueError(
-                        "InteractiveController requires a session aggregate (ISessionAggregate) or a "
-                        "session_manager to read the session pool for the doctor pane; "
-                        "pass session=, session_manager=, or doctor_runner=."
+                        "InteractiveController requires a session aggregate (ISessionAggregate) for the "
+                        "doctor pane; pass session= or doctor_runner=."
                     )
 
                 def doctor_runner() -> list[dict[str, Any]]:
-                    return run_doctor_checks(session=aggregate)
+                    # Narrowed: the guard above raised when _session is None.
+                    assert self._session is not None
+                    return run_doctor_checks(session=self._session)
 
             app = QwenTuiApp(
                 self._workspace,

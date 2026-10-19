@@ -12,7 +12,6 @@ from pathlib import Path
 from modules.shared.src.common.taxonomy_core_vo import AppConfig, HeadlessFlag, PromptText
 from modules.shared.src.common.utility_response_normalizer import (
     detect_processing_failure,
-    error_response,
     safe_handle,
     success_response,
 )
@@ -45,9 +44,11 @@ def dispatch_run(
     if mode == "direct":
         raw_prompt = cfg.inline_prompt_text
         if not raw_prompt:
-            return error_response(
-                RuntimeError("Missing inline prompt text for direct mode."), "validation_error", "cli-400"
-            )
+            return {
+                "success": False,
+                "message": "Missing inline prompt text for direct mode.",
+                "error_code": "cli-400",
+            }
         prompt_text = PromptText(raw_prompt)
         response = prompt.execute(
             PromptRequest(
@@ -84,11 +85,15 @@ def dispatch_run(
             )
         result = response.response_text
     else:
-        return error_response(RuntimeError(f"Unsupported CLI mode: {mode}"), "validation_error", "cli-400")
+        return {
+            "success": False,
+            "message": f"Unsupported CLI mode: {mode}",
+            "error_code": "cli-400",
+        }
 
     failure = _processing_failure_message(result)
     if failure is not None:
-        return error_response(RuntimeError(failure), "processing_failed", "cli-422")
+        return {"success": False, "message": failure, "error_code": "cli-422"}
     return success_response(result)
 
 

@@ -1,12 +1,14 @@
 """Cross-surface JSON envelope contract test.
 
 One forced failure per ``--json`` surface (jobs, swarm, observability,
-doctor) asserts the exact key set ``{success, message, error_code}`` and the
-value types, so a surface cannot drift back to an ad-hoc ``error`` payload
-without failing this test. The jobs group pins one forced failure per verb
-(list / status / cleanup / submit) so the converted branches cannot rot.
-The doctor healthy record also pins ``severity != "error"`` for a check
-that passed and ``run_doctor == 0`` for a fully healthy fixture.
+doctor, run) asserts the exact key set ``{success, message, error_code}`` and
+the value types, so a surface cannot drift back to an ad-hoc ``error``
+payload without failing this test. The jobs group pins one forced failure per
+verb (list / status / cleanup / submit) so the converted branches cannot rot.
+The doctor healthy record also pins ``severity != "error"`` for a check that
+passed and ``run_doctor == 0`` for a fully healthy fixture. The run surface
+still builds its error dict via ``error_response`` (not ``_fail_json``); its
+forced-failure test pins the fixed-key shape it actually ships.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import pytest
 from modules.cli.src.surface_cli_doctor_command import run_doctor
 from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
 from modules.cli.src.surface_cli_observability_command import handle_observability_command
+from modules.cli.src.surface_cli_run_command import dispatch_run
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
 from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse, SessionStatus
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmResponse
@@ -193,6 +196,18 @@ def test_doctor_json_healthy_fixture_exits_zero(capsys, monkeypatch, tmp_path) -
     ):
         monkeypatch.delenv(name, raising=False)
 
+    # Make the chromium check host-independent: a binaryless CI host must not
+    # fail "all checks pass → exit 0" because Playwright has no cached browser.
+    monkeypatch.setattr(
+        "modules.cli.src.surface_cli_doctor_command._check_chromium",
+        lambda include_heavy: {
+            "name": "Playwright Chromium Browser",
+            "passed": True,
+            "detail": "stubbed for the healthy fixture",
+            "severity": "ok",
+        },
+    )
+
     assert run_doctor(json_output=True, session=_pool_aggregate()) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["status"] == "healthy"
@@ -245,7 +260,36 @@ def test_doctor_empty_pool_json_is_unhealthy(capsys) -> None:
     assert token["passed"] is False
 
 
-# ─── failure channels: stdout JSON, stderr prefix ──────────────────────────
+# ─── run: forced failure envelope for the run surface ───────────────────────
+
+
+def test_run_dispatch_forced_failure_is_the_fixed_envelope() -> None:
+    """dispatch_run emits the fixed {success, message, error_code} envelope.
+
+    The run surface builds its error dict via error_response semantics rather
+    than _fail_json, so this pins the exact keys (success/message/error_code)
+    for a forced cli-422 processing failure without converting dispatch_run.
+    """
+    from modules.shared.src.common.taxonomy_core_vo import AppConfig, PromptText
+    from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+    from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+
+    class _FailingPrompt(IPromptAggregate):
+        def execute(self, request: PromptRequest) -> PromptResponse:
+            return PromptResponse(response_text=PromptText("ERROR [processing] boom"))
+
+    cfg = AppConfig(
+        input_path="ignored.md",
+        output_path="ignored.md",
+        session_path="ignored.md",
+        mode="direct",
+        inline_prompt_text="run this",
+    )
+    result: dict[str, object] = dispatch_run(cfg, _FailingPrompt())
+    assert result["success"] is False
+    assert set(result.keys()) == set(EXPECTED_KEYS)
+    assert str(result["error_code"]) == "cli-422"
+    assert "boom" in str(result["message"])
 
 
 @pytest.mark.parametrize(

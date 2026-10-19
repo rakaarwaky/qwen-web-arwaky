@@ -245,16 +245,16 @@ def test_smoke_gate_runs_with_an_injected_aggregate() -> None:
     assert "Browser Smoke Test" not in {name for name, _, _ in results}
 
 
-def test_doctor_and_gate_refuse_to_run_without_an_aggregate() -> None:
-    """A wiring gap raises instead of reporting a synthetic empty pool."""
+def test_doctor_and_gate_require_an_aggregate() -> None:
+    """run_doctor and build_smoke_gate require a session aggregate — no default, no raise site."""
     import pytest
 
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate, run_doctor
 
-    with pytest.raises(ValueError, match="session aggregate"):
-        run_doctor(json_output=False)
-    with pytest.raises(ValueError, match="session aggregate"):
-        build_smoke_gate(None)
+    with pytest.raises(TypeError, match="required positional argument: 'session'"):
+        run_doctor(json_output=False)  # type: ignore[call-arg]  # deliberately omitting required session arg
+    with pytest.raises(TypeError, match="required positional argument: 'session'"):
+        build_smoke_gate()  # type: ignore[call-arg]  # deliberately omitting required session arg
 
 
 def _pool_aggregate():

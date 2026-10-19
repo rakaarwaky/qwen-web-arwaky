@@ -28,7 +28,7 @@ text unless `--json` is set; the TUI visual token set lives in
 | `qwen-web-arwaky` (no args, TTY) | `root_cli_main_entry` → `surface_cli_interactive_controller` | Delegates to the TUI surface (`modules/tui`); the CLI module never imports TUI code at module load — the controller's TUI import is deferred into `run()`, so headless CLI paths stay TUI-free. |
 | `qwen-web-arwaky` (no args, config given) | `surface_cli_run_command.dispatch_run` | Headless single-file pipeline run. |
 | `init` | `surface_cli_init_command` | Workspace bootstrap: creates `.agents/skills` and `.qwen-web-arwaky` under `--dir` (default: cwd). |
-| `doctor` | `surface_cli_doctor_command` | Environment and session-pool health checks (the pool is the single source of truth; the aggregate is required — `run_doctor(session=None)` raises `ValueError`); `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
+| `doctor` | `surface_cli_doctor_command` | Environment and session-pool health checks (the pool is the single source of truth; the aggregate is required — `run_doctor(session)` is a required positional argument with no default, so an unwired call raises `TypeError`); `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
 | `session` | `surface_cli_sessions_command` | Subcommands: `list`, `login --name NAME`, `health`, `remove NAME [--force] [--keep-profile]`, `status`. |
 | `prompt direct` | `surface_cli_run_command` | `-t TEXT [-o FILE] [--headless] [--json]` — inline text prompt. |
 | `prompt file` | `surface_cli_run_command` | `-i FILE [-o FILE] [--headless] [--json]` — prompt file only. |
@@ -111,6 +111,8 @@ always the fixed-key envelope above):
 {"success": true, "total": <int>, "jobs": [{"job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>, "input_file": "<path>", "output_file": "<path>"}]}
 // job status
 {"success": true, "job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>}
+// job cleanup
+{"success": true, "removed": <int>}
 // swarm start
 {"success": true, "swarm_id": "<id>", "status": "<status>", "input_path": "<path>", "root_path": "<path>", "browser_concurrency": <int>, "completed_count": <int>, "failed_count": <int>, "agents": [{"agent_id": "<id>", "status": "<status>", "attempt": <int>, "error": "<string|null>"}]}
 // swarm status
