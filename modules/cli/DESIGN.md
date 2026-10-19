@@ -28,7 +28,7 @@ text unless `--json` is set; the TUI visual token set lives in
 | `qwen-web-arwaky` (no args, TTY) | `root_cli_main_entry` → `surface_cli_interactive_controller` | Delegates to the TUI surface (`modules/tui`); the CLI module never imports TUI code at module load — the controller's TUI import is deferred into `run()`, so headless CLI paths stay TUI-free. |
 | `qwen-web-arwaky` (no args, config given) | `surface_cli_run_command.dispatch_run` | Headless single-file pipeline run. |
 | `init` | `surface_cli_init_command` | Workspace bootstrap: creates `.agents/skills` and `.qwen-web-arwaky` under `--dir` (default: cwd). |
-| `doctor` | `surface_cli_doctor_command` | Environment and session health checks; `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
+| `doctor` | `surface_cli_doctor_command` | Environment and session-pool health checks (the pool is the single source of truth; the aggregate is required — `run_doctor(session=None)` raises `ValueError`); `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
 | `session` | `surface_cli_sessions_command` | Subcommands: `list`, `login --name NAME`, `health`, `remove NAME [--force] [--keep-profile]`, `status`. |
 | `prompt direct` | `surface_cli_run_command` | `-t TEXT [-o FILE] [--headless] [--json]` — inline text prompt. |
 | `prompt file` | `surface_cli_run_command` | `-i FILE [-o FILE] [--headless] [--json]` — prompt file only. |
@@ -47,7 +47,7 @@ parser (or the group-level parser) and are uniformly available:
 
 | Flag | Default | Notes |
 |---|---|---|
-| `--json` | off | Print the response envelope verbatim as JSON on stdout. Available on every `job`, `swarm`, `observability`, and `session` subcommand. |
+| `--json` | off | Print the response envelope verbatim as JSON on stdout. Available on every `job`, `swarm`, `observability`, and `session` subcommand — including `session login`, which then runs exactly one login and emits the success envelope without the banner or the add-another re-prompt. |
 | `--headless` / `--no-headless` | on | BooleanOptionalAction; off (headed) mode opens a visible browser. |
 | `-o FILE` / `--output-path` | `None` | Destination for the Markdown response; omitted only for `job submit` which stores the record in the jobs folder. |
 | `--deep` | off | On `doctor` only; runs the heavy Playwright probe (alias: `QWEN_DOCTOR_DEEP=1`). |
@@ -94,7 +94,7 @@ Error reference codes used by the CLI surface:
 
 | Format | Trigger | Shape |
 |---|---|---|
-| Plain text (default) | No `--json` | One-line status per operation; `doctor` prints a multi-line check table with `✓` / `⚠` / `✗` glyphs; tables fit `shutil.get_terminal_size()` with `…` truncation. |
+| Plain text (default) | No `--json` | One-line status per operation; `doctor` prints a multi-line check table with `✓` / `⚠` / `✗` glyphs; the `session list` / `session status` pool table fits `shutil.get_terminal_size()` with `…` truncation measured in display columns (wide glyphs included). |
 | JSON envelope | `--json` | `{"success": bool, "message": str, "error_code"?: str}` on stdout; failures also log a one-line summary to stderr. |
 | Markdown file | `-o FILE` on prompt subcommands | The response text, written as Markdown to the named path; not emitted to stdout. |
 | Jobs status table | `job list` / `job status` | Human-readable table with `RUNNING` / `COMPLETED` / `FAILED` status per record; `--json` prints the raw `JobRecord` dict. |
@@ -129,13 +129,21 @@ always the fixed-key envelope above):
 {"success": true, "sessions": [{"session_id": "<id>", "name": "<name>", "status": "active|limited|unknown", "total_requests": <int>, "failed_requests": <int>}], "healthy": <int>, "limited": <int>, "unknown": <int>}
 // session health
 {"success": true, "message": "<summary>", "states": [{"session_id": "<id>", "status": "active|limited|unknown", "is_healthy": <bool>}]}
+// session login
+{"success": true, "message": "Session 'X' saved"}
 // session remove
 {"success": true, "message": "Removed session 'X'"}
 ```
 
+`session login --json` runs exactly one headed login: no banner, no
+add-another re-prompt, and the fixed-key envelope above on stdout. Without
+`--json` the banner and the iterative "add another?" prompt drive a
+multi-login session.
+
 Status glyphs (`surface_cli_json_hook.STATUS_GLYPHS`): `✓` / `✗` / `⚠`
-for results, `●` / `◐` / `○` for health, `…` pending. ANSI color is
-applied only when the stream is a TTY and `NO_COLOR` is unset.
+for results, `●` / `◐` / `○` for health, `…` pending. Glyphs are emitted
+unpainted on the CLI; ANSI color is owned by the TUI layer
+(`modules/tui/DESIGN.md`).
 
 ## Reference
 

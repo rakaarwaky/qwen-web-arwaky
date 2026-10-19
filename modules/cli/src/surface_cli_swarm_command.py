@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from modules.cli.src.surface_cli_json_hook import _fail_json
+from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
 from modules.shared.src.common.utility_core_path_validation import (
     validate_swarm_id,
     validate_swarm_input_path,
@@ -34,7 +34,11 @@ def _render_snapshot(snapshot: SwarmSnapshot) -> None:
     if snapshot.agents:
         print("   Agents:")
         for agent in snapshot.agents:
-            icon = "✓" if agent.status == "completed" else ("✗" if agent.status == "failed" else "⋯")
+            icon = (
+                status_glyph("ok")
+                if agent.status == "completed"
+                else (status_glyph("fail") if agent.status == "failed" else status_glyph("pending"))
+            )
             extra = f" · {agent.error}" if agent.error else ""
             print(f"     {icon} {agent.agent_id:<24} {agent.status:<10} attempt {agent.attempt}{extra}")
 
@@ -76,7 +80,7 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
         )
     else:
         _render_snapshot(snapshot)
-        print(f"\n✅ Swarm started. Poll with: qwen-web-arwaky swarm status {snapshot.swarm_id}")
+        print(f"\n{status_glyph('ok')} Swarm started. Poll with: qwen-web-arwaky swarm status {snapshot.swarm_id}")
     return 0
 
 
@@ -137,7 +141,7 @@ def _cmd_cancel(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
         )
     else:
         status = snapshot.status if snapshot else "cancelled"
-        print(f"✅ Swarm {swarm_id} cancelled (status: {status}).")
+        print(f"{status_glyph('ok')} Swarm {swarm_id} cancelled (status: {status}).")
     return 0
 
 

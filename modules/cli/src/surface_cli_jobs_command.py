@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
@@ -119,8 +118,7 @@ def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) ->
         limit = int(getattr(args, "limit", 10))
         response = jobs.execute(JobRequest(verb="list_jobs", limit=limit))
         if response.error:
-            print(f"[ERROR] {response.error}", file=sys.stderr)
-            return 1
+            return _fail_json(f"Job list failed: {response.error}", "cli-500", json_output)
         records = list(response.records or [])
         if json_output:
             print(
@@ -155,12 +153,10 @@ def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) ->
     if command == "status":
         response = jobs.execute(JobRequest(verb="get_job_status", job_id=getattr(args, "job_id", None)))
         if response.error:
-            print(f"[ERROR] {response.error}", file=sys.stderr)
-            return 1
+            return _fail_json(f"Job status failed: {response.error}", "cli-500", json_output)
         record = response.record
         if record is None:
-            print(f"Job not found: {getattr(args, 'job_id', '')}")
-            return 1
+            return _fail_json(f"Job not found: {getattr(args, 'job_id', '')}", "cli-400", json_output)
         if json_output:
             print(
                 json.dumps(
@@ -180,9 +176,11 @@ def handle_jobs_command(args: argparse.Namespace, jobs: IJobManagerAggregate) ->
     if command == "cleanup":
         response = jobs.execute(JobRequest(verb="cleanup_stale_jobs"))
         if response.error:
-            print(f"[ERROR] {response.error}", file=sys.stderr)
-            return 1
-        print(f"Cleaned {response.removed} stale job(s)")
+            return _fail_json(f"Job cleanup failed: {response.error}", "cli-500", json_output)
+        if json_output:
+            print(json.dumps({"success": True, "removed": response.removed}, indent=2))
+        else:
+            print(f"Cleaned {response.removed} stale job(s)")
         return 0
 
     print("Use 'qwen-web-arwaky job --help' for usage")

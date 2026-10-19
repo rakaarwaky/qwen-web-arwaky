@@ -189,6 +189,17 @@ def test_deep_probe_notice_before_the_playwright_probe(capsys, monkeypatch) -> N
     assert "Running a deep Playwright probe" in capsys.readouterr().err
 
 
+def test_light_probe_emits_no_stderr_notice(capsys, monkeypatch) -> None:
+    """The light path leaves stderr clean so headless logs stay quiet."""
+
+    monkeypatch.setattr(
+        "modules.shared.src.update.utility_update_browser_binary.find_chrome_binary",
+        lambda: Path("/usr/bin/chromium"),
+    )
+    _check_chromium(include_heavy=False)
+    assert capsys.readouterr().err == ""
+
+
 def test_deep_flag_runs_the_heavy_probe(monkeypatch) -> None:
     """run_doctor(deep=True) drives include_heavy without the env alias."""
     called: dict[str, bool] = {}
@@ -198,10 +209,10 @@ def test_deep_flag_runs_the_heavy_probe(monkeypatch) -> None:
         return []
 
     monkeypatch.setattr("modules.cli.src.surface_cli_doctor_command.run_doctor_checks", _spy_checks)
-    from modules.cli.src.surface_cli_doctor_command import _StubSessionAggregate, run_doctor
+    from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     monkeypatch.delenv("QWEN_DOCTOR_DEEP", raising=False)
-    run_doctor(json_output=False, deep=True, session=_StubSessionAggregate())
+    run_doctor(json_output=False, deep=True, session=_pool_aggregate())
     assert called["heavy"] is True
 
 
@@ -213,18 +224,18 @@ def test_deep_env_alias_drives_the_heavy_probe(monkeypatch) -> None:
         return []
 
     monkeypatch.setattr("modules.cli.src.surface_cli_doctor_command.run_doctor_checks", _spy_checks)
-    from modules.cli.src.surface_cli_doctor_command import _StubSessionAggregate, run_doctor
+    from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     monkeypatch.setenv("QWEN_DOCTOR_DEEP", "1")
-    run_doctor(json_output=False, deep=False, session=_StubSessionAggregate())
+    run_doctor(json_output=False, deep=False, session=_pool_aggregate())
     assert called["heavy"] is True
 
 
-def test_smoke_gate_runs_without_a_session_injection() -> None:
-    """build_smoke_gate(None) still yields name/passed/detail triples."""
+def test_smoke_gate_runs_with_an_injected_aggregate() -> None:
+    """build_smoke_gate yields name/passed/detail triples from the pool."""
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
-    gate = build_smoke_gate(None)
+    gate = build_smoke_gate(_pool_aggregate())
     results = gate()
     assert results
     for name, passed, detail in results:
@@ -232,3 +243,26 @@ def test_smoke_gate_runs_without_a_session_injection() -> None:
         assert isinstance(passed, bool)
         assert isinstance(detail, str)
     assert "Browser Smoke Test" not in {name for name, _, _ in results}
+
+
+def test_doctor_and_gate_refuse_to_run_without_an_aggregate() -> None:
+    """A wiring gap raises instead of reporting a synthetic empty pool."""
+    import pytest
+
+    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate, run_doctor
+
+    with pytest.raises(ValueError, match="session aggregate"):
+        run_doctor(json_output=False)
+    with pytest.raises(ValueError, match="session aggregate"):
+        build_smoke_gate(None)
+
+
+def _pool_aggregate():
+    """Test-side aggregate answering every verb from an empty pool."""
+    from unittest.mock import MagicMock
+
+    from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse
+
+    aggregate = MagicMock()
+    aggregate.execute.return_value = SessionResponse(sessions=SessionList([]), message="0 sessions")
+    return aggregate

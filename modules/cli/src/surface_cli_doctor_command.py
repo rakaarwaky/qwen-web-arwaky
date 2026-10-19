@@ -1,17 +1,17 @@
 """CLI surface: doctor command — system diagnostic checks (AES406).
 
 Audits environment health: Python version, Playwright Chromium, workspace
-initialization, session profile (presence, age, re-login recommendation, and
-retained backup generations), output writability, host capacity for the
-browser fan-out, the effective Chromium sandbox mode, and the environment
-variable contract. With ``--smoke``, a final check runs a headless browser
-round-trip on the saved session to verify the full pipeline end-to-end
-(issue #322).
+initialization, the session pool (the single source of truth for session
+state), output writability, host capacity for the browser fan-out, the
+effective Chromium sandbox mode, and the environment variable contract.
+With ``--smoke``, a final check runs a headless browser round-trip on the
+saved session to verify the full pipeline end-to-end (issue #322).
 
-:func:`run_doctor_checks` is the library form. The Root layer injects
-:func:`build_smoke_gate` into the update pipeline so a post-upgrade smoke gate
-reuses these exact checks (issue #294), and the failure footer points at the
-operator runbooks (issue #299).
+:func:`run_doctor_checks` is the library form; every caller — the CLI
+report and the update pipeline's postflight gate — injects a session
+aggregate, so doctor and ``session list`` can never disagree about the
+pool (issue #294). The failure footer points at the operator runbooks
+(issue #299).
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from modules.shared.src.common.utility_core_env import (
 )
 from modules.shared.src.common.utility_core_paths import get_playwright_browsers_path
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse
+from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -108,7 +108,13 @@ def _sandbox_mode() -> str:
 
 
 def _check(name: str, passed: bool, detail: str, severity: str = "ok") -> dict[str, Any]:
-    """Build one diagnostic record; *severity* marks a non-fatal warning."""
+    """Build one diagnostic record.
+
+    Severity vocabulary: ``"ok"`` for a passing check, ``"warning"`` for a
+    check that passes with a concern worth surfacing (a host limitation or an
+    operator misconfiguration), and ``"error"`` only for ``passed=False`` —
+    so a report consumer can tell a hard failure from a soft concern.
+    """
     return {"name": name, "passed": passed, "detail": detail, "severity": severity}
 
 
@@ -199,7 +205,11 @@ def _check_session(session: ISessionAggregate) -> dict[str, Any]:
     if entries:
         lines = [f"Session pool: {len(entries)} account(s) under {SESSIONS_DIR}"]
         for s in entries:
-            icon = "✅" if s.is_healthy else ("⚠️" if s.is_limited else "🔵")
+            icon = (
+                status_glyph("health_ok")
+                if s.is_healthy
+                else (status_glyph("health_limited") if s.is_limited else status_glyph("health_unknown"))
+            )
             lines.append(f"  {icon} {s.session_id} ({s.name}): {s.status.value}")
         healthy = sum(1 for s in entries if s.is_healthy)
         limited = sum(1 for s in entries if s.is_limited)
@@ -235,17 +245,21 @@ def _check_capacity() -> dict[str, Any]:
 
     The limit is derived from available memory rather than a fixed constant, so
     the reported number matches what the job executor will actually use
-    (issue #291).
+    (issue #291). The severity vocabulary: ``"ok"`` for the derived limit or a
+    deliberate under-configuration, ``"warning"`` only for an override that
+    exceeds the derived limit — memory oversubscription, the dangerous case,
+    must not read as healthy.
     """
     configured = _env("QWEN_WEB_MAX_WORKERS")
     derived = recommended_max_workers()
     detail = describe_capacity()
     if configured.isdigit():
+        oversubscribed = int(configured) > derived
         return _check(
             "Host Capacity",
             True,
             f"{detail}; QWEN_WEB_MAX_WORKERS={configured} overrides the derived limit",
-            severity="warning" if int(configured) > derived else "ok",
+            severity="warning" if oversubscribed else "ok",
         )
     return _check("Host Capacity", True, detail)
 
@@ -320,10 +334,11 @@ def _smoke_check(session: ISessionAggregate | None) -> tuple[bool, str]:
 
     Delegates to ``ISessionAggregate.execute()`` so the surface reuses
     the Core launch → navigate → textarea-check → close pipeline with no new
-    capability code. The aggregate is injected by the Root container.
+    capability code. Every caller injects the aggregate; a missing one is
+    a wiring gap, reported as such rather than as a synthetic failure.
     """
     if session is None:
-        return False, "Smoke test requires a session aggregate; run it through `qwen-web-arwaky doctor --smoke`."
+        return False, "No session aggregate is available; the smoke gate is not wired for this run."
     try:
         from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -363,20 +378,6 @@ def run_doctor_checks(
     return checks
 
 
-class _StubSessionAggregate(ISessionAggregate):
-    """Pool-only aggregate for gate runs that have no session orchestrator.
-
-    ``build_smoke_gate`` is also wired with ``None`` by tests, so the gate
-    still works: every verb is answered with an empty pool / invalid verdict,
-    which is exactly what a host with no session state reports.
-    """
-
-    def execute(self, request: SessionRequest) -> SessionResponse:
-        if request.verb == "list_sessions":
-            return SessionResponse(sessions=SessionList([]))
-        return SessionResponse(valid=False, message="No session aggregate wired for the smoke gate.")
-
-
 def build_smoke_gate(
     session: ISessionAggregate | None = None,
 ) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
@@ -387,11 +388,20 @@ def build_smoke_gate(
     depends only on an injected callable, never on a Surface. The checks run
     at gate-execution time (not container-construction time) so the post-update
     gate reflects the post-upgrade state (issue #506).
+
+    *session* defaults to ``None`` for the library signature but the gate
+    needs one to read the pool: pass the aggregate or a loader such as
+    ``session_manager.load_pool()``. ``None`` raises rather than reporting a
+    confidently empty pool from a wiring gap.
     """
-    aggregate = session if session is not None else _StubSessionAggregate()
+    if session is None:
+        raise ValueError(
+            "build_smoke_gate requires a session aggregate (ISessionAggregate) to read the session pool; "
+            "pass one explicitly, e.g. build_smoke_gate(session_manager.load_pool())."
+        )
 
     def _gate() -> tuple[tuple[str, bool, str], ...]:
-        checks = run_doctor_checks(session=aggregate)
+        checks = run_doctor_checks(session=session)
         return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
 
     return _gate
@@ -402,6 +412,20 @@ def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]],
     failed = [c for c in checks if not c["passed"]]
     warned = [c for c in checks if c["passed"] and c.get("severity") == "warning"]
     return not failed, failed, warned
+
+
+def _required_session(session: ISessionAggregate | None) -> ISessionAggregate:
+    """Return *session* or raise the dependency error for the unwired case.
+
+    An unwired aggregate is a wiring gap; reporting an empty pool from it
+    would understate session state on a host with healthy sessions (issue #5).
+    """
+    if session is None:
+        raise ValueError(
+            "run_doctor requires a session aggregate (ISessionAggregate) to read the session pool; "
+            "pass one explicitly, e.g. run_doctor(session=session_manager.load_pool())."
+        )
+    return session
 
 
 def run_doctor(
@@ -418,11 +442,10 @@ def run_doctor(
     probe; *deep* and the flag are OR-ed, the env var is only an alias.
     """
     include_heavy = deep or _flag("QWEN_DOCTOR_DEEP")
-    aggregate = session if session is not None else _StubSessionAggregate()
     checks = run_doctor_checks(
         include_heavy=include_heavy,
         smoke=smoke,
-        session=aggregate,
+        session=_required_session(session),
     )
     all_passed, failed, warned = summarize(checks)
 

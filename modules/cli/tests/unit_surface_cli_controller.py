@@ -153,10 +153,27 @@ class TestQwenTuiLogHandler:
         assert "ERROR" in call_args[1]
 
 
+def _healthy_pool_aggregate():
+    """Test-side aggregate reporting one healthy session in the pool."""
+    from unittest.mock import MagicMock
+
+    from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse, SessionStatus
+
+    session = MagicMock()
+    session.is_healthy = True
+    session.is_limited = False
+    session.status = SessionStatus.ACTIVE
+    session.session_id = "session_1"
+    session.name = "default"
+    aggregate = MagicMock()
+    aggregate.execute.return_value = SessionResponse(sessions=SessionList([session]), message="1 session(s)")
+    return aggregate
+
+
 def test_doctor_command(capsys):
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
-    code = run_doctor(json_output=False)
+    code = run_doctor(json_output=False, session=_healthy_pool_aggregate())
     captured = capsys.readouterr()
     assert code in (0, 1)
     assert "System Health Diagnostic" in captured.out
@@ -168,7 +185,7 @@ def test_doctor_command_json(capsys):
 
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
-    code = run_doctor(json_output=True)
+    code = run_doctor(json_output=True, session=_healthy_pool_aggregate())
     captured = capsys.readouterr()
     assert code in (0, 1)
     data = json.loads(captured.out)

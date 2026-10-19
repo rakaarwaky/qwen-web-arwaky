@@ -23,7 +23,7 @@ from modules.logging.src.capabilities_observability_setup import effective_telem
 from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.config.utility_config_app_factory import build_app_config
-from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse
+from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse, SessionStatus
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability
 from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapability
@@ -212,7 +212,7 @@ def test_doctor_warns_when_production_has_no_error_tracking(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     with patch("os.environ", {"ENVIRONMENT": "production", "SENTRY_DSN": "", "OTEL_EXPORTER_OTLP_ENDPOINT": ""}):
-        run_doctor(json_output=False)
+        run_doctor(json_output=False, session=_healthy_pool_aggregate())
     out = capsys.readouterr().out
     assert "Observability Backends" in out
     assert "file log" in out
@@ -222,7 +222,7 @@ def test_doctor_does_not_warn_in_development_without_a_backend(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     with patch("os.environ", {"ENVIRONMENT": "development", "SENTRY_DSN": "", "OTEL_EXPORTER_OTLP_ENDPOINT": ""}):
-        run_doctor(json_output=False)
+        run_doctor(json_output=False, session=_healthy_pool_aggregate())
     out = capsys.readouterr().out
     observability_line = [line for line in out.splitlines() if "Observability Backends" in line]
     # The check name is present but the production-only warning text is not.
@@ -254,14 +254,31 @@ def test_degraded_observability_is_logged_at_setup(caplog) -> None:
     assert any("observability_degraded" in msg for msg in messages)
 
 
-# ─── #292 / #300: doctor reports the environment contract and backup state ──
+# ─── doctor report and the #292 / #300 environment contract ────────────────
+
+
+def _healthy_pool_aggregate() -> MagicMock:
+    """Test-side session aggregate reporting one healthy session in the pool.
+
+    Doctor reports the pool exclusively, so every run uses an injected
+    aggregate rather than a production-side default (issue #5).
+    """
+    session = MagicMock()
+    session.is_healthy = True
+    session.is_limited = False
+    session.status = SessionStatus.ACTIVE
+    session.session_id = "session_1"
+    session.name = "default"
+    aggregate = MagicMock()
+    aggregate.execute.return_value = SessionResponse(sessions=SessionList([session]), message="1 session(s)")
+    return aggregate
 
 
 def test_doctor_warns_about_unrecognized_qwen_variables(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     with patch("os.environ", {"QWEN_WEB_MAX_WORKS": "5"}):
-        run_doctor(json_output=False)
+        run_doctor(json_output=False, session=_healthy_pool_aggregate())
     out = capsys.readouterr().out
     assert "Unrecognized Environment Variables" in out
     assert "QWEN_WEB_MAX_WORKS" in out
@@ -270,7 +287,7 @@ def test_doctor_warns_about_unrecognized_qwen_variables(capsys) -> None:
 def test_doctor_reports_sandbox_mode(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
-    run_doctor(json_output=False)
+    run_doctor(json_output=False, session=_healthy_pool_aggregate())
     out = capsys.readouterr().out
     assert "Chromium Sandbox" in out
     assert "sandbox" in out.lower()
@@ -279,7 +296,7 @@ def test_doctor_reports_sandbox_mode(capsys) -> None:
 def test_doctor_reports_host_capacity(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
-    run_doctor(json_output=False)
+    run_doctor(json_output=False, session=_healthy_pool_aggregate())
     out = capsys.readouterr().out
     assert "Host Capacity" in out
     assert "recommended max workers" in out
@@ -292,7 +309,7 @@ def test_doctor_json_includes_environment_capacity_and_runbooks(capsys) -> None:
     from modules.cli.src.surface_cli_doctor_command import run_doctor
 
     with patch("os.environ", {"SENTRY_DSN": "https://public:secret@o1.ingest.sentry.io/9"}):
-        run_doctor(json_output=True)
+        run_doctor(json_output=True, session=_healthy_pool_aggregate())
     data = json.loads(capsys.readouterr().out)
 
     assert data["environment"]["SENTRY_DSN"] == "***"
@@ -305,7 +322,7 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
     """build_smoke_gate is the callable the Root layer injects (#294)."""
     from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
 
-    gate = build_smoke_gate()
+    gate = build_smoke_gate(_healthy_pool_aggregate())
     results = gate()
     assert results
     for name, passed, detail in results:
@@ -317,9 +334,17 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
     assert "Host Capacity" in names
     assert "Chromium Sandbox" in names
     assert "Browser Smoke Test" not in names
-    # The pool is the single source of truth: no aggregate injected means
-    # the check reports the empty pool, not a legacy filesystem probe.
     assert "Session Authentication Token" in names
+
+
+def test_smoke_gate_builder_requires_an_aggregate() -> None:
+    """A wiring gap raises instead of reporting a confidently empty pool."""
+    import pytest
+
+    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+
+    with pytest.raises(ValueError, match="session aggregate"):
+        build_smoke_gate(None)
 
 
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:

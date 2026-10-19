@@ -3,8 +3,10 @@
 One forced failure per ``--json`` surface (jobs, swarm, observability,
 doctor) asserts the exact key set ``{success, message, error_code}`` and the
 value types, so a surface cannot drift back to an ad-hoc ``error`` payload
-without failing this test. The doctor healthy record also pins
-``severity != "error"`` for a check that passed.
+without failing this test. The jobs group pins one forced failure per verb
+(list / status / cleanup / submit) so the converted branches cannot rot.
+The doctor healthy record also pins ``severity != "error"`` for a check
+that passed and ``run_doctor == 0`` for a fully healthy fixture.
 """
 
 from __future__ import annotations
@@ -12,12 +14,14 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 from modules.cli.src.surface_cli_doctor_command import run_doctor
 from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
 from modules.cli.src.surface_cli_observability_command import handle_observability_command
 from modules.cli.src.surface_cli_swarm_command import handle as handle_swarm_command
-from modules.shared.src.common.taxonomy_core_vo import JobRecord
 from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse, SessionStatus
+from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmResponse
 
 EXPECTED_KEYS = {"success", "message", "error_code"}
 
@@ -33,33 +37,80 @@ def _envelope(capsys) -> dict:
     return payload
 
 
-def _job_record() -> JobRecord:
-    return JobRecord(
-        job_id="job-1",
-        created_at="2026-10-10T00:00:00",
-        latest_event="DISPATCH_ACKNOWLEDGED",
-        completed=False,
-        input_file="task.md",
-        error=None,
-    )
+# ─── jobs: one forced failure per verb ──────────────────────────────────────
 
 
-# ─── jobs: bad prompt path ──────────────────────────────────────────────────
-
-
-def test_jobs_validation_failure_is_the_fixed_envelope(tmp_path, capsys) -> None:
+def _jobs_args(command: str) -> MagicMock:
     args = MagicMock()
-    args.job_command = "submit"
-    args.prompt_path = str(tmp_path / "missing.md")
+    args.job_command = command
+    args.json = True
+    args.limit = 10
+    args.job_id = "job-missing"
+    args.prompt_path = "ignored.md"
     args.attachment_path = None
     args.output_path = None
     args.headless = True
-    args.json = True
+    return args
+
+
+def test_jobs_validation_failure_is_the_fixed_envelope(tmp_path, capsys) -> None:
+    args = _jobs_args("submit")
+    args.prompt_path = str(tmp_path / "missing.md")
 
     assert handle_jobs_command(args, MagicMock()) == 1
     payload = _envelope(capsys)
     assert payload["error_code"] == "cli-400"
     assert "missing" in payload["message"].lower()
+
+
+def test_jobs_list_failure_is_the_fixed_envelope(capsys) -> None:
+    args = _jobs_args("list")
+    aggregate = MagicMock()
+    aggregate.execute.return_value.error = "jobs store unavailable"
+
+    assert handle_jobs_command(args, aggregate) == 1
+    payload = _envelope(capsys)
+    assert payload["error_code"] == "cli-500"
+    assert "jobs store unavailable" in payload["message"]
+
+
+def test_jobs_status_missing_record_is_the_fixed_envelope(capsys) -> None:
+    args = _jobs_args("status")
+    aggregate = MagicMock()
+    aggregate.execute.return_value = MagicMock(record=None, error=None)
+
+    assert handle_jobs_command(args, aggregate) == 1
+    payload = _envelope(capsys)
+    assert payload["error_code"] == "cli-400"
+    assert "job-missing" in payload["message"]
+
+
+def test_jobs_cleanup_failure_is_the_fixed_envelope(capsys) -> None:
+    args = _jobs_args("cleanup")
+    aggregate = MagicMock()
+    aggregate.execute.return_value = MagicMock(removed=0, error="cleanup refused")
+
+    assert handle_jobs_command(args, aggregate) == 1
+    payload = _envelope(capsys)
+    assert payload["error_code"] == "cli-500"
+    assert "cleanup refused" in payload["message"]
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["submit", "list", "status", "cleanup"],
+)
+def test_jobs_failure_stdout_carries_no_cross_mark_or_raw_error_key(command, capsys, tmp_path) -> None:
+    """Every jobs verb failure emits the envelope: no ❌, no ``"error":`` key."""
+    args = _jobs_args(command)
+    args.prompt_path = str(tmp_path / "missing.md")
+    aggregate = MagicMock()
+    aggregate.execute.return_value = MagicMock(record=None, records=[], removed=0, error="aggregate down")
+
+    assert handle_jobs_command(args, aggregate) == 1
+    payload = _envelope(capsys)
+    assert not payload["success"]
+    assert "error" not in payload
 
 
 # ─── swarm: unknown swarm id ─────────────────────────────────────────────────
@@ -72,7 +123,7 @@ def test_swarm_unknown_id_is_the_fixed_envelope(capsys) -> None:
     args.json = True
 
     swarm = MagicMock()
-    swarm.execute.return_value = MagicMock(error=None, snapshot=None)
+    swarm.execute.return_value = SwarmResponse(error=None, snapshot=None)
 
     assert handle_swarm_command(args, swarm) == 1
     payload = _envelope(capsys)
@@ -115,13 +166,40 @@ def _pool_aggregate() -> MagicMock:
     return aggregate
 
 
-def test_doctor_json_healthy_records_never_carry_error_severity(capsys) -> None:
-    """A passing check's severity must not be the failure sentinel."""
-    assert run_doctor(json_output=True, session=_pool_aggregate()) in (0, 1)
+def test_doctor_json_healthy_fixture_exits_zero(capsys, monkeypatch, tmp_path) -> None:
+    """A fully healthy fixture: all checks pass and the run exits 0.
+
+    The environment is pinned to the passing state (workspace initialized,
+    no capacity override) so the severity assertion below cannot hold
+    vacuously: a passing check is ``"ok"`` or, for a host limitation such as
+    an unavailable OS sandbox, ``"warning"`` — never the failure sentinel
+    ``"error"``.
+    """
+    from modules.shared.src.common.taxonomy_core_constant import LOCAL_WS_DIR
+
+    workspace = tmp_path / LOCAL_WS_DIR
+    (workspace / "log").mkdir(parents=True)
+    (workspace / "output").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("QWEN_WEB_MAX_WORKERS", raising=False)
+    monkeypatch.delenv("QWEN_DOCTOR_DEEP", raising=False)
+    monkeypatch.delenv("QWEN_DOCTOR_SHOW_PATH", raising=False)
+    for name in (
+        "QWEN_DISABLE_SANDBOX",
+        "QWEN_ENABLE_SANDBOX",
+        "ENVIRONMENT",
+        "SENTRY_DSN",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert run_doctor(json_output=True, session=_pool_aggregate()) == 0
     data = json.loads(capsys.readouterr().out)
+    assert data["status"] == "healthy"
     for check in data["checks"]:
-        if check["passed"]:
-            assert check["severity"] != "error", f"{check['name']}: passing check marked 'error'"
+        assert check["passed"] is True, f"{check['name']}: expected to pass on the healthy fixture"
+        assert check["severity"] != "error", f"{check['name']}: passing check marked 'error'"
+        assert check["severity"] in ("ok", "warning"), f"{check['name']}: unknown severity {check['severity']!r}"
 
 
 def test_doctor_json_sandboxed_pass_is_not_error() -> None:
@@ -140,7 +218,21 @@ def test_doctor_json_capacity_override_below_derived_is_not_error() -> None:
 
     with patch.dict(os.environ, {"QWEN_WEB_MAX_WORKERS": "1"}, clear=False):
         assert _check_capacity()["passed"] is True
-        assert _check_capacity()["severity"] != "error"
+        assert _check_capacity()["severity"] == "ok"
+
+
+def test_doctor_json_capacity_override_above_derived_is_a_warning() -> None:
+    """Issue 4: memory oversubscription serializes as a warning, never 'ok'."""
+    import os
+    from unittest.mock import patch
+
+    from modules.cli.src.surface_cli_doctor_command import _check_capacity, recommended_max_workers
+
+    over = recommended_max_workers() * 10
+    with patch.dict(os.environ, {"QWEN_WEB_MAX_WORKERS": str(over)}, clear=False):
+        record = _check_capacity()
+    assert record["passed"] is True
+    assert record["severity"] == "warning"
 
 
 def test_doctor_empty_pool_json_is_unhealthy(capsys) -> None:
@@ -156,17 +248,24 @@ def test_doctor_empty_pool_json_is_unhealthy(capsys) -> None:
 # ─── failure channels: stdout JSON, stderr prefix ──────────────────────────
 
 
-def test_plain_text_failure_carries_the_error_prefix_on_stderr(tmp_path, capsys) -> None:
+@pytest.mark.parametrize(
+    "command,expected_code",
+    [
+        ("submit", "cli-400"),
+        ("list", "cli-500"),
+        ("status", "cli-400"),
+        ("cleanup", "cli-500"),
+    ],
+)
+def test_jobs_plain_text_failure_carries_the_error_prefix_on_stderr(command, expected_code, tmp_path, capsys) -> None:
     """Without --json the failure is ``[ERROR] …`` on stderr, exit 1."""
-    args = MagicMock()
-    args.job_command = "submit"
-    args.prompt_path = str(tmp_path / "missing.md")
-    args.attachment_path = None
-    args.output_path = None
-    args.headless = True
+    args = _jobs_args(command)
     args.json = False
+    args.prompt_path = str(tmp_path / "missing.md")
+    aggregate = MagicMock()
+    aggregate.execute.return_value = MagicMock(record=None, records=[], removed=0, error="aggregate down")
 
-    assert handle_jobs_command(args, MagicMock()) == 1
+    assert handle_jobs_command(args, aggregate) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     for line in captured.err.splitlines():

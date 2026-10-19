@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from typing import Any
 
-from modules.cli.src.surface_cli_json_hook import _fail_json
+from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
 from modules.shared.src.logging.contract_logging_aggregate import IObservabilityAggregate
 from modules.shared.src.logging.taxonomy_logging_vo import (
     MetricsSnapshot,
@@ -25,15 +24,14 @@ def _cmd_report(args: argparse.Namespace, orchestrator: IObservabilityAggregate)
     json_output = bool(getattr(args, "json", False))
     response = orchestrator.execute(ObservabilityRequest(verb="write_quality_report"))
     if not response.success:
-        print(f"[ERROR] {response.error}", file=sys.stderr)
-        return 1
+        return _fail_json(f"Quality report failed: {response.error}", "cli-500", json_output)
 
     report_path = response.report_path
     if json_output:
         payload: dict[str, Any] = {"success": True, "report_path": str(report_path)}
         print(json.dumps(payload, indent=2, default=str))
     else:
-        print(f"✅ Quality report written: {report_path}")
+        print(f"{status_glyph('ok')} Quality report written: {report_path}")
     return 0
 
 

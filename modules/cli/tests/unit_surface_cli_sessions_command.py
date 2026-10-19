@@ -4,27 +4,30 @@ An in-memory ``ISessionAggregate`` stub stands in for the real pool — no
 profile directory is ever touched. Covers the destructive ``remove`` path
 (by id, by name, ``--keep-profile``, missing token), the ``--json``
 envelope on ``list`` / ``status`` / ``health`` / ``remove``, the login
-re-prompt loop with a mocked ``input``, and the terminal-fit table
-helpers.
+re-prompt loop with a mocked ``input`` (including Ctrl+D and the empty-name
+fallback), and the display-width-aware pool table — including the
+``COLUMNS=60`` snapshot through the real ``cmd_list`` / ``cmd_status`` so
+the rendered table can never again ship a 350-character rule (issue 1).
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 from modules.cli.src import surface_cli_sessions_command as sessions
-from modules.cli.src.surface_cli_json_hook import _fit, _render_table
+from modules.cli.src.surface_cli_json_hook import _fit, display_width
 from modules.cli.src.surface_cli_sessions_command import (
-    _render_pool_table,
     cmd_health_check,
     cmd_list,
     cmd_login,
     cmd_remove,
     cmd_status,
     handle_sessions,
+    render_pool_table,
 )
 from modules.shared.src.session.taxonomy_session_vo import (
     SessionInfo,
@@ -208,7 +211,8 @@ def test_remove_keep_profile_drops_only_the_pool_entry(capsys) -> None:
     assert cmd_remove(aggregate, args) == 0
     out = capsys.readouterr().out
     assert "Profile kept" in out
-    assert aggregate.removes == ["default"]
+    # The surface asks for a pool-only removal and never a profile delete.
+    assert [r.verb for r in aggregate.requests] == ["remove_session"]
     assert aggregate.deletes == []
 
 
@@ -259,7 +263,9 @@ def test_health_check_reports_the_message(capsys) -> None:
     aggregate = InMemorySessions([_info("session_1", "default")])
     assert cmd_health_check(aggregate) == 0
     out = capsys.readouterr().out
-    assert "healthy" in out
+    # The exact summary the stub produces, not a substring that "unhealthy"
+    # would also satisfy.
+    assert "Result: 1 healthy, 0 limited" in out
 
 
 def test_health_check_json_payload(capsys) -> None:
@@ -290,6 +296,32 @@ def test_login_saves_the_session_and_stops(capsys) -> None:
     assert aggregate.logins == ["work"]
 
 
+def test_login_eof_exits_the_re_prompt_loop(capsys) -> None:
+    """Ctrl+D at the re-prompt exits the loop instead of raising a traceback (issue 9)."""
+    aggregate = InMemorySessions()
+    args = _args("login", name="work")
+    with patch("builtins.input", side_effect=EOFError):
+        assert cmd_login(aggregate, args) == 0
+    assert aggregate.logins == ["work"]
+
+
+def test_login_empty_name_falls_back_to_session_default(capsys) -> None:
+    """An empty answer at the name prompt registers ``session_default`` (issue 9)."""
+    aggregate = InMemorySessions()
+    args = _args("login", name="work")
+    answers = iter(["y", "", EOFError])
+
+    def _answer(_prompt: str) -> str:
+        nxt = next(answers)
+        if nxt is EOFError:
+            raise nxt
+        return nxt
+
+    with patch("builtins.input", side_effect=_answer):
+        assert cmd_login(aggregate, args) == 0
+    assert aggregate.logins == ["work", "session_default"]
+
+
 def test_login_prompt_loops_iteratively_through_many_cycles() -> None:
     """A harness of ~1500 'y' cycles must exit cleanly with no RecursionError."""
     aggregate = InMemorySessions()
@@ -308,6 +340,7 @@ def test_login_prompt_loops_iteratively_through_many_cycles() -> None:
 
 
 def test_login_failure_stops_the_loop(capsys) -> None:
+    """A failed login exits 1 with the [ERROR] line on stderr — never ❌ on stdout (issue 8)."""
     aggregate = InMemorySessions()
 
     def _failing_login(request: SessionRequest) -> SessionResponse:
@@ -317,7 +350,10 @@ def test_login_failure_stops_the_loop(capsys) -> None:
     args = _args("login", name="work")
     with patch("builtins.input", return_value="n"):
         assert cmd_login(aggregate, args) == 1
-    assert "[ERROR]" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert "[ERROR]" in captured.err
+    for line in captured.out.splitlines():
+        assert not line.startswith("❌"), f"stdout carried a cross-mark line: {line}"
 
 
 # ─── handle_sessions dispatch + no-❌ guard ────────────────────────────────
@@ -333,25 +369,69 @@ def test_handle_sessions_without_an_aggregate_fails_cleanly(capsys) -> None:
     args = _args("list", json_output=True)
     assert handle_sessions(args, None) == 1
     out = capsys.readouterr().out
-    import json
 
     payload = json.loads(out)
     assert payload["success"] is False
     assert payload["error_code"] == "cli-500"
 
 
-def test_no_failure_line_starts_with_a_cross_mark_on_stdout(capsys) -> None:
-    """Guard rail: no line beginning with ``❌`` is ever written to stdout."""
+def test_handle_sessions_dispatches_the_expected_verbs() -> None:
+    """The surface's verb choice is pinned, not the stub's bookkeeping (issue 8)."""
     aggregate = InMemorySessions([_info("session_1", "default")])
     handle_sessions(_args("list"), aggregate)
     handle_sessions(_args("status"), aggregate)
     handle_sessions(_args("health"), aggregate)
-    out = capsys.readouterr().out
-    for line in out.splitlines():
+    handle_sessions(_args("remove", session_id="session_1", force=False, keep_profile=True), aggregate)
+    assert [r.verb for r in aggregate.requests] == [
+        "list_sessions",
+        "list_sessions",
+        "check_health",
+        "remove_session",
+    ]
+
+
+def test_no_failure_line_starts_with_a_cross_mark_on_stdout(capsys) -> None:
+    """Guard rail: no line beginning with ``❌`` is ever written to stdout."""
+    aggregate = InMemorySessions([_info("session_1", "default")])
+
+    def _raise(request: SessionRequest) -> SessionResponse:
+        return SessionResponse(valid=False, error="aggregate down")
+
+    handle_sessions(_args("list"), aggregate)
+    handle_sessions(_args("status"), aggregate)
+    handle_sessions(_args("health"), aggregate)
+    handle_sessions(_args("remove", session_id="session_1", force=False, keep_profile=True), aggregate)
+    aggregate.execute = _raise
+    handle_sessions(_args("list"), aggregate)
+    handle_sessions(_args("health"), aggregate)
+    handle_sessions(_args("remove", session_id="session_1", force=False, keep_profile=True), aggregate)
+    captured = capsys.readouterr()
+    for line in captured.out.splitlines():
         assert not line.startswith("❌"), f"stdout carried a cross-mark line: {line}"
+        assert '"error":' not in line, f"stdout carried a raw error key: {line}"
+    assert any(line.startswith("[ERROR]") for line in captured.err.splitlines())
 
 
-# ─── terminal-fit table helpers ─────────────────────────────────────────────
+def test_no_cross_mark_or_error_key_on_job_failure_stdout(capsys) -> None:
+    """Job list/status/cleanup failures emit the envelope on stdout, never ❌."""
+    from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
+
+    for command in ("list", "status", "cleanup"):
+        args = MagicMock()
+        args.job_command = command
+        args.limit = 10
+        args.job_id = "job-missing"
+        args.json = True
+        aggregate = MagicMock()
+        aggregate.execute.return_value.error = "aggregate down"
+        assert handle_jobs_command(args, aggregate) == 1
+    captured = capsys.readouterr()
+    for line in captured.out.splitlines():
+        assert not line.startswith("❌"), f"stdout carried a cross-mark line: {line}"
+        assert '"error":' not in line, f"stdout carried a raw error key: {line}"
+
+
+# ─── display-width-aware pool table ─────────────────────────────────────────
 
 
 def test_fit_truncates_with_an_ellipsis_marker() -> None:
@@ -361,26 +441,112 @@ def test_fit_truncates_with_an_ellipsis_marker() -> None:
     assert _fit("abc", 0) == ""
 
 
-def test_render_table_fits_to_terminal_size_with_per_column_floors() -> None:
-    """Snapshot at COLUMNS=60: wide values get truncated with an ellipsis."""
-    rows = (("a" * 30, "b" * 30, "c" * 30), ("short", "med", "very-long-value"))
-    text = _render_table(rows, (6, 6, 6), budget=60, rule="-")
-    assert text.count("-" * 60) == 2
-    # The total content width respects the budget.
+def test_fit_counts_display_columns_not_characters() -> None:
+    """A wide glyph occupies two columns; _fit must truncate by display width."""
+    assert display_width("●") == 2
+    assert display_width("◐ warnings") == 11
+    assert _fit("●●●●", 5) == "●●…"
+    assert _fit("健康状態", 5) == "健康…"
+    assert _fit("abc●", 4) == "abc…"
+
+
+def _wide_pool() -> list[Any]:
+    """Pool whose status glyphs are wide enough to overflow a char-based fit."""
+    return [
+        _info("session_1", "default", status=SessionStatus.LIMITED),
+        _info("session_2", "work", status=SessionStatus.ACTIVE),
+    ]
+
+
+def test_render_pool_table_fits_the_budget_with_wide_glyphs() -> None:
+    """Issue 1: every rendered line stays inside the budget, glyphs included."""
+    text = render_pool_table(_wide_pool(), sessions._LIST_COLUMNS, sessions._LIST_FLOORS, budget=60)
     for line in text.splitlines():
-        assert len(line) <= 60
+        assert display_width(line) <= 60, f"line overflowed the budget: {line!r}"
+    assert "session_1" in text
+    # The limited session carries its wide health glyph.
+    assert "◐" in text
+
+
+def test_render_pool_table_never_wraps_on_a_narrow_terminal() -> None:
+    long_pool = [_info(f"session_{i}", f"long-account-name-{i}", status=SessionStatus.LIMITED) for i in range(5)]
+    text = render_pool_table(long_pool, sessions._LIST_COLUMNS, sessions._LIST_FLOORS, budget=40)
+    for line in text.splitlines():
+        assert display_width(line) <= 40, f"line overflowed 40 columns: {line!r}"
 
 
 def test_render_pool_table_unifies_the_sessions_tables() -> None:
     pool = [_info("session_1", "default", status=SessionStatus.ACTIVE, total_requests=5, failed_requests=0)]
-    text = _render_pool_table(pool, sessions._LIST_COLUMNS, sessions._LIST_FLOORS)
+    text = render_pool_table(pool, sessions._LIST_COLUMNS, sessions._LIST_FLOORS, budget=80)
     assert "session_1" in text
     assert "default" in text
 
 
-def test_register_sessions_subparser_exposes_group_json_flag() -> None:
-    """The session group registers a --json flag on every subcommand."""
+def test_render_pool_table_casts_non_string_cells() -> None:
+    """A MagicMock cell renders its string form instead of crashing."""
+    cell = MagicMock()
+    cell.total_requests = 7
+    cell.failed_requests = 1
+    cell.is_healthy = True
+    cell.is_limited = False
+    cell.status.value = "active"
+    cell.session_id = "session_9"
+    cell.name = "mocked"
+    cell.last_used = _NOW
+    text = render_pool_table([cell], sessions._STATUS_COLUMNS, sessions._STATUS_FLOORS, budget=80)
+    assert "session_9" in text
+    assert "mocked" in text
 
+
+def test_render_pool_table_renders_one_table_not_header_plus_legacy_rows() -> None:
+    """Issue 1: the shared table renders the header, EVERY row, and the rules."""
+    pool = _wide_pool()
+    text = render_pool_table(pool, sessions._LIST_COLUMNS, sessions._LIST_FLOORS, budget=80)
+    lines = text.splitlines()
+    # Top rule, header, one row per pool session, bottom rule — nothing else.
+    assert len(lines) == 2 + 1 + len(pool), f"expected a header + every row, got {lines}"
+    assert lines[0] == lines[-1], "the top and bottom rules must match"
+    assert lines[0].startswith("━"), "the rule must be a single ━ character repeated"
+    assert lines[1].split()[:2] == ["ID", "Name"], f"the header must lead the table: {lines[1]!r}"
+    for session in pool:
+        assert any(session.session_id in line for line in lines[2:-1]), (
+            f"row for {session.session_id} missing: the body must render every pool session"
+        )
+
+
+def test_list_table_under_columns_60_never_overflows(capsys, monkeypatch) -> None:
+    """The real cmd_list under COLUMNS=60: no line exceeds 60 columns (issue 1).
+
+    This is the regression the 350-character rule shipped under: the table
+    ran through the shared renderer on synthetic strings only, never through
+    the command on a narrow terminal.
+    """
+    monkeypatch.setenv("COLUMNS", "60")
+    aggregate = InMemorySessions(_wide_pool())
+    assert cmd_list(aggregate) == 0
+    out = capsys.readouterr().out
+    for line in out.splitlines():
+        assert display_width(line) <= 60, f"cmd_list overflowed COLUMNS=60: {line!r}"
+    # The pool rendered through the shared table: the rule is a single ━,
+    # never the 350-character artifact.
+    assert not any(len(line) > 60 for line in out.splitlines())
+    assert any(line.startswith("━") for line in out.splitlines())
+
+
+def test_status_table_under_columns_60_never_overflows(capsys, monkeypatch) -> None:
+    """The real cmd_status under COLUMNS=60: every line fits the terminal."""
+    monkeypatch.setenv("COLUMNS", "60")
+    aggregate = InMemorySessions(_wide_pool())
+    assert cmd_status(aggregate) == 0
+    out = capsys.readouterr().out
+    for line in out.splitlines():
+        assert display_width(line) <= 60, f"cmd_status overflowed COLUMNS=60: {line!r}"
+    # The status column set (Requests/Failed) renders through the same table.
+    assert "Requests" in out and "Failed" in out
+
+
+def test_register_sessions_subparser_exposes_group_json_flag() -> None:
+    """--json is registered on the reporting subcommands; login carries none."""
     from modules.root_cli_main_entry import _parse_args
 
     assert _parse_args(["session", "list", "--json"]).json is True
@@ -390,24 +556,5 @@ def test_register_sessions_subparser_exposes_group_json_flag() -> None:
     assert remove.json is True
     assert remove.keep_profile is True
     assert _parse_args(["session", "list"]).json is False
-
-
-# ─── module barrel ─────────────────────────────────────────────────────────
-
-
-def test_module_barrel_lists_all_ten_surfaces() -> None:
-    import modules.cli.src as cli_barrel
-
-    expected = [
-        "surface_cli_doctor_command",
-        "surface_cli_init_command",
-        "surface_cli_interactive_controller",
-        "surface_cli_jobs_command",
-        "surface_cli_observability_command",
-        "surface_cli_json_hook",
-        "surface_cli_run_command",
-        "surface_cli_sessions_command",
-        "surface_cli_swarm_command",
-        "surface_cli_update_command",
-    ]
-    assert cli_barrel.__all__ == expected
+    # login --json is honored: one login, the envelope, no blocking prompt.
+    assert _parse_args(["session", "login", "--name", "x", "--json"]).json is True

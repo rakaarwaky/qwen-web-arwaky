@@ -78,13 +78,12 @@ def test_smoke_aggregate_exception_reports_failure(capsys) -> None:
     assert "browser launch exploded" in smoke["detail"]
 
 
-def test_smoke_without_session_injection_fails_cleanly(capsys) -> None:
-    """Calling the surface directly without an aggregate must not crash."""
-    run_doctor(json_output=True, smoke=True)
+def test_smoke_without_session_injection_fails_cleanly() -> None:
+    """Calling the surface without an aggregate raises the dependency error."""
+    import pytest
 
-    data = json.loads(capsys.readouterr().out)
-    names = [check["name"] for check in data["checks"]]
-    assert data["checks"][names.index("Browser Smoke Test")]["passed"] is False
+    with pytest.raises(ValueError, match="session aggregate"):
+        run_doctor(json_output=True, smoke=True)
 
 
 def test_smoke_disabled_keeps_five_checks(capsys) -> None:

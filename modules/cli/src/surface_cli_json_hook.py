@@ -2,21 +2,24 @@
 
 Smart surface helpers (no domain imports): the fixed-key failure envelope
 every ``--json`` surface funnels through, the ``[ERROR]`` / ``[WARN]``
-stderr channels, and the status-glyph vocabulary plus terminal-fitted table
-rendering shared by the report surfaces.
+stderr channels, the status-glyph vocabulary shared by the report surfaces,
+and the display-width-aware truncation helper the pool tables render
+through. Glyphs are emitted unpainted; the Textual TUI layer owns all ANSI
+color.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import sys
-from typing import TextIO
+import unicodedata
+
+#: Failure exit code shared by every ``--json`` surface: the fixed-key
+#: envelope and ``error_code`` never diverge in exit status.
+EXIT_FAILURE = 1
 
 #: Canonical status glyphs: ``✓ / ✗ / ⚠`` for results, ``● / ◐ / ○`` for
-#: health, ``…`` for pending. ASCII-safe keys so surfaces stay greppable;
-#: the ANSI paint is applied only on a TTY with NO_COLOR unset.
+#: health, ``…`` for pending. ASCII-safe keys so surfaces stay greppable.
 STATUS_GLYPHS: dict[str, str] = {
     "ok": "✓",
     "fail": "✗",
@@ -29,34 +32,24 @@ STATUS_GLYPHS: dict[str, str] = {
 
 _ERROR_PREFIX = "[ERROR]"
 _WARN_PREFIX = "[WARN]"
-_RESET = "\033[0m"
-_GLYPH_ANSI: dict[str, str] = {
-    "ok": "\033[32m",
-    "fail": "\033[31m",
-    "warn": "\033[33m",
-    "pending": "\033[90m",
-    "health_ok": "\033[32m",
-    "health_limited": "\033[33m",
-    "health_unknown": "\033[90m",
-}
+
+#: Glyphs that render two columns wide in the CLI's monospaced fonts even
+#: though ``unicodedata.east_asian_width`` reports them ``A`` (ambiguous):
+#: the geometric health glyphs and the heavy box-drawing rule. Named here so
+#: :func:`display_width` matches the terminal, not the Unicode property
+#: table. The ellipsis ``…`` and the result markers ``✓ / ✗ / ⚠`` render one
+#: column and stay out of the table so :func:`_fit` can trade one column of
+#: content for the marker.
+_TWO_COLUMN_CHARS = frozenset("●◐○━")
+
+_WIDE_CATEGORIES = ("W", "F")
 
 
-def _color_enabled(stream: TextIO = sys.stdout) -> bool:
-    """True only when *stream* is a TTY and ``NO_COLOR`` is unset."""
-    return "NO_COLOR" not in os.environ and bool(getattr(stream, "isatty", lambda: False)())
-
-
-def _colorize(text: str, key: str, stream: TextIO = sys.stdout) -> str:
-    """Wrap *text* in the ANSI paint for *key* when the stream accepts color."""
-    if not _color_enabled(stream):
-        return text
-    return f"{_GLYPH_ANSI[key]}{text}{_RESET}"
-
-
-def status_glyph(key: str, *, stream: TextIO = sys.stdout) -> str:
-    """Return the glyph for *key*, painted only on a color-capable stream."""
-    glyph = STATUS_GLYPHS.get(key, key)
-    return _colorize(glyph, key, stream=stream) if key in _GLYPH_ANSI else glyph
+def _char_width(char: str) -> int:
+    """Return the terminal columns one character occupies (2 for wide glyphs)."""
+    if char in _TWO_COLUMN_CHARS:
+        return 2
+    return 2 if unicodedata.east_asian_width(char) in _WIDE_CATEGORIES else 1
 
 
 def print_error(msg: str) -> None:
@@ -69,8 +62,13 @@ def print_warn(msg: str) -> None:
     print(f"{_WARN_PREFIX} {msg}", file=sys.stderr)
 
 
+def status_glyph(key: str) -> str:
+    """Return the glyph for *key*, unpainted (the TUI layer owns color)."""
+    return STATUS_GLYPHS.get(key, key)
+
+
 def _fail_json(message: str, error_code: str, json_output: bool) -> int:
-    """Emit one failure on the canonical channel; always exit code 1.
+    """Emit one failure on the canonical channel; always exit :data:`EXIT_FAILURE`.
 
     With *json_output* the fixed-key envelope
     ``{"success": false, "message": str, "error_code": str}`` goes to stdout;
@@ -80,79 +78,48 @@ def _fail_json(message: str, error_code: str, json_output: bool) -> int:
         print(json.dumps({"success": False, "message": message, "error_code": error_code}, indent=2))
     else:
         print_error(message)
-    return 1
+    return EXIT_FAILURE
+
+
+def display_width(text: str) -> int:
+    """Return the number of terminal columns *text* occupies.
+
+    ``len()`` undercounts wide glyphs (``●``, ``◐``, ``━``, CJK): each renders
+    two columns while counting as one character, so a width computed from the
+    character count overflows the terminal.
+    """
+    return sum(_char_width(char) for char in text)
+
+
+def _display_slice(text: str, width: int) -> str:
+    """Return the leading substring of *text* covering *width* display columns."""
+    consumed = 0
+    for index, char in enumerate(text):
+        if consumed + _char_width(char) > width:
+            return text[:index]
+        consumed += _char_width(char)
+    return text
 
 
 def _fit(text: str, width: int) -> str:
-    """Return *text* clamped to *width* columns with a ``…`` marker."""
+    """Return *text* clamped to *width* display columns with a ``…`` marker.
+
+    The marker is itself one display column, so a fitted string's display
+    width is exactly *width* (``width - 1`` of content plus ``…``).
+    """
     if width <= 0:
         return ""
-    if len(text) <= width:
+    if display_width(text) <= width:
         return text
     if width == 1:
         return "…"
-    return text[: width - 1] + "…"
-
-
-def _table_widths(rows: tuple[tuple[str, ...], ...], floors: tuple[int, ...], budget: int) -> list[int]:
-    """Distribute *budget* across columns, honoring per-column *floors*.
-
-    Natural content width wins while it fits; once it overflows only the
-    widest columns are squeezed (never below their floor), so a narrow
-    terminal shortens long values instead of dropping short ones. The
-    inter-column separators are reserved before the squeeze runs, so a
-    rendered row can never exceed the budget. Rows shorter than the column
-    count contribute nothing, so a ragged row set cannot overflow the index.
-    """
-    counts = len(floors)
-    widths = [floors[index] for index in range(counts)]
-    for row in rows:
-        for index in range(min(counts, len(row))):
-            widths[index] = max(widths[index], len(row[index]))
-    separators = max(0, counts - 1)
-    # Repeatedly take one column from the widest until it fits or every
-    # column sits at its floor. O(budget) at worst, and budget is bounded by
-    # the terminal width, so this never scales with row count.
-    for _ in range(max(0, sum(widths) + separators - budget)):
-        candidates = [index for index in range(counts) if widths[index] > floors[index]]
-        if not candidates:
-            break
-        widths[max(candidates, key=lambda index: widths[index])] -= 1
-    return widths
-
-
-def _render_table(
-    rows: tuple[tuple[str, ...], ...],
-    floors: tuple[int, ...],
-    *,
-    budget: int | None = None,
-    rule: str = "─",
-) -> str:
-    """Render *rows* as a rule-bordered table fitted to the terminal width.
-
-    The column budget defaults to ``shutil.get_terminal_size().columns`` and
-    every cell passes through :func:`_fit`, so a table never wraps.
-    """
-    if budget is None:
-        budget = shutil.get_terminal_size().columns
-    widths = _table_widths(rows, floors, budget)
-    separators = max(0, len(floors) - 1)
-    rule_width = min(budget, sum(widths) + separators)
-    lines = [rule * rule_width]
-    for row in rows:
-        lines.append(" ".join(_fit(cell, widths[index]).ljust(widths[index]) for index, cell in enumerate(row)))
-    lines.append(rule * rule_width)
-    return "\n".join(lines)
+    return _display_slice(text, width - 1) + "…"
 
 
 __all__ = [
+    "EXIT_FAILURE",
     "STATUS_GLYPHS",
-    "_colorize",
     "_fail_json",
-    "_fit",
-    "_render_table",
-    "_table_widths",
-    "print_error",
-    "print_warn",
+    "display_width",
     "status_glyph",
 ]
