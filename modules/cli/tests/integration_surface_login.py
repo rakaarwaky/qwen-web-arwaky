@@ -180,8 +180,11 @@ def test_manual_login_reports_invalid_final_state(tmp_path: Path) -> None:
     The mock's check_session returns False (first result), so login fails with message."""
     browser = _BrowserHarness([False])
 
-    result = _login_verdict(_orchestrator(browser), wait_for_confirmation=True,
-        session_path=tmp_path / "session",)
+    result = _login_verdict(
+        _orchestrator(browser),
+        wait_for_confirmation=True,
+        session_path=tmp_path / "session",
+    )
 
     assert "did not produce a valid" in str(result)
 

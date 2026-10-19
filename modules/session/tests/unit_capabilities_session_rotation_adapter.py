@@ -1,10 +1,14 @@
-"""Unit tests for the rotation exhaustion contract (SESSION-02, D2).
+"""Unit tests for SessionRotationAdapter: rotation outcomes and exhaustion.
 
-When every pooled session is rate-limited, ``rotate`` returns
-``RotatorResponse(session=None, throttled=True)`` — exhaustion is a state
-to report, not a fault — while ``execute_with_rotation`` still raises
-``AllSessionsLimitedError``. Rotation also iterates deterministically
-from ``pool.current_index`` and probes each session exactly once.
+Covers the locked decisions (SESSION-02, BA-2-002):
+- ``rotate`` returns an explicit ``no_eligible_session`` outcome (with
+  reason and recovery action) when no eligible session remains, and the
+  derived ``throttled`` view reads True on that outcome.
+- ``execute_with_rotation`` returns an explicit error outcome on
+  exhaustion (never raises); ``AllSessionsLimitedError`` is a deprecated
+  alias kept for import compatibility.
+- Rotation iterates deterministically from ``pool.current_index`` and
+  probes each session exactly once; exclusions are honored.
 """
 
 from __future__ import annotations
@@ -13,14 +17,10 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
-from modules.session.src.capabilities_session_rotation_adapter import (
-    AllSessionsLimitedError,
-    SessionRotationAdapter,
-)
+from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
+    SessionHealthResult,
     SessionInfo,
     SessionPool,
     SessionStatus,
@@ -45,9 +45,40 @@ class _StubChecker:
         self.healthy_ids = healthy_ids
         self.probed: list[str] = []
 
+    def _verdict(self, session: SessionInfo) -> SessionHealthResult:
+        if session.session_id in self.healthy_ids:
+            return SessionHealthResult(session_id=session.session_id, status=SessionStatus.ACTIVE)
+        status = session.status
+        if status == SessionStatus.LIMITED:
+            return SessionHealthResult(
+                session_id=session.session_id,
+                status=SessionStatus.LIMITED,
+                reason="QUOTA",
+                evidence="Daily limit reached",
+            )
+        return SessionHealthResult(
+            session_id=session.session_id,
+            status=SessionStatus.AUTH_REQUIRED,
+            reason="EXPIRED",
+            evidence="Session expired",
+        )
+
     async def check_session(self, session: SessionInfo) -> bool:
         self.probed.append(session.session_id)
         return session.session_id in self.healthy_ids
+
+    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+        self.probed.append(session.session_id)
+        return self._verdict(session)
+
+    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
+        return pool
+
+    def check_pool_sync(self, pool: SessionPool, session_manager) -> list[tuple[SessionInfo, SessionHealthResult]]:
+        return [(s, self._verdict(s)) for s in pool.sessions]
+
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
+        return (sum(1 for _, v in results if v.is_healthy), len(results))
 
 
 def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter:
@@ -137,12 +168,88 @@ def test_get_next_session_skips_the_round_robin_candidate_in_the_fallback(tmp_pa
     assert sorted(checker.probed) == ["session_1", "session_2"]
 
 
-def test_execute_with_rotation_raises_when_all_limited(tmp_path: Path) -> None:
-    """``execute_with_rotation`` keeps raising on exhaustion (D2)."""
+def test_execute_with_rotation_reports_outcome_on_exhausted_pool(tmp_path: Path) -> None:
+    """``execute_with_rotation`` returns an explicit error outcome on exhaustion, never submits."""
     pool = _pool([SessionStatus.LIMITED, SessionStatus.LIMITED], tmp_path)
     checker = _StubChecker(healthy_ids=set())
     adapter = _adapter(pool, checker)
 
-    with pytest.raises(AllSessionsLimitedError):
-        asyncio.run(adapter.execute_with_rotation("prompt"))
+    result, session = asyncio.run(adapter.execute_with_rotation("prompt"))
+
+    assert session is None
+    assert "no_eligible_session" in result
     assert adapter.metrics.sessions_exhausted == 1
+
+
+def test_all_sessions_limited_error_still_importable() -> None:
+    """``AllSessionsLimitedError`` is kept as a deprecated alias for import compatibility."""
+    from modules.session.src.capabilities_session_rotation_adapter import AllSessionsLimitedError
+
+    err = AllSessionsLimitedError(pool=SessionPool.empty())
+    assert isinstance(err, Exception)
+    assert "rate-limited" in str(err)
+
+
+# ── outcome/reason contract (BA-2-002, merged from unit_session_rotation_outcomes) ─
+
+
+def test_rotation_empty_pool_returns_empty_pool_reason(tmp_path: Path) -> None:
+    pool = _pool([], tmp_path)
+    checker = _StubChecker(healthy_ids=set())
+    adapter = _adapter(pool, checker)
+
+    resp = asyncio.run(adapter.rotate(RotatorRequest()))
+
+    assert resp.session is None
+    assert resp.outcome == "no_eligible_session"
+    assert resp.reason == "empty_pool"
+    assert resp.recovery_action is not None
+
+
+def test_rotation_single_limited_pool_returns_all_sessions_limited(tmp_path: Path) -> None:
+    pool = _pool([SessionStatus.LIMITED], tmp_path)
+    checker = _StubChecker(healthy_ids=set())
+    adapter = _adapter(pool, checker)
+
+    resp = asyncio.run(adapter.rotate(RotatorRequest()))
+
+    assert resp.session is None
+    assert resp.outcome == "no_eligible_session"
+    assert resp.reason == "all_sessions_limited"
+
+
+def test_rotation_all_excluded_returns_all_sessions_excluded(tmp_path: Path) -> None:
+    pool = _pool([SessionStatus.ACTIVE, SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_1", "session_2"})
+    adapter = _adapter(pool, checker)
+
+    resp = asyncio.run(adapter.rotate(RotatorRequest(exclude_ids=("session_1", "session_2"))))
+
+    assert resp.session is None
+    assert resp.outcome == "no_eligible_session"
+    assert resp.reason == "all_sessions_excluded"
+
+
+def test_rotation_mixed_pool_selects_next_healthy(tmp_path: Path) -> None:
+    pool = _pool([SessionStatus.LIMITED, SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_2"})
+    adapter = _adapter(pool, checker)
+
+    resp = asyncio.run(adapter.rotate(RotatorRequest()))
+
+    assert resp.session is not None
+    assert resp.session.session_id == "session_2"
+    assert resp.outcome == "success"
+    assert resp.reason is None
+
+
+def test_rotation_known_limited_session_never_selected(tmp_path: Path) -> None:
+    """Never submits through a known-LIMITED profile."""
+    pool = _pool([SessionStatus.LIMITED], tmp_path)
+    checker = _StubChecker(healthy_ids=set())
+    adapter = _adapter(pool, checker)
+
+    resp = asyncio.run(adapter.rotate(RotatorRequest(exclude_ids=())))
+
+    assert resp.session is None
+    assert resp.outcome == "no_eligible_session"

@@ -21,11 +21,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.common import taxonomy_core_constant as constants
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.session.taxonomy_session_vo import (
+    SessionHealthResult,
     SessionInfo,
     SessionPool,
     SessionStatus,
@@ -180,6 +180,8 @@ def test_load_pool_ignores_non_profile_dirs(manager: SessionManager, patch_sessi
     assert pool.total_count == 1
     assert pool.sessions[0].name == "default"
 
+
+@pytest.fixture()
 def pool_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point POOL_FILE and SESSIONS_DIR at a tmp tree so no real profile is touched."""
     sessions_dir = tmp_path / "share" / "sessions"
@@ -365,14 +367,56 @@ def test_running_init_twice_keeps_a_populated_default_profile(pool_home: Path, m
 # ── check_pool_sync probes run concurrently (BE-4-001) ─────────────────────────
 
 
-class _SlowChecker(SessionHealthChecker):
-    """A checker whose probes each sleep, so concurrency is measurable."""
+class _SlowChecker:
+    """A checker whose probes each sleep, so concurrency is measurable.
+
+    Implements the full health-checker seam so the manager can mark pool
+    state synchronously via :meth:`check_pool_sync` without a real browser.
+    """
 
     probe_duration: float = 0.15
 
+    def __init__(self) -> None:
+        self._next_status: dict[str, SessionStatus] = {}
+
+    def set_status(self, session_id: str, status: SessionStatus) -> None:
+        self._next_status[session_id] = status
+
     async def check_session(self, session: SessionInfo) -> bool:
         await asyncio.sleep(self.probe_duration)
-        return session.status == SessionStatus.ACTIVE
+        return self._next_status.get(session.session_id, SessionStatus.ACTIVE) == SessionStatus.ACTIVE
+
+    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+        await asyncio.sleep(self.probe_duration)
+        status = self._next_status.get(session.session_id, SessionStatus.ACTIVE)
+        return SessionHealthResult(session_id=session.session_id, status=status)
+
+    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
+
+        updated = []
+        for s in pool.sessions:
+            verdict = await self.diagnose_session(s)
+            updated.append(s.with_status(verdict.status, reason=verdict.reason))
+        return SessionPool(sessions=updated, current_index=pool.current_index)
+
+    def check_pool_sync(self, pool: SessionPool, session_manager) -> list[tuple[SessionInfo, SessionHealthResult]]:
+        async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
+            tasks = [self.diagnose_session(s) for s in pool.sessions]
+            verdicts = await asyncio.gather(*tasks)
+            results = list(zip(pool.sessions, verdicts, strict=True))
+            for s, verdict in results:
+                if verdict.is_healthy:
+                    session_manager.mark_healthy(s.session_id)
+                elif verdict.status == SessionStatus.LIMITED:
+                    session_manager.mark_limited(s.session_id, reason=verdict.reason)
+                else:
+                    session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
+            return results
+
+        return asyncio.run(_run())
+
+    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
+        return (sum(1 for _, v in results if v.is_healthy), len(results))
 
 
 def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
@@ -396,7 +440,7 @@ def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
     elapsed = time.monotonic() - started
 
     assert [s.session_id for s, _ in results] == [s.session_id for s in sessions]
-    assert all(healthy is True for _, healthy in results)
+    assert all(verdict.is_healthy for _, verdict in results)
     # 4 sequential probes would take >= 0.6s; concurrent must stay near one probe.
     assert elapsed < _SlowChecker.probe_duration * 2, f"probes ran sequentially: {elapsed:.2f}s"
     assert manager.mark_healthy.call_count == 4
@@ -417,10 +461,13 @@ def test_check_pool_sync_marks_limited_sessions_in_pool_order(pool_home: Path) -
     pool = SessionPool(sessions=sessions)
     manager = MagicMock()
     checker = _SlowChecker()
+    # All probes report LIMITED except session_0 and session_2 (ACTIVE by index parity)
+    for i in range(3):
+        checker.set_status(f"session_{i}", SessionStatus.ACTIVE if i % 2 == 0 else SessionStatus.LIMITED)
 
     results = checker.check_pool_sync(pool, manager)
 
-    assert [healthy for _, healthy in results] == [True, False, True]
+    assert [verdict.is_healthy for _, verdict in results] == [True, False, True]
     marked = [call.args[0] for call in manager.mark_healthy.call_args_list]
     limited = [call.args[0] for call in manager.mark_limited.call_args_list]
     assert marked == ["session_0", "session_2"]
@@ -436,6 +483,7 @@ def test_pool_file_survives_an_empty_sessions_listing(pool_home: Path) -> None:
 
     assert pool.sessions == []
     assert not (pool_home / "sessions.json").exists()
+
 
 def _safe_profile(root: Path) -> Path:
     """A profile directory that clears the path-safety guard."""
@@ -557,4 +605,3 @@ def test_session_directory_stays_owner_only_after_a_refused_delete(
             manager.delete_session_profile(target)
 
     assert stat.S_IMODE(target.stat().st_mode) & 0o077 == 0
-

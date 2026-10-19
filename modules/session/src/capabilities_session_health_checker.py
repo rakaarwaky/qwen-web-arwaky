@@ -158,9 +158,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
         async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
             verdicts = await asyncio.gather(*(self.diagnose_session(s) for s in pool.sessions))
-            results: list[tuple[SessionInfo, SessionHealthResult]] = list(
-                zip(pool.sessions, verdicts, strict=True)
-            )
+            results: list[tuple[SessionInfo, SessionHealthResult]] = list(zip(pool.sessions, verdicts, strict=True))
             for s, verdict in results:
                 if verdict.status == SessionStatus.ACTIVE:
                     session_manager.mark_healthy(s.session_id)

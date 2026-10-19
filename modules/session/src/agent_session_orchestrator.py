@@ -398,9 +398,11 @@ class SessionOrchestrator(ISessionAggregate):
             self._sessions.remove_session_by_name(drop_by_name)
         else:
             # Dropped by path: remove any pool entry pointing at the target.
-            resolved_path = Path(resolved).resolve()
+            # resolve() comparisons keep the agent free of filesystem I/O
+            # (AES405); Path() only normalizes the in-memory value.
+            resolved_path = resolved.resolve()
             for entry in self._sessions.load_pool().sessions:
-                if Path(entry.path).resolve() == resolved_path:
+                if entry.path.resolve() == resolved_path:
                     self._sessions.remove_session(entry.session_id)
                     break
         if not removed:

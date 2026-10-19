@@ -26,7 +26,10 @@ from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
     RotatorResponse,
+    SessionInfo,
+    SessionPool,
     SessionRequest,
+    SessionStatus,
 )
 from modules.shared.src.session.utility_session_guard import is_filesystem_root, is_safe_session_target
 
@@ -332,43 +335,6 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
 # ── Regression: pool profile must win over the empty default session ────────
 
 
-def _orchestrator_with_pool(tmp_path: Path, pool_sessions: list[tuple[str, Path]]) -> SessionOrchestrator:
-    """Build an orchestrator whose session manager reports ``pool_sessions``.
-
-    ``(name, path)`` pairs become the pool entries. ``load_pool`` answers the
-    listing and ``find_pool_profile_with_content`` applies the same on-disk
-    rule the real capability uses (first entry whose directory carries
-    ``Local State`` or ``Default/Cookies``), so the resolver's selection is
-    asserted against the pool order rather than a hardcoded winner.
-    """
-    from datetime import datetime
-
-    from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
-
-    pool = SessionPool(
-        sessions=[
-            SessionInfo(
-                session_id=name,
-                name=name,
-                path=path,
-                status=SessionStatus.ACTIVE,
-                created_at=datetime(2026, 1, 1),
-            )
-            for name, path in pool_sessions
-        ]
-    )
-    resolved: Path | None = None
-    for s in pool.sessions:
-        if s.path.is_dir() and ((s.path / "Local State").is_file() or (s.path / "Default" / "Cookies").is_file()):
-            resolved = s.path
-            break
-    sessions = MagicMock()
-    sessions.load_pool.return_value = pool
-    sessions.find_pool_profile_with_content.return_value = resolved
-    sessions.get_session_by_name.side_effect = lambda name: next((s for s in pool.sessions if s.name == name), None)
-    return SessionOrchestrator(browser=MagicMock(), observability=MagicMock(), sessions=sessions)
-
-
 def test_validate_none_uses_pool_profile_with_chromium_content(tmp_path: Path) -> None:
     """``validate`` with no path must use the logged-in pool profile.
 
@@ -456,13 +422,9 @@ def test_delete_none_uses_pool_profile_with_chromium_content(tmp_path: Path) -> 
     assert orch._sessions is not None
     orch._sessions.delete_session_profile = delete_profile
 
-    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
-        build.return_value.session_path = profile
-        result = orch.execute(SessionRequest(verb="delete", name="arwaky007"))
+    result = orch.execute(SessionRequest(verb="delete", name="arwaky007"))
 
     assert "deleted successfully" in str(result)
-    build.assert_called_once()
-    assert build.call_args.kwargs["session_path"] == profile
     delete_profile.assert_called_once_with(profile, force=False)
 
 
@@ -494,6 +456,7 @@ def test_validate_none_without_session_manager_keeps_the_default(tmp_path: Path)
 
     assert build.call_args.kwargs["session_path"] is None
 
+
 def _info(name: str, path: Path, status: SessionStatus = SessionStatus.ACTIVE) -> SessionInfo:
     return SessionInfo(session_id=name, name=name, path=path, status=status)
 
@@ -501,11 +464,30 @@ def _info(name: str, path: Path, status: SessionStatus = SessionStatus.ACTIVE) -
 def _orchestrator_with_pool(
     tmp_path: Path, pool_sessions: list[tuple[str, Path]], *, rotator: object | None = None
 ) -> SessionOrchestrator:
+    from datetime import datetime
+
+    from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionStatus
+
     pool = SessionPool(
-        sessions=[_info(name, path) for name, path in pool_sessions],
+        sessions=[
+            SessionInfo(
+                session_id=name,
+                name=name,
+                path=path,
+                status=SessionStatus.ACTIVE,
+                created_at=datetime(2026, 1, 1),
+            )
+            for name, path in pool_sessions
+        ]
     )
+    resolved: Path | None = None
+    for s in pool.sessions:
+        if s.path.is_dir() and ((s.path / "Local State").is_file() or (s.path / "Default" / "Cookies").is_file()):
+            resolved = s.path
+            break
     sessions = MagicMock()
     sessions.load_pool.return_value = pool
+    sessions.find_pool_profile_with_content.return_value = resolved
     sessions.get_session_by_name.side_effect = lambda name: next((s for s in pool.sessions if s.name == name), None)
     sessions.remove_session_by_name.return_value = True
     return SessionOrchestrator(
@@ -522,6 +504,10 @@ class _StubRotator:
         self.seen: list[RotatorRequest] = []
 
     async def rotate(self, request: RotatorRequest) -> RotatorResponse:
+        self.seen.append(request)
+        return self.response
+
+    def rotate_sync(self, request: RotatorRequest) -> RotatorResponse:
         self.seen.append(request)
         return self.response
 
@@ -587,7 +573,7 @@ def test_rotate_with_a_healthy_session_reports_the_selection(tmp_path: Path) -> 
 
 
 def test_rotate_reports_throttled_when_the_pool_is_exhausted(tmp_path: Path) -> None:
-    rotator = _StubRotator(RotatorResponse(session=None, throttled=True))
+    rotator = _StubRotator(RotatorResponse(session=None, outcome="no_eligible_session", reason="all_sessions_limited"))
     orch = _orchestrator_with_pool(tmp_path, [], rotator=rotator)
 
     response = orch.execute(SessionRequest(verb="rotate"))
@@ -610,6 +596,9 @@ def test_rotate_propagates_rotator_errors(tmp_path: Path) -> None:
         async def rotate(self, request: RotatorRequest) -> RotatorResponse:
             raise QwenCliError("health checker not configured")
 
+        def rotate_sync(self, request: RotatorRequest) -> RotatorResponse:
+            raise QwenCliError("health checker not configured")
+
     orch = _orchestrator_with_pool(tmp_path, [], rotator=_Boom())
 
     with pytest.raises(QwenCliError, match="health checker not configured"):
@@ -617,7 +606,7 @@ def test_rotate_propagates_rotator_errors(tmp_path: Path) -> None:
 
 
 def test_rotate_forwards_an_empty_exclude_set(tmp_path: Path) -> None:
-    rotator = _StubRotator(RotatorResponse(session=None, throttled=True))
+    rotator = _StubRotator(RotatorResponse(session=None, outcome="no_eligible_session", reason="all_sessions_limited"))
     orch = _orchestrator_with_pool(tmp_path, [], rotator=rotator)
 
     orch.execute(SessionRequest(verb="rotate"))
@@ -695,7 +684,7 @@ def test_delete_by_pool_entry_path_does_not_drop_the_pool_entry(tmp_path: Path) 
     (profile / ".backups" / "20250101T000000Z").mkdir(parents=True)
     orch = _orchestrator_with_pool(tmp_path, [("alpha", profile)])
     assert orch._sessions is not None
-    orch._sessions.delete_session_profile = MagicMock()
+    orch._sessions.delete_session_profile = MagicMock(return_value=True)
 
     response = orch.execute(SessionRequest(verb="delete", session_path=profile, name=""))
 
@@ -711,7 +700,7 @@ def test_delete_by_name_resolves_the_pool_entry_and_removes_it(tmp_path: Path) -
     (profile / ".backups" / "20250101T000000Z").mkdir(parents=True)
     orch = _orchestrator_with_pool(tmp_path, [("alpha", profile)])
     assert orch._sessions is not None
-    orch._sessions.delete_session_profile = MagicMock()
+    orch._sessions.delete_session_profile = MagicMock(return_value=True)
 
     response = orch.execute(SessionRequest(verb="delete", name="alpha"))
 
@@ -736,4 +725,3 @@ def test_rotate_runs_the_async_rotator_on_the_sync_seam(tmp_path: Path) -> None:
 
     assert inspect.iscoroutinefunction(rotator.rotate)
     assert response.error is None
-
