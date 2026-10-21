@@ -348,6 +348,7 @@ def setup_xdg_directories(python_bin: Path) -> None:
     (xdg_data / "output").mkdir(parents=True, exist_ok=True)
     (xdg_data / "sessions" / "default").mkdir(parents=True, exist_ok=True)
     (xdg_state / "log").mkdir(parents=True, exist_ok=True)
+    (xdg_state / "meta").mkdir(parents=True, exist_ok=True)
     (xdg_cache / ".processing").mkdir(parents=True, exist_ok=True)
     xdg_config.mkdir(parents=True, exist_ok=True)
 

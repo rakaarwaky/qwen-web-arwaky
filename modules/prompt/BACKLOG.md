@@ -24,7 +24,8 @@ Last Updated: 2026-10-05
 
 | Scenario | Kind | Test file | Test name | Last verified |
 |---|---|---|---|---|
-| A direct prompt produces a response file at the named destination | Automated | `modules/prompt/tests/unit_agent_direct_prompt.py` | direct prompt save | 2026-10-05 |
+| A direct prompt produces a response file at the named destination | Automated | `modules/prompt/tests/unit_agent_direct_prompt.py` | direct prompt save | 2026-10-22 |
+| A saved response carries its run metadata outside the output directory | Automated | `modules/prompt/tests/dogfood_output_saver.py` | a saved response carries its run metadata | 2026-10-22 |
 | A stalled stream reports incomplete | Automated | `modules/prompt/tests/unit_capability_stream_monitor.py` | stall detection | 2026-10-05 |
 | An attachment over the upload limit is rejected | Automated | `modules/prompt/tests/unit_capability_file_uploader.py` | upload limit | 2026-10-05 |
 | A cancel on a terminal pipeline reports zero | Gap | none yet | see `PROMPT-02` | 2026-10-05 |
@@ -56,3 +57,4 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
+| 2026-10-22 | Sidecars moved to `DEFAULT_METADATA_DIR` (XDG state `meta/`); direct-prompt outputs named `direct_*` instead of `tmpXXXX_*` (FR-PROMPT-009). | @qwen-web-arwaky |

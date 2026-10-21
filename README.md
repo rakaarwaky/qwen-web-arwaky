@@ -169,6 +169,8 @@ A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker coun
 
 Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
 
+Generated responses land in `~/.local/share/qwen-web-arwaky/output/`; the `.meta.json` run-traceability sidecar for each response lives separately, under `~/.local/state/qwen-web-arwaky/meta/`, mirroring the artifact's relative path.
+
 ## Testing
 
 See [`TEST.md`](TEST.md) for test tiers, browser fixtures, regression locks, and the TDD workflow.
