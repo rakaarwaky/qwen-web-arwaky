@@ -6,11 +6,12 @@ Smart surface: delegates to the session aggregate
 the pool tables render through ``render_pool_table``, fitted to the terminal
 in display columns so wide status glyphs never overflow.
 
-``login`` is the one interactive subcommand: it opens a headed browser for a
-manual sign-in and — without ``--json`` — offers an "add another" re-prompt.
-With ``--json`` it runs exactly one login, prints no banner, and emits the
-fixed-key success envelope, so non-interactive callers never block on
-``input()``.
+Two subcommands are interactive on a TTY. ``login`` opens a headed browser
+for a manual sign-in and — without ``--json`` — offers an "add another"
+re-prompt; ``remove`` — without ``--json``, ``--force``, or ``--keep-profile``
+— asks a ``[y/N]`` confirmation before it deletes the profile. With
+``--json`` both run unattended and emit the fixed-key envelope, so
+non-interactive callers never block on ``input()``.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 import unicodedata
 from typing import TYPE_CHECKING, Any
 
@@ -35,9 +37,12 @@ if TYPE_CHECKING:
 #: ``list`` / ``status`` share the leading ID / Name / Status columns; the
 #: per-column floors keep short cells readable when the terminal is narrow.
 _LIST_COLUMNS = ("ID", "Name", "Status", "Last Used")
-_LIST_FLOORS = (6, 8, 8, 10)
+# UX-5-002: the Status floor is 16 so a full ``⛔ auth_required`` cell
+# (2 + 13 display columns) never truncates to ``…`` — the auth-required
+# verdict is the one a whole pool can sit in, so it must render in full.
+_LIST_FLOORS = (6, 8, 16, 10)
 _STATUS_COLUMNS = ("ID", "Name", "Status", "Requests", "Failed")
-_STATUS_FLOORS = (6, 8, 8, 8, 6)
+_STATUS_FLOORS = (6, 8, 16, 8, 6)
 _PAD = 2
 
 #: Glyphs that render two columns wide in the CLI's monospaced fonts even
@@ -409,17 +414,39 @@ def cmd_health_check(session: ISessionAggregate, json_output: bool = False) -> i
     return 0
 
 
+def _remove_confirmed(token: str) -> bool:
+    """Ask the operator to confirm a destructive remove on an interactive TTY.
+
+    UX-4-003: the prompt is the CLI's parity with the TUI's ``ConfirmModal`` —
+    a destructive action names its target and defaults to "no". Anything but
+    ``y`` / ``yes`` aborts with exit 0 (the session is kept, nothing changed).
+    A closed stdin (``EOFError``) also aborts: a piped run must never escape
+    as a traceback.
+    """
+    try:
+        answer = input(f"Remove session '{token}' and delete its profile? [y/N]: ").strip().lower()
+    except EOFError:
+        return False
+    return answer in ("y", "yes")
+
+
 def cmd_remove(session: ISessionAggregate, args: argparse.Namespace, json_output: bool = False) -> int:
     """Remove a session entry via the session aggregate.
 
     Drops the pool entry; when ``--keep-profile`` is set the Chromium
     profile directory is left on disk, otherwise the pool removal also
-    deletes the profile directory.
+    deletes the profile directory. On an interactive TTY, without
+    ``--json``, ``--force``, or ``--keep-profile``, the destructive path
+    asks a ``[y/N]`` confirmation first (UX-4-003) — ``--json``,
+    ``--force``, and ``--keep-profile`` keep machine/scripted semantics and
+    never prompt.
     """
     token = args.session_id
 
     if getattr(args, "keep_profile", False):
-        # Drop the pool entry only; leave the profile on disk.
+        # Drop the pool entry only; leave the profile on disk. The
+        # pool-entry-only path is non-destructive, so it keeps scripted
+        # semantics: no prompt.
         response: SessionResponse = session.execute(SessionRequest(verb="remove_session", name=token))
         if response.error:
             return _fail_json(str(response.error), "cli-500", json_output)
@@ -435,6 +462,12 @@ def cmd_remove(session: ISessionAggregate, args: argparse.Namespace, json_output
     matches = [s for s in list(listing.sessions or []) if s.session_id == token or s.name == token]
     if not matches:
         return _fail_json(f"Session '{token}' not found in the pool", "cli-400", json_output)
+
+    # UX-4-003: only an interactive TTY without --json and without --force
+    # prompts; every scripted path (--json, --force, non-TTY) runs straight.
+    if not json_output and not getattr(args, "force", False) and sys.stdin.isatty() and not _remove_confirmed(token):
+        print("Aborted — session kept.")
+        return 0
 
     response = session.execute(
         SessionRequest(
