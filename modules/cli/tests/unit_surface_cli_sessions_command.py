@@ -186,6 +186,38 @@ def test_status_json_payload_carries_counts(capsys) -> None:
     assert len(payload["sessions"]) == 2
 
 
+def test_list_renders_full_auth_required_cells_at_80_columns(capsys) -> None:
+    # UX-5-002: the Status floor of 16 keeps a whole-pool auth_required verdict
+    # readable — the full cell renders with no "…" truncation at the narrowest
+    # budget a real terminal reports.
+    from modules.cli.src.surface_cli_sessions_command import (
+        _LIST_COLUMNS,
+        _LIST_FLOORS,
+        display_width,
+        render_pool_table,
+    )
+
+    pool = [
+        _info("session_1", "default", status=SessionStatus.AUTH_REQUIRED),
+        _info("session_2", "work", status=SessionStatus.AUTH_REQUIRED),
+        _info("session_3", "staging", status=SessionStatus.AUTH_REQUIRED),
+    ]
+    table = render_pool_table(pool, _LIST_COLUMNS, _LIST_FLOORS, budget=80)
+    assert _LIST_FLOORS[2] == 16, "the Status floor is pinned at 16"
+
+    lines = table.splitlines()
+    assert max(display_width(line) for line in lines) <= 80, "the table must stay within the 80-column budget"
+
+    auth_required = SessionStatus.AUTH_REQUIRED.value
+    header = lines[1]
+    body = lines[2:-1]
+    assert "Status" in header, f"the real list column set must render, got {header!r}"
+    assert len(body) == 3, f"one rendered row per pool session, got {len(body)}"
+    for row in body:
+        assert auth_required in row, f"the full auth_required verdict must render in full, got {row!r}"
+        assert "…" not in row, f"no cell may truncate at the floor, got {row!r}"
+
+
 # ─── remove ─────────────────────────────────────────────────────────────────
 
 

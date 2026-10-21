@@ -1,11 +1,14 @@
 """Unit tests for the Sessions-pane account card action buttons.
 
-The card foot carries three icon-only buttons:
+The card foot carries three icon-only buttons — the shipped glyph set is
+↻ / ☐ / × (rendered from ``_GLYPHS`` in
+``modules.tui.src.surface_tui_utils_component``), with ASCII fallbacks
+``r / h / x`` on forced-ascii locale terminals:
 - ↻ (refresh, ``account-refresh-<n>``): reloads the pool from disk and
   repaints the row.
-- 🧪 (health, ``account-health-<n>``): runs the pool health check — the
+- ☐ (health, ``account-health-<n>``): runs the pool health check — the
   same probe as ``qwa session health`` (``SessionHealthChecker``).
-- 🗑 (trash, ``account-delete-<n>``): removes the pool entry and deletes
+- × (delete, ``account-delete-<n>``): removes the pool entry and deletes
   the Chromium profile — the same logic as ``qwa session remove``
   (``SessionManager.remove_session`` + ``delete_session_profile``),
   guarded by a ``ConfirmModal``.
@@ -71,15 +74,19 @@ class TestAccountCardButtons:
                 assert buttons[0].name == "account-refresh-1"
                 assert buttons[1].name == "account-health-1"
                 assert buttons[2].name == "account-delete-1"
+                # UX-4-001: every icon-only button carries an accessible
+                # tooltip naming the session — the row has no other text
+                # channel for a screen reader (WCAG 1.1.1).
+                assert buttons[0].tooltip == "Refresh pool entry 'arwaky007'", buttons[0].tooltip
+                assert buttons[1].tooltip == "Run a health check on 'arwaky007'", buttons[1].tooltip
+                assert buttons[2].tooltip == "Delete session 'arwaky007' (asks confirmation first)", buttons[2].tooltip
 
-        # The glyph resolver honours NO_COLOR / ASCII locale so a real terminal
-        # without a Nerd Font renders the ASCII fallback instead of a tofu box.
-        # The test locks the *wide* glyphs, so it must disable that override
-        # for the duration of the assertion — otherwise a CI box with NO_COLOR
-        # set sees 'r'/'h'/'x' and the test fails even though the code is
-        # correct. The card is built inside the patch so the resolver sees
-        # the cleared env when it resolves the button labels.
-        with patch.dict(os.environ, {"NO_COLOR": "", "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8"}, clear=False):
+        # The glyph resolver honours the forced-ascii locale fallback so a
+        # real terminal without a Nerd Font renders the ASCII set instead of
+        # a tofu box. NO_COLOR is a *colour* preference and no longer
+        # affects iconography (UX-3-003), so the wide-glyph assertion here
+        # needs only a UTF-8 locale.
+        with patch.dict(os.environ, {"LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8"}, clear=False):
             os.environ.pop("NO_COLOR", None)
             card = _TuiUtilsMixin._account_card(session, 1)
             asyncio.run(_run())
@@ -204,6 +211,8 @@ class TestDeleteSessionWorker:
         session_info.path = MagicMock()
         app._sessions_cache = [session_info]
         app._sessions_loaded_once = True
+        # The confirm flow captures the target name before the worker runs.
+        app._last_delete_name = "arwaky007"
 
         async def _run() -> None:
             async with app.run_test(size=(150, 44)):
@@ -220,21 +229,28 @@ class TestDeleteSessionWorker:
         asyncio.run(_run())
 
     def test_delete_declined_is_noop(self) -> None:
-        from modules.tui.tests.fixture_tui_app import make_app
+        """A declined modal never starts the worker.
+
+        The confirm callback only calls ``_run_delete_session`` when the
+        modal answered True, so there is nothing to undo on Cancel.
+        """
+
+        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
 
         app = make_app()
         mock_manager = MagicMock()
         app._session_manager = mock_manager
 
         async def _run() -> None:
-            async with app.run_test(size=(150, 44)) as pilot:
-                # Declining the confirm modal must not start a delete worker.
-                app._confirm_delete_session("arwaky007")
-                await pilot.pause(0.1)
-                from textual.widgets import Button
+            async with app.run_test(size=(150, 44)):
+                app._sessions_cache = []
+                _sync_cft(app)
+                worker = app._run_delete_session(False)
+                from textual.worker import WorkerFailed
 
-                app.screen.query_one("#btn-cancel", Button).press()
-                await pilot.pause(0.2)
+                with contextlib.suppress(WorkerFailed):
+                    if worker is not None:
+                        await worker.wait()
                 mock_manager.remove_session.assert_not_called()
                 mock_manager.delete_session_profile.assert_not_called()
 
@@ -243,7 +259,7 @@ class TestDeleteSessionWorker:
 
 class TestSessionsPaneLayout:
     """The Sessions pane carries exactly one add control and exactly one
-    table, whose columns are name | status | ↻ | 🧪 | 🗑.
+    table, whose columns are name | status | ↻ | ☐ | ×.
 
     These lock the simplification request: no second add button, no second
     table, and no leftover log panel below the table.
