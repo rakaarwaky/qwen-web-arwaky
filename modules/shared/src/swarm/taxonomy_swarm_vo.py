@@ -28,6 +28,7 @@ class SwarmRequest:
     verb: SwarmVerb
     input_path: Path | None = None
     swarm_id: SwarmId | str | None = None
+    headless: bool = True
 
 
 @dataclass(frozen=True)

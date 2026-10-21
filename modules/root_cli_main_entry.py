@@ -227,6 +227,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     swarm_start = swarm_sub.add_parser("start", help="Start a Swarm fan-out over a file or folder")
     swarm_start.add_argument("input", help="Path to file or folder to fan out across all role templates")
     swarm_start.add_argument("--json", action="store_true", help="Format output as JSON")
+    swarm_start.add_argument(
+        "--headed",
+        action="store_true",
+        help="Show browser windows (non-headless) instead of running headless",
+    )
     swarm_status = swarm_sub.add_parser("status", help="Show status of a running or completed Swarm")
     swarm_status.add_argument("swarm_id", help="Swarm ID to query")
     swarm_status.add_argument("--json", action="store_true", help="Format output as JSON")

@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- fix(tui): the Swarm screen now passes the shared headless toggle to each Swarm leg so "headless off" launches visible Chromium windows instead of running headless. Set `QWA_SWARM_HEADLESS=0` at the CLI level for the same effect.
 - fix(cli): `doctor --json` no longer marks a healthy sandbox / capacity check as `severity: "error"`; the sentinel for a passing check is `"ok"`.
 - fix(cli): `update --rollback` failure emits the envelope (`{"success": false, "message": …, "error_code": "cli-500"}`) with the `[ERROR]` prefix instead of `{"success": false, "error": …}` / `❌`.
 - fix(cli): a rotation failure in the headless controller prints `[WARN] Session rotation failed; falling back to the default session: {cause}` to stderr instead of silently degrading.

@@ -54,13 +54,16 @@ class ISwarmStartProtocol(ABC):
         ...
 
     @abstractmethod
-    def start(self, input_path: FilePath, attachment_path: FilePath) -> SwarmSnapshot:
+    def start(self, input_path: FilePath, attachment_path: FilePath, headless: bool = True) -> SwarmSnapshot:
         """Start a fan-out over the discovered roles and return the initial snapshot.
 
         ``input_path`` is what the user pointed at — a file or a folder —
         and is recorded on the snapshot. ``attachment_path`` is the single
         material every role reads; the caller resolves a folder input down
         to it, because the fan-out threads read it on their first pass.
+
+        ``headless`` decides whether each Chromium instance runs headless.
+        ``True`` means no visible browser window; ``False`` shows the window.
         """
         ...
 

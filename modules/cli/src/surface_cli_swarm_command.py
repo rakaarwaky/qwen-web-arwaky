@@ -51,7 +51,9 @@ def _cmd_start(args: argparse.Namespace, swarm: ISwarmAggregate) -> int:
     if error is not None:
         return _fail_json(error["message"], "cli-400", json_output)
 
-    response = swarm.execute(SwarmRequest(verb="start", input_path=input_path))
+    response = swarm.execute(
+        SwarmRequest(verb="start", input_path=input_path, headless=not getattr(args, "headed", False))
+    )
     if response.error:
         return _fail_json(str(response.error), "cli-500", json_output)
     snapshot = response.snapshot

@@ -92,7 +92,7 @@ class SwarmOrchestrator(ISwarmAggregate):
         if request.verb == "start":
             if request.input_path is None:
                 return SwarmResponse(error="start requires input_path")
-            return SwarmResponse(snapshot=self._start(request.input_path))
+            return SwarmResponse(snapshot=self._start(request.input_path, request.headless))
         if request.verb == "snapshot":
             if request.swarm_id is None:
                 return SwarmResponse(error="snapshot requires swarm_id")
@@ -104,7 +104,7 @@ class SwarmOrchestrator(ISwarmAggregate):
             return SwarmResponse(snapshot=self._progress(SwarmId(request.swarm_id)))
         raise ValueError(f"Unknown swarm verb: {request.verb!r}")
 
-    def _start(self, input_path: Path) -> SwarmSnapshot:
+    def _start(self, input_path: Path, headless: bool = True) -> SwarmSnapshot:
         """Start a fan-out over every discovered role template.
 
         A folder input is compiled down to one attachment first, so every
@@ -118,7 +118,7 @@ class SwarmOrchestrator(ISwarmAggregate):
             attachment = self._folder_adapter.resolve_to_attachment(input_path)
         # ``FilePath`` is a NewType over ``Path``: this narrows the request
         # value for the start seam and touches nothing on disk.
-        return self._start_seam.start(cast(FilePath, input_path), cast(FilePath, attachment))
+        return self._start_seam.start(cast(FilePath, input_path), cast(FilePath, attachment), headless=headless)
 
     def _progress(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""
