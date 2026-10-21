@@ -50,16 +50,7 @@ class ConfigHealthProbeCapability(ISmokeGate):
 
 # Block 2: Protocol Method Implementation
 
-def build_config_smoke_gate(session: ISessionAggregate) -> ISmokeGate:
-    """Factory that returns a smoke gate callable for the update pipeline.
-
-    The Root layer injects this callable, never the class itself, to avoid
-    import cycles. Callers get a simple callable that executes the same doctor
-    checks that the CLI surface reports, ensuring the post-flight gate cannot
-    disagree with the interactive ``qwen-web-arwaky doctor`` (issue #294).
-    """
-    return ConfigHealthProbeCapability(session)
-
+# Empty Block 2: no direct protocol trait implementation beyond the class
 
 # Block 3: Dunder Methods, Factories & Helpers
 
