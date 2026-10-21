@@ -11,6 +11,7 @@ from typing import Any
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_ATOMIC_WRITE,
     DEFAULT_GENERATE_SIDECAR,
+    DEFAULT_METADATA_DIR,
 )
 from modules.shared.src.common.taxonomy_core_error import OutputWriteError
 from modules.shared.src.common.taxonomy_core_vo import (
@@ -22,7 +23,12 @@ from modules.shared.src.common.taxonomy_core_vo import (
     RunContext,
 )
 from modules.shared.src.common.utility_core_text import strip_ui_noise, utc_now_iso
-from modules.shared.src.common.utility_io_writer import atomic_write_text, ensure_dir, write_json_file
+from modules.shared.src.common.utility_io_writer import (
+    atomic_write_text,
+    ensure_dir,
+    sidecar_path_for,
+    write_json_file,
+)
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.prompt.contract_prompt_protocol import ISaverProtocol
 
@@ -39,9 +45,11 @@ class Saver(ISaverProtocol):
         self,
         generate_sidecar: GenerateSidecarFlag = GenerateSidecarFlag(DEFAULT_GENERATE_SIDECAR),
         atomic_write: AtomicWriteFlag = AtomicWriteFlag(DEFAULT_ATOMIC_WRITE),
+        metadata_dir: Path | None = None,
     ) -> None:
         self.generate_sidecar = generate_sidecar
         self.atomic_write = atomic_write
+        self.metadata_dir = metadata_dir if metadata_dir is not None else DEFAULT_METADATA_DIR
 
     # Block 2: Protocol Method Implementation
     def write_output(
@@ -91,9 +99,9 @@ class Saver(ISaverProtocol):
         # Step 3: Write main content file (atomic or direct)
         self._write_text_file(path, full_text, atomic_write)
 
-        # Step 4: Generate .meta.json sidecar file (if enabled)
+        # Step 4: Generate .meta.json sidecar under the XDG meta root (if enabled)
         if generate_sidecar:
-            sidecar_path = path.with_suffix(".meta.json")
+            sidecar_path = sidecar_path_for(path, self.metadata_dir)
             ensure_dir(sidecar_path)
             try:
                 meta_dict = {

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from modules.shared.src.common.taxonomy_core_constant import DIRECT_PROMPT_STEM
 from modules.shared.src.config.utility_config_app_factory import resolve_pipeline_output_path
 
 
@@ -90,3 +91,32 @@ def test_unicode_and_space_containing_stems_survive_resolution(tmp_path: Path) -
     assert out_path.parent == out_dir
     assert prompt.stem in out_path.name
     assert "\u4f60\u597d" in out_path.name
+
+
+def test_explicit_stem_overrides_prompt_stem_for_auto_names(tmp_path: Path) -> None:
+    """Direct prompts pass DIRECT_PROMPT_STEM so tmpXXXX never names the output."""
+    prompt = tmp_path / "tmpAb12Cd.txt"
+    prompt.write_text("typed prompt", encoding="utf-8")
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    _, out_path = resolve_pipeline_output_path(prompt, output_file=out_dir, stem=DIRECT_PROMPT_STEM)
+
+    assert out_path.parent == out_dir
+    assert out_path.name.startswith(f"{DIRECT_PROMPT_STEM}_")
+    assert "tmpAb12Cd" not in out_path.name
+
+
+def test_default_output_uses_direct_stem_when_no_output_file(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "modules.shared.src.config.utility_config_app_factory.DEFAULT_OUTPUT",
+        tmp_path / "xdg-output",
+    )
+    prompt = tmp_path / "tmpZz99Yy.txt"
+    prompt.write_text("typed prompt", encoding="utf-8")
+
+    _, out_path = resolve_pipeline_output_path(prompt, stem=DIRECT_PROMPT_STEM)
+
+    assert out_path.parent == tmp_path / "xdg-output"
+    assert out_path.name.startswith(f"{DIRECT_PROMPT_STEM}_")
+    assert "tmpZz99Yy" not in out_path.name
