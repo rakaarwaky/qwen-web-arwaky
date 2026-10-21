@@ -66,6 +66,7 @@ class _TuiWorkersMixin:
     _swarm_pending_input: Path | None
     _confirm_or_start_swarm: Any
     _swarm_started_perf: float | None
+    _headless: bool
     _session_check_timed_out: bool
     _last_session_state: str | None
     _slot_generation: dict[int, int]
@@ -487,7 +488,9 @@ class _TuiWorkersMixin:
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
         try:
-            snapshot = self._swarm.execute(SwarmRequest(verb="start", input_path=input_path)).snapshot
+            snapshot = self._swarm.execute(
+                SwarmRequest(verb="start", input_path=input_path, headless=self._headless)
+            ).snapshot
             if snapshot is None:
                 self.call_from_thread(
                     self._log_swarm_msg,

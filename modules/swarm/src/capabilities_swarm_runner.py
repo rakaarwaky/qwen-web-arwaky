@@ -89,6 +89,7 @@ class SwarmRunner(ISwarmStartProtocol):
         self._registry = registry
         self._output_root = Path(output_root)
         self._headless = bool(headless)
+        self._headless_for_run = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get("QWA_SWARM_CONCURRENCY", "").strip()
             concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
@@ -105,7 +106,12 @@ class SwarmRunner(ISwarmStartProtocol):
         """Configured browser concurrency for a single Swarm run."""
         return BrowserCount(self._browser_concurrency)
 
-    def start(self, input_path: FilePath, attachment_path: FilePath) -> SwarmSnapshot:
+    def start(
+        self,
+        input_path: FilePath,
+        attachment_path: FilePath,
+        headless: bool = True,
+    ) -> SwarmSnapshot:
         """Create a Swarm directory and schedule all discovered templates.
 
         ``input_path`` is what the user pointed at and is recorded on the
@@ -145,6 +151,7 @@ class SwarmRunner(ISwarmStartProtocol):
             thread_name_prefix=f"qwen_swarm_{swarm_id[-6:]}",
         )
         self._registry.attach_executor(swarm_id, executor)
+        self._headless_for_run = bool(headless)
         running = self._registry.revise(swarm_id, lambda current: replace_status(current, "running"))
         for role in roles:
             executor.submit(self._run_agent, swarm_id, role)
@@ -226,7 +233,7 @@ class SwarmRunner(ISwarmStartProtocol):
                         prompt_file=prompt_file,
                         attachment_file=attachment_path,
                         output_file=output_path,
-                        headless=HeadlessFlag(self._headless),
+                        headless=HeadlessFlag(self._headless_for_run),
                         cancel_event=event,
                     )
                 )
