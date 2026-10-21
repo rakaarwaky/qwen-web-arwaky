@@ -4,6 +4,11 @@ Smart surface helpers (no domain imports): the fixed-key failure envelope
 every ``--json`` surface funnels through, the ``[ERROR]`` stderr channel,
 and the status-glyph vocabulary shared by the report surfaces. Glyphs are
 emitted unpainted; the Textual TUI layer owns all ANSI color.
+
+UX-3-002: ``STATUS_GLYPHS`` is declared once in the shared Taxonomy layer
+(:mod:`modules.shared.src.common.taxonomy_core_constant`) and re-exported
+here so the CLI and the TUI read the same object instead of each carrying
+a literal that drifts.
 """
 
 from __future__ import annotations
@@ -11,22 +16,21 @@ from __future__ import annotations
 import json
 import sys
 
+from modules.shared.src.common.taxonomy_core_constant import STATUS_GLYPHS
+
 #: Failure exit code shared by every ``--json`` surface: the fixed-key
 #: envelope and ``error_code`` never diverge in exit status.
 EXIT_FAILURE = 1
 
-#: Canonical status glyphs: ``✓ / ✗ / ⚠`` for results, ``● / ◐ / ○`` for
-#: health, ``…`` for pending. ASCII-safe keys so surfaces stay greppable.
-STATUS_GLYPHS: dict[str, str] = {
-    "ok": "✓",
-    "fail": "✗",
-    "warn": "⚠",
-    "pending": "…",
-    "health_ok": "●",
-    "health_limited": "◐",
-    "health_auth": "⛔",
-    "health_unknown": "○",
-}
+#: Re-exported from the shared Taxonomy layer so every CLI report surface
+#: reads the canonical glyph object (``✗`` U+2717 is the failure marker).
+__all__ = [
+    "EXIT_FAILURE",
+    "STATUS_GLYPHS",
+    "_fail_json",
+    "print_error",
+    "status_glyph",
+]
 
 _ERROR_PREFIX = "[ERROR]"
 
@@ -53,11 +57,3 @@ def _fail_json(message: str, error_code: str, json_output: bool) -> int:
     else:
         print_error(message)
     return EXIT_FAILURE
-
-
-__all__ = [
-    "EXIT_FAILURE",
-    "STATUS_GLYPHS",
-    "_fail_json",
-    "status_glyph",
-]

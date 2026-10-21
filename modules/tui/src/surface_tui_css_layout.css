@@ -227,6 +227,18 @@
     content-align: center middle;
 }
 
+/* UX-1-002: the one-line key-hint strip under the session table. It is a
+   sibling of #session-rows inside the #session-table card, so a row repaint
+   must never remove it: it stays visible on an empty pool and with ≥1
+   session. */
+.session-key-hint {
+    width: 100%;
+    height: 1;
+    color: $status_muted;
+    text-style: italic;
+    padding: 0 1;
+}
+
 .session-row {
     layout: horizontal;
     width: 100%;
@@ -287,9 +299,12 @@
 }
 
 /* The row's three per-account action buttons: ↻ (refresh) reloads the pool
-   from disk, 🧪 (health) runs the pool health check (same probe as
-   'qwa session health'), 🗑 (trash) deletes the pool entry + profile (same
-   logic as 'qwa session remove'). Icon-only, 4 cells wide. */
+   from disk, ☐ (health) runs the pool health check (same probe as
+   'qwa session health'), × (delete) deletes the pool entry + profile (same
+   logic as 'qwa session remove'). The shipped glyph set is ↻ / ☐ / ×
+   (rendered from _GLYPHS in surface_tui_utils_component), with ASCII
+   fallbacks r / h / x on forced-ascii locale terminals. Icon-only, 4 cells
+   wide. */
 .account-btn {
     width: 4;
     min-width: 4;

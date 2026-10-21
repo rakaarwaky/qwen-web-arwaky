@@ -29,7 +29,7 @@ from modules.shared.src.common.taxonomy_core_constant import DEFAULT_MODEL
 from modules.shared.src.common.utility_core_version import get_package_version
 from modules.tui.src.surface_tui_component import QwenTuiLogHandler, QwenTuiRichLog
 from modules.tui.src.surface_tui_css_view import THEME
-from modules.tui.src.surface_tui_utils_component import _TuiUtilsMixin
+from modules.tui.src.surface_tui_utils_component import SESSION_EMPTY_HINT, _TuiUtilsMixin
 
 
 class _TuiComposeMixin:
@@ -203,9 +203,11 @@ class _TuiComposeMixin:
                         classes="btn-session-add-contained",
                     )
 
-                # The pane's one and only table: name | status | ↻ | 🧪 | 🗑.
+                # The pane's one and only table: name | status | ↻ | ☐ | ×.
                 # The head row is static; every session row is mounted into
                 # #session-rows so a repaint never disturbs the header.
+                # The glyphs are the wide set from _GLYPHS (surface_tui_utils_component);
+                # forced-ascii locale terminals render the ASCII fallbacks r / h / x.
                 with Vertical(id="session-table", classes="screen-card"):
                     with Horizontal(classes="session-row session-row-head"):
                         yield Label("NAME", classes="session-cell session-cell-name")
@@ -213,9 +215,17 @@ class _TuiComposeMixin:
                         yield Label("ACTIONS", classes="session-cell session-cell-actions")
                     with Vertical(id="session-rows"):
                         yield Label(
-                            "Belum ada session — tekan A untuk menambah",
+                            SESSION_EMPTY_HINT,
                             classes="session-empty",
                         )
+                    # UX-1-002: a dim one-line key-hint strip under the table.
+                    # It is a sibling of #session-rows, so a row repaint must
+                    # not remove it — it stays visible on an empty pool and
+                    # with ≥1 session.
+                    yield Label(
+                        "↑/↓ select row · A add · R refresh · E health · D delete · ?: all shortcuts",
+                        classes="session-key-hint",
+                    )
 
             # ─── Screen 3: Chat (per-slot console) ─────────────────
             # The mockup's chat console carries no configuration form: it is a
@@ -386,8 +396,11 @@ class _TuiComposeMixin:
                         id="btn-headless-swarm",
                         classes="swarm-headless-toggle",
                     )
+                    # UX-5-003: the label carries the run state — ▶ START on
+                    # a cold screen, flipped to ↻ RESTART by the swarm
+                    # worker once a run registers (see _set_swarm_start_label).
                     yield Button(
-                        "↻ RESTART",
+                        "▶ START",
                         id="btn-swarm-start",
                         classes="btn-restart",
                     )
