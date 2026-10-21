@@ -122,27 +122,6 @@ def click_first_visible_enabled(
     return False
 
 
-def is_selector_visible(page: Page, selector: str, timeout_ms: int = 1000) -> bool:
-    """Check whether a single CSS selector produces a visible element.
-
-    Parameters
-    ----------
-    page : Page
-        Active Playwright page.
-    selector : str
-        CSS or XPath selector.
-    timeout_ms : int
-        Visibility timeout in milliseconds.
-
-    Returns
-    -------
-    bool
-        True if a matching element is visible within the timeout.
-
-    """
-    return any_visible_locator(page, selector, timeout_ms)
-
-
 def any_visible_locator(
     page: Page,
     selectors: str | Sequence[str],

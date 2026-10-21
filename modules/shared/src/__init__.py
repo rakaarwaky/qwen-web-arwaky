@@ -193,9 +193,6 @@ from .common.utility_core_path import (
     should_process_file,
 )
 
-# ─── Utility: paths (Playwright browser path resolution) ──────
-from .common.utility_core_paths import get_playwright_browsers_path
-
 # ─── Utility: prompt ──────────────────────────────────────────
 from .common.utility_core_prompt import (
     extract_prompt_text,
@@ -385,7 +382,6 @@ __all__ = [
     "DEFAULT_JOBS_DIR",
     "SWARM_OUTPUT_ROOT",
     "XDG_SKILL_MD",
-    "get_playwright_browsers_path",
     "MAX_ATTEMPTS",
     "SD_NOTIFY_READY",
     "SD_NOTIFY_STOPPING",
@@ -500,7 +496,6 @@ __all__ = [
     "utility_core_exit",
     "utility_core_path",
     "utility_core_path_validation",
-    "utility_core_paths",
     "utility_core_prompt",
     "utility_core_prompt_template",
     "utility_core_session_backup",
@@ -573,7 +568,6 @@ from modules.shared.src.common import (
     utility_core_exit,
     utility_core_path,
     utility_core_path_validation,
-    utility_core_paths,
     utility_core_prompt,
     utility_core_prompt_template,
     utility_core_session_backup,
