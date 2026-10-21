@@ -48,7 +48,7 @@ def sandbox_unavailable() -> bool:
     for line in status.splitlines():
         if line.startswith("Seccomp:"):
             parts = line.split()
-            if len(parts) >= 2 and parts[1].isdigit():
+            if len(parts) == 2 and parts[1].isdigit():
                 seccomp = int(parts[1])
             break
     if seccomp is None or seccomp == 0:
