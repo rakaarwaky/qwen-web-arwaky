@@ -11,7 +11,7 @@ from modules.prompt.src.capabilities_output_saver import Saver
 from modules.shared.src import RunContext, SaverConfig
 from modules.shared.src.common.taxonomy_core_error import OutputWriteError
 from modules.shared.src.common.utility_core_text import strip_ui_noise
-from modules.shared.src.common.utility_io_writer import ensure_dir, save_orchestrator_output
+from modules.shared.src.common.utility_io_writer import ensure_dir, save_orchestrator_output, sidecar_path_for
 
 
 class TestStripUiNoise:
@@ -63,11 +63,37 @@ class TestWriteFileAtomic:
         assert target.read_text() == "nested"
 
 
+class TestSidecarPathFor:
+    def test_under_default_output_mirrors_relative_path(self, tmp_path, monkeypatch):
+        default_output = tmp_path / "xdg-output"
+        nested = default_output / "nested"
+        nested.mkdir(parents=True)
+        out_file = nested / "result.md"
+        meta_dir = tmp_path / "meta"
+        monkeypatch.setattr(
+            "modules.shared.src.common.utility_io_writer.DEFAULT_OUTPUT",
+            default_output,
+        )
+        sidecar = sidecar_path_for(out_file, meta_dir)
+        assert sidecar == meta_dir.resolve() / "nested" / "result.meta.json"
+        assert sidecar.parent != out_file.parent
+
+    def test_absolute_path_outside_default_output_nests_under_meta(self, tmp_path):
+        out_file = tmp_path / "custom" / "answer.md"
+        meta_dir = tmp_path / "meta"
+        sidecar = sidecar_path_for(out_file, meta_dir)
+        assert sidecar.suffix == ".json"
+        assert sidecar.name == "answer.meta.json"
+        assert meta_dir.resolve() in sidecar.parents
+        assert sidecar.parent != out_file.parent
+
+
 class TestWriteOutputExtended:
     def test_with_sidecar(self, tmp_path):
         out_file = tmp_path / "result.md"
+        meta_dir = tmp_path / "meta"
         ctx = RunContext()
-        Saver().write_output(
+        Saver(metadata_dir=meta_dir).write_output(
             path=out_file,
             content="AI answer",
             ctx=ctx,
@@ -76,8 +102,9 @@ class TestWriteOutputExtended:
             input_chars=5,
             output_chars=9,
         )
-        sidecar = out_file.with_suffix(".meta.json")
+        sidecar = sidecar_path_for(out_file, meta_dir)
         assert sidecar.exists()
+        assert not out_file.with_suffix(".meta.json").exists()
         meta = json.loads(sidecar.read_text())
         assert meta["run_id"] == ctx.run_id
 
@@ -85,7 +112,8 @@ class TestWriteOutputExtended:
         out_file = tmp_path / "plain.md"
         ctx = RunContext()
         cfg = SaverConfig(generate_sidecar=False)
-        Saver().write_output(
+        meta_dir = tmp_path / "meta"
+        Saver(metadata_dir=meta_dir).write_output(
             path=out_file,
             content="plain",
             ctx=ctx,
@@ -95,7 +123,7 @@ class TestWriteOutputExtended:
             output_chars=5,
             config=cfg,
         )
-        assert not out_file.with_suffix(".meta.json").exists()
+        assert not sidecar_path_for(out_file, meta_dir).exists()
 
     def test_non_atomic_write(self, tmp_path):
         out_file = tmp_path / "result.md"

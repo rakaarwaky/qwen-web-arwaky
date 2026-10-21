@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_OUTPUT, DIRECT_PROMPT_STEM
 from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, SendDispatchError
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
@@ -91,6 +92,10 @@ def test_process_direct_prompt_happy_path() -> None:
     assert str(response) == "Hello from Qwen AI!"
     mocks["flow"].dispatch_and_wait_for_response.assert_called_once()
     assert mocks["flow"].dispatch_and_wait_for_response.call_args.kwargs["prompt"] == "What is Python?"
+    saved_path = mocks["saver"].write_output.call_args.args[0]
+    assert saved_path.parent == DEFAULT_OUTPUT
+    assert saved_path.name.startswith(f"{DIRECT_PROMPT_STEM}_")
+    assert not saved_path.name.startswith("tmp")
 
 
 def test_process_direct_prompt_timeout_error() -> None:

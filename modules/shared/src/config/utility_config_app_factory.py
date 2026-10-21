@@ -48,7 +48,7 @@ def sandbox_unavailable() -> bool:
     for line in status.splitlines():
         if line.startswith("Seccomp:"):
             parts = line.split()
-            if len(parts) >= 2 and parts[1].isdigit():
+            if len(parts) == 2 and parts[1].isdigit():
                 seccomp = int(parts[1])
             break
     if seccomp is None or seccomp == 0:
@@ -139,6 +139,7 @@ def resolve_pipeline_output_path(
     prompt_file: Path | str,
     output_file: Path | str | None = None,
     attachment_path: Path | str | None = None,
+    stem: str | None = None,
 ) -> tuple[Path, Path]:
     """Resolve prompt file and output file paths cleanly for prompt pipeline agents.
 
@@ -154,8 +155,11 @@ def resolve_pipeline_output_path(
     * A **directory path** → auto-name a file inside it, using the same
       ``{stem}_{YYYYMMDD-HHMMSS}_{hex4}.md`` form as the default case.
 
-    The stem is the attachment's stem when ``attachment_path`` is given,
-    otherwise the prompt's stem.
+    The stem is ``stem`` when given, otherwise the attachment's stem when
+    ``attachment_path`` is provided, otherwise the prompt's stem. Direct
+    prompts materialize their text as a ``tmpXXXX`` file, so they pass
+    ``DIRECT_PROMPT_STEM`` and never leak that throwaway name into the
+    output directory.
     """
     import uuid
     from datetime import datetime
@@ -170,8 +174,13 @@ def resolve_pipeline_output_path(
     # would need escaping on any supported platform.
     unique = uuid.uuid4().hex[:4]
 
-    # Prefer attachment stem; fall back to prompt stem when there is no attachment.
-    stem = Path(attachment_path).stem if attachment_path else p_path.stem
+    # Explicit stem wins; otherwise prefer attachment stem; fall back to prompt stem.
+    if stem is not None:
+        resolved_stem = stem
+    elif attachment_path:
+        resolved_stem = Path(attachment_path).stem
+    else:
+        resolved_stem = p_path.stem
 
     if output_file:
         out_path = Path(output_file).resolve()
@@ -181,8 +190,8 @@ def resolve_pipeline_output_path(
         # same file (issue #280 AC-1 collision safety applies only to
         # auto-generated names). A directory argument still auto-completes a
         # unique filename inside it.
-        out_path = out_path / f"{stem}_{ts}_{unique}.md" if out_path.is_dir() else out_path
+        out_path = out_path / f"{resolved_stem}_{ts}_{unique}.md" if out_path.is_dir() else out_path
     else:
-        out_path = DEFAULT_OUTPUT / f"{stem}_{ts}_{unique}.md"
+        out_path = DEFAULT_OUTPUT / f"{resolved_stem}_{ts}_{unique}.md"
 
     return p_path, out_path

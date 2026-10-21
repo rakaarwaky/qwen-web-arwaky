@@ -79,6 +79,18 @@ DEFAULT_VENV = XDG_DATA_HOME / "venv"
 DEFAULT_JOBS_DIR = XDG_STATE_HOME / "jobs"
 XDG_SKILL_MD = XDG_DATA_HOME / "SKILL.md"
 
+# Run traceability metadata (the .meta.json sidecars the saver writes) lives
+# under XDG_STATE_HOME, mirroring the artifact's path relative to
+# DEFAULT_OUTPUT, so the output directory holds only prompt responses and
+# jobs/, log/, and update-snapshots/ stay its siblings.
+DEFAULT_METADATA_DIR = XDG_STATE_HOME / "meta"
+
+# Stem for auto-named direct-prompt artifacts. The direct pipeline
+# materializes the typed prompt as a TemporaryFile, so relying on that
+# file's stem leaks throwaway `tmpXXXX` names into the output directory;
+# a fixed stem keeps response files identifiable and sortable.
+DIRECT_PROMPT_STEM = "direct"
+
 # ─── Parallel job execution & resource budgets (Issue #365) ───────────────────
 # Number of prompt jobs allowed to run concurrently. Each worker launches its
 # own Chromium browser instance with an ephemeral clone of the login session.

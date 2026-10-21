@@ -13,6 +13,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_METADATA_DIR, DEFAULT_OUTPUT
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import OutputWriteError
 from modules.shared.src.common.taxonomy_core_event import EVENT_OUTPUT_COPIED
@@ -75,6 +76,24 @@ def ensure_dir(path: Path) -> Path:
     """Create parent directories for *path* if they do not exist."""
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def sidecar_path_for(output_path: Path, metadata_dir: Path | None = None) -> Path:
+    """Map an output artifact to its ``.meta.json`` under the XDG meta root.
+
+    Sidecars mirror the artifact's path relative to ``DEFAULT_OUTPUT`` so the
+    output directory holds only prompt responses. Paths outside
+    ``DEFAULT_OUTPUT`` nest their absolute path (sans root) under the meta
+    root, so two destinations that share a basename never collide.
+    """
+    root = (metadata_dir or DEFAULT_METADATA_DIR).resolve()
+    out = Path(output_path).resolve()
+    try:
+        rel = out.relative_to(DEFAULT_OUTPUT.resolve())
+    except ValueError:
+        parts = out.parts[1:] if out.is_absolute() else out.parts
+        rel = Path(*parts) if parts else Path(out.name)
+    return root / rel.with_suffix(".meta.json")
 
 
 def save_orchestrator_output(

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from modules.prompt.src.capabilities_output_saver import Saver
 from modules.shared.src.common.taxonomy_core_vo import RunContext
+from modules.shared.src.common.utility_io_writer import sidecar_path_for
 
 
 def _save(saver: Saver, target: Path, source: Path, context: RunContext) -> None:
@@ -44,12 +45,14 @@ def test_dogfood_a_saved_response_carries_its_run_metadata(tmp_path: Path) -> No
     source = tmp_path / "prompt.md"
     source.write_text("Summarize this", encoding="utf-8")
     target = tmp_path / "answer.md"
+    meta_dir = tmp_path / "meta"
     context = RunContext()
 
-    _save(Saver(), target, source, context)
+    _save(Saver(metadata_dir=meta_dir), target, source, context)
 
-    sidecar = target.with_suffix(".meta.json")
+    sidecar = sidecar_path_for(target, meta_dir)
     assert sidecar.exists(), "a saved response must carry the metadata a monitor reads"
+    assert not target.with_suffix(".meta.json").exists()
     assert context.run_id in sidecar.read_text(encoding="utf-8")
 
 
@@ -57,10 +60,11 @@ def test_dogfood_the_sidecar_is_valid_json(tmp_path: Path) -> None:
     source = tmp_path / "prompt.md"
     source.write_text("Summarize this", encoding="utf-8")
     target = tmp_path / "answer.md"
+    meta_dir = tmp_path / "meta"
 
-    _save(Saver(), target, source, RunContext())
+    _save(Saver(metadata_dir=meta_dir), target, source, RunContext())
 
-    sidecar = json.loads(target.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    sidecar = json.loads(sidecar_path_for(target, meta_dir).read_text(encoding="utf-8"))
     assert isinstance(sidecar, dict)
 
 

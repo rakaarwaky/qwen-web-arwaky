@@ -14,6 +14,7 @@ from pathlib import Path
 from playwright.sync_api import Page
 
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.common.taxonomy_core_constant import DIRECT_PROMPT_STEM
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
@@ -101,7 +102,11 @@ class DirectPromptAdapter(IDirectPromptProtocol):
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(prompt_str)
 
-                p_path, out_path = resolve_pipeline_output_path(Path(tmp_path), output_file)
+                p_path, out_path = resolve_pipeline_output_path(
+                    Path(tmp_path),
+                    output_file,
+                    stem=DIRECT_PROMPT_STEM,
+                )
                 cfg = build_app_config(
                     input_path=p_path,
                     output_path=out_path,
