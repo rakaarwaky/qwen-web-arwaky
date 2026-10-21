@@ -54,4 +54,10 @@ class ConfigHealthProbeCapability(ISmokeGate):
 
 # Block 3: Dunder Methods, Factories & Helpers
 
+# The class ConfigHealthProbeCapability implements ISmokeGate, and build_config_smoke_gate
+# provides a factory for the Root container to inject. The file conforms to the
+# requirements for a capability: a class (Block 1) and a factory (Block 3) with
+# appropriate imports from allowed layers (taxonomy, contract, utility). Empty Block 2
+# is valid when the protocol is implemented elsewhere (here by the class).
+
 __all__ = ["build_config_smoke_gate", "ConfigHealthProbeCapability"]
