@@ -10,6 +10,10 @@ AES403: capability layer. Imports taxonomy, contract, and utility only.
 
 from __future__ import annotations
 
+from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
+from modules.shared.src.update.contract_update_protocol import ISmokeGate
+
+
 # Block 1: Class Definition & Constructor
 class ConfigHealthProbeCapability(ISmokeGate):
     """Implements ISmokeGate via the functional doctor checks.
@@ -44,7 +48,7 @@ class ConfigHealthProbeCapability(ISmokeGate):
         )
 
 
-# Block 3: Dunder Methods, Factories & Helpers
+# Block 2: Protocol Method Implementation
 
 def build_config_smoke_gate(session: ISessionAggregate) -> ISmokeGate:
     """Factory that returns a smoke gate callable for the update pipeline.
@@ -56,5 +60,7 @@ def build_config_smoke_gate(session: ISessionAggregate) -> ISmokeGate:
     """
     return ConfigHealthProbeCapability(session)
 
+
+# Block 3: Dunder Methods, Factories & Helpers
 
 __all__ = ["build_config_smoke_gate", "ConfigHealthProbeCapability"]
