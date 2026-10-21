@@ -4,49 +4,57 @@ Implements ISmokeGate. Provides the functional doctor gate that the Root layer
 injects for the FR-UPDATE-003 smoke verification. The gate is a callable returning
 tuples of (name, passed, detail) describing each check, so the update pipeline
 depends only on an injected callable, never on a Surface.
+
+AES403: capability layer. Imports taxonomy, contract, and utility only.
 """
 
 from __future__ import annotations
 
-from typing import cast
+# Block 1: Class Definition & Constructor
+class ConfigHealthProbeCapability(ISmokeGate):
+    """Implements ISmokeGate via the functional doctor checks.
 
-from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.update.contract_update_protocol import ISmokeGate
+    Wire-up:
+        session: ISessionAggregate
 
-
-def build_config_smoke_gate(session: ISessionAggregate) -> ISmokeGate:
-    """Create the smoke gate callable for the update pipeline.
-
-    The smoke gate delegates to the functional ``doctor`` form, reusing the
-    ``ISessionAggregate`` so that ``doctor`` and the smoke gate share the same
-    session pool state (issue #294). ``run_doctor_checks`` is imported from the
-    CLI surface module so the checks stay co-located and DRY.
-
-    Parameters
-    ----------
-    session: ISessionAggregate
-        The injected session aggregate providing the pool; necessary for
-        ``doctor`` because the smoke gate needs a session to validate.
-
-    Returns
-    -------
-    ISmokeGate
-        Callable returning ``(name, passed, detail)`` triples for each check.
+    Public method:
+        __call__() -> tuple[tuple[str, bool, str], ...]
     """
-    from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
 
-    def _gate() -> tuple[tuple[str, bool, str], ...]:
+    def __init__(self, session: ISessionAggregate) -> None:
+        self._session = session
+
+    def __call__(self) -> tuple[tuple[str, bool, str], ...]:
+        """Run the smoke gate checks via the functional doctor form.
+
+        Returns the same triples as the CLI doctor surface: (name, passed, detail)
+        for every diagnostic check, so the update pipeline can iterate without
+        parsing JSON or knowing about the underlying CLI surface.
+        """
+        from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+
         checks = run_doctor_checks(
             include_heavy=False,
             smoke=True,
-            session=session,
+            session=self._session,
         )
         return tuple(
             (str(check["name"]), bool(check["passed"]), str(check["detail"]))
             for check in checks
         )
 
-    return _gate
+
+# Block 3: Dunder Methods, Factories & Helpers
+
+def build_config_smoke_gate(session: ISessionAggregate) -> ISmokeGate:
+    """Factory that returns a smoke gate callable for the update pipeline.
+
+    The Root layer injects this callable, never the class itself, to avoid
+    import cycles. Callers get a simple callable that executes the same doctor
+    checks that the CLI surface reports, ensuring the post-flight gate cannot
+    disagree with the interactive ``qwen-web-arwaky doctor`` (issue #294).
+    """
+    return ConfigHealthProbeCapability(session)
 
 
-__all__ = ["build_config_smoke_gate"]
+__all__ = ["build_config_smoke_gate", "ConfigHealthProbeCapability"]
