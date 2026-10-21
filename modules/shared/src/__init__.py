@@ -213,7 +213,7 @@ from .common.utility_response_normalizer import (
     success_response,
 )
 from .config.contract_config_aggregate import IConfigAggregate
-from .config.contract_config_protocol import IWorkspaceProtocol
+from .config.contract_config_protocol import IConfigHealthProbeProtocol, IWorkspaceProtocol
 from .jobs.contract_jobs_aggregate import IJobManagerAggregate
 from .jobs.contract_jobs_protocol import IJobStorageProtocol
 from .logging.contract_logging_aggregate import IObservabilityAggregate
@@ -430,14 +430,13 @@ __all__ = [
     "ISessionRotatorProtocol",
     "IRunCancelProtocol",
     "IWorkspaceProtocol",
+    "IConfigHealthProbeProtocol",
     "IBrowserAggregate",
     "IConfigAggregate",
     "IJobManagerAggregate",
     "IObservabilityAggregate",
     "IPromptAggregate",
-    "IPromptFlowAggregate",
     "IUpdateAggregate",
-    "IPromptFlowAggregate",
     "ISessionAggregate",
     "ISwarmAggregate",
     # Swarm VOs
@@ -462,7 +461,6 @@ __all__ = [
     "validate_file",
     "strip_ui_noise",
     "utc_now_iso",
-    "ErrorCategory",
     "exit_code_for",
     "should_treat_as_new_response",
     "is_stability_satisfied",
@@ -475,16 +473,6 @@ __all__ = [
     "is_safe_session_target",
     "renewal_is_possible",
     # Sub-package re-exports (AES702)
-    "modules",
-    "browser",
-    "common",
-    "config",
-    "jobs",
-    "logging",
-    "prompt",
-    "session",
-    "swarm",
-    "update",
     "taxonomy_core_constant",
     "taxonomy_core_entity",
     "taxonomy_core_error",

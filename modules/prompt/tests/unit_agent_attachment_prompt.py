@@ -10,7 +10,11 @@ from playwright.sync_api import Error
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
-from modules.shared.src import (
+from modules.shared.src.common.taxonomy_core_error import (
+    ResponseDetectionTimeoutError,
+    SendDispatchError,
+)
+from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_DOCUMENT_PARSED,
     EVENT_FILE_UPLOADED,
@@ -20,8 +24,6 @@ from modules.shared.src import (
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
     PIPELINE_EVENT_SEQUENCE,
-    ResponseDetectionTimeoutError,
-    SendDispatchError,
 )
 from modules.shared.src.common.taxonomy_core_vo import MessageCount
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest

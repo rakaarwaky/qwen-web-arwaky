@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter as CoreOrchestrator
-from modules.shared.src import AppConfig, AuthRequiredError, PromptInjectionError, RunContext
+from modules.shared.src.common.taxonomy_core_error import (
+    AuthRequiredError,
+    PromptInjectionError,
+)
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, RunContext
 
 
 class TestQwenAutoContract(unittest.TestCase):

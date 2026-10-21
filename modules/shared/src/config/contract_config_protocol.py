@@ -190,9 +190,25 @@ class IWorkspaceProtocol(ABC):
         ...
 
 
+class IConfigHealthProbeProtocol(ABC):
+    """Post-update functional health gate contract (FR-UPDATE-003).
+
+    A callable returning ``(name, passed, detail)`` triples for every
+    diagnostic check. The Root layer injects the implementation so the
+    update pipeline depends only on an injected callable, never on a
+    Surface (issues #294 / #506).
+    """
+
+    @abstractmethod
+    def __call__(self) -> tuple[tuple[str, bool, str], ...]:
+        """Return the ``(name, passed, detail)`` triples for each diagnostic check."""
+        ...
+
+
 __all__ = [
     "IConfigCapacityProtocol",
     "IConfigEnvironmentProtocol",
+    "IConfigHealthProbeProtocol",
     "IConfigPathResolverProtocol",
     "IConfigSlotPlanProtocol",
     "IConfigValidatorProtocol",
@@ -203,6 +219,7 @@ __all__ = [
 _layer_symbols: dict[str, object] = {
     "IConfigCapacityProtocol": IConfigCapacityProtocol,
     "IConfigEnvironmentProtocol": IConfigEnvironmentProtocol,
+    "IConfigHealthProbeProtocol": IConfigHealthProbeProtocol,
     "IConfigPathResolverProtocol": IConfigPathResolverProtocol,
     "IConfigSlotPlanProtocol": IConfigSlotPlanProtocol,
     "IConfigValidatorProtocol": IConfigValidatorProtocol,

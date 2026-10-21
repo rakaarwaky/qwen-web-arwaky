@@ -8,12 +8,8 @@ import pytest
 from playwright.sync_api import Error, TimeoutError
 
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.shared.src import (
-    DEFAULT_INJECTOR_CONFIG,
-    ElementNotFoundError,
-    InjectorConfig,
-    PromptInjectionError,
-)
+from modules.shared.src.common.taxonomy_core_error import ElementNotFoundError, PromptInjectionError
+from modules.shared.src.common.taxonomy_core_vo import DEFAULT_INJECTOR_CONFIG, InjectorConfig
 
 # ─── _verify_injection ─────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import pytest
 from playwright.sync_api import Error
 
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.shared.src import PromptInjectionError
+from modules.shared.src.common.taxonomy_core_error import PromptInjectionError
 
 
 class TestVerifyInjectionExtended:

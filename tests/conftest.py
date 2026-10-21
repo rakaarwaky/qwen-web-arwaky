@@ -27,8 +27,8 @@ from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAd
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
-from modules.shared.src import AppConfig, RunContext
 from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, RunContext
 from modules.shared.src.common.utility_core_status import status_path_for
 from tests.pipeline_fixtures import restore_fixture_state
 

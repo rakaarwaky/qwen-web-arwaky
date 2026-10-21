@@ -9,7 +9,7 @@ import pytest
 
 from modules.browser.src import capabilities_browser_adapter as browser_adapter
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.shared.src import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
 _browser = BrowserAdapter()
 

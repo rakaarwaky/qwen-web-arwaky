@@ -172,3 +172,13 @@ jobs:
             exit 1
           fi
           echo "Template hygiene check passed."
+
+      # ARCH-4-001: the shared barrel must list only symbols it actually
+      # exports (no phantom names, no bare sub-package names).
+      - name: Validate shared barrel __all__ integrity
+        run: uv run python scripts/validate_shared_barrel.py
+
+      # ARCH-4-003: nothing outside the barrel itself may import it; every
+      # consumer imports the direct submodule path.
+      - name: Forbid barrel imports outside modules/shared/src/__init__.py
+        run: uv run python scripts/check_barrel_imports.py

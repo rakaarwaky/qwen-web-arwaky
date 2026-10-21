@@ -9,9 +9,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.common.utility_core_session_backup import refuse_delete_without_backup
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.session.taxonomy_session_vo import (
@@ -21,6 +21,7 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionReason,
     SessionStatus,
 )
+from modules.shared.src.session.utility_session_guard import is_safe_session_target
 
 log = get_logger("session_manager")
 
@@ -250,12 +251,12 @@ class SessionManager(ISessionManagerProtocol):
         target = profile_path.resolve()
         if not target.exists():
             return False
-        if not utility_session_guard.is_safe_session_target(target):
+        if not is_safe_session_target(target):
             raise QwenCliError(f"Refusing to delete unsafe session path: {target}")
         if force:
             log.warning("session_delete_forced_backup_guard_bypassed target=%s", target)
         try:
-            utility_core_session_backup.refuse_delete_without_backup(target, force=force)
+            refuse_delete_without_backup(target, force=force)
         except OSError as exc:
             raise QwenCliError(f"Refusing to delete {target}: backup guard failed: {exc}") from exc
         try:

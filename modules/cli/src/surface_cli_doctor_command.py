@@ -387,23 +387,22 @@ def build_smoke_gate(
 ) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
     """Return a callable the update pipeline runs as its postflight functional gate.
 
+    Thin surface-level facade over the Capabilities health probe: constructs
+    :func:`modules.config.src.capabilities_config_health_probe.build_config_smoke_gate`
+    so the CLI keeps a library-form seam while the Root layer wires the
+    capability directly (ARCH-1-001).
+
     Returns the non-interactive diagnostic checks as ``(name, passed, detail)``
-    triples. The Root layer composes this so the Capabilities update pipeline
-    depends only on an injected callable, never on a Surface. The checks run
-    at gate-execution time (not container-construction time) so the post-update
-    gate reflects the post-upgrade state (issue #506).
+    triples. The checks run at gate-execution time (not container-construction
+    time) so the post-update gate reflects the post-upgrade state (issue #506).
 
     Pass the aggregate, e.g. ``session_manager.load_pool()`` or a production
     ``ISessionAggregate`` — there is no default, so a wiring gap cannot
     masquerade as an empty pool.
     """
-    aggregate = session
+    from modules.config.src.capabilities_config_health_probe import build_config_smoke_gate
 
-    def _gate() -> tuple[tuple[str, bool, str], ...]:
-        checks = run_doctor_checks(session=aggregate)
-        return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
-
-    return _gate
+    return build_config_smoke_gate(session)
 
 
 def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]]]:

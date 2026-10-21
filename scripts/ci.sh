@@ -15,6 +15,7 @@
 #   5. lint-arwaky-cli scan
 #   6. AD-05 template hygiene (grep for &lt; &gt;)
 #   7. Bandit security scan
+#   8. shared-barrel integrity (ARCH-4-001) + barrel-import ban (ARCH-4-003)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -175,10 +176,16 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
+# ─── Gate 8: shared kernel barrel integrity (ARCH-4-001 / ARCH-4-003) ────────
+# The barrel must list only symbols it actually exports, and nothing outside
+# the barrel may import it directly.
+run_gate "shared barrel __all__ integrity" uv run python scripts/validate_shared_barrel.py
+run_gate "barrel import ban" uv run python scripts/check_barrel_imports.py
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 if [[ "$FAILURES" -eq 0 ]]; then
-    ok "All 7 gates passed — ready to merge"
+    ok "All 8 gates passed — ready to merge"
     exit 0
 else
     warn "${FAILURES} gate(s) failed — see /tmp/ci_*.log"

@@ -20,9 +20,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.logging.src.capabilities_observability_setup import effective_telemetry_mode
-from modules.shared.src import utility_session_guard as session_guard
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.config.utility_config_app_factory import build_app_config
+from modules.shared.src.session import utility_session_guard as session_guard
 from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionRequest, SessionResponse, SessionStatus
 from modules.update.src.capabilities_update_check import UpdateCheckCapability
 from modules.update.src.capabilities_update_rollback import UpdateRollbackCapability

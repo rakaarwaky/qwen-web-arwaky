@@ -6,11 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.shared.src import (
-    LifecycleEmitter,
-    RunContext,
-    SaverConfig,
-)
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_vo import RunContext, SaverConfig
 from modules.shared.src.common.utility_core_text import strip_ui_noise
 from modules.shared.src.common.utility_dom_query import count_messages, latest_message_text
 from tests.helpers import (
@@ -25,7 +22,7 @@ class TestSenderRemaining:
     def test_click_send_custom_config(self):
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
-        from modules.shared.src import SenderConfig
+        from modules.shared.src.common.taxonomy_core_vo import SenderConfig
 
         cfg = SenderConfig(click_timeout_ms=200, try_enter_key_fallback=True)
         # No selectors match → with Enter fallback enabled the dispatcher presses

@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
-from modules.shared.src import AuthRequiredError, LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,

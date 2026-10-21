@@ -9,12 +9,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.prompt.src.capabilities_file_uploader import FileUploader
-from modules.shared.src import (
-    EVENT_DOCUMENT_PARSED,
-    EVENT_FILE_UPLOADED,
-    FileValidationError,
-    LifecycleEmitter,
-)
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import FileValidationError
+from modules.shared.src.common.taxonomy_core_event import EVENT_DOCUMENT_PARSED, EVENT_FILE_UPLOADED
 
 
 class TestValidateFile:

@@ -8,14 +8,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.shared.src import (
-    AppConfig,
+from modules.shared.src.common.taxonomy_core_entity import (
     CircuitBreaker,
     LifecycleEmitter,
-    QwenEventType,
     RateLimiter,
-    RunContext,
 )
+from modules.shared.src.common.taxonomy_core_event import QwenEventType
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, RunContext
 
 # ─── LifecycleEmitter ───────────────────────────────────────────────────────
 

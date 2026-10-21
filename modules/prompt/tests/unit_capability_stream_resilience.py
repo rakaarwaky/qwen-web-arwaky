@@ -7,14 +7,13 @@ from pathlib import Path
 import pytest
 
 from modules.prompt.src.capabilities_stream_monitor import validate_response_content
-from modules.shared.src import (
+from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
+from modules.shared.src.common.taxonomy_core_error import (
     AuthRequiredError,
-    CircuitBreaker,
     OutputValidationError,
     OutputWriteError,
-    RateLimiter,
-    RunContext,
 )
+from modules.shared.src.common.taxonomy_core_vo import RunContext
 from tests.helpers import write_output
 
 

@@ -1,22 +1,23 @@
 """Config health probe capability — smoke gate for the update pipeline (AES403).
 
-Implements ISmokeGate. Provides the functional doctor gate that the Root layer
-injects for the FR-UPDATE-003 smoke verification. The gate is a callable returning
-tuples of (name, passed, detail) describing each check, so the update pipeline
-depends only on an injected callable, never on a Surface.
+Implements ``IConfigHealthProbeProtocol`` (FR-UPDATE-003, issues #294 / #506).
+The gate is the functional doctor form the Root layer injects into the update
+pipeline: a callable returning ``(name, passed, detail)`` triples, so the
+update capability depends only on an injected callable, never on a Surface.
 
 AES403: capability layer. Imports taxonomy, contract, and utility only.
 """
 
 from __future__ import annotations
 
+from modules.shared.src.config.contract_config_protocol import IConfigHealthProbeProtocol
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
-from modules.shared.src.update.contract_update_protocol import ISmokeGate
-
 
 # Block 1: Class Definition & Constructor
-class ConfigHealthProbeCapability(ISmokeGate):
-    """Implements ISmokeGate via the functional doctor checks.
+
+
+class ConfigHealthProbeCapability(IConfigHealthProbeProtocol):
+    """Implements the smoke gate contract via the functional doctor checks.
 
     Wire-up:
         session: ISessionAggregate
@@ -28,12 +29,15 @@ class ConfigHealthProbeCapability(ISmokeGate):
     def __init__(self, session: ISessionAggregate) -> None:
         self._session = session
 
+    # Block 2: Protocol Method Implementation
+
     def __call__(self) -> tuple[tuple[str, bool, str], ...]:
         """Run the smoke gate checks via the functional doctor form.
 
-        Returns the same triples as the CLI doctor surface: (name, passed, detail)
-        for every diagnostic check, so the update pipeline can iterate without
-        parsing JSON or knowing about the underlying CLI surface.
+        Returns the same triples the CLI doctor surface reports —
+        (name, passed, detail) for every diagnostic check — so the update
+        pipeline can iterate them without parsing JSON or knowing about the
+        CLI surface.
         """
         from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
 
@@ -42,22 +46,23 @@ class ConfigHealthProbeCapability(ISmokeGate):
             smoke=True,
             session=self._session,
         )
-        return tuple(
-            (str(check["name"]), bool(check["passed"]), str(check["detail"]))
-            for check in checks
-        )
+        return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
+
+    # Block 3: Dunder Methods, Factories & Helpers
+
+    def __repr__(self) -> str:
+        return f"ConfigHealthProbeCapability(session={self._session!r})"
 
 
-# Block 2: Protocol Method Implementation
+def build_config_smoke_gate(session: ISessionAggregate) -> IConfigHealthProbeProtocol:
+    """Factory that returns a smoke gate callable for the update pipeline.
 
-# Empty Block 2: no direct protocol trait implementation beyond the class
+    The Root layer injects this callable, never the class itself, to keep the
+    wiring explicit. Callers get a simple callable that executes the same
+    doctor checks the CLI surface reports, so the post-flight gate cannot
+    disagree with the interactive ``qwen-web-arwaky doctor`` (issue #294).
+    """
+    return ConfigHealthProbeCapability(session)
 
-# Block 3: Dunder Methods, Factories & Helpers
-
-# The class ConfigHealthProbeCapability implements ISmokeGate, and build_config_smoke_gate
-# provides a factory for the Root container to inject. The file conforms to the
-# requirements for a capability: a class (Block 1) and a factory (Block 3) with
-# appropriate imports from allowed layers (taxonomy, contract, utility). Empty Block 2
-# is valid when the protocol is implemented elsewhere (here by the class).
 
 __all__ = ["build_config_smoke_gate", "ConfigHealthProbeCapability"]

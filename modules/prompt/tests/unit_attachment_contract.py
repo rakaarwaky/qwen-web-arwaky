@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from modules.prompt.src.capabilities_file_uploader import FileUploader
-from modules.shared.src import FileValidationError
+from modules.shared.src.common.taxonomy_core_error import FileValidationError
 from modules.shared.src.common.utility_core_validation import (
     MAX_ATTACHMENT_SIZE_BYTES,
     SUPPORTED_ATTACHMENT_EXTENSIONS,

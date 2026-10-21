@@ -7,7 +7,13 @@ from types import SimpleNamespace
 
 from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.root_core_container import SharedContainer
-from modules.shared.src import DEFAULT_JOBS_DIR, DEFAULT_LOG, DEFAULT_OUTPUT, DEFAULT_SESSION, SWARM_OUTPUT_ROOT
+from modules.shared.src.common.taxonomy_core_constant import (
+    DEFAULT_JOBS_DIR,
+    DEFAULT_LOG,
+    DEFAULT_OUTPUT,
+    DEFAULT_SESSION,
+    SWARM_OUTPUT_ROOT,
+)
 
 
 class TestQwaInit(unittest.TestCase):

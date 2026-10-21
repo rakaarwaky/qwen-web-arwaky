@@ -4,13 +4,6 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from modules.shared.src import (
-    EVENT_FILE_UPLOADED,
-    EVENT_ORDER,
-    EVENT_PROMPT_INJECTED,
-    EVENT_WEB_LOADED,
-    PIPELINE_EVENT_SEQUENCE,
-)
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleGate, LifecycleState
 from modules.shared.src.common.taxonomy_core_error import (
     ErrorCategory,
@@ -22,13 +15,18 @@ from modules.shared.src.common.taxonomy_core_error import QwenCliError as CANONI
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DESCRIPTIONS,
     EVENT_DOCUMENT_PARSED,
+    EVENT_FILE_UPLOADED,
     EVENT_GENERATION_FINISHED,
+    EVENT_ORDER,
     EVENT_OUTPUT_COPIED,
+    EVENT_PROMPT_INJECTED,
     EVENT_SEND_CLICKED,
     EVENT_SESSION_EXPIRED,
     EVENT_SESSION_RENEWED,
     EVENT_STREAMING_GENERATION,
     EVENT_THINKING_STARTED,
+    EVENT_WEB_LOADED,
+    PIPELINE_EVENT_SEQUENCE,
     STANDARD_PROMPT_EVENTS,
     LifecycleEvent,
     QwenEventType,

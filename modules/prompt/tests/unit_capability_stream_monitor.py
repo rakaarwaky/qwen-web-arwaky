@@ -11,16 +11,19 @@ from modules.prompt.src.capabilities_stream_monitor import (
     StreamMonitor,
     validate_response_content,
 )
-from modules.shared.src import (
+from modules.shared.src.common.taxonomy_core_constant import (
     CHALLENGE_KEYWORDS,
-    EVENT_GENERATION_FINISHED,
-    EVENT_STREAMING_GENERATION,
-    AuthRequiredError,
-    LifecycleEmitter,
-    OutputValidationError,
+    JS_GET_RESPONSE_TEXT,
+    THINKING_CARD_TEXT_MARKERS,
 )
-from modules.shared.src.common.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
-from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
+from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
+from modules.shared.src.common.taxonomy_core_error import (
+    AuthRequiredError,
+    OutputValidationError,
+    ResponseDetectionTimeoutError,
+    StuckDetectedError,
+)
+from modules.shared.src.common.taxonomy_core_event import EVENT_GENERATION_FINISHED, EVENT_STREAMING_GENERATION
 
 # ─── validate_response_content ──────────────────────────────────────────────
 
