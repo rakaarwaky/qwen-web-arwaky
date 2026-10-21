@@ -6,15 +6,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.common.taxonomy_core_vo import AppConfig
-
-
-def _compute_output_path(cfg: AppConfig, sub_path: Path) -> Path:
-    """Resolve the output destination for a sub-path (single-file target or directory join)."""
-    if cfg.mode == "single" and cfg.output_path.suffix:
-        return cfg.output_path
-    return cfg.output_path / sub_path.name
-
 
 def should_process_file(f: Path, base_src: Path) -> bool:
     """Check if file qualifies for queue processing."""

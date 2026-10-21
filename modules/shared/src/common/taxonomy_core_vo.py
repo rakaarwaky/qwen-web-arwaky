@@ -728,10 +728,6 @@ class RunState:
     bctx_lock: threading.Lock = field(default_factory=threading.Lock)
     run_id: RunId = field(default_factory=lambda: RunId(uuid.uuid4().hex[:8]))
 
-    def cancel_requested(self) -> bool:
-        """True when the run's cancel event is set."""
-        return self.cancel_event.is_set()
-
 
 __all__ = [
     "PromptText",

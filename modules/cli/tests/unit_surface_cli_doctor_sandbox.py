@@ -176,7 +176,7 @@ def test_deep_probe_notice_before_the_playwright_probe(capsys, monkeypatch) -> N
         lambda: None,
     )
     monkeypatch.setattr(
-        "modules.cli.src.surface_cli_doctor_command.get_playwright_browsers_path",
+        "modules.cli.src.surface_cli_doctor_command.playwright_browsers_path",
         lambda: Path("/nonexistent-playwright-cache"),
     )
 

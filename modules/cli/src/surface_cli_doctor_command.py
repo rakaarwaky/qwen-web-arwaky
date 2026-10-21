@@ -39,9 +39,9 @@ from modules.shared.src.common.utility_core_env import (
     unknown_env_vars,
     validate_env,
 )
-from modules.shared.src.common.utility_core_paths import get_playwright_browsers_path
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.shared.src.update.utility_update_chromium import playwright_browsers_path
 
 RULE = "─" * 50
 PRODUCTION_ENV = "production"
@@ -138,7 +138,7 @@ def _check_chromium(include_heavy: bool) -> dict[str, Any]:
     from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary
 
     trusted_binary = find_chrome_binary()
-    browsers_dir = get_playwright_browsers_path()
+    browsers_dir = playwright_browsers_path()
     executable: str | None = None
     if trusted_binary or (browsers_dir.exists() and any(browsers_dir.glob("chromium-*"))):
         detail = "Chromium binary found in Playwright cache or system PATH"
