@@ -35,6 +35,11 @@ from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_css_view import THEME
 
+# UX-3-002: the tab-title result marker must match the canonical failure
+# glyph the CLI declares in STATUS_GLYPHS (imported through the utils mixin
+# so the two surfaces never disagree).
+from modules.tui.src.surface_tui_utils_component import _CANONICAL_FAIL_GLYPH
+
 # A badge write can land while the app is tearing down: the worker thread's
 # ``call_from_thread`` is queued on the event loop and keeps running after the
 # screen is popped (``ScreenStackError``) or the badge is unmounted
@@ -81,6 +86,7 @@ class _TuiWorkersMixin:
     query_one: Any
     notify: Any
     _set_slot_tab_title: Any
+    _set_swarm_start_label: Any
     _truncate_name: Any
     _update_slot_status: Any
     _refresh_metrics: Any
@@ -407,7 +413,7 @@ class _TuiWorkersMixin:
         """
         if generation != self._slot_generation.get(slot_id, 0):
             return  # stale worker — slot was cancelled or restarted
-        icon = "✓" if ok else "✕"
+        icon = "✓" if ok else _CANONICAL_FAIL_GLYPH
         self._slot_workers[slot_id] = None
         # AR-2/FE-1: release the per-slot cancel event now the run is done.
         self._slot_cancel_events.pop(slot_id, None)
@@ -533,6 +539,10 @@ class _TuiWorkersMixin:
                     THEME["accent_fg"], snapshot.swarm_id, len(snapshot.agents)
                 ),
             )
+            # UX-5-003: a registered run flips the primary CTA from the
+            # cold-start label to RESTART in the same thread-safe block that
+            # records the swarm id, so the label always matches the state.
+            self.call_from_thread(self._set_swarm_start_label, "↻ RESTART")
             while True:
                 time.sleep(1.0)
                 latest = self._swarm.execute(SwarmRequest(verb="snapshot", swarm_id=snapshot.swarm_id)).snapshot
