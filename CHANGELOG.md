@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- refactor(prompt): run-traceability `.meta.json` sidecars now land under `~/.local/state/qwen-web-arwaky/meta/` (`DEFAULT_METADATA_DIR`), mirroring each artifact's path relative to the output root, so `~/.local/share/qwen-web-arwaky/output/` holds only prompt responses. `Saver` takes an optional `metadata_dir`; `qwa init` and `scripts/install.py` provision the directory. Existing sidecars already in the output directory are left in place for the operator to move or delete.
+
+### Fixed
+
+- fix(prompt): auto-named direct-prompt outputs are now `direct_{YYYYMMDD-HHMMSS}_{hex4}.md` instead of `tmpXXXX_…`. The direct pipeline materializes the typed prompt as a throwaway tempfile whose stem leaked into the output filename. `resolve_pipeline_output_path` takes an explicit `stem`, and the direct adapter passes `DIRECT_PROMPT_STEM`.
+
 ## [6.7.0] - 2026-10-18
 
 ### Added

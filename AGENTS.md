@@ -30,7 +30,9 @@ uv run python -m playwright install chromium
 INPUT  = prompt text or `-i <prompt>.md`, optionally `-a <attachment>`,
 driven through an authenticated `chat.qwen.ai` browser session.
 OUTPUT = a Markdown file at `-o <path>`; extraction relies on pinned DOM
-selectors that the tests lock as regressions.
+selectors that the tests lock as regressions. Its `.meta.json` sidecar lives
+under XDG state (`~/.local/state/qwen-web-arwaky/meta/`), never in the
+output folder.
 
 Current release: **v6.4.0**. The legacy `qwen-web-cli` and `qwc` entry points
 were removed in v6.0.0, so the CLI is `qwen-web-arwaky` (alias `qwa`).

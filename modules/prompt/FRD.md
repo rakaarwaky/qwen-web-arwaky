@@ -103,11 +103,11 @@ surfaces and job runners see one pipeline.
 
 ### FR-PROMPT-009: Save the response to the operator's destination
 
-- **Description**: Persist the processed response with a metadata header and sidecar.
+- **Description**: Persist the processed response; the run-traceability sidecar goes to the XDG state metadata directory, never the output directory.
 - **Input**: The output path, the response text, the run context, the source file, duration, and character counts.
-- **Output**: A written response file at the named destination.
-- **Business Rules**: The output path must be writable; a non-writable path is a hard error.
-- **Edge Cases**: A mid-stream extraction failure keeps the response file so an operator can inspect it.
+- **Output**: A written response file at the named destination, plus a `.meta.json` sidecar under `DEFAULT_METADATA_DIR` mirroring the artifact's path relative to the output root.
+- **Business Rules**: The output path must be writable; a non-writable path is a hard error. The output directory holds only prompt responses.
+110- **Edge Cases**: A mid-stream extraction failure keeps the response file so an operator can inspect it.
 - **Error Handling**: A write failure surfaces an output-write error naming the path.
 
 ### FR-PROMPT-010: Upload an attachment

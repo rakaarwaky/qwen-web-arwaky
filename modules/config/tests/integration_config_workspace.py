@@ -9,12 +9,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_METADATA_DIR
 
 
 def test_integration_init_provisions_the_skill_document(tmp_path: Path) -> None:
     WorkspaceProvisioner().init_workspace(tmp_path)
 
     assert (tmp_path / ".agents" / "skills" / "qwen-web-arwaky" / "SKILL.md").is_file()
+
+
+def test_integration_init_provisions_the_metadata_directory(tmp_path: Path) -> None:
+    """Run traceability sidecars live under XDG state, so init must create
+    ``DEFAULT_METADATA_DIR`` alongside the output directory it seeds."""
+    WorkspaceProvisioner().init_workspace(tmp_path)
+
+    assert DEFAULT_METADATA_DIR.is_dir()
 
 
 def test_integration_init_records_the_workspace_in_gitignore(tmp_path: Path) -> None:

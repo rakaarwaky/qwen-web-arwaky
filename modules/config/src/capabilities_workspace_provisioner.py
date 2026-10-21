@@ -18,6 +18,7 @@ from typing import Any
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
+    DEFAULT_METADATA_DIR,
     DEFAULT_OUTPUT,
     DEFAULT_SESSION,
     LOCAL_WS_DIR,
@@ -51,6 +52,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         # Step 1: Ensure XDG directories exist
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         DEFAULT_OUTPUT.mkdir(parents=True, exist_ok=True)
+        DEFAULT_METADATA_DIR.mkdir(parents=True, exist_ok=True)
         DEFAULT_LOG.mkdir(parents=True, exist_ok=True)
 
         # Step 2: Create .agents/skills/qwen-web-arwaky/SKILL.md from the
