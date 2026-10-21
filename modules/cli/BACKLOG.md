@@ -3,11 +3,11 @@
 DESIGN: [DESIGN.md](DESIGN.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State / Health: values from root [ROADMAP.md](../../ROADMAP.md) — do not redefine here.
-Last Updated: 2026-10-18
+Last Updated: 2026-10-21
 
 ## Current Condition
 
-- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 176 passed, at `b93d2ba`, on 2026-10-18.
+- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 178 passed, on branch `rakaarwaky/ux-tui-cli-surface`, on 2026-10-21.
 - In Progress: None.
 - Blocked: None.
 - Next Action: `CLIC-01`, track CLI-only surface issues as they surface.
@@ -27,7 +27,9 @@ Last Updated: 2026-10-18
 | Legacy flat commands are rejected | Automated | `modules/cli/tests/smoke_entry_points.py` | `test_legacy_flat_commands_are_rejected` | `73aee43` |
 | `prompt direct` uses pool session even with one member | Automated | `modules/cli/tests/unit_session_rotation_direct_prompt.py` | all tests | `73aee43` |
 | CLI never imports TUI at module load | Automated | `modules/cli/tests/unit_surface_cli_controller.py` | all tests | `73aee43` |
-| `session` group: list/status/health/remove JSON + login re-prompt loop | Automated | `modules/cli/tests/unit_surface_cli_sessions_command.py` | all tests | 2026-10-18 |
+| `session` group: list/status/health/remove JSON + login re-prompt loop | Automated | `modules/cli/tests/unit_surface_cli_sessions_command.py` | all tests | 2026-10-21 |
+| `session remove` TTY confirmation (UX-4-003) | Automated | `modules/cli/tests/unit_surface_cli_sessions_command.py` | `test_remove_*` | 2026-10-21 |
+| List table renders the full `⛔ auth_required` cell at 80 columns (UX-5-002) | Automated | `modules/cli/tests/unit_surface_cli_sessions_command.py` | `test_list_renders_full_auth_required_cells_at_80_columns` | 2026-10-21 |
 | `session` and command surfaces platform the shared failure envelope | Automated | `modules/cli/tests/contract_json_envelope.py` | all tests | 2026-10-18 |
 | `doctor` sandbox detection and `--deep` probe wiring | Automated | `modules/cli/tests/unit_surface_cli_doctor_sandbox.py` | all tests | 2026-10-18 |
 | CLI barrel re-exports all ten surface modules | Automated | `modules/cli/tests/smoke_entry_points.py` | `test_cli_barrel_re_exports_every_surface` | 2026-10-18 |
@@ -65,3 +67,4 @@ None.
 | 2026-10-12 | Split TUI layer into `modules/tui`; CLI keeps command controllers and doctor/sessions/jobs/swarm/update surfaces | @rakaarwaky |
 | 2026-10-18 | Reworked BACKLOG.md to match aes-docs template: corrected section order, scenario evidence table format, release readiness table; re-based Done line on `73aee43` with 92-test count | @rakaarwaky |
 | 2026-10-18 | v6.7.0: JSON envelope + `session --json`, doctor pool-only session check with `--deep`, iterative login re-prompt, rotation `[WARN]`, glyph/table helpers, barrel completion; test count 92 → 149; review rounds 1–3 closed on top (envelope contract, host-independent doctor fixture, run-surface failure pin, dead adapter removal, required session injection, `job cleanup` payload docs); count 149 → 176 at `b93d2ba` | @rakaarwaky |
+| 2026-10-21 | UX remediation on `rakaarwaky/ux-tui-cli-surface`: shared `STATUS_GLYPHS` re-export (UX-3-002), `session remove` TTY confirmation (UX-4-003), and the UX-5-002 floor-of-16 regression in `unit_surface_cli_sessions_command.py`; count 176 → 178 verified this session | @rakaarwaky |

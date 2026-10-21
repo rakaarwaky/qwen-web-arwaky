@@ -33,6 +33,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - fix(session): a timed-out health probe cooperatively closes its browser context, so a stalled probe no longer leaks Chromium; cancel and open flags are per probe (not instance-shared across concurrent probes), and the timeout grace waits for the probe to acknowledge cancel even during Chromium launch. `sessions.json` mutations and auto-discovery writes take an exclusive advisory lock (`sessions.json.lock`) so concurrent MCP and CLI writers cannot lose updates; usage updates go through locked `mark_used`.
 - fix(jobs): zombie reconciliation treats a stale `heartbeat_at` (`JOB_HEARTBEAT_LEASE_SEC`) as dead even when the PID answers — recycled PIDs no longer keep a dead job looking alive; submit stamps `heartbeat_at` and a missing stamp is only stale after a lease from `created_at`; running jobs restamp their heartbeat every half lease and join the beat thread before the terminal save so a late beat cannot demote `completed=True`.
 - fix(tui): the prompt session-selection seam and its CLI/TUI siblings call `rotate_sync` instead of inline `asyncio.run`, so selection cannot crash inside an already-running event loop. `timeout_sec` on the async MCP prompt tools is documented as applying only when `async_run` is false.
+### Fixed
+
+- fix(tui): non-VALID session verdicts pair the event-log line with an `ACTION:` line naming `ctrl+l`, closing the first-run loop at the point of failure (UX-1-001)
+- fix(tui): the Sessions key-hint strip renders under the session table with the `.session-key-hint` class on a cold start and survives `_refresh_sessions_table` repaints (UX-1-002)
+- fix(tui): a failed login writes the explicit retry line (`Press A (or ADD SESSION) to retry login`); a successful login does not (UX-1-003)
+- fix(tui): the slot carousel renders three label tiers (full `● SLOT 07`, compact `● 07`, bare `07`) from `_MINIMAL_CHIP_COLUMNS`, so narrow screens never overflow the pill row (UX-2-002)
+- fix(tui): the session-row buttons ship the documented glyphs `↻ ☐ ×` with ASCII fallbacks `r h x`, rendered from `_GLYPHS` in `modules/tui/src/surface_tui_utils_component.py`, with tooltips on the three session-row buttons (UX-2-001, UX-4-001)
+- fix(tui): the wide glyphs are gated on the ASCII locale (`C` / `POSIX` / codeset `ANSI_X3.4-1968`), not on `NO_COLOR` — `LC_ALL=C` renders the ASCII fallback while a UTF-8 locale keeps `↻` under `NO_COLOR=1` (UX-3-003)
+- fix(tui): `r` / `e` / `d` are Sessions-pane-gated on `_sessions_active()`; `a` stays global (UX-4-002)
+- fix(tui): `cmd_remove` confirms on a TTY via `_remove_confirmed` before deleting a session (UX-4-003)
+- fix(tui): the session list renders one English empty-state string from the shared `SESSION_EMPTY_HINT` constant on the compose tree, after `_refresh_sessions_table`, and after `_render_account_cards` (UX-5-001)
+- fix(tui): the `⛔ auth_required` verdict renders in full at an 80-column budget — the list floors are `(6, 8, 16, 10)` and the status floors `(6, 8, 16, 8, 6)` so the Status cell never truncates to `…` (UX-5-002)
+- fix(tui): the Swarm primary CTA reads `▶ START` cold and flips to `↻ RESTART` when a run registers via `_set_swarm_start_label` (UX-5-003)
+- fix(cli): the canonical failure glyph `✗` is the one object both surfaces read — `STATUS_GLYPHS` lives in `modules/shared/src/common/taxonomy_core_constant.py` and is re-exported by the CLI and the TUI; the stray `✕` is gone (UX-3-002)
+- fix(cli): `session remove` confirms on a TTY before deleting the profile, so the destructive verb never fires without consent; `--force` and `--json` stay non-interactive (UX-4-003)
+- fix(shared): root `DESIGN.md` is rewritten in `$token` references with zero untraced hex values, and `css_view`'s docstring names the module as the single source of truth for colour (UX-3-001)
+
+### Changed
+
+- docs(tui): `modules/tui/DESIGN.md` documents the session-row glyph spec with ASCII fallbacks, the Terminal Type Projection table, the key-hint strip, the Sessions-gated row keys, and the Swarm START/RESTART label state (UX-2-001, UX-2-003, UX-1-002, UX-4-002, UX-5-003)
+
+### Tests
+
+- test(tui): `unit_tui_ux_remediation.py` — regression tests for UX-3-002, UX-3-003, UX-4-002, UX-5-001, UX-1-001, UX-1-003, UX-2-002, UX-1-002, and UX-5-003
+- test(tui): `unit_tui_session_action_buttons.py` — glyph and tooltip coverage on the three session-row buttons plus the delete-path tests
+- test(cli): `unit_surface_cli_sessions_command.py` — a UX-5-002 regression pinning the Status-column floor of 16 against a whole-pool `auth_required` render at 80 columns
 
 ## [6.7.0] - 2026-10-18
 

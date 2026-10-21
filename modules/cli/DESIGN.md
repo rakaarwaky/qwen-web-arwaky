@@ -29,7 +29,7 @@ text unless `--json` is set; the TUI visual token set lives in
 | `qwen-web-arwaky` (no args, config given) | `surface_cli_run_command.dispatch_run` | Headless single-file pipeline run. |
 | `init` | `surface_cli_init_command` | Workspace bootstrap: creates `.agents/skills` and `.qwen-web-arwaky` under `--dir` (default: cwd). |
 | `doctor` | `surface_cli_doctor_command` | Environment and session-pool health checks (the pool is the single source of truth; the aggregate is required — `run_doctor(session)` is a required positional argument with no default, so an unwired call raises `TypeError`); `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
-| `session` | `surface_cli_sessions_command` | Subcommands: `list`, `login --name NAME`, `health`, `remove NAME [--force] [--keep-profile]`, `status`. |
+| `session` | `surface_cli_sessions_command` | Subcommands: `list`, `login --name NAME`, `health`, `remove NAME [--force] [--keep-profile]`, `status`. `remove` confirms on a TTY unless `--json` / `--force` / `--keep-profile` is set (UX-4-003). |
 | `prompt direct` | `surface_cli_run_command` | `-t TEXT [-o FILE] [--headless] [--json]` — inline text prompt. |
 | `prompt file` | `surface_cli_run_command` | `-i FILE [-o FILE] [--headless] [--json]` — prompt file only. |
 | `prompt attach` | `surface_cli_run_command` | `-i FILE -a FILE [-o FILE] [--headless] [--json]` — prompt file plus attachment. |
@@ -52,8 +52,12 @@ parser (or the group-level parser) and are uniformly available:
 | `-o FILE` / `--output-path` | `None` | Destination for the Markdown response; omitted only for `job submit` which stores the record in the jobs folder. |
 | `--deep` | off | On `doctor` only; runs the heavy Playwright probe (alias: `QWEN_DOCTOR_DEEP=1`). |
 
-`session login` is the only interactive subcommand that opens a browser;
-all other subcommands are non-interactive.
+`session login` is the only interactive subcommand that opens a browser.
+`session remove` is interactive in one narrow case: on a TTY, without
+`--json`, `--force`, or `--keep-profile`, it prompts a `[y/N]` confirmation
+(`_remove_confirmed`) before deleting the profile — anything but `y` / `yes`
+aborts with exit 0 and a closed stdin aborts instead of raising. Every other
+subcommand is non-interactive.
 
 ### Exit Codes
 
@@ -143,8 +147,12 @@ add-another re-prompt, and the fixed-key envelope above on stdout. Without
 `--json` the banner and the iterative "add another?" prompt drive a
 multi-login session.
 
-Status glyphs (`surface_cli_json_hook.STATUS_GLYPHS`): `✓` / `✗` / `⚠`
-for results, `●` / `◐` / `○` for health, `…` pending. Glyphs are emitted
+Status glyphs come from the one shared object both surfaces read:
+`STATUS_GLYPHS` is declared in the shared Taxonomy layer
+(`modules/shared/src/common/taxonomy_core_constant.py`) and re-exported by
+`surface_cli_json_hook` (`from … import STATUS_GLYPHS`; UX-3-002), so the
+CLI and the TUI cannot drift apart. `✓` / `✗` / `⚠` for results, `●` /
+`◐` / `⛔` / `○` for health, `…` pending. Glyphs are emitted
 unpainted on the CLI; ANSI color is owned by the TUI layer
 (`modules/tui/DESIGN.md`).
 
