@@ -123,6 +123,14 @@ SWARM_RESOURCE_WARNING_BROWSERS = 4
 #: the worst-case backlog to a known depth.
 MAX_PENDING_JOBS_PER_WORKER = 1
 
+#: Lease window a job worker's heartbeat must stay fresh within. A record
+#: whose ``heartbeat_at`` is older than this is a zombie even if its
+#: ``owner_pid`` still answers: a recycled PID must not keep a dead job
+#: looking alive. Attachment-parse alone can take 120s, so the window is
+#: sized well past that (180s) — anything shorter would misreport a slow
+#: but healthy run as dead.
+JOB_HEARTBEAT_LEASE_SEC = 180
+
 CHAT_URL = "https://chat.qwen.ai/"
 
 # Browser navigation timeouts (milliseconds). The primary goto uses 30s with
@@ -625,6 +633,14 @@ SEND_CLICK_TIMEOUT_ENV: str = "QWEN_SEND_CLICK_TIMEOUT_MS"
 STATUS_SCHEMA_VERSION: int = 2
 
 # ─── Session domain ──────────────────────────────────────────────────────────
+#: Ceiling for the interactive manual-login wait. Typing credentials takes far
+#: longer than any headless run, so the login loop budgets this window
+#: independently of ``AppConfig.timeout``.
+DEFAULT_LOGIN_WAIT_TIMEOUT_SEC: int = 1800
+
+#: Environment override for ``DEFAULT_LOGIN_WAIT_TIMEOUT_SEC``.
+LOGIN_WAIT_TIMEOUT_ENV: str = "QWEN_LOGIN_WAIT_SEC"
+
 #: The old single-profile location (pre-multi-account). Used only for migration.
 DEFAULT_SESSION_OLD: Path = XDG_DATA_HOME / "qwen_session"
 

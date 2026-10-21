@@ -27,13 +27,15 @@ surfaces submit a job and read its record; they never own a worker.
   - A record that has not completed reports the running state regardless of any partial result.
   - Listing is the recovery path for a lost identifier and is ordered newest first.
   - A record whose worker died is reconciled to a terminal state on the next pool start, so a poller never waits on a job that will never finish.
+  - A record is a zombie when its `owner_pid` no longer answers **or** its `heartbeat_at` is older than the heartbeat lease window (`JOB_HEARTBEAT_LEASE_SEC`); a recycled PID that answers `os.kill` is still a zombie when its heartbeat has gone stale.
+  - A running job refreshes `heartbeat_at` at least once per half lease window, so a live worker is never reconciled; the refresh stops before the terminal save so it cannot resurrect a completed record.
   - Retention removes completed records past their terminal window and incomplete records past their longer window.
 - **Edge Cases**:
   - A repeated failure trips the circuit breaker and later submissions fail fast with the breaker's reason until its window elapses.
   - An unknown or expired identifier reports a not-found error rather than an empty record.
   - A storage directory that does not exist is created rather than reported as missing.
 - **Error Handling**:
-  - Queue-full, throttled, and breaker-open outcomes each carry their own error category so the caller can decide whether to retry.
+  - Queue-full, throttled, and breaker-open outcomes each carry their own error category so the caller can decide whether to retry. The queue-full outcome reaches MCP and CLI surfaces as its own envelope (MCP `QUEUE_FULL`, CLI `cli-429`) preserving `retry_after_sec` and `queue_depth`.
   - Not-found carries the hint that listing recovers the identifier.
   - A record that cannot be written surfaces a file error naming the path; the job still runs.
 
@@ -43,7 +45,7 @@ surfaces submit a job and read its record; they never own a worker.
 - **Input**: The run's status record, or the published status file to read.
 - **Output**: The written status file, or the parsed mapping when read back.
 - **Business Rules**:
-  - The status file is the inter-process handoff: its field set is what an external monitor depends on, so removing a field is a breaking change.
+  - The status file is the inter-process handoff: its field set is what an external monitor depends on, so removing a field is a breaking change. The schema-version-2 key set is pinned by a contract test in the shared member's test suite.
   - An absent, empty, or invalid status file reads back as no mapping rather than raising.
 - **Edge Cases**: A status file that has not been written yet reads back as no mapping.
 - **Error Handling**: A status write that fails surfaces a file error naming the path.

@@ -6,12 +6,14 @@ import contextlib
 import json
 import os
 import shutil
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
 from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
+from modules.shared.src.common.utility_io_writer import exclusive_file_lock
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.session.taxonomy_session_vo import (
@@ -146,11 +148,10 @@ class SessionManager(ISessionManagerProtocol):
     def save_pool(self, pool: SessionPool) -> None:
         """Persist session pool to disk atomically.
 
-        The pool is a local, single-writer state: the CLI is one process
-        at a time, and the MCP server is the only long-lived consumer, so
-        mutations are serialized on one process. A second concurrent writer
-        would lose one of the two, which is documented and not guarded
-        against (see ISSUE.md single-writer assumption note).
+        The write itself stays a plain ``os.replace`` swap: callers that hold
+        :meth:`_pool_lock` serialize the load→mutate→save cycle, so a
+        concurrent writer (the MCP server and a CLI session command running
+        at once) waits rather than overwriting the other's update.
         """
         data: dict[str, object] = {
             "sessions": [
@@ -191,31 +192,33 @@ class SessionManager(ISessionManagerProtocol):
         ``profile_path`` already exists, only its name is updated rather
         than adding a duplicate row.
         """
-        pool = self.load_pool()
-        for i, s in enumerate(pool.sessions):
-            if s.path == profile_path:
-                # Frozen dataclass: replace the entry with a copy that has
-                # the new name instead of mutating in place.
-                pool.sessions[i] = s.with_name(name)
-                self.save_pool(pool)
-                return pool.sessions[i]
-        session_id = self._next_session_id(pool.sessions)
-        info = SessionInfo(
-            session_id=session_id,
-            name=name,
-            path=profile_path,
-            status=SessionStatus.AUTH_REQUIRED,
-        )
-        pool.add_session(info)
-        self.save_pool(pool)
-        return info
+        with self._pool_lock():
+            pool = self.load_pool()
+            for i, s in enumerate(pool.sessions):
+                if s.path == profile_path:
+                    # Frozen dataclass: replace the entry with a copy that has
+                    # the new name instead of mutating in place.
+                    pool.sessions[i] = s.with_name(name)
+                    self.save_pool(pool)
+                    return pool.sessions[i]
+            session_id = self._next_session_id(pool.sessions)
+            info = SessionInfo(
+                session_id=session_id,
+                name=name,
+                path=profile_path,
+                status=SessionStatus.AUTH_REQUIRED,
+            )
+            pool.add_session(info)
+            self.save_pool(pool)
+            return info
 
     def remove_session(self, session_id: str) -> bool:
         """Remove a session by ID."""
-        pool = self.load_pool()
-        if pool.remove_session(session_id):
-            self.save_pool(pool)
-            return True
+        with self._pool_lock():
+            pool = self.load_pool()
+            if pool.remove_session(session_id):
+                self.save_pool(pool)
+                return True
         return False
 
     def get_session_by_name(self, name: str) -> SessionInfo | None:
@@ -224,15 +227,16 @@ class SessionManager(ISessionManagerProtocol):
 
     def remove_session_by_name(self, name: str) -> bool:
         """Remove the pool entry registered under *name*; True when found."""
-        pool = self.load_pool()
-        removed = False
-        for i, s in enumerate(pool.sessions):
-            if s.name == name:
-                pool.sessions.pop(i)
-                removed = True
-                break
-        if removed:
-            self.save_pool(pool)
+        with self._pool_lock():
+            pool = self.load_pool()
+            removed = False
+            for i, s in enumerate(pool.sessions):
+                if s.name == name:
+                    pool.sessions.pop(i)
+                    removed = True
+                    break
+            if removed:
+                self.save_pool(pool)
         return removed
 
     def delete_session_profile(self, profile_path: Path, *, force: bool = False) -> bool:
@@ -298,23 +302,37 @@ class SessionManager(ISessionManagerProtocol):
 
     def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
         """Mark session as rate-limited; a ``None`` reason normalises to ``"QUOTA"``."""
-        pool = self.load_pool()
-        pool.mark_limited(session_id, reason=reason)
-        self.save_pool(pool)
+        with self._pool_lock():
+            pool = self.load_pool()
+            pool.mark_limited(session_id, reason=reason)
+            self.save_pool(pool)
 
     def mark_healthy(self, session_id: str) -> None:
         """Mark session as healthy."""
-        pool = self.load_pool()
-        pool.mark_healthy(session_id)
-        self.save_pool(pool)
+        with self._pool_lock():
+            pool = self.load_pool()
+            pool.mark_healthy(session_id)
+            self.save_pool(pool)
 
     def mark_auth_required(self, session_id: str, reason: SessionReason | None = None) -> None:
         """Mark session as requiring authentication or setup."""
-        pool = self.load_pool()
-        pool.mark_auth_required(session_id, reason=reason)
-        self.save_pool(pool)
+        with self._pool_lock():
+            pool = self.load_pool()
+            pool.mark_auth_required(session_id, reason=reason)
+            self.save_pool(pool)
 
     # Block 3: Dunder Methods, Factories & Helpers
+
+    @contextlib.contextmanager
+    def _pool_lock(self) -> Iterator[None]:
+        """Serialize the load→mutate→save cycle against other processes.
+
+        The pool file is shared by the long-lived MCP server and short-lived
+        CLI session commands; without an exclusive advisory lock the two
+        read-modify-write cycles would silently lose one writer's update.
+        """
+        with exclusive_file_lock(POOL_FILE.with_name(POOL_FILE.name + ".lock")):
+            yield
 
     def _ensure_dirs(self) -> None:
         """Create session storage directories and migrate the legacy profile."""

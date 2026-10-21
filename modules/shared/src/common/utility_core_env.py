@@ -27,7 +27,7 @@ import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from modules.shared.src.common.taxonomy_core_constant import XDG_CONFIG_HOME
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOGIN_WAIT_TIMEOUT_SEC, XDG_CONFIG_HOME
 
 _MASK = "***"
 _GITHUB_REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -55,6 +55,7 @@ QWEN_DISABLE_SANDBOX = "QWEN_DISABLE_SANDBOX"
 QWEN_DOCTOR_DEEP = "QWEN_DOCTOR_DEEP"
 QWEN_DOCTOR_SHOW_PATH = "QWEN_DOCTOR_SHOW_PATH"
 QWEN_ENABLE_SANDBOX = "QWEN_ENABLE_SANDBOX"
+QWEN_LOGIN_WAIT_SEC = "QWEN_LOGIN_WAIT_SEC"
 QWEN_REQUEST_TIMEOUT_SEC = "QWEN_REQUEST_TIMEOUT_SEC"
 QWEN_STREAM_SAFETY_TIMEOUT_SEC = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 QWEN_SWARM_CONCURRENCY = "QWEN_SWARM_CONCURRENCY"
@@ -77,6 +78,7 @@ REGISTERED_ENV: tuple[tuple[str, str, str, bool], ...] = (
     (QWEN_DOCTOR_DEEP, "enable the slow Playwright cold-start probe in doctor", "0", False),
     (QWEN_DOCTOR_SHOW_PATH, "print the effective Chromium binary path in doctor", "0", False),
     (QWEN_ENABLE_SANDBOX, "force Chromium's OS sandbox back on even in containers", "unset", False),
+    (QWEN_LOGIN_WAIT_SEC, "manual-login wait ceiling in seconds; the login window the banner promises", "1800s", False),
     (QWEN_REQUEST_TIMEOUT_SEC, "ceiling on how long a single response may take", "600s", False),
     (QWEN_STREAM_SAFETY_TIMEOUT_SEC, "safety timeout for a streaming response; 0 disables", "4h", False),
     (QWEN_SWARM_CONCURRENCY, "browser fan-out cap for one Swarm; clamped by host memory (issue #291)", "auto", False),
@@ -125,6 +127,17 @@ def get_secret_env(name: str) -> str:
     if name not in _REGISTERED_NAMES:
         raise KeyError(f"{name!r} is not in the environment registry")
     return os.environ.get(name, "")
+
+
+def login_wait_seconds() -> int:
+    """Return the manual-login wait ceiling in seconds.
+
+    Registered ``QWEN_LOGIN_WAIT_SEC`` when it parses positive, else the
+    default. The login loop and the CLI banner both read it here so the
+    promised window is always one number.
+    """
+    raw = get_env(QWEN_LOGIN_WAIT_SEC)
+    return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_LOGIN_WAIT_TIMEOUT_SEC
 
 
 def unknown_env_vars(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
@@ -196,6 +209,9 @@ def validate_env(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     response_ceiling = source.get(QWEN_REQUEST_TIMEOUT_SEC, "").strip()
     if response_ceiling and not response_ceiling.isdigit():
         problems.append(f"{QWEN_REQUEST_TIMEOUT_SEC}: {response_ceiling!r} is not a positive integer")
+    login_wait = source.get(QWEN_LOGIN_WAIT_SEC, "").strip()
+    if login_wait and not login_wait.isdigit():
+        problems.append(f"{QWEN_LOGIN_WAIT_SEC}: {login_wait!r} is not a positive integer")
     timeout = source.get(QWEN_STREAM_SAFETY_TIMEOUT_SEC, "").strip()
     if timeout and (not timeout.isdigit() or int(timeout) < 0):
         problems.append(f"{QWEN_STREAM_SAFETY_TIMEOUT_SEC}: {timeout!r} is not a non-negative integer")
@@ -323,6 +339,7 @@ __all__ = [
     "QWEN_DOCTOR_DEEP",
     "QWEN_DOCTOR_SHOW_PATH",
     "QWEN_ENABLE_SANDBOX",
+    "QWEN_LOGIN_WAIT_SEC",
     "QWEN_REQUEST_TIMEOUT_SEC",
     "QWEN_STREAM_SAFETY_TIMEOUT_SEC",
     "QWEN_SWARM_CONCURRENCY",
@@ -339,6 +356,7 @@ __all__ = [
     "install_settings",
     "is_secret",
     "load_settings",
+    "login_wait_seconds",
     "parse_settings",
     "registered_env",
     "runbook_index",

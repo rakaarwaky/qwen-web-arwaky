@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from modules.cli.src.surface_cli_json_hook import _fail_json, status_glyph
+from modules.shared.src.common.taxonomy_core_error import JobQueueFullError
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
 from modules.shared.src.common.utility_core_path_validation import (
     validate_attachment_path,
@@ -88,6 +89,12 @@ def _cmd_submit(args: argparse.Namespace, jobs: IJobManagerAggregate) -> int:
                     headless=headless,
                 )
             )
+    except JobQueueFullError as exc:
+        # Saturated pool: keep the retry hint and depth so a caller can back
+        # off deliberately instead of reading a generic internal failure.
+        retry_after = getattr(exc, "retry_after_sec", None)
+        hint = f" (retry in {retry_after}s)" if retry_after is not None else ""
+        return _fail_json(f"Worker pool is full{hint}: {exc}", "cli-429", json_output)
     except Exception as exc:
         return _fail_json(f"Job submission failed: {exc}", "cli-500", json_output)
 

@@ -8,8 +8,11 @@ and StatusFileWriter.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
-from contextlib import suppress
+import os
+import sys
+import time
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +26,87 @@ from modules.shared.src.common.taxonomy_core_event import EVENT_OUTPUT_COPIED
 #: ``*.json``) never pick up a partial write, and so real records are free to
 #: contain arbitrary substrings without being mistaken for temp artifacts.
 ATOMIC_TEMP_SUFFIX = ".tmpwrite"
+
+#: Owner-only mode the lock file is forced to, independent of umask.
+_LOCK_FILE_MODE = 0o600
+#: How long to keep polling a contended lock before giving up, and the poll
+#: interval. Bounded so a crashed holder cannot park every later writer.
+LOCK_TIMEOUT_SECONDS = 10.0
+LOCK_POLL_INTERVAL = 0.05
+
+
+def _lock_open_flags() -> int:
+    """Open flags for the lock file; ``msvcrt.locking`` needs a writable fd."""
+    if sys.platform == "win32":
+        return os.O_CREAT | os.O_RDWR
+    flags = os.O_CREAT | os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    return flags
+
+
+def _try_lock(fd: int) -> bool:
+    """Take a non-blocking exclusive lock; True when acquired."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+
+
+def _release_lock(fd: int) -> None:
+    """Drop the exclusive lock held on *fd*; best-effort."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        with suppress(OSError):
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+
+    with suppress(OSError):
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+@contextmanager
+def exclusive_file_lock(lock_path: Path) -> Iterator[None]:
+    """Hold an exclusive advisory lock on *lock_path* for the block's duration.
+
+    Cross-process serialization for read-modify-write cycles (``fcntl.flock``
+    on POSIX, ``msvcrt.locking`` on Windows). Polls up to
+    ``LOCK_TIMEOUT_SECONDS`` so concurrent holders serialize rather than
+    fail; a timeout raises ``OutputWriteError`` so the caller surfaces a
+    named failure instead of silently losing the write.
+    """
+    try:
+        fd = os.open(str(lock_path), _lock_open_flags(), _LOCK_FILE_MODE)
+    except OSError as exc:
+        raise OutputWriteError(f"could not open lock file {lock_path}: {exc}") from exc
+    try:
+        with suppress(OSError):
+            os.chmod(str(lock_path), _LOCK_FILE_MODE)
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while not _try_lock(fd):
+            if time.monotonic() >= deadline:
+                raise OutputWriteError(f"could not acquire lock on {lock_path} within {LOCK_TIMEOUT_SECONDS}s")
+            time.sleep(LOCK_POLL_INTERVAL)
+        try:
+            yield
+        finally:
+            _release_lock(fd)
+    finally:
+        with suppress(OSError):
+            os.close(fd)
 
 
 def _atomic_write(target: Path, content: str, mode: int = 0o600) -> None:

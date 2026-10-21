@@ -21,6 +21,7 @@ from modules.shared.src import (
 )
 from modules.shared.src.common.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
 from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
 
 # ─── validate_response_content ──────────────────────────────────────────────
 
@@ -446,6 +447,69 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=2,
             )
             assert result is not None and result.text == "final answer with enough text"
+
+    def test_stall_outruns_ceiling_and_slow_stream_outlives_stall(self):
+        """FR-PROMPT-006 precedence, pinned in one place.
+
+        A stream with no forward event fails at ``stall_timeout_sec`` with
+        ``StuckDetectedError`` even though ``timeout_sec`` is still far away,
+        while a slow-but-emitting stream survives past the same stall
+        threshold and is bounded only by the response ceiling.
+        """
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        with (
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 300]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(StuckDetectedError, match="Stuck detected"):
+                StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                    page,
+                    timeout_sec=3600,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
+
+        # Same stall window, but the stream keeps emitting forward events well
+        # past it; only the response ceiling ends the wait.
+        emitter = MagicMock(spec=LifecycleEmitter)
+        text_side_effect = [
+            None,
+            "chunk 1 with enough text",
+            "chunk 2 with enough text",
+            "final answer with enough text",
+            "final answer with enough text",
+            "final answer with enough text",
+        ]
+        time_calls = [0, 400, 800, 1200, 1200, 1200]
+
+        with (
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=text_side_effect),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = time_calls
+            mock_time.sleep = MagicMock()
+
+            result = StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                page,
+                timeout_sec=3600,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=2,
+            )
+            assert isinstance(result, StreamVerdict)
+            assert result.text == "final answer with enough text"
+            assert result.verdict == "complete"
 
 
 class TestResponseExtractionContract:

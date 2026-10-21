@@ -15,7 +15,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
 
-from modules.shared.src.common.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
+from modules.shared.src.common.taxonomy_core_constant import (
+    JOB_HEARTBEAT_LEASE_SEC,
+    MAX_PENDING_JOBS_PER_WORKER,
+)
 from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.common.taxonomy_core_error import (
     CircuitBreakerOpenError,
@@ -298,6 +301,32 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         )
         return record
 
+    def _refresh_heartbeat(self, job_id: JobId) -> None:
+        """Restamp ``heartbeat_at`` on a running record so its lease stays fresh.
+
+        Reconcile marks a record a zombie once its heartbeat is older than
+        ``JOB_HEARTBEAT_LEASE_SEC``, so a long prompt run must re-stamp itself
+        well inside that window rather than rely on the single start-time
+        stamp.
+        """
+        record = self._storage.get_job(job_id)
+        if record is None or record.completed:
+            return
+        self._storage.save_job(
+            JobRecord(
+                job_id=record.job_id,
+                created_at=record.created_at,
+                latest_event=record.latest_event,
+                completed=False,
+                started_at=record.started_at,
+                input_file=record.input_file,
+                attachment_file=record.attachment_file,
+                output_file=record.output_file,
+                owner_pid=record.owner_pid,
+                heartbeat_at=utc_now_iso(),
+            )
+        )
+
     def _save_failure(
         self,
         job_id: JobId,
@@ -403,6 +432,16 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         started_at = utc_now_iso()
         record = self._storage.get_job(job_id)
         self._save_started(record, started_at)
+        # Heartbeat beats only while execute() runs; the finally below stops
+        # and joins it before the terminal save lands.
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop,
+            args=(job_id, stop),
+            daemon=True,
+            name=f"job-heartbeat-{job_id}",
+        )
+        heartbeat.start()
         save_failure = self._save_failure
         try:
             result = self._file_only.execute(
@@ -449,6 +488,19 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 str(exc),
                 output_path=output_path,
             )
+        finally:
+            stop.set()
+            heartbeat.join(timeout=JOB_HEARTBEAT_LEASE_SEC)
+
+    def _heartbeat_loop(self, job_id: JobId, stop: threading.Event) -> None:
+        """Restamp ``heartbeat_at`` on a running job until ``stop`` is set.
+
+        Sections are half the lease window so reconcile never sees a live
+        worker's record as stale. The caller sets ``stop`` and joins before
+        the terminal save so a late beat cannot resurrect a completed record.
+        """
+        while not stop.wait(timeout=JOB_HEARTBEAT_LEASE_SEC / 2):
+            self._refresh_heartbeat(job_id)
 
     def _run_attachment_job(
         self,
@@ -484,6 +536,14 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         record = self._storage.get_job(job_id)
         save_started = self._save_started
         save_started(record, started_at, attachment_path=attachment_path)
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop,
+            args=(job_id, stop),
+            daemon=True,
+            name=f"job-heartbeat-{job_id}",
+        )
+        heartbeat.start()
         save_failure = self._save_failure
         try:
             result = self._attachment.execute(
@@ -542,3 +602,6 @@ class AgentJobOrchestrator(IJobManagerAggregate):
                 attachment_path=attachment_path,
                 output_path=output_path,
             )
+        finally:
+            stop.set()
+            heartbeat.join(timeout=JOB_HEARTBEAT_LEASE_SEC)

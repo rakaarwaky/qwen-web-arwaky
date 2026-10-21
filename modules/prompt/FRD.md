@@ -80,7 +80,8 @@ surfaces and job runners see one pipeline.
 - **Business Rules**:
   - The wall-clock response ceiling is a ceiling, not an idle budget; a long thinking phase emits no forward event, so a short ceiling aborts healthy runs.
   - A stalled stream is distinguished from a complete one so a caller can decide whether to retry.
-- **Edge Cases**: A stream that emits no forward event for the full ceiling reports stalled, not complete.
+  - Precedence: the event-driven stall detector (`stall_timeout_sec`) may fire before the response ceiling and is retriable via the dispatch retry budget (`MAX_ATTEMPTS`); the response ceiling (`request_timeout`) is absolute and terminal for the attempt.
+- **Edge Cases**: A stream that emits no forward event for the full ceiling reports stalled, not complete. A slow-but-emitting stream outlives the stall threshold and is only bounded by the response ceiling.
 - **Error Handling**: A monitor that cannot read the stream reports the extraction incomplete rather than raising into the caller.
 
 ### FR-PROMPT-007: Inject prompt text into the chat
@@ -211,6 +212,7 @@ The class is named in the Description column.
 ## Glossary
 
 - **Stream monitor**: The seam that follows the response until a terminal state.
-- **Stall detector**: The check that distinguishes a slow response from a wedged one.
+- **Stall detector**: The check that distinguishes a slow response from a wedged one. Event-driven and retriable; may fire before the response ceiling.
+- **Response ceiling**: The absolute, terminal wall-clock bound (`request_timeout`) for one dispatch attempt.
 - **Extraction verdict**: The result of the monitor: complete, stalled, or incomplete.
 - **Stalled vs incomplete**: `stalled` is the incomplete-family verdict the stall detector emits (no forward event within the stall window); `incomplete` is the verdict for a hard wall-clock response timeout or an unreadable stream. Both save the partial artifact.

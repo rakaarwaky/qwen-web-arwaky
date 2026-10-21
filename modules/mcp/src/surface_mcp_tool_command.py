@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from modules.shared.src.common.taxonomy_core_error import QwenCliError, RateLimitError
+from modules.shared.src.common.taxonomy_core_error import JobQueueFullError, QwenCliError, RateLimitError
 from modules.shared.src.common.taxonomy_core_vo import (
     FilePath,
     HeadlessFlag,
@@ -211,6 +211,27 @@ def _format_rate_limit_payload(exc: RateLimitError) -> str:
     return json.dumps({"success": False, "error": payload}, indent=2)
 
 
+def _format_queue_full_payload(exc: JobQueueFullError) -> str:
+    """Render a saturated-pool refusal as a retryable QUEUE_FULL envelope.
+
+    Keeps the backpressure hint the orchestrator attached (``retry_after_sec``,
+    ``queue_depth``) so a client can back off deliberately.
+    """
+    payload: dict[str, Any] = {
+        "code": "QUEUE_FULL",
+        "message": str(exc),
+        "hint": "Worker pool is at capacity. Wait for retry_after_sec, then resubmit.",
+        "retryable": True,
+    }
+    retry_after = getattr(exc, "retry_after_sec", None)
+    if retry_after is not None:
+        payload["retry_after_sec"] = round(float(retry_after), 1)
+    queue_depth = getattr(exc, "queue_depth", None)
+    if queue_depth is not None:
+        payload["queue_depth"] = int(queue_depth)
+    return json.dumps({"success": False, "error": payload}, indent=2)
+
+
 def _resolve_prompt_path(prompt_file: str, *, field: str = "prompt_file") -> Path | str:
     """Resolve a role or workspace prompt path with explicit runtime validation."""
     if is_prompt_role(prompt_file):
@@ -252,6 +273,7 @@ class McpToolCommand:
         timeout_sec: int = 120,
         headless: bool = True,
         output_file: str | None = None,
+        prompt: str | None = None,
     ) -> str:
         """Process a direct text prompt string to chat.qwen.ai.
 
@@ -261,10 +283,16 @@ class McpToolCommand:
             headless: Run browser headlessly (default: True).
             output_file: Optional destination path for the AI response, matching
                 the CLI's ``prompt direct -o FILE`` flag.
+            prompt: Schema-declared alias of ``prompt_text`` (the input schema
+                names the parameter ``prompt``); the non-empty argument wins.
 
         Returns:
             JSON string containing success status, assistant response text, and metadata.
         """
+        # The tool schema declares `prompt`; callers dispatching with **kwargs
+        # reach this alias, so it must be honoured here rather than dropped.
+        if prompt is not None:
+            prompt_text = prompt
         if not prompt_text or not prompt_text.strip():
             return _format_error_payload(
                 code="VALIDATION_ERROR",
@@ -302,6 +330,7 @@ class McpToolCommand:
         output_file: str | None = None,
         headless: bool = True,
         async_run: bool = True,
+        timeout_sec: int = 120,
     ) -> str:
         """Process a single Markdown prompt file from disk without attachment.
 
@@ -311,6 +340,7 @@ class McpToolCommand:
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
+            timeout_sec: Maximum seconds to wait for the assistant response (default: 120s).
 
         Returns:
             JSON string containing success status, resolved output path, and result preview (or job_id if async).
@@ -350,6 +380,8 @@ class McpToolCommand:
                 )
             except RateLimitError as exc:
                 return _format_rate_limit_payload(exc)
+            except JobQueueFullError as exc:
+                return _format_queue_full_payload(exc)
             except Exception as exc:
                 return _format_error_payload(
                     code="JOB_SUBMIT_FAILED",
@@ -365,6 +397,7 @@ class McpToolCommand:
                     prompt_file=FilePath(p_path),
                     output_file=FilePath(out_path) if out_path else None,
                     headless=HeadlessFlag(headless),
+                    timeout_sec=TimeoutSec(timeout_sec),
                 )
             )
             return _format_success_payload(
@@ -386,6 +419,7 @@ class McpToolCommand:
         output_file: str | None = None,
         headless: bool = True,
         async_run: bool = True,
+        timeout_sec: int = 120,
     ) -> str:
         """Process a Markdown prompt file with a document attachment.
 
@@ -400,6 +434,7 @@ class McpToolCommand:
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
+            timeout_sec: Maximum seconds to wait for the assistant response (default: 120s).
 
         Returns:
             JSON string containing success status, resolved output path, and result (or job_id if async).
@@ -446,6 +481,8 @@ class McpToolCommand:
                 )
             except RateLimitError as exc:
                 return _format_rate_limit_payload(exc)
+            except JobQueueFullError as exc:
+                return _format_queue_full_payload(exc)
             except Exception as exc:
                 return _format_error_payload(
                     code="JOB_SUBMIT_FAILED",
@@ -462,6 +499,7 @@ class McpToolCommand:
                     attachment_file=FilePath(a_path),
                     output_file=FilePath(out_path) if out_path else None,
                     headless=HeadlessFlag(headless),
+                    timeout_sec=TimeoutSec(timeout_sec),
                 )
             )
             return _format_success_payload(
