@@ -42,8 +42,25 @@ class JobStorage(IJobStorageProtocol):
     def __init__(self, storage_dir: Path | None = None) -> None:
         self.storage_dir = storage_dir or DEFAULT_JOBS_DIR
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.cleanup_stale_jobs()
-        self.reconcile_zombies()
+        # Reconciliation is lazy (ARCH-3-003): a read-only command such as
+        # ``doctor`` or ``session list`` should not pay the full zombie/stale
+        # sweep before it runs. Callers that read job state trigger it via
+        # ensure_reconciled().
+        self._reconciled = False
+
+    def ensure_reconciled(self) -> None:
+        """Run the zombie sweep once, on first read.
+
+        Idempotent: the first call performs ``reconcile_zombies``; later calls
+        are a no-op. Only the zombie sweep runs lazily — it marks dead-owner
+        records failed, which changes no file list a read relies on. The
+        retention sweep (``cleanup_stale_jobs``) stays explicit: deleting
+        records on a read would break ``get_job`` for old-but-valid records,
+        so MCP startup/maintenance must call it by name (ARCH-3-003).
+        """
+        if not self._reconciled:
+            self.reconcile_zombies()
+            self._reconciled = True
 
     def save_job(self, record: JobRecord) -> None:
         """Persist a job record to an atomic JSON file."""
@@ -75,6 +92,11 @@ class JobStorage(IJobStorageProtocol):
 
     def get_job(self, job_id: JobId | str) -> JobRecord | None:
         """Retrieve a job record by ID."""
+        self.ensure_reconciled()
+        return self._read_job(job_id)
+
+    def _read_job(self, job_id: JobId | str) -> JobRecord | None:
+        """Read a job record without triggering reconciliation (internal)."""
         target = self._job_file_path(job_id)
         if not target.exists():
             return None
@@ -114,7 +136,7 @@ class JobStorage(IJobStorageProtocol):
         for path in self.storage_dir.glob("*.json"):
             if path.name.endswith(ATOMIC_TEMP_SUFFIX):
                 continue
-            rec = self.get_job(path.stem)
+            rec = self._read_job(path.stem)
             if rec is None or rec.completed or rec.owner_pid is None:
                 continue
             stale_heartbeat = self._heartbeat_is_stale(rec.heartbeat_at, rec.created_at)
@@ -223,6 +245,7 @@ class JobStorage(IJobStorageProtocol):
         shorter than ``limit``; callers must not treat the length as a count of
         stored jobs.
         """
+        self.ensure_reconciled()
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         records: list[JobRecord] = []
         candidate_files: list[tuple[float, Path]] = []
@@ -236,7 +259,7 @@ class JobStorage(IJobStorageProtocol):
         candidate_files.sort(key=lambda t: t[0], reverse=True)
         for _, path in candidate_files[: int(limit)]:
             job_id = path.stem
-            rec = self.get_job(job_id)
+            rec = self._read_job(job_id)
             if rec is not None:
                 records.append(rec)
         return records
