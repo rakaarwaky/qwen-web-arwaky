@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from modules.browser.src import capabilities_browser_adapter as adapter_mod
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.browser import utility_browser_session_check as check_mod
@@ -160,7 +161,6 @@ def test_reset_page_emits_reconnecting():
 
 def test_raise_if_session_expired_banner_keyword():
     """An in-page 'Session expired' notice raises AuthRequiredError tagged session_expired."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
     try:
@@ -173,7 +173,6 @@ def test_raise_if_session_expired_banner_keyword():
 
 def test_raise_if_session_expired_banner_selector():
     """A banner shell with no matching keyword text still fires the expiry raise."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page, _, _ = _make_page_mock(body_text="", banner_shell_visible=True)
     # Drive the two probes independently: login-form selectors are absent,
@@ -664,7 +663,6 @@ def test_err_failed_in_noise_patterns_is_lowercase():
 def test_raise_if_session_expired_raises_on_in_page_expiration_banner():
     """An in-page 'session expired' notice (no login URL redirect, no login
     form) must raise AuthRequiredError with session_expired=True."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -681,7 +679,6 @@ def test_raise_if_session_expired_raises_on_in_page_expiration_banner():
 
 def test_detect_session_expired_banner_no_false_positive_on_normal_chat_body():
     """Normal chat body text without any expiry keyword must not flag the banner."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -698,7 +695,6 @@ def test_raise_if_session_expired_raises_on_live_token_expired_banner():
     again') must raise AuthRequiredError tagged session_expired. The 'token has
     expired' phrase is a substring keyword, so it fires even when the trailing
     'log in again' wording is absent or localized."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -716,7 +712,6 @@ def test_raise_if_session_expired_raises_on_live_token_expired_banner():
 def test_raise_if_session_expired_raises_on_token_has_expired_alone():
     """A banner carrying only 'Token has expired.' (no 'log in again') still
     fires the expiry raise via the dedicated keyword."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"
@@ -735,8 +730,6 @@ def test_detect_session_expired_banner_skips_when_body_unreadable():
     """A DOM that is still hydrating (inner_text raises) is not a signal —
     the check is skipped rather than masking a genuine auth problem."""
     from playwright.sync_api import Error as PwError
-
-    from modules.browser.src import capabilities_browser_adapter as adapter_mod
 
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/"

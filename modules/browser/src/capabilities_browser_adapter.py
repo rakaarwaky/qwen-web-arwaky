@@ -25,9 +25,9 @@ from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
 from modules.shared.src.browser.utility_browser_session_check import (
-    SessionCheck,
-    _assert_on_chat_page,
     _in_page_expiry_banner_visible,
+    assert_on_chat_page,
+    session_is_alive,
 )
 from modules.shared.src.common.taxonomy_core_constant import (
     CHAT_URL,
@@ -115,6 +115,24 @@ def _raise_if_session_expired(page: Page) -> None:
 
 
 # Block 1: Class Definition & Constructor
+
+
+class SessionCheck:
+    """Thin wrapper over utility session probe (API compatibility)."""
+
+    def __init__(self, page: Page) -> None:
+        self.page = page
+
+    def is_alive(self) -> bool:
+        return session_is_alive(self.page)
+
+    def check_auth(self) -> None:
+        try:
+            assert_on_chat_page(self.page)
+        except AuthRequiredError:
+            raise
+        except Error as exc:
+            raise AuthRequiredError(f"Session invalid (browser error): {exc}") from exc
 
 
 class BrowserAdapter(IBrowserProtocol):
@@ -226,7 +244,7 @@ class BrowserAdapter(IBrowserProtocol):
         # login-form check still owns the not-authenticated case when the
         # banner is absent.
         try:
-            _assert_on_chat_page(page, strict=False)
+            assert_on_chat_page(page, strict=False)
         except AuthRequiredError as exc:
             if exc.session_expired:
                 # In-page expiry banner: emit the terminal event before
@@ -448,7 +466,7 @@ class BrowserAdapter(IBrowserProtocol):
 
     def check_auth(self, page: Page) -> None:
         """Raise AuthRequiredError if the page is on a login/auth URL or login form detected."""
-        _assert_on_chat_page(page)
+        assert_on_chat_page(page)
 
     def check_session(self, page: Page) -> bool:
         """Return True only when an authenticated chat page is ready for use.
@@ -465,7 +483,7 @@ class BrowserAdapter(IBrowserProtocol):
                 # A partially loaded page can still expose the authenticated UI;
                 # SessionCheck below is the final source of truth.
                 log.debug("session_load_state_wait_failed")
-            _assert_on_chat_page(page)
+            assert_on_chat_page(page)
             return SessionCheck(page).is_alive()
         except AuthRequiredError:
             return False
@@ -551,7 +569,7 @@ class BrowserAdapter(IBrowserProtocol):
                 try:
                     page = ctx.pages[0] if ctx.pages else ctx.new_page()
                     self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    _assert_on_chat_page(page, strict=strict_auth)
+                    assert_on_chat_page(page, strict=strict_auth)
                     yield page
                 finally:
                     ctx.close()
