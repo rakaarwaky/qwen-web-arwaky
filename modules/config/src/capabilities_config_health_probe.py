@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +39,7 @@ from modules.shared.src.config.contract_config_protocol import IConfigHealthProb
 from modules.shared.src.config.taxonomy_config_vo import HealthProbeRecord, HealthProbeRecords
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.shared.src.update.contract_update_protocol import ISmokeGate
 from modules.shared.src.update.utility_update_chromium import playwright_browsers_path
 
 # Block 1: Class Definition & Constructor
@@ -56,12 +56,12 @@ class ConfigHealthProbe(IConfigHealthProbeProtocol):
     # Block 2: Protocol Method Implementation
 
     def probe(self, session: ISessionAggregate | None = None) -> HealthProbeRecords:
-        """Run every diagnostic check and return the records as plain dicts.
+        """Run every diagnostic check and return the records as frozen VOs.
 
         When *session* is supplied the "Session Authentication Token" check
-        queries the pool (the single source of truth for session state); when
-        it is absent the check still records an empty-pool result so the
-        probe never raises on a missing aggregate.
+        queries the pool (the single source of truth for session state);
+        when it is absent that check is omitted entirely, so a bare probe
+        never raises on a missing aggregate.
         """
         checks: list[dict[str, Any]] = [
             _check_python(),
@@ -202,10 +202,6 @@ def _check_session(session: ISessionAggregate) -> dict[str, Any]:
     entries = list(pool) if pool else []
 
     if entries:
-        lines = [f"Session pool: {len(entries)} account(s) under {SESSIONS_DIR}"]
-        for s in entries:
-            icon = "●" if s.is_healthy else ("◐" if s.is_limited else "○")
-            lines.append(f"  {icon} {s.session_id} ({s.name}): {s.status.value}")
         healthy = sum(1 for s in entries if s.is_healthy)
         limited = sum(1 for s in entries if s.is_limited)
         detail = f"{healthy} healthy, {limited} limited"
@@ -346,7 +342,7 @@ def _check_observability() -> dict[str, Any]:
 
 def build_smoke_gate(
     session: ISessionAggregate,
-) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
+) -> ISmokeGate:
     """Return a callable the update pipeline runs as its postflight functional gate.
 
     Returns the non-interactive diagnostic checks as ``(name, passed, detail)``
@@ -370,5 +366,6 @@ def build_smoke_gate(
 
 __all__ = [
     "ConfigHealthProbe",
+    "ISmokeGate",
     "build_smoke_gate",
 ]

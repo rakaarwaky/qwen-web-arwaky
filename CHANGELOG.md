@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- refactor(config): the post-update functional smoke gate moves out of the CLI Surface into `capabilities_config_health_probe`: `ConfigHealthProbe` implements the new `IConfigHealthProbeProtocol` (returning `HealthProbeRecord` VOs), `build_smoke_gate(session)` returns the injected `ISmokeGate` callable, and `SharedContainer` no longer imports `modules.cli` — the probe owns the non-interactive doctor checks and re-runs them at gate-execution time (issues #294 / #506).
 - refactor(prompt): run-traceability `.meta.json` sidecars now land under `~/.local/state/qwen-web-arwaky/meta/` (`DEFAULT_METADATA_DIR`), mirroring each artifact's path relative to the output root, so `~/.local/share/qwen-web-arwaky/output/` holds only prompt responses. `Saver` takes an optional `metadata_dir`; `qwa init` and `scripts/install.py` provision the directory. Existing sidecars already in the output directory are left in place for the operator to move or delete.
 
 ### Fixed

@@ -8,12 +8,12 @@
 ## System Overview
 
 The config feature turns the operator's environment and parsed arguments
-into one validated runtime configuration. Six capability seams answer the
+into one validated runtime configuration. Seven capability seams answer the
 questions a run needs — what the host allows, whether a config can run,
 where its paths point, how many browsers it can carry, what one slot's
-widget values mean, and whether the host is healthy enough to run at all —
-and the orchestrator folds their answers into a single config the other
-features read.
+widget values mean, how the run workspace is initialized, and whether the
+host is healthy enough to run at all — and the orchestrator folds their
+answers into a single config the other features read.
 
 ## Functional Requirements
 
