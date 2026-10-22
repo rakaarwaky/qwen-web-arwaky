@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from collections.abc import MutableMapping
 from typing import Any
 
 from textual import events
@@ -36,8 +37,9 @@ class _TuiComposeMixin:
     """Mixin that owns the Textual compose tree and app lifecycle hooks."""
 
     # QwenTuiApp sets these at class level / __init__; the mixin reads them.
+    # Typed against QwenTuiAppLike so the seam is not an untyped stub (ARCH-1-003).
     _NUM_SLOTS: int
-    _slot_workers: dict[int, Any]
+    _slot_workers: MutableMapping[int, Any]
     _template_options: list[tuple[str, str]]
     # Declared here to match _TuiUtilsMixin and avoid incompatible-definition error.
     _log_handler: logging.Handler
