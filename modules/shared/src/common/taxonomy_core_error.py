@@ -93,7 +93,19 @@ class NetworkTimeoutError(QwenCliError):
 
 
 class ResponseDetectionTimeoutError(QwenCliError):
-    """Raised when a valid dispatch produces no detectable assistant response."""
+    """Raised when a valid dispatch produces no detectable assistant response.
+
+    Attributes:
+        partial_text: Last assistant text this run confirmed before the cut,
+            when any. The monitor attaches it at the raise site so a pipeline
+            can persist a partial response artifact with an ``incomplete``
+            verdict instead of losing the text with the exception.
+    """
+
+    def __init__(self, message: object, *, partial_text: str | None = None) -> None:
+        """Store the reason plus whatever text was observed before the cut."""
+        super().__init__(message)
+        self.partial_text = partial_text
 
 
 class StuckDetectedError(QwenCliError):
@@ -105,7 +117,17 @@ class StuckDetectedError(QwenCliError):
     the run is classified stuck and this error is raised so callers can
     retry. Slow-but-alive generations keep emitting events and are never
     misclassified.
+
+    Attributes:
+        partial_text: Last assistant text this run confirmed before the
+            stall, when any, so the pipeline can persist a partial response
+            artifact with a ``stalled`` verdict.
     """
+
+    def __init__(self, message: object, *, partial_text: str | None = None) -> None:
+        """Store the stall reason plus whatever text was observed before it."""
+        super().__init__(message)
+        self.partial_text = partial_text
 
 
 class OutputValidationError(QwenCliError):

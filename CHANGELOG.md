@@ -6,14 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- feat(prompt): the response payload carries the extraction verdict — `PromptResponse.extraction_verdict` reports `complete`, `stalled`, or `incomplete` (FR-PROMPT-006). A stalled or timed-out stream also saves the partial response artifact before returning, so an interrupted run leaves an inspectable file with an honest verdict instead of a verdict-less error string.
+- feat(prompt): cancel reports the pipelines it actually stopped — `PromptResponse.pipelines_stopped` plus the honest `cancelled` flag — so a terminal, unregistered, or eventless run reports zero instead of a blanket success (FR-PROMPT-004).
+- feat(prompt): the attachment send ceiling is configurable via `QWEN_SEND_CLICK_TIMEOUT_MS` (default `120000` ms, surfaced as `AppConfig.send_click_timeout_ms`) instead of a hardcoded constant.
+
 ### Changed
 
 - refactor(config): the post-update functional smoke gate moves out of the CLI Surface into `capabilities_config_health_probe`: `ConfigHealthProbe` implements the new `IConfigHealthProbeProtocol` (returning `HealthProbeRecord` VOs), `build_smoke_gate(session)` returns the injected `ISmokeGate` callable, and `SharedContainer` no longer imports `modules.cli` — the probe owns the non-interactive doctor checks and re-runs them at gate-execution time (issues #294 / #506).
+- **BREAKING (machine contract)**: auth failures now exit **3**, not 2 — `AuthRequiredError` (`utility_core_exit.exit_code_for`) and auth-failure envelopes (`root_cli_main_entry._exit_code_for_result`) both remap, so exit 2 is reserved exclusively for `argparse` usage errors. Scripts that branched on `2` for an expired session must switch to `3`.
 - refactor(prompt): run-traceability `.meta.json` sidecars now land under `~/.local/state/qwen-web-arwaky/meta/` (`DEFAULT_METADATA_DIR`), mirroring each artifact's path relative to the output root, so `~/.local/share/qwen-web-arwaky/output/` holds only prompt responses. `Saver` takes an optional `metadata_dir`; `qwa init` and `scripts/install.py` provision the directory. Existing sidecars already in the output directory are left in place for the operator to move or delete.
+- feat(output): directory-style outputs land in a collision-proof folder (UTC timestamp + run id) rather than overwriting an existing generated directory; an explicit `-o` destination keeps its overwrite semantics by design.
+- fix(cli): headless `prompt direct|file|attach` dispatch composes one `PromptOrchestrator` aggregate like the interactive path; the previous wiring raised `TypeError` on every non-interactive prompt run.
+- fix(prompt): a stall (`StuckDetectedError`) is distinguished from a complete stream by its extraction verdict and saved partial artifact; FR-PROMPT-006's retry budget is owned by CONFIG-02 (PROMPT-01), which main now pins — the dispatch seam does not retry a stalled stream (see `test_dispatch_does_not_retry_a_stalled_stream`).
+
+### Added
+
+- feat(mcp): the async prompt tools accept `timeout_sec` (default 120, matching the direct tool), and a saturated pool answers with `QUEUE_FULL` preserving `retry_after_sec` + `queue_depth`; `job submit` reports the same refusal as `cli-429` instead of `cli-500`.
+- feat(cli): `session login` announces its real wait window and the login loop runs on its own ceiling (`DEFAULT_LOGIN_WAIT_TIMEOUT_SEC`, 1800s, env `QWEN_LOGIN_WAIT_SEC`) instead of the generic run timeout.
 
 ### Fixed
 
 - fix(prompt): auto-named direct-prompt outputs are now `direct_{YYYYMMDD-HHMMSS}_{hex4}.md` instead of `tmpXXXX_…`. The direct pipeline materializes the typed prompt as a throwaway tempfile whose stem leaked into the output filename. `resolve_pipeline_output_path` takes an explicit `stem`, and the direct adapter passes `DIRECT_PROMPT_STEM`.
+- fix(output): a sidecar write failure raises `OutputWriteError` after the main response file is on disk, so a run can no longer report success while its `.meta.json` sidecar silently went missing.
+- fix(session): a timed-out health probe cooperatively closes its browser context, so a stalled probe no longer leaks Chromium; cancel and open flags are per probe (not instance-shared across concurrent probes), and the timeout grace waits for the probe to acknowledge cancel even during Chromium launch. `sessions.json` mutations and auto-discovery writes take an exclusive advisory lock (`sessions.json.lock`) so concurrent MCP and CLI writers cannot lose updates; usage updates go through locked `mark_used`.
+- fix(jobs): zombie reconciliation treats a stale `heartbeat_at` (`JOB_HEARTBEAT_LEASE_SEC`) as dead even when the PID answers — recycled PIDs no longer keep a dead job looking alive; submit stamps `heartbeat_at` and a missing stamp is only stale after a lease from `created_at`; running jobs restamp their heartbeat every half lease and join the beat thread before the terminal save so a late beat cannot demote `completed=True`.
+- fix(tui): the prompt session-selection seam and its CLI/TUI siblings call `rotate_sync` instead of inline `asyncio.run`, so selection cannot crash inside an already-running event loop. `timeout_sec` on the async MCP prompt tools is documented as applying only when `async_run` is false.
 
 ## [6.7.0] - 2026-10-18
 

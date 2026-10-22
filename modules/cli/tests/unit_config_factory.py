@@ -11,7 +11,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_constant import DIRECT_PROMPT_STEM
-from modules.shared.src.config.utility_config_app_factory import resolve_pipeline_output_path
+from modules.shared.src.config.utility_config_app_factory import (
+    build_app_config,
+    resolve_pipeline_output_path,
+)
 
 
 def test_directory_output_names_are_unique_across_rapid_calls(tmp_path: Path) -> None:
@@ -120,3 +123,39 @@ def test_default_output_uses_direct_stem_when_no_output_file(tmp_path: Path, mon
     assert out_path.parent == tmp_path / "xdg-output"
     assert out_path.name.startswith(f"{DIRECT_PROMPT_STEM}_")
     assert "tmpZz99Yy" not in out_path.name
+
+
+def test_send_click_timeout_defaults_to_the_documented_ceiling() -> None:
+    """BE-4-003: the attachment send ceiling is 120s unless configured."""
+    cfg = build_app_config(input_path=Path("/in.md"), output_path=Path("/out.md"), session_path=Path("/s"))
+
+    assert cfg.send_click_timeout_ms == 120_000
+
+
+def test_send_click_timeout_reads_the_environment_override(monkeypatch) -> None:
+    """QWEN_SEND_CLICK_TIMEOUT_MS raises or lowers the ceiling per environment."""
+    from modules.shared.src.common.taxonomy_core_constant import SEND_CLICK_TIMEOUT_ENV
+
+    monkeypatch.setenv(SEND_CLICK_TIMEOUT_ENV, "45000")
+    cfg = build_app_config(input_path=Path("/in.md"), output_path=Path("/out.md"), session_path=Path("/s"))
+
+    assert cfg.send_click_timeout_ms == 45_000
+
+
+def test_send_click_timeout_ignores_a_non_positive_override(monkeypatch) -> None:
+    """A malformed override must not disable the send wait."""
+    from modules.shared.src.common.taxonomy_core_constant import SEND_CLICK_TIMEOUT_ENV
+
+    monkeypatch.setenv(SEND_CLICK_TIMEOUT_ENV, "0")
+    cfg = build_app_config(input_path=Path("/in.md"), output_path=Path("/out.md"), session_path=Path("/s"))
+
+    assert cfg.send_click_timeout_ms == 120_000
+
+
+def test_send_click_timeout_ignores_an_unparseable_override(monkeypatch) -> None:
+    from modules.shared.src.common.taxonomy_core_constant import SEND_CLICK_TIMEOUT_ENV
+
+    monkeypatch.setenv(SEND_CLICK_TIMEOUT_ENV, "not-a-number")
+    cfg = build_app_config(input_path=Path("/in.md"), output_path=Path("/out.md"), session_path=Path("/s"))
+
+    assert cfg.send_click_timeout_ms == 120_000

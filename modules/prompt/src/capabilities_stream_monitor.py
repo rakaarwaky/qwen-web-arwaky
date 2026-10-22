@@ -6,6 +6,7 @@ Implements IStreamProtocol.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import threading
 import time
@@ -15,6 +16,7 @@ from playwright.sync_api import Error, Page
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_SAFETY_TIMEOUT_SEC,
     DEFAULT_STALL_TIMEOUT_SEC,
+    JS_GET_RESPONSE_TEXT,
     SAFETY_TIMEOUT_ENV,
     STOP_BUTTON_SELECTORS,
 )
@@ -44,6 +46,66 @@ from modules.shared.src.common.utility_dom_helper import is_any_visible
 from modules.shared.src.common.utility_dom_query import latest_message_text
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.prompt.contract_prompt_protocol import IStreamProtocol
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
+
+#: One selector list for "is the thinking/status card active?" — the Python
+#: probe (``is_thinking_active``) and the single-evaluate probe share it so
+#: the two implementations cannot drift (issue 11).
+THINKING_CARD_SELECTORS: str = '[class*="thinking"], [class*="status-card"], [class*="typing"], [class*="streaming"]'
+
+# One Chromium IPC round-trip per poll: the stop-button visibility, the
+# thinking-card activity, and the latest assistant text are all read by a
+# single page.evaluate so a slot worker costs one round-trip per cycle
+# instead of three-plus (per-slot, per-poll).
+#
+# ``latest_text`` is delegated to JS_GET_RESPONSE_TEXT itself — the same
+# function ``_dom_latest`` evaluates — so the probe inherits its safety
+# filters (reverse document walk, stale "Thought stopped" card markers,
+# pagination n/m skip, user-ancestor skip) instead of the first
+# ``querySelector`` match that defect class exists to avoid (issue 2).
+# The answer is always a string: ``''`` when the assistant has no text
+# yet, so the hot loop never needs a second evaluate (issue 3).
+# The thinking-active loop below mirrors ``is_thinking_active``'s own
+# evaluate script; the two copies must stay in lockstep (same selectors,
+# same visibility and keyword rules) — if either changes, update both.
+JS_PROBE_GENERATION_STATE: str = f"""
+() => {{
+  function anyVisible(sel) {{
+    try {{
+      const els = document.querySelectorAll(sel);
+      for (const el of els) {{
+        const r = el.getBoundingClientRect();
+        if (r.width !== 0 || r.height !== 0) return true;
+      }}
+    }} catch (e) {{}}
+    return false;
+  }}
+  let thinking = false;
+  try {{
+    const els = document.querySelectorAll({json.dumps(THINKING_CARD_SELECTORS)});
+    for (const el of els) {{
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      const txt = (el.innerText || '').toLowerCase();
+      if (txt.includes('thinking') && !txt.includes('completed') && !txt.includes('complete')) {{
+        thinking = true;
+        break;
+      }}
+    }}
+  }} catch (e) {{}}
+  let stopVisible = false;
+  try {{
+    stopVisible = anyVisible({json.dumps(STOP_BUTTON_SELECTORS)});
+  }} catch (e) {{}}
+  let latestText = '';
+  try {{
+    const getResponseText = {JS_GET_RESPONSE_TEXT.strip()};
+    const found = getResponseText();
+    latestText = typeof found === 'string' ? found : '';
+  }} catch (e) {{ latestText = ''; }}
+  return {{thinking: thinking, stop_visible: stopVisible, latest_text: latestText}};
+}}
+"""
 
 log = get_logger("capabilities_stream_monitor")
 # Test seam: patched by unit_capability_stream_monitor to script DOM responses.
@@ -107,26 +169,52 @@ class StreamMonitor(IStreamProtocol):
         Scans every thinking/status-card element (not just the first) and only
         reports active when at least one visible element's text says "thinking"
         without a completed/complete marker. A finished card that stays in the
-        DOM (e.g. "Thinking completed") must NOT count as active.
+        DOM (e.g. "Thinking completed") must NOT count as active. The
+        probe JS in ``JS_PROBE_GENERATION_STATE`` carries the same
+        loop; keep both copies in lockstep if either changes.
         """
         try:
-            js_check = """
-                () => {
-                  const els = document.querySelectorAll('[class*="thinking"], [class*="status-card"],
-                    [class*="typing"], [class*="streaming"]');
-                  for (const el of els) {
+            js_check = f"""
+                () => {{
+                  const els = document.querySelectorAll({json.dumps(THINKING_CARD_SELECTORS)});
+                  for (const el of els) {{
                     const r = el.getBoundingClientRect();
                     if (r.width === 0 && r.height === 0) continue;
                     const txt = (el.innerText || '').toLowerCase();
                     if (txt.includes('thinking') && !txt.includes('completed') && !txt.includes('complete'))
                       return true;
-                  }
+                  }}
                   return false;
-                }
+                }}
             """
             return bool(page.evaluate(js_check))
         except Exception:
             return False
+
+    def _probe_generation_state(self, page: Page) -> tuple[bool, bool, str | None]:
+        """Read one poll cycle's DOM state in a single IPC round-trip.
+
+        Returns ``(thinking_active, generation_complete, latest_text)``. The
+        combined JS evaluation supplies all three from one ``page.evaluate``
+        call, and ``latest_text`` is always a string on that path — empty
+        when the assistant has no text yet — so the hot loop never needs a
+        second evaluate. When the probe cannot run or answers a non-dict
+        (transient evaluate failure), the protocol-conformant public Python
+        methods answer the two state questions and ``None`` sends the text
+        read back to ``_dom_latest`` for this poll only, so the completion
+        semantics are unchanged.
+        """
+        try:
+            probe = page.evaluate(JS_PROBE_GENERATION_STATE)
+        except Exception:
+            probe = None
+        if isinstance(probe, dict):
+            thinking = bool(probe.get("thinking"))
+            stop_visible = bool(probe.get("stop_visible"))
+            latest = probe.get("latest_text")
+            return thinking, not stop_visible and not thinking, latest if isinstance(latest, str) else ""
+        thinking = self.is_thinking_active(page)
+        return thinking, self.is_generation_complete(page, thinking=thinking), None
 
     def wait_for_response(
         self,
@@ -140,7 +228,7 @@ class StreamMonitor(IStreamProtocol):
         dispatch_acknowledged: bool = True,
         baseline_text: ResponseText | None = None,
         cancel_event: threading.Event | None = None,
-    ) -> ResponseText | None:
+    ) -> StreamVerdict:
         """Wait for a terminal assistant response using event-driven DOM signals.
 
         ``timeout_sec`` is a **wall-clock ceiling** (issue #372), matching the
@@ -161,11 +249,17 @@ class StreamMonitor(IStreamProtocol):
         Failure detection inside that budget is event-driven: the monitor
         tracks the last *forward event* (thinking started, streamed text
         change, or terminal completion). When no forward event arrives within
-        ``stall_timeout_sec``, a ``StuckDetectedError`` is raised so callers
-        can retry. Slow-but-alive generations keep emitting forward events and
-        are never misclassified as stuck — but they are still bounded by the
-        ``timeout_sec`` ceiling, and the ``safety_timeout_sec`` circuit breaker
-        remains an absolute backstop for pathological cases.
+        ``stall_timeout_sec``, a ``StuckDetectedError`` is raised. A stall is
+        **terminal for this run** (FRD "A stalled stream reports `stalled`
+        and does not retry the send", PROMPT-01): the send is not retried by
+        this monitor or its dispatcher, and the exception reaches the adapter
+        so the partial response is still saved and the run can be reported
+        with a ``stalled``/``incomplete`` verdict. A retry budget belongs to
+        ``CONFIG-02``, not to this seam. Slow-but-alive generations keep
+        emitting forward events and are never misclassified as stuck — but
+        they are still bounded by the ``timeout_sec`` ceiling, and the
+        ``safety_timeout_sec`` circuit breaker remains an absolute backstop
+        for pathological cases.
 
         ``cancel_event`` is an optional per-run ``threading.Event`` created by
         the calling orchestrator. When it is set, the loop raises
@@ -214,7 +308,8 @@ class StreamMonitor(IStreamProtocol):
             if elapsed >= self.safety_timeout_sec:
                 raise ResponseDetectionTimeoutError(
                     "Response safety circuit breaker tripped after "
-                    f"{self.safety_timeout_sec}s without a terminal generation event"
+                    f"{self.safety_timeout_sec}s without a terminal generation event",
+                    partial_text=last_text,
                 )
             # Issue #372: timeout_sec is a hard cutoff (as the MCP/CLI contracts
             # promise: "maximum seconds to wait"), raised past the safety check
@@ -222,14 +317,16 @@ class StreamMonitor(IStreamProtocol):
             if elapsed >= timeout_sec:
                 raise ResponseDetectionTimeoutError(
                     f"Response hard timeout: {int(elapsed)}s elapsed exceeds the "
-                    f"{timeout_sec}s cutoff without a terminal generation event"
+                    f"{timeout_sec}s cutoff without a terminal generation event",
+                    partial_text=last_text,
                 )
 
-            is_thinking = self.is_thinking_active(page)
-            # Reuse the thinking probe already taken this cycle: the state cannot
-            # change within one iteration, so evaluating it twice only doubles
-            # Chromium IPC traffic across all concurrent slots.
-            is_complete = self.is_generation_complete(page, thinking=is_thinking)
+            # One page.evaluate reads the thinking state, the stop-button
+            # visibility, and the latest text together: three separate
+            # queries per cycle cost one Chromium IPC round-trip each, per
+            # slot, per poll (BE-4-002). The state cannot change within one
+            # iteration, so reusing this triple is observationally identical.
+            is_thinking, is_complete, probe_text = self._probe_generation_state(page)
             forward_event_this_iteration = False
 
             try:
@@ -240,7 +337,17 @@ class StreamMonitor(IStreamProtocol):
                     last_forward_event_time = now
                     forward_event_this_iteration = True
 
-                text = _dom_latest(page)
+                if probe_text is not None:
+                    # The probe answers a string every poll — empty when the
+                    # assistant has no text yet — so the hot path never needs
+                    # a second page.evaluate (issue 3); empty reads as "no
+                    # text yet", matching _dom_latest's None.
+                    text: ResponseText | None = ResponseText(probe_text) if probe_text else None
+                else:
+                    # Non-dict probe answer (transient evaluate failure): the
+                    # tiered reader answers this poll; the next poll retries
+                    # the probe.
+                    text = _dom_latest(page)
                 if text is not None and should_treat_as_new_response(text, previous_text, int(active_min_len)):
                     if not has_thinking:
                         emitter.emit(EVENT_THINKING_STARTED, {"source": "response-start-fallback"})
@@ -259,7 +366,7 @@ class StreamMonitor(IStreamProtocol):
                             )
                             validate_response_content(text)
                             emitter.emit(EVENT_GENERATION_FINISHED, {"text_length": len(text)})
-                            return ResponseText(text)
+                            return StreamVerdict(text=ResponseText(text), verdict="complete")
                     else:
                         if not has_streaming:
                             has_streaming = True
@@ -276,10 +383,14 @@ class StreamMonitor(IStreamProtocol):
                 if not forward_event_this_iteration:
                     stall_elapsed = now - last_forward_event_time
                     if stall_elapsed >= self.stall_timeout_sec:
+                        # ``last_text`` is this run's last confirmed forward
+                        # text; carrying it lets the pipeline save a partial
+                        # artifact under verdict ``stalled`` (BE-1-003).
                         raise StuckDetectedError(
                             "Stuck detected: no forward lifecycle event "
                             f"(thinking/streaming/completion) for {int(stall_elapsed)}s "
-                            f"(stall threshold {self.stall_timeout_sec}s)"
+                            f"(stall threshold {self.stall_timeout_sec}s)",
+                            partial_text=last_text,
                         )
 
                 # Periodic cloud sync is recovery, not a response timeout.

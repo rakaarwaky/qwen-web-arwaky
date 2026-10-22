@@ -17,6 +17,7 @@ from modules.shared.src.common.taxonomy_core_error import (
     RateLimitError,
     ResponseDetectionTimeoutError,
     RunCancelledError,
+    StuckDetectedError,
 )
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_PROMPT_INJECTED,
@@ -30,17 +31,23 @@ from modules.shared.src.common.taxonomy_core_vo import (
     MessageCount,
     PollIntervalSec,
     PromptText,
+    ResponseText,
+    RunContext,
     SenderConfig,
     TimeoutSec,
 )
-from modules.shared.src.common.utility_dom_query import latest_message_text
+from modules.shared.src.common.utility_dom_query import latest_message_text, partial_text_after_stream_cut
+from modules.shared.src.common.utility_error_mapping import to_error_response
+from modules.shared.src.common.utility_io_writer import save_orchestrator_output
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.prompt.contract_prompt_protocol import (
     IInjectionProtocol,
     IPromptFlowProtocol,
+    ISaverProtocol,
     ISendProtocol,
     IStreamProtocol,
 )
+from modules.shared.src.prompt.taxonomy_prompt_vo import ExtractionVerdict, PromptResponse, StreamVerdict
 
 # Block 1: Class Definition & Constructor
 
@@ -67,13 +74,20 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
         cancel_event: CancelToken | None = None,
-    ) -> str:
+    ) -> StreamVerdict:
         """Inject prompt, click send, and wait for the AI response.
 
         ``cancel_event`` is an optional per-run ``threading.Event``.  When it
         is set (by ``request_cancel`` on the owning orchestrator) the flow
         raises ``RunCancelledError`` immediately so the caller's browser
         context is closed without touching sibling runs.
+
+        The returned :class:`StreamVerdict` carries the monitor's extraction
+        verdict so a caller can tell a complete response from one the stall
+        detector cut. ``StuckDetectedError`` is not retried here: a stalled
+        stream is terminal for this run (FRD PROMPT-01, "reports `stalled`
+        and does not retry the send") until ``CONFIG-02`` supplies a retry
+        budget.
         """
         if cancel_event is not None and cancel_event.is_set():
             raise RunCancelledError("Cancelled by user before dispatch")
@@ -129,7 +143,11 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
                 else:
                     time.sleep(delay)
                 continue
-            return str(response)
+            # ``_dispatch_once`` is annotated to return a StreamVerdict and
+            # the only production streamer is StreamMonitor, which does; the
+            # type checker owns this seam (no runtime assert, no fabricated
+            # "complete" for a shape that cannot occur).
+            return response
         if cancel_event is not None and cancel_event.is_set():
             raise RunCancelledError("Cancelled by user while waiting for response") from last_error
         raise last_error
@@ -182,7 +200,7 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         sender_config: SenderConfig | None,
         document_parsed: bool,
         cancel_event: CancelToken | None,
-    ) -> str:
+    ) -> StreamVerdict:
         """Single inject → send → wait cycle. Raises on failure; caller retries."""
         logger = observability.get_logger()
         try:
@@ -210,7 +228,10 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         # stream monitor; a budget overrun surfaces as
         # ResponseDetectionTimeoutError and this loop retries per MAX_ATTEMPTS.
         try:
-            response = streamer.wait_for_response(
+            # The protocol annotates this as StreamVerdict (issue #18): the
+            # monitor either returns one or raises, so the verdict below is
+            # read directly — no legacy str wrap, no None/instance asserts.
+            verdict = streamer.wait_for_response(
                 page,
                 TimeoutSec(timeout_sec),
                 msg_count_before,
@@ -225,11 +246,68 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
                 raise RunCancelledError("Cancelled by user while waiting for response") from err
             raise
 
-        if response and len(response.strip()) > 0:
-            logger.info("Received response (%d chars)", len(response))
-            return response.strip()
+        if verdict.text and len(verdict.text.strip()) > 0:
+            logger.info("Received response (%d chars)", len(verdict.text))
+            return StreamVerdict(text=ResponseText(verdict.text.strip()), verdict=verdict.verdict)
 
         raise ResponseDetectionTimeoutError("No terminal response event detected before the browser flow ended")
+
+    def mid_stream_cut_outcome(
+        self,
+        exc: BaseException,
+        page: Page,
+        *,
+        saver: ISaverProtocol,
+        observability: IObservabilityProtocol,
+        out_path: Path,
+        prompt_path: Path,
+        elapsed: float,
+        ctx: RunContext,
+        emitter: LifecycleEmitter | None,
+    ) -> PromptResponse:
+        """Persist the partial artifact and answer with the honest cut verdict.
+
+        Shared by the file, attachment, and direct pipelines via
+        ``IPromptFlowProtocol`` (BE-1-003 / FRD "A response file survives a
+        mid-stream extraction failure"): a stall or a hard cut still saves
+        whatever the monitor last saw, so the artifact is inspectable, and
+        reports ``stalled`` for the stall detector or ``incomplete`` for any
+        other non-terminal end (the timeout family).
+        ``extraction_verdict=None`` stays reserved for runs where extraction
+        never happened (cancel, auth, pre-flight), so callers keep one honest
+        field across success and failure paths.
+        """
+        cut_verdict: ExtractionVerdict = "stalled" if isinstance(exc, StuckDetectedError) else "incomplete"
+        failure_reason = to_error_response(exc)
+        partial = partial_text_after_stream_cut(exc, page)
+        if partial:
+            try:
+                save_orchestrator_output(saver, out_path, prompt_path, partial, elapsed, ctx, emitter=emitter)
+            except Exception as save_exc:
+                # The stream failure stays the reported result; a failed partial
+                # write must not erase the verdict the caller was promised.
+                observability.get_logger().warning(
+                    "Partial response artifact could not be saved for %s: %s",
+                    out_path,
+                    save_exc,
+                )
+                response = PromptResponse(
+                    response_text=ResponseText(
+                        f"{failure_reason} (partial response could not be written to {out_path})"
+                    ),
+                    extraction_verdict=cut_verdict,
+                )
+            else:
+                response = PromptResponse(
+                    response_text=ResponseText(f"{failure_reason} (partial saved to {out_path})"),
+                    extraction_verdict=cut_verdict,
+                )
+        else:
+            response = PromptResponse(
+                response_text=ResponseText(f"{failure_reason} (no partial response available to save)"),
+                extraction_verdict=cut_verdict,
+            )
+        return response
 
 
 def _interruptible_sleep(cancel_event: CancelToken, seconds: int) -> None:

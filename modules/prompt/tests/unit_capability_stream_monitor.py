@@ -21,8 +21,31 @@ from modules.shared.src import (
 )
 from modules.shared.src.common.taxonomy_core_constant import JS_GET_RESPONSE_TEXT, THINKING_CARD_TEXT_MARKERS
 from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
 
 # ─── validate_response_content ──────────────────────────────────────────────
+
+
+def _probe(
+    *,
+    thinking: bool = False,
+    stop_visible: bool = False,
+    latest_text: str = "",
+) -> dict[str, object]:
+    """Build one ``JS_PROBE_GENERATION_STATE`` answer (issue 11)."""
+    return {"thinking": thinking, "stop_visible": stop_visible, "latest_text": latest_text}
+
+
+def _probe_script(*states: dict[str, object]):
+    """Serve each probe answer once, then repeat the last one forever."""
+    queue = list(states)
+
+    def _next(*_args: object) -> dict[str, object]:
+        if len(queue) > 1:
+            return queue.pop(0)
+        return queue[0]
+
+    return _next
 
 
 class TestValidateResponseContent:
@@ -189,8 +212,6 @@ class TestWaitForResponseEdgeCases:
 
         with (
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 14_400]
@@ -206,6 +227,10 @@ class TestWaitForResponseEdgeCases:
                 )
 
     def test_playwright_timeout_is_recovered_without_failing(self):
+        """The non-dict probe answer (transient evaluate failure) falls back
+        to ``_dom_latest`` for this poll; a ``TimeoutError`` from that reader
+        is recovered without failing the run, and the next poll retries the
+        probe."""
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
         response = "A response recovered after a transient browser timeout."
@@ -213,7 +238,7 @@ class TestWaitForResponseEdgeCases:
         with (
             patch(
                 "modules.prompt.src.capabilities_stream_monitor._dom_latest",
-                side_effect=[None, TimeoutError("temporary"), response, response],
+                side_effect=[None, TimeoutError("temporary")] + [response] * 10,
             ),
             patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch.object(StreamMonitor, "is_thinking_active", return_value=False),
@@ -234,7 +259,7 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=1,
             )
 
-        assert result == response
+        assert result is not None and result.text == response
 
     def test_wait_continues_until_terminal_event_within_timeout_budget(self):
         """Inside the timeout budget the loop must wait for the terminal
@@ -244,10 +269,14 @@ class TestWaitForResponseEdgeCases:
         emitter = MagicMock(spec=LifecycleEmitter)
         response = "A delayed response that must wait for the explicit completed signal."
 
+        page.evaluate.side_effect = _probe_script(
+            _probe(stop_visible=True, latest_text=response),
+            _probe(stop_visible=True, latest_text=response),
+            _probe(stop_visible=False, latest_text=response),
+        )
+
         with (
-            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=1),
-            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=[None, response, response]),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 0.4, 0.5, 0.6]
@@ -262,20 +291,21 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=1,
             )
 
-        assert result == response
+        assert result is not None and result.text == response
 
     def test_stable_text_without_terminal_event_is_not_accepted(self):
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
         response = "A response whose text is stable while Qwen is still generating."
 
+        page.evaluate.side_effect = _probe_script(
+            _probe(stop_visible=True, latest_text=response),
+            _probe(stop_visible=True, latest_text=response),
+            _probe(stop_visible=False, latest_text=response),
+        )
+
         with (
-            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=1),
-            patch(
-                "modules.prompt.src.capabilities_stream_monitor._dom_latest",
-                side_effect=[None, response, response, response],
-            ),
-            patch.object(StreamMonitor, "is_generation_complete", side_effect=[False, False, True]),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 1, 2, 3, 4]
@@ -290,19 +320,22 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=1,
             )
 
-        assert result == response
+        assert result is not None and result.text == response
 
     def test_emits_streaming_event_once_for_multiple_response_updates(self):
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
         first_text = "The first streamed response chunk is long enough."
         second_text = "The second streamed response chunk is also long enough."
-        msg_side_effect = [None, first_text, second_text, second_text, second_text]
+
+        page.evaluate.side_effect = _probe_script(
+            _probe(latest_text=first_text),
+            _probe(latest_text=second_text),
+            _probe(latest_text=second_text),
+        )
 
         with (
-            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
-            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0] + [0.1] * 20
@@ -317,7 +350,7 @@ class TestWaitForResponseEdgeCases:
                 stability_checks=2,
             )
 
-        assert result == second_text
+        assert result is not None and result.text == second_text
         streaming_events = [
             call for call in emitter.emit.call_args_list if call.args and call.args[0] == EVENT_STREAMING_GENERATION
         ]
@@ -328,15 +361,12 @@ class TestWaitForResponseEdgeCases:
         emitter = MagicMock(spec=LifecycleEmitter)
         stable_text = "This is a stable AI response with enough content to pass validation."
 
-        # latest_message_text: first call sets baseline (return None), then return stable_text.
-        # Without this, baseline_text == stable_text so text != baseline_text is always False
-        # and the loop never processes any text, hanging until timeout.
-        msg_side_effect = [None] + [stable_text] * 20
+        # The pre-loop baseline comes from ``_dom_latest`` (returning None);
+        # every poll then reads the stable text from the probe itself.
+        page.evaluate.side_effect = lambda *_: _probe(latest_text=stable_text)
 
         with (
-            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
-            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=msg_side_effect),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0] + [0.1] * 50
@@ -350,7 +380,7 @@ class TestWaitForResponseEdgeCases:
                 polling_interval_sec=0,
                 stability_checks=2,
             )
-            assert result == stable_text
+            assert result is not None and result.text == stable_text
 
     def test_stall_detection_raises_stuck_error_when_no_forward_event(self):
         """No forward event (thinking, text change, or completion) for the
@@ -359,10 +389,10 @@ class TestWaitForResponseEdgeCases:
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
 
+        page.evaluate.side_effect = lambda *_: _probe(stop_visible=True)
+
         with (
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             # The stall window (300s) trips well inside the 900s hard-cutoff
@@ -391,16 +421,74 @@ class TestWaitForResponseEdgeCases:
         # elapsed time reaches 1000s — far beyond the stall threshold but
         # inside the 3600s hard-cutoff budget (issue #372) — and each text
         # change resets the forward-event clock.
+        page.evaluate.side_effect = _probe_script(
+            _probe(latest_text="chunk 1 with enough text"),
+            _probe(latest_text="chunk 2 with enough text"),
+            _probe(latest_text="chunk 3 with enough text"),
+            _probe(latest_text="final answer with enough text"),
+            _probe(latest_text="final answer with enough text"),
+            _probe(latest_text="final answer with enough text"),
+        )
+        time_calls = [0] + [250] * 40
+
+        with (
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = time_calls
+            mock_time.sleep = MagicMock()
+
+            result = StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                page,
+                timeout_sec=3600,
+                msg_count_before=1,
+                emitter=emitter,
+                polling_interval_sec=0,
+                stability_checks=2,
+            )
+            assert result is not None and result.text == "final answer with enough text"
+
+    def test_stall_outruns_ceiling_and_slow_stream_outlives_stall(self):
+        """FR-PROMPT-006 precedence, pinned in one place.
+
+        A stream with no forward event fails at ``stall_timeout_sec`` with
+        ``StuckDetectedError`` even though ``timeout_sec`` is still far away,
+        while a slow-but-emitting stream survives past the same stall
+        threshold and is bounded only by the response ceiling.
+        """
+        page = MagicMock()
+        emitter = MagicMock(spec=LifecycleEmitter)
+
+        with (
+            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
+            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
+            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
+            patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
+        ):
+            mock_time.time.side_effect = [0, 300]
+            mock_time.sleep = MagicMock()
+
+            with pytest.raises(StuckDetectedError, match="Stuck detected"):
+                StreamMonitor(stall_timeout_sec=300).wait_for_response(
+                    page,
+                    timeout_sec=3600,
+                    msg_count_before=1,
+                    emitter=emitter,
+                    polling_interval_sec=0,
+                )
+
+        # Same stall window, but the stream keeps emitting forward events well
+        # past it; only the response ceiling ends the wait.
+        emitter = MagicMock(spec=LifecycleEmitter)
         text_side_effect = [
             None,
             "chunk 1 with enough text",
             "chunk 2 with enough text",
-            "chunk 3 with enough text",
             "final answer with enough text",
             "final answer with enough text",
             "final answer with enough text",
         ]
-        time_calls = [0, 250, 500, 750, 1000, 1000, 1000]
+        time_calls = [0, 400, 800, 1200, 1200, 1200]
 
         with (
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=text_side_effect),
@@ -419,7 +507,9 @@ class TestWaitForResponseEdgeCases:
                 polling_interval_sec=0,
                 stability_checks=2,
             )
-            assert result == "final answer with enough text"
+            assert isinstance(result, StreamVerdict)
+            assert result.text == "final answer with enough text"
+            assert result.verdict == "complete"
 
 
 class TestResponseExtractionContract:
@@ -438,13 +528,11 @@ class TestPreSendBaseline:
         baseline = "Previous assistant answer"
         response = "A newly generated response that is already rendered before polling starts."
 
+        # Explicit baseline skips the pre-loop ``_dom_latest`` read entirely;
+        # every poll's text arrives via the probe.
+        page.evaluate.side_effect = lambda *_: _probe(latest_text=response)
+
         with (
-            patch("modules.shared.src.common.utility_dom_query.count_messages", return_value=2),
-            patch(
-                "modules.prompt.src.capabilities_stream_monitor._dom_latest",
-                side_effect=[response, response, response],
-            ),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 0.1, 0.2, 0.3, 0.4]
@@ -459,7 +547,7 @@ class TestPreSendBaseline:
                 baseline_text=baseline,
             )
 
-        assert result == response
+        assert result is not None and result.text == response
         event_names = [call.args[0] for call in emitter.emit.call_args_list]
         assert EVENT_STREAMING_GENERATION in event_names
         assert EVENT_GENERATION_FINISHED in event_names
@@ -474,8 +562,6 @@ class TestHardResponseTimeout:
 
         with (
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             # wall clock jumps past the 120s budget while the 4h safety
@@ -499,8 +585,6 @@ class TestHardResponseTimeout:
 
         with (
             patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=None),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=False),
             patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time,
         ):
             mock_time.time.side_effect = [0, 14_400]
@@ -521,10 +605,9 @@ class TestReloadGatedOnProgress:
     continues making forward progress, so a long generation cannot be starved
     out of the stability condition.
 
-    The tests run on the real (unpatched) clock: a reload requires 30s of
-    wall time, so an iteration that still has forward progress completes in
-    microseconds and the loop exits long before the first reload window can
-    elapse.
+    Both tests keep wall time far below the 30s reload window — one with a
+    deterministic microsecond clock, one on the real clock with a zero poll
+    interval — so a reload can only fire if the progress gate is broken.
     """
 
     def test_stable_text_still_stabilizes_with_real_clock(self) -> None:
@@ -534,25 +617,21 @@ class TestReloadGatedOnProgress:
         page = MagicMock()
         emitter = MagicMock(spec=LifecycleEmitter)
 
-        texts = iter(
-            [
-                "first word",
-                "first word second",
-                "first word second third",
-                "first word second third fourth",
-                "first word second third fourth",
-                "first word second third fourth",
-                "first word second third fourth",
-                "first word second third fourth",
-                "first word second third fourth",
-            ]
+        page.evaluate.side_effect = _probe_script(
+            _probe(stop_visible=True, latest_text="first word"),
+            _probe(stop_visible=True, latest_text="first word second"),
+            _probe(stop_visible=True, latest_text="first word second third"),
+            _probe(stop_visible=True, latest_text="first word second third fourth"),
+            _probe(stop_visible=False, latest_text="first word second third fourth"),
         )
 
-        with (
-            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", side_effect=lambda *_: next(texts)),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-        ):
+        with patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time:
+            # Microsecond-scale ticks: real enough to advance the loop, far
+            # below the 30s reload window, and far below the safety/hard
+            # budgets. Iteration counts stay deterministic.
+            mock_time.time.side_effect = [0.0] + [0.001 * i for i in range(1, 12)]
+            mock_time.sleep = MagicMock()
+
             result = StreamMonitor().wait_for_response(
                 page,
                 timeout_sec=60,
@@ -563,7 +642,7 @@ class TestReloadGatedOnProgress:
                 baseline_text="prior",
             )
 
-        assert str(result) == "first word second third fourth"
+        assert result is not None and result.text == "first word second third fourth"
         # Streaming text made forward progress every poll, so no reload may
         # have fired — this is exactly the starvation loop the fix removes.
         assert page.reload.call_count == 0
@@ -575,21 +654,18 @@ class TestReloadGatedOnProgress:
         emitter = MagicMock(spec=LifecycleEmitter)
         response = "a stable final answer"
 
-        with (
-            patch("modules.prompt.src.capabilities_stream_monitor._dom_latest", return_value=response),
-            patch.object(StreamMonitor, "is_generation_complete", return_value=True),
-            patch.object(StreamMonitor, "is_thinking_active", return_value=False),
-        ):
-            result = StreamMonitor().wait_for_response(
-                page,
-                timeout_sec=60,
-                msg_count_before=1,
-                emitter=emitter,
-                polling_interval_sec=0,
-                baseline_text="prior",
-            )
+        page.evaluate.side_effect = lambda *_: _probe(latest_text=response)
 
-        assert str(result) == response
+        result = StreamMonitor().wait_for_response(
+            page,
+            timeout_sec=60,
+            msg_count_before=1,
+            emitter=emitter,
+            polling_interval_sec=0,
+            baseline_text="prior",
+        )
+
+        assert result is not None and result.text == response
         assert page.reload.call_count == 0
 
 

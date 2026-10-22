@@ -11,8 +11,10 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 from modules.jobs.src.capabilities_job_storage import JobStorage
+from modules.shared.src.common.taxonomy_core_constant import JOB_HEARTBEAT_LEASE_SEC
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
 
 
@@ -30,6 +32,19 @@ def _dead_worker_record(job_id: str, age_hours: int) -> JobRecord:
         completed=False,
         owner_pid=os.sysconf("SC_OPEN_MAX") + job_id.__len__(),
         heartbeat_at=stale.isoformat(),
+    )
+
+
+def _stale_heartbeat_record(job_id: str, heartbeat_age_sec: float) -> JobRecord:
+    """Return an incomplete record whose heartbeat is older than the lease."""
+    heartbeat = datetime.now(UTC) - timedelta(seconds=heartbeat_age_sec)
+    return JobRecord(
+        job_id=job_id,
+        created_at=heartbeat.isoformat(),
+        latest_event="GENERATION_STARTED",
+        completed=False,
+        owner_pid=os.getpid(),
+        heartbeat_at=heartbeat.isoformat(),
     )
 
 
@@ -74,3 +89,38 @@ def test_acceptance_a_completed_record_is_left_alone(tmp_path: Path) -> None:
     )
 
     assert JobStorage(storage_dir=tmp_path).get_job("done").completed is True
+
+
+def test_acceptance_seeded_zombies_are_terminal_before_the_first_poll(tmp_path: Path) -> None:
+    """JOBS-01: every seeded zombie shape is terminal right after restart."""
+    storage = JobStorage(storage_dir=tmp_path)
+    storage.save_job(_dead_worker_record("dead-pid-zombie", age_hours=48))
+    storage.save_job(_stale_heartbeat_record("live-pid-stale-heartbeat", heartbeat_age_sec=JOB_HEARTBEAT_LEASE_SEC * 4))
+
+    restarted = JobStorage(storage_dir=tmp_path)
+
+    for job_id in ("dead-pid-zombie", "live-pid-stale-heartbeat"):
+        record = restarted.get_job(job_id)
+        assert record is not None, f"{job_id} vanished"
+        assert record.completed is True, f"{job_id} must be terminal before the first poll"
+
+
+def test_acceptance_a_fresh_heartbeat_on_a_live_pid_is_not_a_zombie(tmp_path: Path) -> None:
+    """A slow-but-healthy worker keeps its lease fresh and stays running."""
+    storage = JobStorage(storage_dir=tmp_path)
+    storage.save_job(_stale_heartbeat_record("healthy", heartbeat_age_sec=5))
+
+    assert JobStorage(storage_dir=tmp_path).get_job("healthy").completed is False
+
+
+def test_acceptance_a_recycled_pid_is_reconciled_by_heartbeat_staleness(tmp_path: Path) -> None:
+    """A recycled PID answers ``os.kill`` but a stale heartbeat breaks the tie."""
+    storage = JobStorage(storage_dir=tmp_path)
+    storage.save_job(_stale_heartbeat_record("recycled-pid", heartbeat_age_sec=JOB_HEARTBEAT_LEASE_SEC * 4))
+
+    with mock.patch("os.kill"):
+        reconciled = JobStorage(storage_dir=tmp_path).get_job("recycled-pid")
+
+    assert reconciled is not None
+    assert reconciled.completed is True
+    assert reconciled.error == "heartbeat expired while the record was still incomplete"

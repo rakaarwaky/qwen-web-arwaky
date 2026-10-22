@@ -7,7 +7,6 @@ Imported by :class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import tempfile
 import threading
@@ -106,7 +105,7 @@ class _TuiWorkersMixin:
 
         def _pick() -> Path | None:
             try:
-                response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
+                response = self._session_rotator.rotate_sync(RotatorRequest())
                 return response.session.path if response.session else None
             except Exception:
                 return None

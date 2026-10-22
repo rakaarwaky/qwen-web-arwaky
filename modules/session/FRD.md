@@ -43,6 +43,7 @@ pool, health checking, rotation, renewal, deletion, and login.
   - A rate-limited session is skipped. If no eligible session remains, return an explicit `no_eligible_session` outcome without submitting; never submit through a known-LIMITED profile.
   - The pool order is deterministic so a run resolves the same session under the same pool state.
   - Cross-account rotation on quota is permitted for authorized accounts only (owned/controlled by the operator). See `docs/MULTI_ACCOUNT_ROTATION.md` policy gate (2026-10-18).
+  - The pool file is shared by the long-lived MCP server and short-lived CLI commands, so every load→mutate→save cycle holds an exclusive advisory lock (`sessions.json.lock`, `fcntl.flock` on POSIX / `msvcrt.locking` on Windows) for its full duration; the atomic `os.replace` swap is kept.
   - A CAPTCHA or provider access-control stop halts immediately; no bypass attempt is made.
   - No promise that a provider quota resets by a specific time; the operator decides when to retry.
 - **Edge Cases**:
@@ -76,7 +77,8 @@ pool, health checking, rotation, renewal, deletion, and login.
 - **Business Rules**:
   - The login verb always opens a visible browser window (AES205); the already-valid fast-path belongs to the validate/check_health verbs, and `validate` reports a valid session without launching a login window.
   - The confirmation wait is consulted while the page is live, so the operator's signal is not missed.
-- **Edge Cases**: A headless login has no operator to confirm, so it completes as soon as the page authenticates.
+  - Wait policy: the login loop terminates on login confirmation, page close, or its own wait ceiling — never earlier on the generic run timeout. The ceiling is `DEFAULT_LOGIN_WAIT_TIMEOUT_SEC` (1800s), overridable via `QWEN_LOGIN_WAIT_SEC`, and the CLI banner states the same window.
+- **Edge Cases**: A headless login has no operator to confirm, so it completes as soon as the page authenticates. An `AppConfig.timeout` shorter than the login wait ceiling does not truncate the login window, and a non-integer `QWEN_LOGIN_WAIT_SEC` falls back to the default ceiling.
 - **Error Handling**: A sequence that cannot complete surfaces the reason and leaves the previous session intact.
 
 ## API Contract

@@ -27,7 +27,7 @@ call one orchestrator verb, so the argument contract lives in one place.
 - **Business Rules**:
   - An entry that owns the terminal canvas must attach no standard-error handler, so run records cannot corrupt the interactive UI.
   - Every record emitted from a worker thread routes through the same run stamp, so a record names the run that produced it.
-  - The status file is the inter-process handoff; its field set is what an external monitor depends on.
+  - The status file is the inter-process handoff; its field set is what an external monitor depends on, pinned for schema version 2 by a contract test in the shared member's test suite.
   - The quality report is written at run end, not during the run.
   - Detaching flushes the run's records before the process exits, so a crash cannot lose its final records.
   - The exit code a run reports is decided by one rule shared with the surfaces that print it.

@@ -7,7 +7,7 @@ description: >
   a model name the picker does not offer falls back to the first available one
   with a WARNING. Use when an AI agent needs to send prompts, review code, or
   analyze document attachments via CLI or MCP tools.
-version: 6.0.0
+version: 6.7.0
 triggers:
   - qwen
   - chat.qwen.ai
@@ -33,9 +33,9 @@ Use this skill when an AI agent needs to send prompts or document files to **Qwe
 | Direct text prompt | `process_direct_prompt` | `qwa prompt direct -t "<prompt>" [-o <out>]` |
 | Prompt file only | `process_prompt_file_only` | `qwa prompt file -i <prompt.md> [-o <out>]` |
 | Prompt with attachment | `process_prompt_with_attachment` | `qwa prompt attach -i <prompt.md> -a <file> [-o <out>]` |
-| Check session health | `check_session` | `qwa doctor` |
+| Check session health | `check_session` | `qwa session health` |
 | Manual login / CAPTCHA | `setup_session` | `qwa session login --name <name>` |
-| Reset session | `delete_session` | — |
+| Reset session | `delete_session` | `qwa session remove <name>` |
 | Initialize workspace | `init` | `qwa init` |
 
 > **File conventions:** Place inputs under `.qwen-web-arwaky/input/` and outputs under `.qwen-web-arwaky/output/`. Always append a timestamp to output filenames (e.g., `arch_review_$(date +%Y%m%d_%H%M%S).md` in CLI or `YYYYMMDD_HHMMSS` in MCP) to prevent overwriting results from previous runs.
@@ -130,12 +130,13 @@ Use to verify login status or authenticate a new browser session when cookies ex
 
 1. **Check session health:**
    - MCP: call `check_session`
-   - CLI: `qwa doctor`
+   - CLI: `qwa session health`
 2. **Login / Re-authenticate (opens visible browser for login / CAPTCHA):**
    - MCP: call `setup_session`
    - CLI: `qwa session login --name <name>`
 3. **Reset session profile (if corrupted):**
    - MCP: `delete_session` with `{"confirm": true}`
+   - CLI: `qwa session remove <name>`
 
 ---
 

@@ -16,7 +16,7 @@ from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse, ResponseText
 
-_CANCELLED = PromptResponse(cancelled=True)
+_CANCELLED = PromptResponse(cancelled=True, pipelines_stopped=1)
 
 
 def _orchestrator(
@@ -80,17 +80,48 @@ def test_smoke_the_answer_comes_back_as_response_text() -> None:
     assert str(response.response_text) == "The answer"
 
 
-def test_smoke_a_cancellation_reaches_both_registered_pipelines() -> None:
-    """``request_cancel`` is fanned out to the file and attachment
-    pipelines, because a direct prompt has no run to cancel.
+def test_smoke_a_cancellation_resolves_through_the_shared_registry() -> None:
+    """``request_cancel`` resolves through the one shared cancel registry
+    the adapters also use — a single ``cancel_by_event`` stops the run and
+    reports whether a pipeline actually stopped. The adapters' own
+    ``execute`` is never re-entered: the aggregate routes the cancel solely
+    through the registry.
     """
-    orchestrator, stubs = _orchestrator()
+    orchestrator, stubs = _orchestrator(
+        response=PromptResponse(cancelled=True, pipelines_stopped=1),
+    )
+    stubs["cancel_registry"].cancel_by_event.return_value = True
 
     response = orchestrator.execute(PromptRequest(verb="request_cancel", cancel_event=threading.Event()))
 
-    stubs["process_prompt_file_only"].execute.assert_called_once()
-    stubs["process_prompt_with_attachment"].execute.assert_called_once()
+    stubs["cancel_registry"].cancel_by_event.assert_called_once()
+    stubs["process_prompt_file_only"].execute.assert_not_called()
+    stubs["process_prompt_with_attachment"].execute.assert_not_called()
     assert response.cancelled is True
+    assert response.pipelines_stopped == 1
+
+
+def test_smoke_a_cancel_with_no_active_pipeline_reports_zero() -> None:
+    """A cancel for a run that already reached a terminal state reports
+    zero stopped pipelines instead of a blanket success (FR-PROMPT-004)."""
+    orchestrator, stubs = _orchestrator()
+    stubs["cancel_registry"].cancel_by_event.return_value = False
+
+    response = orchestrator.execute(PromptRequest(verb="request_cancel", cancel_event=threading.Event()))
+
+    stubs["cancel_registry"].cancel_by_event.assert_called_once()
+    assert response.cancelled is False
+    assert response.pipelines_stopped == 0
+
+
+def test_smoke_a_cancel_without_an_event_is_a_zero_no_op() -> None:
+    """A cancel request carrying no event stops nothing and reports zero."""
+    orchestrator, _ = _orchestrator()
+
+    response = orchestrator.execute(PromptRequest(verb="request_cancel"))
+
+    assert response.cancelled is False
+    assert response.pipelines_stopped == 0
 
 
 def test_smoke_a_verb_with_no_wired_adapter_is_refused_by_name() -> None:

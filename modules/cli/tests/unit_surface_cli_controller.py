@@ -17,11 +17,17 @@ def _make_controller() -> InteractiveController:
 
 
 def _controller_with_rotator(response: object, *, raises: bool = False) -> InteractiveController:
+    """Controller whose rotator answers through ``rotate_sync`` (SA-4-03).
+
+    The controller drives the protocol's sync seam; ``rotate`` is booby-trapped
+    so a revert to inline ``asyncio.run`` fails instead of passing vacuously.
+    """
     rotator = MagicMock()
     if raises:
-        rotator.rotate = AsyncMock(side_effect=RuntimeError("rotation failed"))
+        rotator.rotate_sync = MagicMock(side_effect=RuntimeError("rotation failed"))
     else:
-        rotator.rotate = AsyncMock(return_value=response)
+        rotator.rotate_sync = MagicMock(return_value=response)
+    rotator.rotate = AsyncMock(side_effect=AssertionError("controller must not drive rotate inline"))
     return InteractiveController(MagicMock(), MagicMock(), MagicMock(), session_rotator=rotator)
 
 

@@ -22,7 +22,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
 import sys
@@ -271,12 +270,11 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
     if pool.total_count == 0:
         return
 
-    async def _pick() -> Path | None:
-        response = await container.session_rotator.rotate(RotatorRequest())
-        return response.session.path if response.session else None
-
+    # rotate_sync is asyncio.run under the hood: call it only from a thread
+    # that has no running loop. Inside a running loop, await rotate instead.
     try:
-        session_path = asyncio.run(_pick())
+        response = container.session_rotator.rotate_sync(RotatorRequest())
+        session_path = response.session.path if response.session else None
     except Exception:
         session_path = None
 
@@ -435,10 +433,15 @@ def _result_exit_code(result: dict[str, object], json_output: bool = False) -> i
 
 
 def _exit_code_for_result(result: dict[str, object]) -> int:
-    """Map a failed response envelope to a process exit code."""
+    """Map a failed response envelope to a process exit code.
+
+    Auth failures take 3, keeping 2 reserved for argparse usage errors so a
+    machine can tell a bad invocation from an expired session; every other
+    failure stays 1.
+    """
     error = str(result.get("error") or "")
     if "AUTH_REQUIRED" in error or "not authenticated" in error.lower() or "session expired" in error.lower():
-        return 2
+        return 3
     return 1
 
 
@@ -540,12 +543,23 @@ def _dispatch(
     args._cfg = cfg
     # Resolve session rotation before dispatch
     _resolve_session_for_prompt(args, container)
+
+    # The three prompt adapters are composed into the single aggregate the
+    # TUI/MCP paths already drive; the bare adapters cannot serve the
+    # ``single``-mode verbs ``prompt file`` / ``prompt attach``.
+    from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
+
+    prompt_aggregate = PromptOrchestrator(
+        direct=container.agent_direct_prompt_orchestrator,
+        file_only=container.agent_prompt_file_orchestrator,
+        attachment=container.agent_attachment_prompt_orchestrator,
+        cancel_registry=container.run_cancel_registry,
+        observability=container.observability,
+    )
     result = handle_run_command(
         args,
         cfg,
-        container.agent_direct_prompt_orchestrator,
-        container.agent_prompt_file_orchestrator,
-        container.agent_attachment_prompt_orchestrator,
+        prompt_aggregate,
         session_resolver=_session_resolver(args),
     )
     container.observability.metrics.record_execution(bool(result.get("success")))

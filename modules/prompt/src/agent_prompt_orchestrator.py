@@ -32,9 +32,17 @@ class PromptOrchestrator(IPromptAggregate):
     adapter.
 
     ``request_cancel`` reaches the file and attachment pipelines because
-    those are the two that register a run-scoped cancel event; a direct
-    prompt has no registry to stop. It is fanned out to both so a
-    cancelling surface does not have to know which pipeline it started.
+    those are the two that can register one run-scoped cancel event; a
+    direct prompt has no registry to stop. Both adapters register their
+    runs with the one cancel registry injected here (the container wires
+    the same instance into the orchestrator and both adapters, across the
+    CLI, MCP, and TUI surfaces), so the aggregate cancels once through
+    that registry and reports 1 when a pipeline stopped and 0 when the
+    run was already terminal or never registered (FR-PROMPT-004). The
+    adapters keep their own ``request_cancel`` for direct protocol
+    callers, but the aggregate does not fan the event out to them — a
+    second registry resolution through an adapter would hit the same
+    entry and change nothing.
 
     Raises:
         QwenCliError: When a verb is added to ``PromptVerb`` without an
@@ -52,13 +60,21 @@ class PromptOrchestrator(IPromptAggregate):
         """Hold the one adapter that serves each prompt verb.
 
         Args:
-            direct: Serves ``process_direct_prompt``.
-            file_only: Serves ``process_prompt_file_only`` and ``request_cancel``.
+            direct: Serves ``process_direct_prompt`` and implements
+                ``request_cancel`` for direct protocol callers; the
+                aggregate itself never routes a cancel through it.
+            file_only: Serves ``process_prompt_file_only`` and implements
+                ``request_cancel`` for direct protocol callers; the aggregate
+                cancels running pipelines only via ``cancel_registry``.
             attachment: Serves ``process_prompt_with_attachment`` and
-                ``request_cancel``.
-            cancel_registry: The shared targeted-cancel registry the file and
-                attachment adapters register their runs with, so a cancel
-                reaches the run by its stable ID rather than by event identity.
+                implements ``request_cancel`` for direct protocol callers;
+                the aggregate cancels running pipelines only via
+                ``cancel_registry``.
+            cancel_registry: The one targeted-cancel registry the file and
+                attachment adapters register their runs with; the
+                aggregate resolves a cancel through this same instance, so
+                a cancel reaches the run by its stable ID rather than by
+                event identity.
             observability: Records the routed verb, so a surface that sees a
                 failed response can tell which adapter produced it.
         """
@@ -67,7 +83,6 @@ class PromptOrchestrator(IPromptAggregate):
             "process_prompt_file_only": cast(IPromptAggregate, file_only),
             "process_prompt_with_attachment": cast(IPromptAggregate, attachment),
         }
-        self._cancellable = (file_only, attachment)
         self._cancel_registry = cancel_registry
         self._observability = observability
 
@@ -76,7 +91,8 @@ class PromptOrchestrator(IPromptAggregate):
 
         Returns:
             PromptResponse: The adapter's response, unchanged, except for
-            ``request_cancel`` which reports which pipelines stopped.
+            ``request_cancel`` which reports how many in-flight pipelines
+            actually stopped.
 
         Raises:
             QwenCliError: When no adapter is wired for ``request.verb``.
@@ -89,13 +105,20 @@ class PromptOrchestrator(IPromptAggregate):
         return adapter.execute(request)
 
     def _cancel_running(self, request: PromptRequest) -> PromptResponse:
-        """Stop the run held by ``request.cancel_event`` in every pipeline that registered it."""
+        """Stop the run held by ``request.cancel_event`` and count what stopped.
+
+        The event resolves through the one shared registry the adapters
+        also use, so a single ``cancel_by_event`` is the whole operation:
+        it sets the run's event, closes the run's browser context, and
+        answers whether an in-flight run was found. A run that already
+        reached a terminal state (or was never registered) answers zero,
+        and a cancel without an event is a no-op that reports zero.
+        """
         cancel_event = request.cancel_event
         if cancel_event is None:
-            return PromptResponse(cancelled=False)
-        for adapter in self._cancellable:
-            adapter.execute(request)
-        return PromptResponse(cancelled=True)
+            return PromptResponse(cancelled=False, pipelines_stopped=0)
+        stopped = bool(self._cancel_registry.cancel_by_event(cancel_event))
+        return PromptResponse(cancelled=stopped, pipelines_stopped=1 if stopped else 0)
 
 
 __all__ = ["PromptOrchestrator"]

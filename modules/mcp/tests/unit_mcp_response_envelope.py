@@ -13,6 +13,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.mcp.src.surface_mcp_tool_command import (
+    RESULT_TRUST_UNTRUSTED_MODEL_OUTPUT,
+    SECURITY_NOTICE_CONTENT_NOT_INSTRUCTIONS,
     STATUS_ACCEPTED,
     STATUS_COMPLETED,
     STATUS_FAILED,
@@ -20,7 +22,7 @@ from modules.mcp.src.surface_mcp_tool_command import (
     STATUS_SUCCESS,
     McpToolCommand,
 )
-from modules.shared.src.common.taxonomy_core_error import RateLimitError
+from modules.shared.src.common.taxonomy_core_error import JobQueueFullError, RateLimitError
 from modules.shared.src.common.taxonomy_core_vo import ErrorReason, JobRecord, ResponseText
 from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 from modules.shared.src.prompt.taxonomy_prompt_vo import PromptResponse
@@ -154,6 +156,80 @@ def test_rate_limited_submission_returns_retry_hint(tools_and_mocks, tmp_path) -
     assert payload["error"]["code"] == "RATE_LIMITED"
     assert payload["error"]["retryable"] is True
     assert payload["error"]["retry_after_sec"] == pytest.approx(12.3)
+
+
+@pytest.mark.parametrize("kind", ["file_only", "attachment"])
+def test_queue_full_submission_keeps_backpressure_fields(tools_and_mocks, tmp_path, kind: str) -> None:
+    """A saturated pool keeps ``retry_after_sec`` and ``queue_depth``.
+
+    ``JobQueueFullError`` must not fall through to the generic
+    JOB_SUBMIT_FAILED handler, which drops both fields.
+    """
+    tools, _, jobs = tools_and_mocks
+    jobs.execute.side_effect = JobQueueFullError(
+        ErrorReason("worker pool at capacity"), retry_after_sec=12.34, queue_depth=8
+    )
+    attachment = tmp_path / "doc.pdf"
+    attachment.write_text("data", encoding="utf-8")
+
+    if kind == "attachment":
+        raw = tools.process_prompt_with_attachment(str(_prompt(tmp_path)), str(attachment))
+    else:
+        raw = tools.process_prompt_file_only(str(_prompt(tmp_path)))
+
+    payload = json.loads(raw)
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "QUEUE_FULL"
+    assert payload["error"]["retryable"] is True
+    assert payload["error"]["retry_after_sec"] == pytest.approx(12.3)
+    assert payload["error"]["queue_depth"] == 8
+
+
+def test_queue_full_is_distinct_from_generic_submit_failure(tools_and_mocks, tmp_path) -> None:
+    """Control: an unrelated submission error keeps JOB_SUBMIT_FAILED."""
+    tools, _, jobs = tools_and_mocks
+    jobs.execute.side_effect = RuntimeError("boom")
+
+    payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path))))
+
+    assert payload["error"]["code"] == "JOB_SUBMIT_FAILED"
+
+
+# ── Trust marker contract (issue #343 / MCP-02) ──────────────────────────────
+
+
+def test_sync_success_envelope_carries_the_trust_marker(tools_and_mocks, tmp_path) -> None:
+    """Every sync success marks its ``result`` as untrusted model output."""
+    tools, mocks, _ = tools_and_mocks
+    mocks["prompt"].execute.return_value = PromptResponse(response_text=ResponseText("answer text"))
+
+    payload = json.loads(tools.process_prompt_file_only(str(_prompt(tmp_path)), async_run=False))
+
+    assert payload["result_trust"] == RESULT_TRUST_UNTRUSTED_MODEL_OUTPUT
+    assert payload["security_notice"] == SECURITY_NOTICE_CONTENT_NOT_INSTRUCTIONS
+
+
+def test_async_completed_envelope_marks_the_result_preview(tools_and_mocks) -> None:
+    """A completed async poll with a preview carries the same trust marker."""
+    tools, _, jobs = tools_and_mocks
+    jobs.execute.return_value = JobResponse(record=_job_record(completed=True, result_preview="preview text"))
+
+    payload = json.loads(tools.get_job_status("file_20260922_000000_abc123"))
+
+    assert payload["status"] == STATUS_COMPLETED
+    assert payload["result_trust"] == RESULT_TRUST_UNTRUSTED_MODEL_OUTPUT
+    assert payload["security_notice"] == SECURITY_NOTICE_CONTENT_NOT_INSTRUCTIONS
+
+
+def test_async_status_without_preview_has_no_result_trust(tools_and_mocks) -> None:
+    """The marker accompanies model text: a preview-free poll carries none."""
+    tools, _, jobs = tools_and_mocks
+    jobs.execute.return_value = JobResponse(record=_job_record(completed=False))
+
+    payload = json.loads(tools.get_job_status("file_20260922_000000_abc123"))
+
+    assert payload["completed"] is False
+    assert "result_trust" not in payload
 
 
 def test_direct_prompt_forwards_output_file(tools_and_mocks, tmp_path) -> None:

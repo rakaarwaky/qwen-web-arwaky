@@ -66,7 +66,7 @@ def test_acceptance_a_missing_prompt_file_is_reported_before_the_send(tmp_path: 
         headless=True,
     )
 
-    assert "not found" in str(result).lower(), f"the failure must name the missing file, got: {result}"
+    assert "not found" in str(result.response_text).lower(), f"the failure must name the missing file, got: {result}"
 
 
 def test_acceptance_invalid_attachment_surfaces_stable_reason_without_browser_launch(
@@ -103,7 +103,7 @@ def test_acceptance_invalid_attachment_surfaces_stable_reason_without_browser_la
         headless=True,
     )
 
-    result_str = str(result)
+    result_str = str(result.response_text)
     assert result_str.startswith("ERROR [FileValidationError]:"), (
         f"must start with ERROR [FileValidationError], got: {result_str}"
     )

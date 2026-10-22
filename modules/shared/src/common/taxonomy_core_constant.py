@@ -123,6 +123,14 @@ SWARM_RESOURCE_WARNING_BROWSERS = 4
 #: the worst-case backlog to a known depth.
 MAX_PENDING_JOBS_PER_WORKER = 1
 
+#: Lease window a job worker's heartbeat must stay fresh within. A record
+#: whose ``heartbeat_at`` is older than this is a zombie even if its
+#: ``owner_pid`` still answers: a recycled PID must not keep a dead job
+#: looking alive. Attachment-parse alone can take 120s, so the window is
+#: sized well past that (180s) — anything shorter would misreport a slow
+#: but healthy run as dead.
+JOB_HEARTBEAT_LEASE_SEC = 180
+
 CHAT_URL = "https://chat.qwen.ai/"
 
 # Browser navigation timeouts (milliseconds). The primary goto uses 30s with
@@ -607,6 +615,17 @@ DEFAULT_STALL_TIMEOUT_SEC: int = 300
 #: Environment override for ``DEFAULT_SAFETY_TIMEOUT_SEC``.
 SAFETY_TIMEOUT_ENV: str = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 
+# ─── Prompt domain: attachment send ceiling ──────────────────────────────────
+#: Wall-clock ceiling on the attachment send path: how long the dispatch may
+#: hold while a large document finishes parsing before the first click
+#: (FRD Assumptions: the response ceiling is configured per environment).
+#: Override with ``QWEN_SEND_CLICK_TIMEOUT_MS``; keep the default generous
+#: because parsing a big attachment legitimately takes minutes.
+DEFAULT_SEND_CLICK_TIMEOUT_MS: int = 120_000
+
+#: Environment override for ``DEFAULT_SEND_CLICK_TIMEOUT_MS``.
+SEND_CLICK_TIMEOUT_ENV: str = "QWEN_SEND_CLICK_TIMEOUT_MS"
+
 # ─── Job domain: status document contract ──────────────────────────────────
 #: Version of the ``status.json`` document contract; bump when a field is
 #: added or its meaning changes so external monitors can branch on it
@@ -614,6 +633,11 @@ SAFETY_TIMEOUT_ENV: str = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 STATUS_SCHEMA_VERSION: int = 2
 
 # ─── Session domain ──────────────────────────────────────────────────────────
+#: Ceiling for the interactive manual-login wait. Typing credentials takes far
+#: longer than any headless run, so the login loop budgets this window
+#: independently of ``AppConfig.timeout``.
+DEFAULT_LOGIN_WAIT_TIMEOUT_SEC: int = 1800
+
 #: The old single-profile location (pre-multi-account). Used only for migration.
 DEFAULT_SESSION_OLD: Path = XDG_DATA_HOME / "qwen_session"
 
