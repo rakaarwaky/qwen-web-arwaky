@@ -22,13 +22,13 @@ from playwright.sync_api import (
 )
 from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
-from modules.browser.src.capabilities_browser_session_check import (
+from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
+from modules.shared.src.browser.utility_browser_session_check import (
     SessionCheck,
     _assert_on_chat_page,
     _in_page_expiry_banner_visible,
 )
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
 from modules.shared.src.common.taxonomy_core_constant import (
     CHAT_URL,
     DEFAULT_MODEL,

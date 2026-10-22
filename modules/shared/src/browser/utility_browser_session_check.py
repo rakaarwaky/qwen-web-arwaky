@@ -1,6 +1,6 @@
-"""Capabilities: browser session liveness and auth probe (AES403).
+"""Utility: browser session liveness and auth probe.
 
-Owns SessionCheck — page readiness + auth assertion used by BrowserAdapter.
+SessionCheck — page readiness + auth assertion used by BrowserAdapter and tests.
 """
 
 from __future__ import annotations

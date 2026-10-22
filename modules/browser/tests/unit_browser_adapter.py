@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.browser.src import capabilities_browser_session_check as check_mod
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
+from modules.shared.src.browser import utility_browser_session_check as check_mod
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
@@ -47,7 +47,7 @@ def _make_page_mock(body_text: str = "", banner_shell_visible: bool = False):
     mock_page.query_selector.return_value = MagicMock()
 
     original_any_visible = None
-    from modules.browser.src import capabilities_browser_session_check as check_mod
+    from modules.shared.src.browser import utility_browser_session_check as check_mod
 
     original_any_visible = check_mod.is_any_visible
     check_mod.is_any_visible = lambda page, selectors, _visible=banner_shell_visible: _visible
