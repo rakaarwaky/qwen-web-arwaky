@@ -2,10 +2,13 @@
 
 Implements IMetricsProtocol.
 Thread-safe JSON-backed metrics persistence with rolling 24h execution events.
+Mutations stay in memory (ARCH-3-001); disk writes happen on flush/snapshot.
 """
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import json
 import threading
 from datetime import datetime, timezone
@@ -32,7 +35,11 @@ class MetricsCounter(IMetricsProtocol):
         self._counters: dict[str, int] = {}
         self._execution_events: list[dict[str, Any]] = []
         self._start_time = datetime.now(tz=timezone.utc)
+        self._dirty = False
+        self._mutation_count = 0
+        self._flush_every = 64
         self._load()
+        atexit.register(self._atexit_flush)
 
     # Block 2: Protocol Method Implementation
 
@@ -40,13 +47,13 @@ class MetricsCounter(IMetricsProtocol):
         """Add *amount* to the counter *key* and persist the metrics file."""
         with self._lock:
             self._counters[key] = self._counters.get(key, MessageCount(0)) + amount
-            self._persist()
+            self._mark_dirty()
 
     def record_execution(self, success: bool) -> None:
         """Record one terminal pipeline execution for the reliability SLO."""
         with self._lock:
             self._execution_events.append({"at": datetime.now(tz=timezone.utc).isoformat(), "success": bool(success)})
-            self._persist()
+            self._mark_dirty()
 
     def record_failure(self, category: FailureCategory) -> None:
         """Bump one occurrence for *category* in the rolling error counter.
@@ -63,7 +70,7 @@ class MetricsCounter(IMetricsProtocol):
             return
         with self._lock:
             self._counters[f"error.{category}"] = self._counters.get(f"error.{category}", 0) + 1
-            self._persist()
+            self._mark_dirty()
 
     def failure_counts(self) -> FailureCategoryCounts:
         """Return the rolling per-category error counts, ranked by descending count.
@@ -84,6 +91,8 @@ class MetricsCounter(IMetricsProtocol):
     def snapshot(self) -> MetricsSnapshot:
         """Return all counters plus rolling-24h execution totals and success rate."""
         with self._lock:
+            if self._dirty:
+                self._persist()
             self._prune_events()
             total = len(self._execution_events)
             successful = sum(1 for event in self._execution_events if event.get("success") is True)
@@ -98,6 +107,22 @@ class MetricsCounter(IMetricsProtocol):
 
     def __repr__(self) -> str:
         return f"MetricsCounter(path={self._metrics_path!s})"
+
+    def flush(self) -> None:
+        """Persist dirty counters to disk. No-op when clean."""
+        with self._lock:
+            if self._dirty:
+                self._persist()
+
+    def _atexit_flush(self) -> None:
+        with contextlib.suppress(Exception):
+            self.flush()
+
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self._mutation_count += 1
+        if self._mutation_count >= self._flush_every:
+            self._persist()
 
     def _load(self) -> None:
         try:
@@ -144,6 +169,7 @@ class MetricsCounter(IMetricsProtocol):
         # not want world-readable, so the file is owner-only regardless of the
         # process umask (issue #352).
         harden_private_file(self._metrics_path)
+        self._dirty = False
 
 
 __all__ = ["MetricsCounter"]

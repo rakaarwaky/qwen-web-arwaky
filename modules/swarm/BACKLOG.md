@@ -2,7 +2,7 @@
 
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md).
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-05
 
 ## Current Condition
@@ -14,11 +14,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Health | Dependencies | Next Action | Updated |
+| ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| SWARM-01 | P1 | Ready | On Track | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 |
-| SWARM-02 | P1 | Ready | On Track | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 |
-| SWARM-03 | P2 | Ready | On Track | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 |
+| SWARM-01 | P1 | Ready | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 |
+| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 |
+| SWARM-03 | P2 | Ready | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 |
 
 ## Scenario Evidence
 

@@ -25,7 +25,7 @@ from modules.shared.src.common.taxonomy_core_constant import (
     SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.common.taxonomy_core_vo import FilePath
-from modules.shared.src.common.utility_telemetry_scrubber import harden_private_dir
+from modules.shared.src.common.utility_io_writer import harden_private_dir
 from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
 
 # Block 1: Class Definition & Constructor

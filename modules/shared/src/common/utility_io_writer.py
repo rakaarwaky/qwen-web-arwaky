@@ -162,3 +162,15 @@ def save_orchestrator_output(
             EVENT_OUTPUT_COPIED,
             {"path": str(out_path), "bytes": out_path.stat().st_size},
         )
+
+
+def harden_private_dir(path: Path) -> Path:
+    """Create *path* (parents ok) as owner-only 0700 and chmod after mkdir.
+
+    umask can strip mode bits on mkdir, so chmod is applied explicitly.
+    Returns the path for chaining.
+    """
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.chmod(0o700)
+    return path
