@@ -30,6 +30,18 @@ call the aggregate and receive a page already proven usable.
 - **Edge Cases**: A launch that fails after retries surfaces a browser-launch error naming the reason; a sandbox the host cannot provide falls back to the sandbox-disabled launch only when the configuration allows it; a page redirected to a login URL or showing a login form raises an authentication error rather than yielding an unusable page; a picker that never becomes ready falls back through the configured retry budget before reporting failure.
 - **Error Handling**: Browser-launch errors carry the host capability that failed; session-directory permission failures surface as a file error naming the path; an authentication error names the login path so the caller can route the operator to the setup verb; a model switch that cannot complete surfaces a model-switch error naming the requested and active model.
 
+### FR-BROWSER-002: Probe session liveness and authentication
+
+- **Description**: Bind one page to a session probe that reports whether the chat UI is alive and asserts the saved session is still authenticated — the check every pipeline run depends on before it dispatches a prompt.
+- **Input**: The live Playwright page to probe.
+- **Output**: A boolean liveness verdict from `is_alive`, and `check_auth` raising an authentication error when the page is a login or guest view, shows a login form, or an in-page session-expiry banner.
+- **Business Rules**:
+  - Liveness never raises: an unreadable or still-loading page reports False instead of an error.
+  - Authentication combines the URL check, the login-form check, and the in-page expiry banner check.
+  - A page that is still hydrating is tolerated by `check_auth` while it exposes the authenticated UI.
+- **Edge Cases**: A page whose DOM is mid-hydration reports False rather than a spurious authentication error; an in-page expiry notice on the chat URL raises the authentication error naming the re-login verb.
+- **Error Handling**: An authentication error names the login path so the caller can route the operator to the setup verb; browser errors during the probe surface as an authentication error naming the reason.
+
 ## API Contract
 
 ### Protocol API

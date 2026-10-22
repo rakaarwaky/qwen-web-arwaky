@@ -11,6 +11,7 @@ from typing import cast
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_session_check import SessionCheck
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
@@ -137,6 +138,10 @@ class SharedContainer:
         self.rl = RateLimiter(MaxPerMinute(rate_limit_per_minute))
 
         self.browser = BrowserAdapter()
+        # Browser capability: the session probe (page liveness + auth
+        # assertion) the adapter delegates to; registered here so the
+        # container owns the seam.
+        self.session_check = SessionCheck
         self.injector = PromptInjector()
         self.sender = SendDispatcher()
         self.streamer = StreamMonitor()
