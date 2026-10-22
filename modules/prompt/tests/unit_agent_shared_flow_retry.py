@@ -17,10 +17,7 @@ import pytest
 
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.shared.src.common.taxonomy_core_constant import MAX_ATTEMPTS
-from modules.shared.src.common.taxonomy_core_error import (
-    ResponseDetectionTimeoutError,
-    StuckDetectedError,
-)
+from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.common.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE, STANDARD_PROMPT_EVENTS
 from modules.shared.src.common.taxonomy_core_vo import AppConfig, MessageCount, ResponseText, TimeoutSec
 from modules.shared.src.common.utility_dom_helper import setup_lifecycle_state
