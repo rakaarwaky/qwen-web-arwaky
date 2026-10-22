@@ -224,11 +224,19 @@ class _TuiSessionsHandlerMixin:
         self.action_session_add_new()
 
     def action_session_refresh(self) -> None:
-        """r: reload the pool (problem 6 / req C)."""
+        """r: reload the pool (problem 6 / req C).
+
+        UX-4-002: gated to the Sessions pane, the same way the ↑/↓ row keys
+        already are — a stray r/e/d on another screen must do nothing.
+        """
+        if not self._sessions_active():
+            return
         self._refresh_sessions_table()
 
     def action_session_edit(self) -> None:
         """e: run the health check on the selected row (or the whole pool)."""
+        if not self._sessions_active():
+            return
         idx = self._session_row_index()
         if idx >= 0:
             self._account_button_pressed("health", idx + 1)
@@ -237,6 +245,8 @@ class _TuiSessionsHandlerMixin:
 
     def action_session_delete(self) -> None:
         """d/Delete: delete the selected row's session, guarded by a modal."""
+        if not self._sessions_active():
+            return
         idx = self._session_row_index()
         if idx < 0:
             self._log_msg("[dim]No session selected — press ↑/↓ first.[/]")

@@ -677,6 +677,21 @@ RATE_LIMIT_PATTERNS: list[str] = [
     r"usage\s+limit",
 ]
 
+# ─── Cross-surface status glyphs ────────────────────────────────────────────
+#: Canonical status glyph vocabulary: ``✓ / ✗ / ⚠`` for results,
+#: ``● / ◐ / ○`` for health, ``...`` for pending. Declared once in the
+#: shared Taxonomy layer so both surfaces import the same object.
+STATUS_GLYPHS: dict[str, str] = {
+    "ok": "✓",
+    "fail": "✗",
+    "warn": "⚠",
+    "pending": "…",
+    "health_ok": "●",
+    "health_limited": "◐",
+    "health_auth": "⛔",
+    "health_unknown": "○",
+}
+
 
 # ─── Prompt templates (role-based built-in templates) ─────────────────────
 # Role templates now live as Markdown files under ``modules/shared/templates/{role}.md``

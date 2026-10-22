@@ -6,16 +6,15 @@ consumed by :class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 This module is the **single source of truth for colour**. ``_COLORS`` is the
 canonical palette; ``THEME`` and the ``$token`` CSS variables are derived from
 it, so a component never hardcodes a hex value. The canonical hex values are
-mirrored in the "Terminal Palette" table of
-``design/obsidian_terminal/DESIGN.md`` — keep both in step when a value
-changes.
+mirrored in the "Terminal Palette" table of the root ``DESIGN.md`` — keep
+both in step when a value changes.
 """
 
 from __future__ import annotations
 
 # V1/V4: single source of truth — derive THEME and CSS tokens from _COLORS.
 # Every text colour below clears WCAG AA (4.5:1) against its background.
-# Mirror the canonical hex values in design/obsidian_terminal/DESIGN.md.
+# Mirror the canonical hex values in the root DESIGN.md.
 from pathlib import Path
 
 _CSS_DIR = Path(__file__).parent

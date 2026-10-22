@@ -106,7 +106,7 @@ Run application commands inside the activated virtual environment.
 | `qwen-web-arwaky session login --name personal` | Open the interactive one-time Qwen login. | The CLI confirms that the session was saved. |
 | `qwen-web-arwaky session list` | List registered sessions with health state. | The session pool table prints. |
 | `qwen-web-arwaky session health` | Ping every session with a live headless probe. | Each session reports healthy or limited. |
-| `qwen-web-arwaky session remove <id-or-name>` | Drop a session entry and its Chromium profile. | The pool entry and profile are removed. |
+| `qwen-web-arwaky session remove <id-or-name>` | Drop a session entry and its Chromium profile. Prompts for confirmation on an interactive TTY; `--force`/`--json` skip the prompt. | The pool entry and profile are removed. |
 | `qwen-web-arwaky prompt direct -t "Explain this repository" -o output.md` | Send an inline prompt and save the response. | `output.md` contains the Qwen response. |
 | `qwen-web-arwaky prompt file -i prompt.md -o output.md` | Send a Markdown prompt file. | `output.md` contains the Qwen response. |
 | `qwen-web-arwaky prompt attach -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
