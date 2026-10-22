@@ -235,7 +235,7 @@ class TestDeleteSessionWorker:
         modal answered True, so there is nothing to undo on Cancel.
         """
 
-        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+        from modules.tui.tests.fixture_tui_app import make_app
 
         app = make_app()
         mock_manager = MagicMock()
