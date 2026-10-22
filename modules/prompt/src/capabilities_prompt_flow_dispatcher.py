@@ -36,6 +36,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     SenderConfig,
     TimeoutSec,
 )
+from modules.shared.src.common.utility_core_prompt import strip_input_from_output
 from modules.shared.src.common.utility_dom_query import latest_message_text, partial_text_after_stream_cut
 from modules.shared.src.common.utility_error_mapping import to_error_response
 from modules.shared.src.common.utility_io_writer import save_orchestrator_output
@@ -247,8 +248,12 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
             raise
 
         if verdict.text and len(verdict.text.strip()) > 0:
+            # Strip the echoed input from the captured response so the
+            # saved artifact carries only the answer, not a copy of the
+            # prompt that Qwen may prepend to its reply.
+            cleaned = strip_input_from_output(verdict.text, prompt)
             logger.info("Received response (%d chars)", len(verdict.text))
-            return StreamVerdict(text=ResponseText(verdict.text.strip()), verdict=verdict.verdict)
+            return StreamVerdict(text=ResponseText((cleaned or verdict.text.strip()).strip()), verdict=verdict.verdict)
 
         raise ResponseDetectionTimeoutError("No terminal response event detected before the browser flow ended")
 
