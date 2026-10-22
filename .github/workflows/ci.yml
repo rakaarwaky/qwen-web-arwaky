@@ -57,6 +57,9 @@ jobs:
       - name: Mypy check
         run: uv run mypy modules/
 
+      - name: Validate modules.shared.src __all__
+        run: uv run python scripts/ci_validate_all.py
+
   build:
     name: Build package
     runs-on: ubuntu-latest
