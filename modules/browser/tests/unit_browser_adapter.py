@@ -10,7 +10,8 @@ import pytest
 from modules.browser.src import capabilities_browser_adapter as adapter_mod
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
-from modules.shared.src.browser import utility_browser_session_check as check_mod
+from modules.shared.src.browser import utility_browser_session_check as session_check_util
+from modules.shared.src.common import utility_dom_helper as dom_helper
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
     EVENT_MODEL_VERIFIED,
@@ -47,12 +48,9 @@ def _make_page_mock(body_text: str = "", banner_shell_visible: bool = False):
     mock_page.locator.return_value = MagicMock()
     mock_page.query_selector.return_value = MagicMock()
 
-    original_any_visible = None
-    from modules.shared.src.browser import utility_browser_session_check as check_mod
-
-    original_any_visible = check_mod.is_any_visible
-    check_mod.is_any_visible = lambda page, selectors, _visible=banner_shell_visible: _visible
-    return mock_page, check_mod, original_any_visible
+    original_any_visible = dom_helper.is_any_visible
+    dom_helper.is_any_visible = lambda page, selectors, _visible=banner_shell_visible: _visible
+    return mock_page, session_check_util, original_any_visible
 
 
 def test_session_check_is_alive_success():
@@ -95,7 +93,7 @@ def test_check_auth_valid():
     try:
         BrowserAdapter().check_auth(mock_page)
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
 
 def test_check_auth_login_url():
@@ -116,8 +114,8 @@ def test_assert_on_chat_page_strict_logs_warning_when_textarea_missing():
     mock_page, _, _ = _make_page_mock(body_text="")
     mock_page.query_selector.return_value = None  # textarea missing, no login form
 
-    with patch.object(check_mod.log, "warning") as warn, patch.object(check_mod.log, "info") as info:
-        check_mod._assert_on_chat_page(mock_page)  # default strict=True
+    with patch.object(session_check_util.log, "warning") as warn, patch.object(session_check_util.log, "info") as info:
+        session_check_util.assert_on_chat_page(mock_page)  # default strict=True
 
     warn.assert_called_once_with("chat_textarea_missing_but_no_login_form_detected %s", mock_page.url)
     info.assert_not_called()
@@ -129,8 +127,8 @@ def test_assert_on_chat_page_non_strict_logs_info_when_textarea_missing():
     mock_page, _, _ = _make_page_mock(body_text="")
     mock_page.query_selector.return_value = None  # textarea missing, no login form
 
-    with patch.object(check_mod.log, "warning") as warn, patch.object(check_mod.log, "info") as info:
-        check_mod._assert_on_chat_page(mock_page, strict=False)
+    with patch.object(session_check_util.log, "warning") as warn, patch.object(session_check_util.log, "info") as info:
+        session_check_util.assert_on_chat_page(mock_page, strict=False)
 
     info.assert_called_once_with("chat_textarea_missing_but_no_login_form_detected %s", mock_page.url)
     warn.assert_not_called()
@@ -147,7 +145,7 @@ def test_assert_on_chat_page_strict_still_raises_on_auth_redirect():
     mock_page.inner_text.return_value = ""
 
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
-        check_mod._assert_on_chat_page(mock_page, strict=False)
+        session_check_util.assert_on_chat_page(mock_page, strict=False)
 
 
 def test_reset_page_emits_reconnecting():
@@ -168,7 +166,7 @@ def test_raise_if_session_expired_banner_keyword():
             adapter_mod._raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
 
 def test_raise_if_session_expired_banner_selector():
@@ -184,14 +182,14 @@ def test_raise_if_session_expired_banner_selector():
     def _split_probe(page, selectors):
         return selectors == banner
 
-    original_is_any_visible = check_mod.is_any_visible
-    check_mod.is_any_visible = _split_probe
+    original_is_any_visible = dom_helper.is_any_visible
+    dom_helper.is_any_visible = _split_probe
     try:
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
             adapter_mod._raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
-        check_mod.is_any_visible = original_is_any_visible
+        dom_helper.is_any_visible = original_is_any_visible
 
 
 def test_assert_on_chat_page_no_false_positive_on_chat_text():
@@ -199,9 +197,9 @@ def test_assert_on_chat_page_no_false_positive_on_chat_text():
 
     mock_page, _, orig = _make_page_mock(body_text="Hello, here is a response.")
     try:
-        check_mod._assert_on_chat_page(mock_page)  # no raise
+        session_check_util.assert_on_chat_page(mock_page)  # no raise
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
 
 def test_goto_chat_uses_commit_when_domcontentloaded_is_slow():
@@ -232,7 +230,7 @@ def test_navigate_to_chat_emits_web_loaded():
     try:
         BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
     # navigate_to_chat emits WEB_LOADED, LOGIN_VERIFIED, then MODEL_VERIFIED.
     emitted_events = [call.args[0] for call in mock_emitter.emit.call_args_list]
@@ -251,7 +249,7 @@ def test_navigate_to_chat_emits_session_expired_on_in_page_banner():
             BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
         assert exc_info.value.session_expired is True
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
     emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
     assert EVENT_SESSION_EXPIRED in emitted, f"expected EVENT_SESSION_EXPIRED in {emitted}"
@@ -269,7 +267,7 @@ def test_navigate_to_chat_no_session_expired_event_on_clean_page():
     try:
         BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
-        check_mod.is_any_visible = orig
+        dom_helper.is_any_visible = orig
 
     emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
     assert EVENT_SESSION_EXPIRED not in emitted, f"unexpected EVENT_SESSION_EXPIRED in {emitted}"
@@ -300,14 +298,14 @@ def test_navigate_to_chat_reports_fallback_model_on_event():
     mock_page.locator.side_effect = _fake_locator
     mock_page.get_by_role.return_value = trigger
     mock_page.inner_text.return_value = ""
-    orig_vis = check_mod.is_any_visible
-    check_mod.is_any_visible = lambda page, selectors: False
+    orig_vis = dom_helper.is_any_visible
+    dom_helper.is_any_visible = lambda page, selectors: False
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
     try:
         BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
-        check_mod.is_any_visible = orig_vis
+        dom_helper.is_any_visible = orig_vis
 
     verified = [call for call in mock_emitter.emit.call_args_list if call.args[0] == EVENT_MODEL_VERIFIED]
     assert verified, "MODEL_VERIFIED must be emitted even on the fallback path"
@@ -430,7 +428,7 @@ def _navigate_fixture(mock_page: MagicMock, model_text: str) -> MagicMock:
     mock_page.get_by_role.return_value.inner_text.return_value = model_text
     # No in-page expiry banner: body is clean and no login/expired shells show.
     mock_page.inner_text.return_value = ""
-    check_mod.is_any_visible = lambda page, selectors: False
+    dom_helper.is_any_visible = lambda page, selectors: False
     return MagicMock(spec=LifecycleEmitter)
 
 
@@ -597,10 +595,10 @@ def test_assert_on_chat_page_no_false_positive_when_class_wildcards_absent():
         # is in the combined string, return True (false positive); otherwise False.
         return "[class*='login'" in selectors or "[class*='passport'" in selectors
 
-    with patch.object(check_mod, "is_any_visible", side_effect=fake_is_any_visible):
+    with patch.object(dom_helper, "is_any_visible", side_effect=fake_is_any_visible):
         # Must NOT raise — the bug fix removes the false-positive selectors,
         # so fake_is_any_visible returns False and the check passes.
-        check_mod._assert_on_chat_page(mock_page)
+        session_check_util.assert_on_chat_page(mock_page)
 
 
 def test_assert_on_chat_page_happy_path_no_login_form_visible():
@@ -610,9 +608,9 @@ def test_assert_on_chat_page_happy_path_no_login_form_visible():
     mock_page.url = "https://chat.qwen.ai/"
     mock_page.query_selector.return_value = MagicMock()  # textarea present
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         # Should complete without raising AuthRequiredError.
-        check_mod._assert_on_chat_page(mock_page)
+        session_check_util.assert_on_chat_page(mock_page)
 
 
 def test_login_form_selectors_do_not_include_has_text_buttons():
@@ -640,9 +638,9 @@ def test_assert_on_chat_page_no_false_positive_when_signin_button_visible():
         old_fp_patterns = ("has-text('Log in')", "has-text('Sign in')", "has-text('Sign up')")
         return any(p in selectors for p in old_fp_patterns)
 
-    with patch.object(check_mod, "is_any_visible", side_effect=fake_is_any_visible):
+    with patch.object(dom_helper, "is_any_visible", side_effect=fake_is_any_visible):
         # Must NOT raise — the has-text selectors have been removed.
-        check_mod._assert_on_chat_page(mock_page)
+        session_check_util.assert_on_chat_page(mock_page)
 
 
 def test_err_failed_in_noise_patterns_is_lowercase():
@@ -670,7 +668,7 @@ def test_raise_if_session_expired_raises_on_in_page_expiration_banner():
     mock_page.query_selector.return_value = MagicMock()  # textarea present
     mock_page.inner_text.return_value = "Session expired, please login again"
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
             adapter_mod._raise_if_session_expired(mock_page)
 
@@ -686,7 +684,7 @@ def test_detect_session_expired_banner_no_false_positive_on_normal_chat_body():
     mock_page.query_selector.return_value = MagicMock()  # textarea present
     mock_page.inner_text.return_value = "Ask Qwen anything"
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
 
 
@@ -702,7 +700,7 @@ def test_raise_if_session_expired_raises_on_live_token_expired_banner():
     mock_page.query_selector.return_value = MagicMock()  # textarea present
     mock_page.inner_text.return_value = "Token has expired, please log in again"
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
             adapter_mod._raise_if_session_expired(mock_page)
 
@@ -719,7 +717,7 @@ def test_raise_if_session_expired_raises_on_token_has_expired_alone():
     mock_page.query_selector.return_value = MagicMock()  # textarea present
     mock_page.inner_text.return_value = "Token has expired."
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
             adapter_mod._raise_if_session_expired(mock_page)
 
@@ -737,7 +735,7 @@ def test_detect_session_expired_banner_skips_when_body_unreadable():
     mock_page.query_selector.return_value = MagicMock()
     mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
 
 
@@ -751,7 +749,7 @@ def test_detect_session_expired_returns_true_on_token_expired_banner():
     mock_page.url = "https://chat.qwen.ai/"
     mock_page.inner_text.return_value = "Token has expired, please log in again"
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         assert BrowserAdapter().detect_session_expired(mock_page) is True
 
 
@@ -762,7 +760,7 @@ def test_detect_session_expired_returns_false_on_clean_page():
     mock_page.url = "https://chat.qwen.ai/"
     mock_page.inner_text.return_value = "Hello, here is a response."
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         assert BrowserAdapter().detect_session_expired(mock_page) is False
 
 
@@ -774,7 +772,7 @@ def test_detect_session_expired_returns_false_when_body_unreadable():
     mock_page.url = "https://chat.qwen.ai/"
     mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         assert BrowserAdapter().detect_session_expired(mock_page) is False
 
 
@@ -790,7 +788,7 @@ def test_detect_session_expired_fires_on_banner_shell_selector():
 
         return selectors == ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
 
-    with patch.object(check_mod, "is_any_visible", side_effect=_banner_probe):
+    with patch.object(dom_helper, "is_any_visible", side_effect=_banner_probe):
         assert BrowserAdapter().detect_session_expired(mock_page) is True
 
 
@@ -804,7 +802,7 @@ def test_navigate_to_chat_emits_session_expired_before_propagation():
     mock_page.query_selector.return_value = None
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
             BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
 
@@ -823,7 +821,7 @@ def test_navigate_to_chat_no_session_expired_emit_on_redirect_case():
     mock_page.inner_text.return_value = "login"
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
-    with patch.object(check_mod, "is_any_visible", return_value=False):
+    with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Not authenticated") as exc_info:
             BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
 
