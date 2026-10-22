@@ -2,7 +2,7 @@
 
 FRD: [DATA.md](DATA.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md).
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-05
 
 ## Current Condition
@@ -14,11 +14,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Health | Dependencies | Next Action | Updated |
+| ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| SHARED-01 | P1 | Ready | At Risk | None | Add an acceptance scenario proving a session restore from backup leaves the target directory byte-identical. | 2026-10-05 |
-| SHARED-02 | P1 | Ready | On Track | None | Pin the DOM query helpers against one captured chat transcript so selector drift fails the kernel suite before it fails a run. | 2026-10-05 |
-| SHARED-03 | P2 | Ready | On Track | `CONFIG-02` | Specify the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settles. | 2026-10-05 |
+| SHARED-01 | P1 | Ready | None | Add an acceptance scenario proving a session restore from backup leaves the target directory byte-identical. | 2026-10-05 |
+| SHARED-02 | P1 | Ready | None | Pin the DOM query helpers against one captured chat transcript so selector drift fails the kernel suite before it fails a run. | 2026-10-05 |
+| SHARED-03 | P2 | Ready | `CONFIG-02` | Specify the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settles. | 2026-10-05 |
 
 ## Scenario Evidence
 
