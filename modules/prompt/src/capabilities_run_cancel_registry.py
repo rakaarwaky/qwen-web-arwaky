@@ -16,7 +16,10 @@ import contextlib
 import threading
 
 from modules.shared.src.common.taxonomy_core_vo import CancelToken, RunId, RunState
+from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.prompt.contract_prompt_protocol import IRunCancelProtocol
+
+log = get_logger("capabilities_run_cancel_registry")
 
 
 # Block 1: Class Definition & Constructor
@@ -28,6 +31,12 @@ class RunCancelRegistry:
     are recreated across threads.  A private event-index supports the
     ``request_cancel`` convenience path used by surfaces that only hold the
     original ``threading.Event``.
+
+    The event index maps one event to the *latest* run registered with it
+    (FR-PROMPT-005). Under the TUI slot model one slot reuses its event
+    across sequential jobs, so ``register(B)`` supersedes ``register(A)``,
+    and ``release`` only pops the mapping when it still points at the
+    releasing run — releasing A never makes B uncancellable.
     """
 
     def __init__(self) -> None:
@@ -37,17 +46,35 @@ class RunCancelRegistry:
 
     # Block 2: Protocol Method Implementation
     def register(self, run_state: RunState) -> None:
-        """Track a newly started in-flight run."""
+        """Track a newly started in-flight run.
+
+        When ``run_state.cancel_event`` was already registered for a
+        different run — the TUI's one-event-per-slot reuse — the newer run
+        supersedes the older mapping and the reuse is logged so the older
+        run's own release never unregisters the live one.
+        """
         with self._lock:
             self._states[run_state.run_id] = run_state
             if run_state.cancel_event is not None:
+                previous = self._event_index.get(run_state.cancel_event)
+                if previous is not None and previous != run_state.run_id:
+                    log.warning(
+                        "Cancel event reused: run %s supersedes run %s in the event index",
+                        run_state.run_id,
+                        previous,
+                    )
                 self._event_index[run_state.cancel_event] = run_state.run_id
 
     def release(self, run_state: RunState) -> None:
-        """Drop the entry for a finished run."""
+        """Drop the entry for a finished run.
+
+        The event index entry is removed only when it still points at this
+        run, so a run whose event was reused by a later registration never
+        deletes the successor's mapping.
+        """
         with self._lock:
             self._states.pop(run_state.run_id, None)
-            if run_state.cancel_event is not None:
+            if run_state.cancel_event is not None and self._event_index.get(run_state.cancel_event) == run_state.run_id:
                 self._event_index.pop(run_state.cancel_event, None)
 
     def active_bctx(self, run_id: RunId) -> object | None:
@@ -68,7 +95,7 @@ class RunCancelRegistry:
         with run_state.bctx_lock:
             run_state.active_bctx = bctx
 
-    def cancel_run(self, run_id: RunId) -> None:
+    def cancel_run(self, run_id: RunId) -> bool:
         """Cancel one specific in-flight run identified by its run_id.
 
         The run's ``cancel_event`` is always set so any in-progress flow
@@ -76,11 +103,16 @@ class RunCancelRegistry:
         When the run is still active, its browser context is closed so the
         underlying browser process stops.  Sibling runs holding different
         run_ids are unaffected.
+
+        Returns:
+            bool: True when an in-flight run was found and stopped, False
+            when the run already finished (or was never registered), so a
+            cancel never reports success for a terminal run.
         """
         with self._lock:
             run_state = self._states.get(run_id)
         if run_state is None:
-            return
+            return False
         run_state.cancel_event.set()
         bctx = self.active_bctx(run_id)
         if bctx is not None:
@@ -88,19 +120,23 @@ class RunCancelRegistry:
             if callable(close_fn):
                 with contextlib.suppress(Exception):
                     close_fn()
+        return True
 
-    def cancel_by_event(self, cancel_event: CancelToken) -> None:
+    def cancel_by_event(self, cancel_event: CancelToken) -> bool:
         """Cancel the run whose ``cancel_event`` was supplied.
 
         Delegates to ``cancel_run`` using the stable run_id resolved from
         the internal event index.  If the event is not registered the run
-        has already finished and the call is a no-op.
+        has already finished and the call is a no-op returning False.
+
+        Returns:
+            bool: True when an in-flight run was found and stopped.
         """
         with self._lock:
             run_id = self._event_index.get(cancel_event)
         if run_id is None:
-            return
-        self.cancel_run(run_id)
+            return False
+        return self.cancel_run(run_id)
 
     # Block 3: Dunder Methods, Factories, Helpers
     def __repr__(self) -> str:

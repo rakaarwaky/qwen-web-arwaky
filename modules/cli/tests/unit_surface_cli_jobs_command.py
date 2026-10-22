@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
+from modules.shared.src.common.taxonomy_core_error import JobQueueFullError
 from modules.shared.src.common.taxonomy_core_vo import JobRecord
 from modules.shared.src.jobs.taxonomy_jobs_vo import JobResponse
 
@@ -142,6 +143,31 @@ class TestJobsSubmit:
         assert rc == 1
         err = capsys.readouterr().err
         assert "PATH_OUTSIDE_WORKSPACE" in err or "outside the workspace" in err
+
+    def test_submit_queue_full_reports_cli_429_with_retry_hint(self, tmp_path, capsys) -> None:
+        """A saturated pool must not degrade into the generic cli-500."""
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        prompt_file = tmp_path / "task.md"
+        prompt_file.write_text("test prompt")
+        jobs = MagicMock()
+        jobs.execute.side_effect = JobQueueFullError("worker pool at capacity", retry_after_sec=12.5, queue_depth=8)
+        rc = handle_jobs_command(_submit_args(str(prompt_file), json_output=True), jobs)
+        assert rc == 1
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["success"] is False
+        assert payload["error_code"] == "cli-429"
+        assert "retry in 12.5s" in payload["message"]
+
+    def test_submit_generic_failure_stays_cli_500(self, tmp_path, capsys) -> None:
+        """Control: a non-backpressure exception keeps the generic code."""
+        os.environ["QWEN_WORKSPACE_ROOT"] = str(tmp_path)
+        prompt_file = tmp_path / "task.md"
+        prompt_file.write_text("test prompt")
+        jobs = MagicMock()
+        jobs.execute.side_effect = RuntimeError("pool down")
+        rc = handle_jobs_command(_submit_args(str(prompt_file), json_output=True), jobs)
+        assert rc == 1
+        assert json.loads(capsys.readouterr().out)["error_code"] == "cli-500"
 
 
 class TestJobsStatus:

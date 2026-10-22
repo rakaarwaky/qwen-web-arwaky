@@ -19,8 +19,9 @@ from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDis
 from modules.shared.src.common.taxonomy_core_constant import MAX_ATTEMPTS
 from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError
 from modules.shared.src.common.taxonomy_core_event import PIPELINE_EVENT_SEQUENCE, STANDARD_PROMPT_EVENTS
-from modules.shared.src.common.taxonomy_core_vo import AppConfig, MessageCount, TimeoutSec
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, MessageCount, ResponseText, TimeoutSec
 from modules.shared.src.common.utility_dom_helper import setup_lifecycle_state
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
 
 
 def _make_cfg() -> AppConfig:
@@ -75,22 +76,21 @@ def _run_once(
     events=STANDARD_PROMPT_EVENTS,
 ) -> str:
     sender = _make_sender(events)
-    return str(
-        flow.dispatch_and_wait_for_response(
-            page=MagicMock(),
-            filepath=Path("/tmp/prompt.txt"),
-            prompt="hello",
-            msg_count_before=MessageCount(0),
-            timeout_sec=TimeoutSec(60),
-            active_cfg=_make_cfg(),
-            emitter=emitter,
-            state=state,
-            observability=observability,
-            injector=MagicMock(),
-            sender=sender,
-            streamer=streamer,
-        )
+    verdict = flow.dispatch_and_wait_for_response(
+        page=MagicMock(),
+        filepath=Path("/tmp/prompt.txt"),
+        prompt="hello",
+        msg_count_before=MessageCount(0),
+        timeout_sec=TimeoutSec(60),
+        active_cfg=_make_cfg(),
+        emitter=emitter,
+        state=state,
+        observability=observability,
+        injector=MagicMock(),
+        sender=sender,
+        streamer=streamer,
     )
+    return str(verdict.text)
 
 
 def test_dispatch_retry_survives_first_attempt_timeout() -> None:
@@ -107,7 +107,7 @@ def test_dispatch_retry_survives_first_attempt_timeout() -> None:
     streamer = _make_streamer(
         [
             ResponseDetectionTimeoutError("no terminal response event detected"),
-            "final response",
+            StreamVerdict(text=ResponseText("final response"), verdict="complete"),
         ]
     )
 
@@ -176,7 +176,7 @@ def test_attachment_pipeline_retry_preserves_document_parsed() -> None:
     streamer = _make_streamer(
         [
             ResponseDetectionTimeoutError("no terminal response event detected"),
-            "final response",
+            StreamVerdict(text=ResponseText("final response"), verdict="complete"),
         ]
     )
 
@@ -190,3 +190,33 @@ def test_attachment_pipeline_retry_preserves_document_parsed() -> None:
     gate = emitter.gate
     assert gate is not None
     assert "EVENT_DOCUMENT_PARSED" in [str(e) for e in gate.completed]
+
+
+def test_dispatch_does_not_retry_a_stalled_stream() -> None:
+    """BE-3-003 / FRD Test Scenario: "A stalled stream reports `stalled` and
+    does not retry the send." A StuckDetectedError is terminal for the run;
+    the retry budget belongs to CONFIG-02, not this seam."""
+    from modules.shared.src.common.taxonomy_core_error import StuckDetectedError
+
+    flow = PromptFlowDispatcher()
+    observability = MagicMock()
+    logger = MagicMock()
+
+    emitter, state = setup_lifecycle_state(logger, STANDARD_PROMPT_EVENTS)
+    for event in STANDARD_PROMPT_EVENTS[:3]:
+        emitter.emit(event)
+
+    remaining = [StuckDetectedError("no forward lifecycle event for 300s")]
+
+    def wait_for_response_stub(*_args, **_kwargs):
+        raise remaining[0]
+
+    streamer = MagicMock()
+    streamer.wait_for_response.side_effect = wait_for_response_stub
+
+    with patch("modules.prompt.src.capabilities_prompt_flow_dispatcher.time.sleep"):
+        with pytest.raises(StuckDetectedError, match="no forward lifecycle event"):
+            _run_once(flow, emitter, state, streamer, observability)
+
+    # The stall fired once and the send was not retried: one wait, one attempt.
+    assert streamer.wait_for_response.call_count == 1

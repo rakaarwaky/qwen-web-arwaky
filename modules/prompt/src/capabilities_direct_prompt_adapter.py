@@ -16,6 +16,7 @@ from playwright.sync_api import Page
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.common.taxonomy_core_constant import DIRECT_PROMPT_STEM
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
+from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, StuckDetectedError
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     STANDARD_PROMPT_EVENTS,
@@ -45,7 +46,11 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
     IStreamProtocol,
     LifecycleObserver,
 )
-from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import (
+    PromptRequest,
+    PromptResponse,
+    StreamVerdict,
+)
 
 # Block 1: Class Definition & Constructor
 
@@ -81,7 +86,7 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         headless: HeadlessFlag | bool = True,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Pipeline 1: Process a direct text prompt string and return AI response.
 
         ``event_observer`` optionally receives every emitted lifecycle event
@@ -121,16 +126,41 @@ class DirectPromptAdapter(IDirectPromptProtocol):
                 t0 = time.time()
                 with self._browser.browser_session(cfg) as bctx:
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                    text = self._execute_direct_on_page(page, p_path, prompt_str, int(timeout_sec), cfg, emitter, state)
+                    try:
+                        verdict = self._execute_direct_on_page(
+                            page, p_path, prompt_str, int(timeout_sec), cfg, emitter, state
+                        )
+                    except (StuckDetectedError, ResponseDetectionTimeoutError) as exc:
+                        # BE-1-003: the flow's shared cut handler saves the
+                        # partial artifact and returns the honest verdict
+                        # (stalled / incomplete) for all three pipelines.
+                        return self._flow.mid_stream_cut_outcome(
+                            exc,
+                            page,
+                            saver=self._saver,
+                            observability=self._observability,
+                            out_path=out_path,
+                            prompt_path=p_path,
+                            elapsed=time.time() - t0,
+                            ctx=ctx,
+                            emitter=emitter,
+                        )
                 dur = time.time() - t0
-                save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
-                return ResponseText(text)
+                save_orchestrator_output(self._saver, out_path, p_path, verdict.text, dur, ctx, emitter=emitter)
+                # The siblings report the saved path, not the raw answer; the
+                # answer itself lives in the artifact (BE-1-003). The verdict
+                # rides along so a caller can tell a complete response from a
+                # recovered one.
+                return PromptResponse(
+                    response_text=ResponseText(f"Successfully processed {p_path.name} -> {out_path}"),
+                    extraction_verdict=verdict.verdict,
+                )
             finally:
                 p = Path(tmp_path)
                 if p.exists():
                     p.unlink()
         except Exception as exc:
-            return to_error_response(exc)
+            return PromptResponse(response_text=to_error_response(exc), extraction_verdict=None)
         finally:
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
@@ -162,7 +192,7 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         active_cfg: AppConfig,
         emitter: LifecycleEmitter,
         state: LifecycleState,
-    ) -> str:
+    ) -> StreamVerdict:
         self._browser.navigate_to_chat(page, emitter)
         self._browser.check_auth(page)
         msg_count_before = self._sender.count_messages(page)
@@ -195,18 +225,19 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         surface renders the problem without a try/except.
         """
         if request.verb == "process_direct_prompt":
-            return PromptResponse(
-                response_text=self.process_direct_prompt(
-                    prompt=request.prompt,
-                    timeout_sec=request.timeout_sec,
-                    output_file=request.output_file,
-                    headless=request.headless,
-                    event_observer=request.event_observer,
-                    session_resolver=request.session_resolver,
-                )
+            return self.process_direct_prompt(
+                prompt=request.prompt,
+                timeout_sec=request.timeout_sec,
+                output_file=request.output_file,
+                headless=request.headless,
+                event_observer=request.event_observer,
+                session_resolver=request.session_resolver,
             )
         if request.verb == "request_cancel":
-            return PromptResponse(cancelled=True)
+            # FR-PROMPT-004: a direct prompt registers no cancel event and
+            # owns no browser context to stop, so cancel always reports
+            # zero pipelines stopped for it.
+            return PromptResponse(cancelled=False, pipelines_stopped=0)
         return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 

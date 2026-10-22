@@ -74,7 +74,9 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
         ``IPromptAggregate.request_cancel`` is a first-class contract
         operation, so the Swarm cancel seam reaches it through ``execute``
         with the ``request_cancel`` verb rather than duck-typing on an
-        attribute that may or may not exist (issue #360).
+        attribute that may or may not exist (issue #360). The response is
+        discarded: a fan-out cancel is best-effort and reports at the
+        fan-out level, so no caller consumes a per-leg count.
         """
         self._attachment.execute(PromptRequest(verb="request_cancel", cancel_event=event))
 

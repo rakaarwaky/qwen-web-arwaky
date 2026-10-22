@@ -14,7 +14,12 @@ from playwright.sync_api import Page
 
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.common.taxonomy_core_error import RunCancelledError, UploadFailureError
+from modules.shared.src.common.taxonomy_core_error import (
+    ResponseDetectionTimeoutError,
+    RunCancelledError,
+    StuckDetectedError,
+    UploadFailureError,
+)
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     PIPELINE_EVENT_SEQUENCE,
@@ -23,6 +28,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
     AttachmentPath,
     CancelToken,
+    ClickTimeoutMs,
     HeadlessFlag,
     JobName,
     OutputPath,
@@ -53,7 +59,11 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
     IUploadProtocol,
     LifecycleObserver,
 )
-from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import (
+    PromptRequest,
+    PromptResponse,
+    StreamVerdict,
+)
 
 
 def new_run_state(cancel_event: CancelToken | None = None) -> RunState:
@@ -95,8 +105,8 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
 
     # Block 2: Protocol Method Implementation
 
-    def request_cancel(self, cancel_event: CancelToken) -> None:
-        """Cancel a specific in-flight run identified by its cancel event.
+    def request_cancel(self, cancel_event: CancelToken) -> bool:
+        """Cancel the in-flight run identified by its cancel event.
 
         The caller (e.g. the TUI slot worker) creates its own
         ``threading.Event`` per run, passes it into
@@ -106,8 +116,13 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
 
         The registry resolves the event to a stable run_id internally, so the
         lookup never depends on event object identity outliving the run.
+
+        Returns:
+            bool: True only when an in-flight pipeline was stopped, so a
+            cancel for a run that already finished reports zero stopped
+            pipelines (FR-PROMPT-004).
         """
-        self._cancel.cancel_by_event(cancel_event)
+        return self._cancel.cancel_by_event(cancel_event)
 
     @staticmethod
     def _resolve_session_path(session_resolver: Callable[[], Path | None] | None) -> Path | None:
@@ -128,7 +143,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Pipeline 3: Process a prompt file from disk with document attachment.
 
         Supports folder paths: if attachment_file is a folder, it will be
@@ -159,6 +174,10 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
             att_path = self._folder_adapter.resolve_to_attachment(Path(attachment_file))
             self._uploader.validate_file(att_path)
             p_path, out_path = resolve_pipeline_output_path(p_path, output_file, attachment_path=att_path)
+            # FR-PROMPT-002: read the prompt text before any browser work so
+            # an unreadable file fails at pre-flight (it already exists and
+            # is validated above; this covers permission/encoding failures).
+            read_prompt = self._read_prompt_text(p_path)
 
             cfg = build_app_config(
                 input_path=p_path,
@@ -178,16 +197,45 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                     if run_state.cancel_event.is_set():
                         raise RunCancelledError("Cancelled by user before browser launch")
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                    text = self._execute_attachment_on_page(
-                        page, p_path, att_path, cfg.request_timeout, cfg, emitter, state, run_state.cancel_event
-                    )
+                    try:
+                        text = self._execute_attachment_on_page(
+                            page,
+                            p_path,
+                            att_path,
+                            cfg.request_timeout,
+                            cfg,
+                            emitter,
+                            state,
+                            prompt=read_prompt,
+                            cancel_event=run_state.cancel_event,
+                        )
+                    except (StuckDetectedError, ResponseDetectionTimeoutError) as exc:
+                        # BE-1-003: the flow's shared cut handler saves the
+                        # partial artifact and returns the honest verdict
+                        # (stalled / incomplete) for all three pipelines.
+                        return self._flow.mid_stream_cut_outcome(
+                            exc,
+                            page,
+                            saver=self._saver,
+                            observability=self._observability,
+                            out_path=out_path,
+                            prompt_path=p_path,
+                            elapsed=time.time() - t0,
+                            ctx=ctx,
+                            emitter=emitter,
+                        )
                 finally:
                     self._cancel.set_active_bctx(run_state.run_id, None)
             dur = time.time() - t0
-            save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
-            return ResponseText(f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}")
+            save_orchestrator_output(self._saver, out_path, p_path, text.text, dur, ctx, emitter=emitter)
+            return PromptResponse(
+                response_text=ResponseText(
+                    f"Successfully processed {p_path.name} with attachment {att_path.name} -> {out_path}"
+                ),
+                extraction_verdict=text.verdict,
+            )
         except Exception as exc:
-            return to_error_response(exc)
+            return PromptResponse(response_text=to_error_response(exc), extraction_verdict=None)
         finally:
             self._cancel.release(run_state)
             self._observability.detach_run_log(RunId(ctx.run_id))
@@ -204,11 +252,10 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         active_cfg: AppConfig,
         emitter: LifecycleEmitter,
         state: LifecycleState,
+        prompt: str,
         cancel_event: CancelToken | None = None,
-    ) -> str:
+    ) -> StreamVerdict:
         logger = self._observability.get_logger()
-
-        prompt = filepath.read_text(encoding="utf-8").strip()
 
         self._browser.navigate_to_chat(page, emitter)
         self._browser.check_auth(page)
@@ -224,10 +271,12 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
             logger.error("File upload or parsing could not be positively verified: %s%s", att_path.name, detail)
             raise UploadFailureError(f"Attachment upload/parsing failed for {att_path.name}{detail}")
 
-        # Use a generous timeout so _wait_for_send_enabled can hold for
-        # long document parsing (up to 120s) before the first click attempt.
+        # The send ceiling is configured per environment (FRD Assumptions):
+        # a large document can hold the send for minutes while parsing
+        # finishes, so the ceiling comes from AppConfig instead of a
+        # hardcoded constant. QWEN_SEND_CLICK_TIMEOUT_MS overrides it.
         send_cfg = SenderConfig(
-            click_timeout_ms=120_000,
+            click_timeout_ms=ClickTimeoutMs(int(active_cfg.send_click_timeout_ms)),
             try_enter_key_fallback=True,
         )
         try:
@@ -253,6 +302,11 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                 emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "post_send_banner"})
             raise
 
+    @staticmethod
+    def _read_prompt_text(filepath: Path) -> str:
+        """Read and normalize the prompt file, naming the path on failure (FR-PROMPT-002)."""
+        return filepath.read_text(encoding="utf-8").strip()
+
     def execute(self, request: PromptRequest) -> PromptResponse:
         """Run one prompt verb and return the answer, with failures carried.
 
@@ -267,23 +321,20 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                     response_text=ResponseText("ERROR: process_prompt_with_attachment requires attachment_file")
                 )
             try:
-                return PromptResponse(
-                    response_text=self.process_prompt_with_attachment(
-                        prompt_file=request.prompt_file,
-                        attachment_file=request.attachment_file,
-                        output_file=request.output_file,
-                        headless=request.headless,
-                        cancel_event=request.cancel_event,
-                        event_observer=request.event_observer,
-                        session_resolver=request.session_resolver,
-                    )
+                return self.process_prompt_with_attachment(
+                    prompt_file=request.prompt_file,
+                    attachment_file=request.attachment_file,
+                    output_file=request.output_file,
+                    headless=request.headless,
+                    cancel_event=request.cancel_event,
+                    event_observer=request.event_observer,
+                    session_resolver=request.session_resolver,
                 )
             except Exception as exc:
                 return PromptResponse(response_text=ResponseText(f"ERROR: {exc}"))
         if request.verb == "request_cancel":
-            if request.cancel_event is not None:
-                self.request_cancel(request.cancel_event)
-            return PromptResponse(cancelled=True)
+            stopped = self.request_cancel(request.cancel_event) if request.cancel_event is not None else False
+            return PromptResponse(cancelled=stopped, pipelines_stopped=1 if stopped else 0)
         return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 

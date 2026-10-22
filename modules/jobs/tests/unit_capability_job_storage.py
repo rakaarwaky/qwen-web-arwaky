@@ -11,6 +11,7 @@ import pytest
 
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
+from modules.shared.src.common.taxonomy_core_constant import JOB_HEARTBEAT_LEASE_SEC
 from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
@@ -213,6 +214,121 @@ class TestJobOwnershipPreserved(unittest.TestCase):
 
         self.assertLess(elapsed, 0.5, f"submit took {elapsed:.2f}s — must be sub-500ms when rejected")
         throttled._executor.shutdown(wait=True)
+
+
+class TestSubmitHeartbeatStamp(unittest.TestCase):
+    """Submit must stamp heartbeat_at so a second process cannot zombie a live job."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage_dir = Path(self.temp_dir.name)
+        self.storage = JobStorage(storage_dir=self.storage_dir)
+        self.mock_file_only = MagicMock()
+        self.mock_attachment = MagicMock()
+        # Block the worker so the submit→start window stays open.
+        self._release = __import__("threading").Event()
+        self.mock_file_only.execute.side_effect = lambda *_a, **_k: (
+            self._release.wait(timeout=30),
+            PromptResponse(response_text=ResponseText("ok")),
+        )[1]
+        self.orchestrator = AgentJobOrchestrator(
+            storage=self.storage,
+            file_only=self.mock_file_only,
+            attachment=self.mock_attachment,
+            max_workers=1,
+        )
+
+    def tearDown(self) -> None:
+        self._release.set()
+        self.orchestrator._executor.shutdown(wait=True)
+        self.temp_dir.cleanup()
+
+    def test_submit_record_carries_heartbeat_at(self) -> None:
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        rec = _submit_file(self.orchestrator, prompt_file)
+        self.assertIsNotNone(rec.heartbeat_at)
+
+    def test_missing_heartbeat_is_not_stale_within_grace(self) -> None:
+        from datetime import UTC, datetime
+
+        fresh = datetime.now(UTC).isoformat()
+        self.assertFalse(JobStorage._heartbeat_is_stale(None, fresh))
+
+    def test_missing_heartbeat_is_stale_after_lease(self) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        old = (datetime.now(UTC) - timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC * 2)).isoformat()
+        self.assertTrue(JobStorage._heartbeat_is_stale(None, old))
+
+    def test_naive_created_at_is_treated_as_utc_not_typeerror(self) -> None:
+        # Legacy/corrupt records store offset-naive stamps; must not crash reconcile.
+        from datetime import UTC, datetime, timedelta
+
+        fresh = datetime.now(UTC).replace(tzinfo=None).isoformat()
+        old = (datetime.now(UTC) - timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC * 2)).replace(tzinfo=None).isoformat()
+        self.assertFalse(JobStorage._heartbeat_is_stale(None, fresh))
+        self.assertTrue(JobStorage._heartbeat_is_stale(None, old))
+        self.assertTrue(JobStorage._heartbeat_is_stale(old, None))
+        self.assertFalse(JobStorage._heartbeat_is_stale(fresh, None))
+
+    def test_non_string_stamp_is_treated_as_stale_not_attributeerror(self) -> None:
+        # Corrupt JSON can store a numeric stamp; must not crash construction-time reconcile.
+        self.assertTrue(JobStorage._heartbeat_is_stale(None, 12345))
+        self.assertTrue(JobStorage._heartbeat_is_stale(None, 12.5))
+        self.assertTrue(JobStorage._heartbeat_is_stale(12345, None))
+        self.assertTrue(JobStorage._heartbeat_is_stale(12.5, None))
+
+    def test_live_job_is_not_zombied_by_second_storage_construct(self) -> None:
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        rec = _submit_file(self.orchestrator, prompt_file)
+        # Second process in the submit→start window must not mark it failed.
+        again = JobStorage(storage_dir=self.storage_dir)
+        loaded = again.get_job(rec.job_id)
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertFalse(loaded.completed, "live submit window job was marked zombie")
+
+
+class TestTerminalSaveAfterHeartbeatJoin(unittest.TestCase):
+    """Terminal state must survive the heartbeat (join-before-save)."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage = JobStorage(storage_dir=Path(self.temp_dir.name))
+        self.mock_file_only = MagicMock()
+        self.mock_attachment = MagicMock()
+        self.orchestrator = AgentJobOrchestrator(
+            storage=self.storage,
+            file_only=self.mock_file_only,
+            attachment=self.mock_attachment,
+            max_workers=1,
+        )
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_completed_record_is_not_demoted_by_a_late_beat(self) -> None:
+        prompt_file = Path(self.temp_dir.name) / "p.md"
+        prompt_file.write_text("hi", encoding="utf-8")
+        self.mock_file_only.execute.return_value = PromptResponse(response_text=ResponseText("ok"))
+        rec = _submit_file(self.orchestrator, prompt_file)
+        self.orchestrator._executor.shutdown(wait=True)
+        loaded = _job_status(self.orchestrator, rec.job_id)
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertTrue(loaded.completed)
+        self.assertIsNotNone(loaded.completed_at)
+        self.assertIsNotNone(loaded.result_preview)
+        # A beat after completion must refuse to rewrite the record.
+        before = loaded.completed_at
+        self.orchestrator._refresh_heartbeat(JobId(rec.job_id))
+        after = _job_status(self.orchestrator, rec.job_id)
+        assert after is not None
+        self.assertTrue(after.completed)
+        self.assertEqual(after.completed_at, before)
+        self.assertEqual(after.result_preview, loaded.result_preview)
 
 
 if __name__ == "__main__":

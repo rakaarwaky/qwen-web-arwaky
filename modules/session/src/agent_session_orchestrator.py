@@ -22,6 +22,7 @@ from modules.shared.src.common.taxonomy_core_constant import CHAT_URL, DEFAULT_O
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.utility_core_env import login_wait_seconds
 from modules.shared.src.common.utility_core_session_backup import take_snapshot
 from modules.shared.src.config.utility_config_app_factory import build_app_config
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
@@ -206,7 +207,9 @@ class SessionOrchestrator(ISessionAggregate):
             page = bctx.pages[0] if bctx.pages else bctx.new_page()
             page.goto(CHAT_URL, wait_until="domcontentloaded")
 
-            deadline = time.monotonic() + cfg.timeout
+            # The human wait ceiling is its own budget: a typed login must
+            # never be cut short by the generic run timeout.
+            deadline = time.monotonic() + login_wait_seconds()
             while True:
                 try:
                     if page.is_closed():

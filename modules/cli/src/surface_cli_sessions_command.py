@@ -26,6 +26,7 @@ from modules.cli.src.surface_cli_json_hook import (
     _fail_json,
     status_glyph,
 )
+from modules.shared.src.common.utility_core_env import login_wait_seconds
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest, SessionResponse
 
 if TYPE_CHECKING:
@@ -306,7 +307,9 @@ def _login_once(session: ISessionAggregate, name: str, json_output: bool = False
         print("Creating isolated browser profile...")
         print()
         print("⏳ Launching browser for manual login...")
+        minutes, _ = divmod(login_wait_seconds(), 60)
         print("   Login at chat.qwen.ai, then close the browser window when done.")
+        print(f"   Waiting up to {minutes} minutes for the login to finish.")
         print()
         print("💡 Tip: Close the browser window to continue.")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

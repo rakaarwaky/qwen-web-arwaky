@@ -9,12 +9,14 @@ from __future__ import annotations
 import inspect
 
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
+from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
 from modules.config.src.capabilities_workspace_provisioner import WorkspaceProvisioner
 from modules.shared.src.config.contract_config_aggregate import IConfigAggregate
 from modules.shared.src.config.contract_config_protocol import (
+    IConfigHealthProbeProtocol,
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IConfigValidatorProtocol,
@@ -26,6 +28,7 @@ _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     IConfigPathResolverProtocol,
     IConfigSlotPlanProtocol,
     IWorkspaceProtocol,
+    IConfigHealthProbeProtocol,
 )
 
 
@@ -47,6 +50,10 @@ def test_slot_resolver_implements_the_slot_plan_protocol() -> None:
 
 def test_workspace_provisioner_implements_the_workspace_protocol() -> None:
     assert IWorkspaceProtocol in inspect.getmro(WorkspaceProvisioner)
+
+
+def test_health_probe_implements_the_health_probe_protocol() -> None:
+    assert IConfigHealthProbeProtocol in inspect.getmro(ConfigHealthProbe)
 
 
 def test_aggregate_declares_only_the_execute_door() -> None:

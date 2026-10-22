@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import re
+import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
@@ -38,6 +40,10 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
     #: Bounded ceiling on the whole probe; a stalled launch is a limit signal too.
     DEFAULT_TIMEOUT_SECONDS = 60.0
+
+    #: Grace the asyncio side gives a cancelled probe thread to close its own
+    #: browser context before the timeout verdict is returned.
+    CANCEL_JOIN_TIMEOUT_SECONDS = 5.0
 
     def __init__(
         self,
@@ -90,6 +96,11 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
         cfg = self._build_cfg(session)
         loop = asyncio.get_running_loop()
+        # Per-probe handles: concurrent diagnose_session calls on one checker
+        # must not share cancel state or a sibling's timeout would abort them.
+        cancel = self._new_cancel()
+        probe_done = threading.Event()
+
         probe_task = loop.run_in_executor(
             None,
             self._probe_verdict,
@@ -97,10 +108,21 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
             session.session_id,
             session.status,
             session.reason,
+            cancel,
+            probe_done,
         )
         try:
             return await asyncio.wait_for(probe_task, timeout=self._timeout)
         except asyncio.TimeoutError:
+            # Ask the probe thread to tear its own browser context down; the
+            # executor thread cannot be cancelled, so the probe must do it.
+            cancel.set()
+            # Bounded grace until the probe acknowledges cancel and exits —
+            # including the launch window before its context is open. Never
+            # blocks unconditionally: a wedged page must not park the check.
+            deadline = time.monotonic() + self.CANCEL_JOIN_TIMEOUT_SECONDS
+            while not probe_done.is_set() and time.monotonic() < deadline:
+                await asyncio.sleep(0.05)
             if session.status == SessionStatus.LIMITED:
                 return SessionHealthResult(
                     session_id=session_id,
@@ -176,6 +198,11 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         return healthy_count, len(results)
 
     # Block 3: Dunder Methods, Factories, Helpers
+
+    def _new_cancel(self) -> threading.Event:
+        """Fresh cooperative cancel handle for one probe (never shared)."""
+        return threading.Event()
+
     def _build_cfg(self, session: SessionInfo) -> AppConfig:
         """Point the probe at *session*'s stored profile, reusing the base cfg's flags."""
         base = self._session_cfg
@@ -217,11 +244,28 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         session_id: SessionId,
         prior_status: SessionStatus,
         prior_reason: str | None,
+        cancel: threading.Event,
+        probe_done: threading.Event,
     ) -> SessionHealthResult:
         """Synchronous probe returning a reasoned SessionHealthResult.
 
         Runs on a worker thread to keep the asyncio event loop unblocked.
+        *cancel* / *probe_done* belong to this probe only.
         """
+        try:
+            return self._probe_verdict_inner(cfg, session_id, prior_status, prior_reason, cancel)
+        finally:
+            probe_done.set()
+
+    def _probe_verdict_inner(
+        self,
+        cfg: AppConfig,
+        session_id: SessionId,
+        prior_status: SessionStatus,
+        prior_reason: str | None,
+        cancel: threading.Event,
+    ) -> SessionHealthResult:
+        """Body of one probe; *cancel* is never shared across concurrent probes."""
         if self._browser is None:
             if prior_status == SessionStatus.LIMITED:
                 return SessionHealthResult(
@@ -240,7 +284,18 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
             )
 
         try:
+            # Entering the adapter context launches Chromium; teardown runs on
+            # this thread when the with-block exits (including cancel).
             with self._browser.health_probe_page(cfg) as page:
+                if cancel.is_set():
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.AUTH_REQUIRED,
+                        reason=HealthReason.TIMEOUT.value,
+                        evidence="Health probe cancelled before completing",
+                        recovery_action="Check network connection and responsiveness of chat.qwen.ai.",
+                    )
+
                 if self._body_is_rate_limited(page):
                     evidence = self._extract_limit_evidence(page)
                     return SessionHealthResult(
@@ -251,7 +306,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
                         recovery_action="Session is rate-limited. Switch accounts or reduce request throughput.",
                     )
 
-                if not self._page_is_usable(page):
+                if not self._page_is_usable(page, cancel=cancel):
                     return SessionHealthResult(
                         session_id=session_id,
                         status=SessionStatus.AUTH_REQUIRED,
@@ -317,12 +372,19 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         return None
 
     @staticmethod
-    def _page_is_usable(page: Any) -> bool:
-        """True when the chat composer (textarea) is present on the page."""
+    def _page_is_usable(page: Any, cancel: threading.Event | None = None) -> bool:
+        """True when the chat composer (textarea) is present on the page.
+
+        ``cancel`` breaks out of the 500 ms poll steps so a probe asked to
+        stop does not spend the whole usability window waiting on a page it
+        is about to discard.
+        """
         try:
             selector = "textarea"
             deadline = 3
             for _ in range(deadline):
+                if cancel is not None and cancel.is_set():
+                    return False
                 if page.query_selector(selector):
                     return True
                 page.wait_for_timeout(500)

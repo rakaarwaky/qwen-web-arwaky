@@ -8,8 +8,9 @@ and StatusFileWriter.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
-from contextlib import suppress
+import os
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +25,45 @@ from modules.shared.src.common.taxonomy_core_event import EVENT_OUTPUT_COPIED
 #: contain arbitrary substrings without being mistaken for temp artifacts.
 ATOMIC_TEMP_SUFFIX = ".tmpwrite"
 
+#: Owner-only mode the lock file is forced to, independent of umask.
+_LOCK_FILE_MODE = 0o600
+
+
+@contextmanager
+def exclusive_file_lock(lock_path: Path) -> Iterator[None]:
+    """Hold an exclusive advisory lock on *lock_path* for the block's duration.
+
+    Blocking ``fcntl.flock`` serializes same-host concurrent writers (MCP
+    server + CLI). The kernel releases the lock when the holder dies, so a
+    crashed writer cannot wedge later ones.
+    """
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, _LOCK_FILE_MODE)
+    except OSError as exc:
+        raise OutputWriteError(f"could not open lock file {lock_path}: {exc}") from exc
+    try:
+        with suppress(OSError):
+            os.chmod(str(lock_path), _LOCK_FILE_MODE)
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            with suppress(OSError):
+                fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        with suppress(OSError):
+            os.close(fd)
+
 
 def _atomic_write(target: Path, content: str, mode: int = 0o600) -> None:
     """Write content to a file atomically via temp + replace with secure file mode (Issue #353).
+
+    The mode is applied to the temp file **before** the rename, so no window
+    exists where the destination is world/group-readable, and re-asserted
+    on the destination afterwards because ``os.replace`` preserves the
+    source inode when the target already exists with looser permissions.
 
     Parameters
     ----------

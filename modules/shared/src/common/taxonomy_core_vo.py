@@ -664,6 +664,10 @@ class AppConfig:
     request_timeout: int = 600
     poll_interval: float = 1.0
     streaming_timeout: int = 180
+    #: Wall-clock ceiling on the attachment send path (parse-wait + first
+    #: click), sourced from ``QWEN_SEND_CLICK_TIMEOUT_MS`` so the ceiling is
+    #: configured per environment instead of hardcoded (FRD Assumptions).
+    send_click_timeout_ms: int = 120_000
     inline_prompt: bool = False
     inline_prompt_text: str | None = None
 
