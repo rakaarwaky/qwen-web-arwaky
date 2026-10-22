@@ -9,6 +9,7 @@ validation problems.
 
 from __future__ import annotations
 
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_LOGIN_WAIT_TIMEOUT_SEC
 from modules.shared.src.common.utility_core_env import (
     ENVIRONMENT,
     QWEN_DEFAULT_MODEL,
@@ -20,6 +21,7 @@ from modules.shared.src.common.utility_core_env import (
     effective_config,
     get_secret_env,
     is_secret,
+    login_wait_seconds,
     registered_env,
     runbook_index,
     unknown_env_vars,
@@ -130,3 +132,28 @@ def test_runbook_index_covers_the_incident_categories():
     for category in ("auth", "browser", "file_io", "session", "update"):
         assert index[category].startswith("docs/")
         assert index[category].endswith(".md")
+
+
+def test_login_wait_seconds_defaults_to_the_registered_ceiling():
+    assert login_wait_seconds() == DEFAULT_LOGIN_WAIT_TIMEOUT_SEC == 1800
+
+
+def test_login_wait_seconds_honors_a_positive_override(monkeypatch):
+    monkeypatch.setenv("QWEN_LOGIN_WAIT_SEC", "900")
+    assert login_wait_seconds() == 900
+
+
+def test_login_wait_seconds_falls_back_on_a_bad_override(monkeypatch):
+    monkeypatch.setenv("QWEN_LOGIN_WAIT_SEC", "soon")
+    assert login_wait_seconds() == DEFAULT_LOGIN_WAIT_TIMEOUT_SEC
+    monkeypatch.setenv("QWEN_LOGIN_WAIT_SEC", "0")
+    assert login_wait_seconds() == DEFAULT_LOGIN_WAIT_TIMEOUT_SEC
+
+
+def test_validate_env_accepts_a_login_wait_override():
+    assert validate_env({"QWEN_LOGIN_WAIT_SEC": "1800"}) == ()
+
+
+def test_validate_env_rejects_a_non_integer_login_wait():
+    problems = validate_env({"QWEN_LOGIN_WAIT_SEC": "half-hour"})
+    assert any("QWEN_LOGIN_WAIT_SEC" in problem for problem in problems)

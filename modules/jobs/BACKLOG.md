@@ -10,15 +10,15 @@ Last Updated: 2026-10-05
 - Done: `uv run python -m pytest modules/jobs/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
 - Blocked: None.
-- Next Action: `JOBS-01`, the zombie-reconciliation acceptance gap.
+- Next Action: None. `JOBS-01` shipped on 2026-10-22; next open item is `JOBS-02`.
 
 ## Backlog
 
 | ID | Priority | State | Health | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| JOBS-01 | P0 | Ready | At Risk | None | Add an acceptance scenario proving a pool restarted over zombie records reports every one terminal before its first poll. | 2026-10-05 |
-| JOBS-02 | P1 | Ready | On Track | `MCP-01` | Specify the immediate backpressure envelope a saturated pool returns once the bounded-submission finding lands. | 2026-10-05 |
-| JOBS-03 | P2 | Ready | On Track | None | Pin the status-file field set as a compatibility contract so a monitor field removal is caught in CI. | 2026-10-05 |
+| JOBS-01 | P0 | Done | Healthy | None | None — zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. | 2026-10-22 |
+| JOBS-02 | P1 | Done | Healthy | `MCP-01` | None — the saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. | 2026-10-22 |
+| JOBS-03 | P2 | Done | Healthy | `LOGGING-03` | None — single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. | 2026-10-22 |
 
 ## Scenario Evidence
 
@@ -26,7 +26,7 @@ Last Updated: 2026-10-05
 |---|---|---|---|---|
 | A pool at its pending ceiling rejects a submission | Automated | `modules/jobs/tests/unit_agent_job_backpressure.py` | queue rejection | 2026-10-05 |
 | An absent status file reads back as no mapping | Automated | `modules/jobs/tests/unit_capability_job_storage.py` | status read | 2026-10-05 |
-| A restart reconciles every zombie record | Gap | none yet | see `JOBS-01` | 2026-10-05 |
+| A restart reconciles every zombie record | Automated | `modules/jobs/tests/acceptance_job_zombie_reconciliation.py` | `test_acceptance_seeded_zombies_are_terminal_before_the_first_poll`, `test_acceptance_a_recycled_pid_is_reconciled_by_heartbeat_staleness` | 2026-10-22 |
 
 ## Blockers
 
@@ -42,7 +42,7 @@ None.
 | Area | Status | Notes |
 |---|---|---|
 | Tests | Done | `uv run python -m pytest modules/jobs/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 2 of 3 scenarios mapped; one gap tracked as `JOBS-01`. |
+| Scenario evidence | Done | All 3 scenarios mapped; the former `JOBS-01` gap closed on 2026-10-22. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
 ## Deferred

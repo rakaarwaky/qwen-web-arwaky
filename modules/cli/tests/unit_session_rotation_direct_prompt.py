@@ -36,10 +36,11 @@ def _container_with_single_pool() -> MagicMock:
     rotator = MagicMock()
     resp = MagicMock()
     resp.session = pool.sessions[0]
-    # ISessionRotatorProtocol.rotate is async; an AsyncMock makes `await`
-    # hand back the response instead of raising TypeError (which the
-    # resolver's except-Exception would silently swallow).
-    rotator.rotate = AsyncMock(return_value=resp)
+    # The resolver drives the protocol's sync seam (SA-4-03); rotate stays
+    # booby-trapped so a revert to inline asyncio.run fails loudly instead
+    # of being swallowed by the resolver's except-Exception.
+    rotator.rotate_sync = MagicMock(return_value=resp)
+    rotator.rotate = AsyncMock(side_effect=AssertionError("resolver must not drive rotate inline"))
     return MagicMock(session_manager=session_manager, session_rotator=rotator)
 
 

@@ -169,11 +169,7 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
 
         session = rot_resp.session
         response = await self._execute_request(prompt, attachment, session)
-
-        pool = self._manager.load_pool()
-        updated = session.with_usage(success=True)
-        pool.sessions = [updated if s.session_id == session.session_id else s for s in pool.sessions]
-        self._manager.save_pool(pool)
+        self._manager.mark_used(session.session_id, success=True)
 
         return response, session
 

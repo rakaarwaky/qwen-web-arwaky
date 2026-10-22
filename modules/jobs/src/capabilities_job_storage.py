@@ -13,7 +13,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR, JOB_HEARTBEAT_LEASE_SEC
 from modules.shared.src.common.taxonomy_core_vo import (
     JobId,
     JobLimit,
@@ -106,7 +106,13 @@ class JobStorage(IJobStorageProtocol):
             return None
 
     def reconcile_zombies(self) -> JobCount:
-        """Mark started-but-incomplete records owned by dead processes as failed."""
+        """Mark started-but-incomplete records owned by dead or stale workers as failed.
+
+        A record is a zombie when its ``owner_pid`` no longer answers OR its
+        ``heartbeat_at`` is older than ``JOB_HEARTBEAT_LEASE_SEC``. The
+        heartbeat arm catches a recycled PID: the PID can be alive again while
+        the worker that owned the job is gone.
+        """
         import os
 
         reconciled = 0
@@ -116,31 +122,73 @@ class JobStorage(IJobStorageProtocol):
             rec = self.get_job(path.stem)
             if rec is None or rec.completed or rec.owner_pid is None:
                 continue
+            stale_heartbeat = self._heartbeat_is_stale(rec.heartbeat_at, rec.created_at)
             alive = True
             try:
                 os.kill(rec.owner_pid, 0)
             except OSError:
                 alive = False
-            if not alive:
-                updated = JobRecord(
-                    job_id=rec.job_id,
-                    created_at=rec.created_at,
-                    latest_event=rec.latest_event,
-                    completed=True,
-                    started_at=rec.started_at,
-                    completed_at=datetime.now(timezone.utc).isoformat(),
-                    duration_sec=rec.duration_sec,
-                    input_file=rec.input_file,
-                    attachment_file=rec.attachment_file,
-                    output_file=rec.output_file,
-                    owner_pid=rec.owner_pid,
-                    heartbeat_at=rec.heartbeat_at,
-                    error="process exited before completion",
-                    result_preview=rec.result_preview,
-                )
-                self.save_job(updated)
-                reconciled += 1
+            if alive and not stale_heartbeat:
+                continue
+            error = (
+                "heartbeat expired while the record was still incomplete"
+                if alive
+                else "process exited before completion"
+            )
+            updated = JobRecord(
+                job_id=rec.job_id,
+                created_at=rec.created_at,
+                latest_event=rec.latest_event,
+                completed=True,
+                started_at=rec.started_at,
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                duration_sec=rec.duration_sec,
+                input_file=rec.input_file,
+                attachment_file=rec.attachment_file,
+                output_file=rec.output_file,
+                owner_pid=rec.owner_pid,
+                heartbeat_at=rec.heartbeat_at,
+                error=error,
+                result_preview=rec.result_preview,
+            )
+            self.save_job(updated)
+            reconciled += 1
         return JobCount(reconciled)
+
+    @staticmethod
+    def _heartbeat_is_stale(heartbeat_at: str | None, created_at: str | None = None) -> bool:
+        """True when the heartbeat is missing past a submit grace, or older than the lease.
+
+        A missing stamp is only stale after one lease from ``created_at`` so
+        the submit→start window (owner alive, no worker stamp yet) is not
+        marked a zombie by a second process's construction-time reconcile.
+        """
+
+        # Legacy/corrupt records may store offset-naive stamps; attach UTC so
+        # subtraction against aware now() cannot raise TypeError and abort
+        # construction-time reconcile_zombies.
+        def _parse(stamp: str) -> datetime:
+            parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
+
+        if not heartbeat_at:
+            if not created_at:
+                return True
+            try:
+                created = _parse(created_at)
+            except (ValueError, TypeError, AttributeError):
+                # Corrupt JSON can hold a non-string stamp; `_parse` then raises
+                # AttributeError on `.replace`, which would crash the
+                # construction-time reconcile_zombies call — treat as stale.
+                return True
+            return datetime.now(timezone.utc) - created > timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC)
+        try:
+            stamp = _parse(heartbeat_at)
+        except (ValueError, TypeError, AttributeError):
+            return True
+        return datetime.now(timezone.utc) - stamp > timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC)
 
     def cleanup_stale_jobs(
         self,

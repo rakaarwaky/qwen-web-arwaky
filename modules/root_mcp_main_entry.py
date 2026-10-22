@@ -173,6 +173,12 @@ TOOLS: list[Tool] = [
                     "default": None,
                     "examples": ["/home/user/output/analysis_output.md"],
                 },
+                "timeout_sec": {
+                    "type": "integer",
+                    "description": "Maximum seconds to wait for the assistant response when async_run is false. Ignored for async jobs.",
+                    "default": 120,
+                    "minimum": 1,
+                },
                 "headless": {
                     "type": "boolean",
                     "description": "Run the browser headlessly (True) or with visible UI (False).",
@@ -209,6 +215,12 @@ TOOLS: list[Tool] = [
                     "description": "Destination path for the AI response output (optional).",
                     "default": None,
                     "examples": ["/home/user/output/analysis_output.md"],
+                },
+                "timeout_sec": {
+                    "type": "integer",
+                    "description": "Maximum seconds to wait for the assistant response when async_run is false. Ignored for async jobs.",
+                    "default": 120,
+                    "minimum": 1,
                 },
                 "headless": {
                     "type": "boolean",

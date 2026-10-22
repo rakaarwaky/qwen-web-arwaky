@@ -298,6 +298,25 @@ def test_login_saves_the_session_and_stops(capsys) -> None:
     assert aggregate.logins == ["work"]
 
 
+def test_login_banner_states_the_wait_window(capsys) -> None:
+    """The banner must promise the same ceiling the login loop honors (SA-4-02)."""
+    aggregate = InMemorySessions()
+    args = _args("login", name="work")
+    with patch("builtins.input", return_value="n"):
+        assert cmd_login(aggregate, args) == 0
+    assert "up to 30 minutes" in capsys.readouterr().out
+
+
+def test_login_banner_honors_env_override(capsys, monkeypatch) -> None:
+    """QWEN_LOGIN_WAIT_SEC rewrites the window the banner prints."""
+    monkeypatch.setenv("QWEN_LOGIN_WAIT_SEC", "2700")
+    aggregate = InMemorySessions()
+    args = _args("login", name="work")
+    with patch("builtins.input", return_value="n"):
+        assert cmd_login(aggregate, args) == 0
+    assert "up to 45 minutes" in capsys.readouterr().out
+
+
 def test_login_json_emits_the_envelope_once(capsys) -> None:
     """session login --json: exactly one login, the fixed-key success envelope
     on stdout, no banner, no input() re-prompt, exit 0 (issue 2)."""

@@ -61,9 +61,9 @@ all other subcommands are non-interactive.
 |---|---|---|
 | `0` | Success envelope returned | `root_cli_main_entry._result_exit_code` |
 | `1` | Failure envelope returned, or unhandled exception caught by `safe_handle` | `root_cli_main_entry._exit_code_for_result`; `utility_core_exit.exit_code_for` |
-| `2` | `AuthRequiredError` raised during pipeline execution (session expired, re-login needed) | `utility_core_exit.exit_code_for` |
+| `2` | `argparse` usage error (missing required flag, unknown subcommand) | argparse default; code `2` is exclusively argparse's usage signal |
+| `3` | `AuthRequiredError` or an auth-failure envelope (session expired, re-login needed) | `utility_core_exit.exit_code_for`; `root_cli_main_entry._exit_code_for_result` |
 | `130` | `KeyboardInterrupt` | `utility_core_exit.exit_code_for` |
-| `2` | `argparse` usage error (missing required flag, unknown subcommand) | argparse default; exit code `2` is argparse's own, distinct from the auth path |
 
 ### Response Envelope
 
@@ -86,6 +86,7 @@ Error reference codes used by the CLI surface:
 |---|---|
 | `cli-400` | Validation failure (missing required argument, bad path, unknown id). |
 | `cli-422` | Processing failure: the request was well formed but the pipeline could not complete it (prompt processing, a failed self-update). |
+| `cli-429` | Saturated worker pool refused a job submit (`JobQueueFullError`); message carries the retry hint. |
 | `cli-500` | Unhandled runtime failure (default from `error_response`). |
 | `cli-502` | Update-specific failure: the check or rollback machinery itself errored; routes to the update runbook, not the generic one. |
 | `auth-required` | Session has expired; re-run `qwen-web-arwaky session login`. |

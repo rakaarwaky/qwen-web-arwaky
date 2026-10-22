@@ -11,11 +11,16 @@ import collections
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import cast
 
-from modules.shared.src.common.taxonomy_core_constant import MAX_PENDING_JOBS_PER_WORKER
+from modules.shared.src.common.taxonomy_core_constant import (
+    JOB_HEARTBEAT_LEASE_SEC,
+    MAX_PENDING_JOBS_PER_WORKER,
+)
 from modules.shared.src.common.taxonomy_core_entity import CircuitBreaker, RateLimiter
 from modules.shared.src.common.taxonomy_core_error import (
     CircuitBreakerOpenError,
@@ -221,6 +226,9 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             input_file=str(p_path),
             output_file=str(out_path) if out_path else None,
             owner_pid=self._storage.current_pid(),
+            # Stamp at submit so a second process reconciling in the
+            # submit→start window does not treat the live job as a zombie.
+            heartbeat_at=utc_now_iso(),
         )
         self._storage.save_job(record)
 
@@ -258,6 +266,9 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             attachment_file=str(a_path),
             output_file=str(out_path) if out_path else None,
             owner_pid=self._storage.current_pid(),
+            # Stamp at submit so a second process reconciling in the
+            # submit→start window does not treat the live job as a zombie.
+            heartbeat_at=utc_now_iso(),
         )
         self._storage.save_job(record)
 
@@ -297,6 +308,34 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             )
         )
         return record
+
+    def _refresh_heartbeat(self, job_id: JobId) -> None:
+        """Restamp ``heartbeat_at`` on a running record so its lease stays fresh.
+
+        Reconcile marks a record a zombie once its heartbeat is older than
+        ``JOB_HEARTBEAT_LEASE_SEC``, so a long prompt run must re-stamp itself
+        well inside that window rather than rely on the single start-time
+        stamp. A completed record is never rewritten: the execute paths join
+        the beat thread before the terminal save, so this early-return is a
+        guard against a beat that somehow races a terminal write from elsewhere.
+        """
+        record = self._storage.get_job(job_id)
+        if record is None or record.completed:
+            return
+        self._storage.save_job(
+            JobRecord(
+                job_id=record.job_id,
+                created_at=record.created_at,
+                latest_event=record.latest_event,
+                completed=False,
+                started_at=record.started_at,
+                input_file=record.input_file,
+                attachment_file=record.attachment_file,
+                output_file=record.output_file,
+                owner_pid=record.owner_pid,
+                heartbeat_at=utc_now_iso(),
+            )
+        )
 
     def _save_failure(
         self,
@@ -403,52 +442,82 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         started_at = utc_now_iso()
         record = self._storage.get_job(job_id)
         self._save_started(record, started_at)
-        save_failure = self._save_failure
+        terminal_error: str | None = None
+        terminal_preview: str | None = None
         try:
-            result = self._file_only.execute(
-                PromptRequest(
-                    verb="process_prompt_file_only",
-                    prompt_file=self._as_prompt_path(prompt_path.path),
-                    output_file=str(output_path) if output_path else None,
-                    headless=headless,
-                )
-            )
-            duration = round(time.perf_counter() - start_t, 2)
-            result_text = str(result.response_text or "") if result.response_text is not None else ""
-            failure = detect_processing_failure(result_text) or (
-                result_text if result_text.startswith("ERROR") else None
-            )
-            if failure:
-                if self._circuit_breaker is not None:
-                    self._circuit_breaker.record_failure(
-                        FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+            with self._heartbeat(job_id):
+                result = self._file_only.execute(
+                    PromptRequest(
+                        verb="process_prompt_file_only",
+                        prompt_file=self._as_prompt_path(prompt_path.path),
+                        output_file=str(output_path) if output_path else None,
+                        headless=headless,
                     )
-                save_failure(job_id, record, started_at, duration, prompt_path, failure, output_path=output_path)
-                return
+                )
+                result_text = str(result.response_text or "") if result.response_text is not None else ""
+                failure = detect_processing_failure(result_text) or (
+                    result_text if result_text.startswith("ERROR") else None
+                )
+                if failure:
+                    if self._circuit_breaker is not None:
+                        self._circuit_breaker.record_failure(
+                            FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+                        )
+                    terminal_error = failure
+                else:
+                    terminal_preview = self._storage.preview_job_output(
+                        output_path or JobPath.blank(),
+                        ResultText(result_text),
+                    ).text
+        except Exception as exc:
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
+            terminal_error = str(exc)
+        # Heartbeat thread is joined; the terminal write cannot race a beat.
+        duration = round(time.perf_counter() - start_t, 2)
+        save_failure = self._save_failure
+        if terminal_error is not None:
+            save_failure(job_id, record, started_at, duration, prompt_path, terminal_error, output_path=output_path)
+        else:
             self._save_success(
                 job_id,
                 record,
                 started_at,
                 duration,
                 prompt_path,
-                self._storage.preview_job_output(
-                    output_path or JobPath.blank(),
-                    ResultText(result_text),
-                ).text,
+                terminal_preview,
                 output_path=output_path,
             )
-        except Exception as exc:
-            if self._circuit_breaker is not None:
-                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
-            save_failure(
-                job_id,
-                record,
-                started_at,
-                round(time.perf_counter() - start_t, 2),
-                prompt_path,
-                str(exc),
-                output_path=output_path,
-            )
+
+    @contextmanager
+    def _heartbeat(self, job_id: JobId) -> Iterator[None]:
+        """Restamp heartbeat_at on the worker until the body exits.
+
+        Stop+join run in finally so the beat thread is dead before the
+        terminal save that follows this context.
+        """
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop,
+            args=(job_id, stop),
+            daemon=True,
+            name=f"job-heartbeat-{job_id}",
+        )
+        heartbeat.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            heartbeat.join(timeout=JOB_HEARTBEAT_LEASE_SEC)
+
+    def _heartbeat_loop(self, job_id: JobId, stop: threading.Event) -> None:
+        """Restamp ``heartbeat_at`` on a running job until ``stop`` is set.
+
+        Sections are half the lease window so reconcile never sees a live
+        worker's record as stale.
+        """
+        while not stop.wait(timeout=JOB_HEARTBEAT_LEASE_SEC / 2):
+            self._refresh_heartbeat(job_id)
 
     def _run_attachment_job(
         self,
@@ -484,61 +553,59 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         record = self._storage.get_job(job_id)
         save_started = self._save_started
         save_started(record, started_at, attachment_path=attachment_path)
-        save_failure = self._save_failure
+        terminal_error: str | None = None
+        terminal_preview: str | None = None
         try:
-            result = self._attachment.execute(
-                PromptRequest(
-                    verb="process_prompt_with_attachment",
-                    prompt_file=str(prompt_path),
-                    attachment_file=str(attachment_path),
-                    output_file=str(output_path) if output_path else None,
-                    headless=headless,
-                )
-            )
-            duration = round(time.perf_counter() - start_t, 2)
-            result_text = str(result.response_text or "") if result.response_text is not None else ""
-            failure = detect_processing_failure(result_text) or (
-                result_text if result_text.startswith("ERROR") else None
-            )
-            if failure:
-                if self._circuit_breaker is not None:
-                    self._circuit_breaker.record_failure(
-                        FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+            with self._heartbeat(job_id):
+                result = self._attachment.execute(
+                    PromptRequest(
+                        verb="process_prompt_with_attachment",
+                        prompt_file=str(prompt_path),
+                        attachment_file=str(attachment_path),
+                        output_file=str(output_path) if output_path else None,
+                        headless=headless,
                     )
-                save_failure(
-                    job_id,
-                    record,
-                    started_at,
-                    duration,
-                    prompt_path,
-                    failure,
-                    attachment_path=attachment_path,
-                    output_path=output_path,
                 )
-                return
+                result_text = str(result.response_text or "") if result.response_text is not None else ""
+                failure = detect_processing_failure(result_text) or (
+                    result_text if result_text.startswith("ERROR") else None
+                )
+                if failure:
+                    if self._circuit_breaker is not None:
+                        self._circuit_breaker.record_failure(
+                            FailureCategory(ErrorCategory.categorize(QwenCliError(failure)))
+                        )
+                    terminal_error = failure
+                else:
+                    terminal_preview = self._storage.preview_job_output(
+                        output_path or JobPath.blank(),
+                        ResultText(result_text),
+                    ).text
+        except Exception as exc:
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
+            terminal_error = str(exc)
+        # Heartbeat thread is joined; the terminal write cannot race a beat.
+        duration = round(time.perf_counter() - start_t, 2)
+        if terminal_error is not None:
+            self._save_failure(
+                job_id,
+                record,
+                started_at,
+                duration,
+                prompt_path,
+                terminal_error,
+                attachment_path=attachment_path,
+                output_path=output_path,
+            )
+        else:
             self._save_success(
                 job_id,
                 record,
                 started_at,
                 duration,
                 prompt_path,
-                self._storage.preview_job_output(
-                    output_path or JobPath.blank(),
-                    ResultText(result_text),
-                ).text,
-                attachment_path=attachment_path,
-                output_path=output_path,
-            )
-        except Exception as exc:
-            if self._circuit_breaker is not None:
-                self._circuit_breaker.record_failure(FailureCategory(ErrorCategory.categorize(exc)))
-            save_failure(
-                job_id,
-                record,
-                started_at,
-                round(time.perf_counter() - start_t, 2),
-                prompt_path,
-                str(exc),
+                terminal_preview,
                 attachment_path=attachment_path,
                 output_path=output_path,
             )

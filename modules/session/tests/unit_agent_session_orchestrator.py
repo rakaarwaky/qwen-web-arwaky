@@ -332,6 +332,51 @@ def test_login_verb_always_opens_headed_browser(tmp_path: Path) -> None:
     validate.assert_called_once()
 
 
+# ── Regression: login waits on its own ceiling, not the run timeout (SA-4-02) ─
+
+
+def test_login_loop_runs_past_run_timeout_up_to_login_ceiling(tmp_path: Path) -> None:
+    """A typed login must not be cut short by ``AppConfig.timeout``.
+
+    The loop deadline comes from the login wait ceiling. With a 5s run
+    timeout on the config and a 60s login ceiling, the loop must keep polling
+    until the ceiling — five polls at t=10..50, stopping at t=60.
+    """
+    fake_sessions = tmp_path / "share" / "sessions"
+    fake_default = fake_sessions / "default"
+    fake_default.mkdir(parents=True)
+
+    page = MagicMock()
+    page.is_closed.return_value = False
+    ctx = MagicMock()
+    ctx.pages = [page]
+    browser = MagicMock()
+    browser.browser_session.return_value.__enter__.return_value = ctx
+
+    orch = SessionOrchestrator(browser=browser, observability=MagicMock(), sessions=SessionManager())
+
+    with (
+        patch.object(SessionOrchestrator, "_validate_saved_session", return_value=True),
+        patch("modules.shared.src.session.utility_session_guard.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.SESSIONS_DIR", fake_sessions),
+        patch("modules.session.src.capabilities_session_manager.POOL_FILE", fake_sessions / "sessions.json"),
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.login_wait_seconds", return_value=60),
+        patch("modules.session.src.agent_session_orchestrator.time") as fake_time,
+    ):
+        build.return_value.session_path = fake_default
+        build.return_value.timeout = 5
+        # Deadline built at t=0, then each poll advances 10 fake seconds.
+        fake_time.monotonic.side_effect = [0, 10, 20, 30, 40, 50, 60]
+        response = orch.execute(SessionRequest(verb="login", session_path=fake_default, name="default"))
+
+    assert response.valid
+    assert page.wait_for_timeout.call_count == 5, (
+        "loop must poll past the 5s run timeout and stop at the 60s login ceiling"
+    )
+    fake_time.monotonic.assert_called()  # clock was actually consulted
+
+
 # ── Regression: pool profile must win over the empty default session ────────
 
 

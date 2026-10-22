@@ -8,7 +8,6 @@ supports headless single-file execution when a config is supplied.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 from typing import Any
@@ -128,7 +127,7 @@ class InteractiveController:
             try:
                 from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 
-                response = asyncio.run(self._session_rotator.rotate(RotatorRequest()))
+                response = self._session_rotator.rotate_sync(RotatorRequest())
                 return response.session.path if response.session else None
             except Exception as exc:
                 # Degradation is non-fatal: warn on stderr and keep the default session.

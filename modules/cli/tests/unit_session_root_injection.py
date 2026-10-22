@@ -16,11 +16,13 @@ container's seams and assert the values reach the call sites.
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
-from modules.root_cli_main_entry import main
+from modules.root_cli_main_entry import _resolve_session_for_prompt, main
 from modules.shared.src.session.taxonomy_session_vo import SessionList, SessionResponse
 
 
@@ -127,3 +129,35 @@ def test_interactive_controller_receives_the_session_rotator(tmp_path: Path) -> 
         assert main() == 0
 
     assert captured.get("session_rotator") is rotator
+
+
+def test_prompt_session_resolution_uses_rotate_sync_inside_a_running_loop(tmp_path: Path) -> None:
+    """SA-4-03: the root resolver must reach the protocol's sync seam.
+
+    ``asyncio.run`` inside an already-running event loop raises RuntimeError,
+    so driving ``rotate`` directly from this sync seam is a crash waiting to
+    happen; the resolver must call ``rotate_sync`` and never touch ``rotate``.
+    """
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    args = argparse.Namespace(action="prompt")
+
+    rotator = MagicMock(name="session_rotator")
+    rotator.rotate = AsyncMock(side_effect=AssertionError("rotate must not be driven from a sync seam"))
+    rotator.rotate_sync.return_value = MagicMock(session=MagicMock(path=profile))
+
+    pool = MagicMock()
+    pool.total_count = 1
+
+    container = MagicMock()
+    container.session_manager.load_pool.return_value = pool
+    container.session_rotator = rotator
+
+    async def _inside_loop() -> None:
+        _resolve_session_for_prompt(args, container)
+
+    asyncio.run(_inside_loop())
+
+    rotator.rotate_sync.assert_called_once()
+    rotator.rotate.assert_not_called()
+    assert args._session_override == profile

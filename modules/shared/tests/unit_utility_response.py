@@ -52,7 +52,27 @@ def test_exit_code_for_auth_required():
         "category": "processing_failed",
         "ref": "cli-422",
     }
-    assert _result_exit_code(result) == 2
+    assert _result_exit_code(result) == 3
+
+
+def test_exit_code_for_raised_auth_required_error():
+    """A raised AuthRequiredError exits 3, leaving 2 to argparse (SA-3-02)."""
+    from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
+    from modules.shared.src.common.utility_core_exit import exit_code_for
+
+    assert exit_code_for(AuthRequiredError("Not authenticated to chat.qwen.ai")) == 3
+
+
+def test_argparse_usage_error_exits_2():
+    """argparse's usage signal stays deterministically 2 (SA-3-02)."""
+    import pytest
+
+    from modules.root_cli_main_entry import _parse_args
+
+    with pytest.raises(SystemExit) as exc_info:
+        _parse_args(["--definitely-not-a-real-flag"])
+
+    assert exc_info.value.code == 2
 
 
 def test_exit_code_for_generic_failure():
