@@ -25,6 +25,9 @@ from modules.shared.src.update.utility_update_version import compare_versions
 log = get_logger("capabilities_update_upgrade")
 
 
+# Block 1: Class Definition & Constructor
+
+
 class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
     """FR-UPDATE-002: upgrade the package and synchronise the browser build."""
 
@@ -38,6 +41,8 @@ class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
         self.package_name = package_name
         self.pip_timeout_sec = pip_timeout_sec
         self.browser_timeout_sec = browser_timeout_sec
+
+    # Block 2: Protocol Method Implementation
 
     def upgrade_package(
         self,
@@ -150,6 +155,8 @@ class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
     def chromium_is_present(self) -> bool:
         """Expose the shared Chromium-presence check (used by the verify gate)."""
         return chromium_present()
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         return f"UpdateUpgradeCapability(package={self.package_name!r})"

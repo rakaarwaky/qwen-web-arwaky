@@ -47,6 +47,7 @@ class SwarmRegistry(ISwarmRegistryProtocol):
         self._attachments: dict[SwarmId, FilePath] = {}
         self._executors: dict[SwarmId, TaskExecutor] = {}
 
+    # Block 2: Protocol Method Implementation
     def open_run(
         self,
         snapshot: SwarmSnapshot,
@@ -123,6 +124,7 @@ class SwarmRegistry(ISwarmRegistryProtocol):
             self._attachments.pop(swarm_id, None)
             return self._executors.pop(swarm_id, None)
 
+    # Block 3: Constructors, Std Traits, Helpers
     def __repr__(self) -> str:
         """Report how many runs this registry currently tracks."""
         return f"SwarmRegistry(runs={len(self._snapshots)})"

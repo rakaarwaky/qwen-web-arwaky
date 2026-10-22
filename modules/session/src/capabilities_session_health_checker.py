@@ -34,6 +34,7 @@ _compiled_patterns = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
 # request budget.
 
 
+# Block 1: Class Definition & Constructor
 class SessionHealthChecker(ISessionHealthCheckerProtocol):
     """Checks session health with a real browser ping against the session profile."""
 
@@ -55,6 +56,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         self._timeout = timeout_seconds
         self._session_cfg = session_cfg
 
+    # Block 2: Protocol Method Implementation
     async def check_session(self, session: SessionInfo) -> bool:
         """Return True when *session* is healthy (auth valid and not rate-limited).
 
@@ -194,6 +196,8 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         """Return ``(healthy_count, total)`` for a pool-check result list."""
         healthy_count = sum(1 for _, verdict in results if verdict.is_healthy)
         return healthy_count, len(results)
+
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def _new_cancel(self) -> threading.Event:
         """Fresh cooperative cancel handle for one probe (never shared)."""

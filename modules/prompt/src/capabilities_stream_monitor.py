@@ -112,6 +112,9 @@ log = get_logger("capabilities_stream_monitor")
 _dom_latest = latest_message_text
 
 
+# Block 1: Class Definition & Constructor
+
+
 class StreamMonitor(IStreamProtocol):
     """Response streaming detection and stability polling."""
 
@@ -137,6 +140,8 @@ class StreamMonitor(IStreamProtocol):
             self.polling_interval_sec = PollIntervalSec(1.0)
             self.stability_checks = StabilityChecks(4)
             self.min_text_length = MinTextLength(1)
+
+    # Block 2: Protocol Method Implementation
 
     def is_generation_complete(self, page: Page, *, thinking: bool | None = None) -> bool:
         """Check if Qwen AI is done generating.
@@ -426,6 +431,8 @@ class StreamMonitor(IStreamProtocol):
             except Exception as e:
                 log.error("Unexpected error during polling: %s", e)
                 raise
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         """Return string representation of StreamMonitor."""

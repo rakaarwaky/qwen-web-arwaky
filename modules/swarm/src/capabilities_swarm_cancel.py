@@ -52,6 +52,7 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
         self._registry = registry
         self._attachment = attachment
 
+    # Block 2: Protocol Method Implementation
     def cancel(self, swarm_id: SwarmId) -> None:
         """Stop active browser contexts and prevent queued work from running."""
         if self._registry.get_snapshot(swarm_id) is None:
@@ -66,6 +67,7 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
         if executor is not None:
             executor.shutdown(wait=False, cancel_futures=True)
 
+    # Block 3: Constructors, Std Traits, Helpers
     def _request_attachment_cancel(self, event: CancelToken) -> None:
         """Forward a cancel event to the attachment aggregate via its typed seam.
 

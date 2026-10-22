@@ -36,6 +36,7 @@ class FolderCompiler(IFolderCompileProtocol):
         else:
             self.input_dir = Path.cwd() / LOCAL_WS_DIR / "input"
 
+    # Block 2: Protocol Method Implementation
     def compile_folder(
         self,
         folder_path: Path,
@@ -141,6 +142,7 @@ class FolderCompiler(IFolderCompileProtocol):
         """Check if path is a directory (not a file)."""
         return Path(path).is_dir()
 
+    # Block 3: Dunder Methods, Factories, Helpers
     def _generate_output_path(self, folder_path: Path) -> Path:
         """Generate output path with timestamp: .qwen-web-arwaky/input/{folder_name}_{timestamp}.md"""
         timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")

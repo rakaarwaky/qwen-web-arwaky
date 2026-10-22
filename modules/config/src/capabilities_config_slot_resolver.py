@@ -33,8 +33,13 @@ from modules.shared.src.config.utility_config_app_factory import (
 SlotInputError: type[SlotInputValue] = SlotInputValue
 
 
+# Block 1: Class Definition & Constructor
+
+
 class SlotRunPlanResolver(IConfigSlotPlanProtocol):
     """Resolve raw slot widget values into an executable run plan."""
+
+    # Block 2: Protocol Method Implementation
 
     def resolve_slot_run_plan(
         self,
@@ -118,6 +123,9 @@ class SlotRunPlanResolver(IConfigSlotPlanProtocol):
         if not files:
             return BatchPromptOutcome(error=SlotInputValue(f"No .md files found in {batch_path}"))
         return BatchPromptOutcome(files=files)
+
+
+# Block 3: Dunder Methods, Factories & Helpers
 
 
 def _output_dir_write_error(out_path: Path) -> str | None:

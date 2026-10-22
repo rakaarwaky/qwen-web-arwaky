@@ -27,6 +27,8 @@ from modules.shared.src.common.taxonomy_core_constant import (
 from modules.shared.src.common.taxonomy_core_vo import FilePath
 from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
 
+# Block 1: Class Definition & Constructor
+
 
 class WorkspaceProvisioner(IWorkspaceProtocol):
     """Workspace directory provisioning with symlinks and a nested .gitignore."""
@@ -35,6 +37,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         """Initialize WorkspaceProvisioner."""
         pass
 
+    # Block 2: Protocol Method Implementation
     def init_workspace(self, target_dir: FilePath) -> None:
         """Initialize workspace in 4 sequential steps:
 
@@ -123,6 +126,8 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
             kept = [line for line in root_lines if line not in (f"{LOCAL_WS_DIR}/", ".qwen-web/")]
             if len(kept) != len(root_lines):
                 root_git_ignore.write_text("\n".join(kept).rstrip("\n") + "\n", encoding="utf-8")
+
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def __repr__(self) -> str:
         """Return string representation of WorkspaceProvisioner."""

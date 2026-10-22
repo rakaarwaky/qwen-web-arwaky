@@ -45,7 +45,7 @@ with suppress(ImportError):
     OTelTracerProvider = TracerProvider
     OTelBatchSpanProcessor = BatchSpanProcessor
 
-from modules.shared.src.common import utility_core_exit
+from modules.shared.src import utility_core_exit
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.common.taxonomy_core_error import ErrorCategory
 from modules.shared.src.common.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
@@ -66,6 +66,9 @@ from modules.shared.src.logging.contract_logging_protocol import IMetricsProtoco
 # ``capabilities_status_writer``) and are injected into ``ObservabilitySetup``
 # by the composition root. They are intentionally NOT defined here so this file
 # does not import its peer capabilities (AES201).
+
+
+# Block 1: Class Definition & Constructor
 
 
 class ObservabilitySetup(IObservabilityProtocol):
@@ -89,6 +92,8 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._metrics = metrics
         self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
+
+    # Block 2: Protocol Method Implementation
 
     @property
     def metrics(self) -> IMetricsProtocol:
@@ -143,6 +148,8 @@ class ObservabilitySetup(IObservabilityProtocol):
                 mode,
                 os.getenv("ENVIRONMENT", "production"),
             )
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _configure_sentry(self) -> None:
         """Configure Sentry and log an explicit degraded event when it is off.

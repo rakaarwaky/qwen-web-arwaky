@@ -41,6 +41,9 @@ _NO_ELIGIBLE_RECOVERY: dict[str, str] = {
 }
 
 
+# Block 1: Class Definition & Constructor
+
+
 class SessionRotationAdapter(ISessionRotatorProtocol):
     """Transparent session rotation with health checking."""
 
@@ -54,6 +57,8 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
         self._checker: ISessionHealthCheckerProtocol | None = health_checker
         self._prompt: IPromptAggregate | None = prompt
         self._metrics = RotationMetrics()
+
+    # Block 2: Protocol Method Implementation
 
     async def get_next_session(self) -> SessionInfo | None:
         """Get next healthy session with fallback.
@@ -165,6 +170,8 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
     def metrics(self) -> RotationMetrics:
         """Get rotation metrics."""
         return self._metrics
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def _ensure_checker(self) -> ISessionHealthCheckerProtocol:
         """Return the health checker, raising if not configured."""

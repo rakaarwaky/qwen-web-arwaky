@@ -10,12 +10,11 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
-from modules.shared.src.common import utility_core_session_backup
+from modules.shared.src import utility_core_session_backup, utility_session_guard
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.utility_io_writer import exclusive_file_lock
 from modules.shared.src.common.utility_logger_factory import get_logger
-from modules.shared.src.session import utility_session_guard
 from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.session.taxonomy_session_vo import (
     SessionInfo,
@@ -28,12 +27,17 @@ from modules.shared.src.session.taxonomy_session_vo import (
 log = get_logger("session_manager")
 
 
+# Block 1: Class Definition & Constructor
+
+
 class SessionManager(ISessionManagerProtocol):
     """Manages Qwen session storage and CRUD operations."""
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self._base_dir = base_dir or SESSIONS_DIR
         self._ensure_dirs()
+
+    # Block 2: Protocol Method Implementation
 
     def load_pool(self) -> SessionPool:
         """Load session pool from disk, auto-discovering profile dirs on disk.
@@ -333,6 +337,8 @@ class SessionManager(ISessionManagerProtocol):
             pool = self._load_pool_under_lock()
             pool.sessions = [s.with_usage(success=success) if s.session_id == session_id else s for s in pool.sessions]
             self.save_pool(pool)
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     @contextlib.contextmanager
     def _pool_lock(self) -> Iterator[None]:

@@ -42,6 +42,8 @@ from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 from modules.shared.src.update.contract_update_protocol import ISmokeGate
 from modules.shared.src.update.utility_update_chromium import playwright_browsers_path
 
+# Block 1: Class Definition & Constructor
+
 
 class ConfigHealthProbe(IConfigHealthProbeProtocol):
     """Host health probe capability (AES403).
@@ -50,6 +52,8 @@ class ConfigHealthProbe(IConfigHealthProbeProtocol):
     update pipeline's postflight smoke gate exercises, so no caller has to
     reach into the Surface to run the same checks twice.
     """
+
+    # Block 2: Protocol Method Implementation
 
     def probe(self, session: ISessionAggregate | None = None) -> HealthProbeRecords:
         """Run every diagnostic check and return the records as frozen VOs.
@@ -84,6 +88,8 @@ class ConfigHealthProbe(IConfigHealthProbeProtocol):
             )
             for c in checks
         )
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"

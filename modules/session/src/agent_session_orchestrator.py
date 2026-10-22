@@ -70,6 +70,8 @@ class SessionOrchestrator(ISessionAggregate):
         self._health_checker = health_checker
         self._rotator = rotator
 
+    # Block 2: Protocol Method Implementation
+
     def execute(self, request: SessionRequest) -> SessionResponse:
         """Run the requested session verb and return its outcome.
 
@@ -162,6 +164,8 @@ class SessionOrchestrator(ISessionAggregate):
         if request.verb == "rotate":
             return self._rotate(request.exclude_ids)
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
+
+    # Block 3: Dunder Methods, Factories, Helpers
 
     def _login(
         self,

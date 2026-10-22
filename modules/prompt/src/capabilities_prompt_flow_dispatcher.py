@@ -49,6 +49,8 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
 )
 from modules.shared.src.prompt.taxonomy_prompt_vo import ExtractionVerdict, PromptResponse, StreamVerdict
 
+# Block 1: Class Definition & Constructor
+
 
 class PromptFlowDispatcher(IPromptFlowProtocol):
     """Drives the shared prompt dispatch and response-wait flow."""

@@ -52,6 +52,8 @@ from modules.shared.src.prompt.taxonomy_prompt_vo import (
     StreamVerdict,
 )
 
+# Block 1: Class Definition & Constructor
+
 
 class DirectPromptAdapter(IDirectPromptProtocol):
     """Orchestrates direct string text prompt execution."""
@@ -73,6 +75,8 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         self._saver = saver
         self._observability = observability
         self._flow = flow
+
+    # Block 2: Protocol Method Implementation
 
     def process_direct_prompt(
         self,
@@ -160,6 +164,8 @@ class DirectPromptAdapter(IDirectPromptProtocol):
         finally:
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
+
+    # Block 3: Dunder Methods, Factories & Helpers
 
     @staticmethod
     def _resolve_session_path(session_resolver: Callable[[], Path | None] | None) -> Path | None:
