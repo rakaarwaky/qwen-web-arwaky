@@ -1,10 +1,10 @@
 """Taxonomy: config-feature value objects.
 
-The config feature reports on itself in four shapes: a sandbox-mode
-verdict, a list of configuration problems, a set of resolved paths, and
-a host-capacity report. Each is a frozen value object so a caller can
-hold the result, compare it, and print it without reaching back into
-the capability that produced it.
+The config feature reports on itself in five shapes: a sandbox-mode
+verdict, a list of configuration problems, a set of resolved paths, a
+host-capacity report, and a health-probe record set. Each is a frozen
+value object so a caller can hold the result, compare it, and print it
+without reaching back into the capability that produced it.
 """
 
 from __future__ import annotations
@@ -163,6 +163,29 @@ class CapacityReport:
 
 
 @dataclass(frozen=True)
+class HealthProbeRecord:
+    """One non-interactive doctor diagnostic record (issue #294 / #506).
+
+    Mirrors the plain-dict shape the CLI doctor report prints:
+    ``name`` identifies the check, ``passed`` is the verdict, ``detail``
+    is the operator sentence, and ``severity`` distinguishes a passing
+    check with a soft concern from a clean pass.
+    """
+
+    name: str
+    passed: bool
+    detail: str
+    severity: str = "ok"
+
+
+#: The record set a health probe returns — the non-interactive doctor
+#: diagnostics the CLI report renders and the update pipeline's
+#: postflight functional gate normalizes to ``(name, passed, detail)``
+#: triples.
+HealthProbeRecords = tuple[HealthProbeRecord, ...]
+
+
+@dataclass(frozen=True)
 class ConfigRequest:
     """One config verb plus everything the orchestrator needs to run it.
 
@@ -214,6 +237,8 @@ __all__ = [
     "ConfigRequest",
     "ConfigResponse",
     "ConfigSeverity",
+    "HealthProbeRecord",
+    "HealthProbeRecords",
     "ModelName",
     "ResolvedConfigPath",
     "ResolvedConfigPaths",

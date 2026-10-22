@@ -1,6 +1,6 @@
 """Config-domain capability contract (AES102 `_protocol`).
 
-Six capability seams back the config feature, each owning one kind of
+Seven capability seams back the config feature, each owning one kind of
 self-inspection that the CLI surface used to perform inline:
 
 - ``IConfigEnvironmentProtocol`` — what the host's environment resolves to
@@ -10,6 +10,8 @@ self-inspection that the CLI surface used to perform inline:
 - ``IConfigCapacityProtocol``     — how many browsers the host can carry
 - ``IConfigSlotPlanProtocol``     — what a slot's raw widget values resolve
   to as an executable run plan
+- ``IConfigHealthProbeProtocol``  — host health probe records for the
+  doctor smoke gate (issue #294 / #506)
 - ``IWorkspaceProtocol``          — how the run workspace is initialized
   (XDG dirs, SKILL.md, .qwen-web-arwaky symlinks, .gitignore)
 
@@ -21,6 +23,7 @@ call that one ``execute`` and never reach for a protocol here.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from modules.shared.src.common.taxonomy_core_vo import (
     AppConfig,
@@ -36,6 +39,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
 from modules.shared.src.config.taxonomy_config_vo import (
     CapacityReport,
     ConfigIssues,
+    HealthProbeRecords,
     ModelName,
     ResolvedConfigPaths,
     SandboxReport,
@@ -181,6 +185,31 @@ class IConfigSlotPlanProtocol(ABC):
         ...
 
 
+class IConfigHealthProbeProtocol(ABC):
+    """Host health probe contract (issue #294 / #506).
+
+    Collects the non-interactive doctor diagnostic records into plain
+    dictionaries — the same shape the CLI doctor report prints and the
+    update pipeline's postflight functional gate consumes. A capability
+    implements this so the Root layer composes ``build_smoke_gate`` from
+    Capabilities without importing the CLI Surface, and so a test can
+    substitute the probe without patching a module global.
+
+    The optional *session* argument lets the probe report on the session
+    pool (the single source of truth for session state) when it is
+    available, so doctor and the update gate agree about the pool.
+    """
+
+    @abstractmethod
+    def probe(self, session: Any | None = None) -> HealthProbeRecords:
+        """Return every health diagnostic record as plain dictionaries.
+
+        Each record has the keys ``name`` (str), ``passed`` (bool),
+        ``detail`` (str), and optionally ``severity`` ("ok" | "warning").
+        """
+        ...
+
+
 class IWorkspaceProtocol(ABC):
     """Workspace directory provisioning contract."""
 
@@ -193,6 +222,7 @@ class IWorkspaceProtocol(ABC):
 __all__ = [
     "IConfigCapacityProtocol",
     "IConfigEnvironmentProtocol",
+    "IConfigHealthProbeProtocol",
     "IConfigPathResolverProtocol",
     "IConfigSlotPlanProtocol",
     "IConfigValidatorProtocol",
@@ -203,6 +233,7 @@ __all__ = [
 _layer_symbols: dict[str, object] = {
     "IConfigCapacityProtocol": IConfigCapacityProtocol,
     "IConfigEnvironmentProtocol": IConfigEnvironmentProtocol,
+    "IConfigHealthProbeProtocol": IConfigHealthProbeProtocol,
     "IConfigPathResolverProtocol": IConfigPathResolverProtocol,
     "IConfigSlotPlanProtocol": IConfigSlotPlanProtocol,
     "IConfigValidatorProtocol": IConfigValidatorProtocol,

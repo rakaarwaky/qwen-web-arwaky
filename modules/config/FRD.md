@@ -8,11 +8,12 @@
 ## System Overview
 
 The config feature turns the operator's environment and parsed arguments
-into one validated runtime configuration. Five capability seams answer the
+into one validated runtime configuration. Six capability seams answer the
 questions a run needs — what the host allows, whether a config can run,
-where its paths point, how many browsers it can carry, and what one slot's
-widget values mean — and the orchestrator folds their answers into a single
-config the other features read.
+where its paths point, how many browsers it can carry, what one slot's
+widget values mean, and whether the host is healthy enough to run at all —
+and the orchestrator folds their answers into a single config the other
+features read.
 
 ## Functional Requirements
 
@@ -79,6 +80,15 @@ config the other features read.
 - **Edge Cases**: A directory the host refuses to create surfaces a file error naming the path.
 - **Error Handling**: A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location.
 
+### FR-CONFIG-007: Probe host health for the update smoke gate
+
+- **Description**: Run the non-interactive doctor diagnostics (Python version, Chromium binary reachability, workspace initialization, session pool status, output writability, host capacity, sandbox mode, environment contract, observability backends) and report each as a record.
+- **Input**: The process environment and host state; optionally the session pool aggregate.
+- **Output**: A tuple of health-probe records, each naming the check, its pass/fail verdict, an operator sentence, and a severity.
+- **Business Rules**: The checks run at gate-execution time so a post-update gate reflects the post-upgrade state (issue #506); an empty session pool is a legitimate "no session" result, not a probe failure.
+- **Edge Cases**: A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; a production host with no error tracking reports a warning, not a failure.
+- **Error Handling**: A check that cannot be probed reports the probe error in the detail sentence rather than raising.
+
 ## API Contract
 
 ### Protocol API
@@ -97,6 +107,7 @@ config the other features read.
 | `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
 | `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
 | `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and a nested `.qwen-web-arwaky/.gitignore` that keeps the workspace dir local. |
+| `probe` | host state, optional session aggregate | health-probe records | none | none | Run the non-interactive doctor diagnostics and report each as a record for the update smoke gate. |
 
 ### Aggregate API
 
@@ -129,6 +140,7 @@ config the other features read.
 - A config with several invalid fields reports every one of them in one call.
 - A folder input holding three prompts discovers them in a deterministic order.
 - A workspace init creates owner-only directories, provisions SKILL.md and symlinks, and reuses an existing workspace.
+- A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; the update smoke gate reflects the post-upgrade state because the probe re-runs the checks at gate-execution time.
 
 ## Assumptions & Constraints
 
