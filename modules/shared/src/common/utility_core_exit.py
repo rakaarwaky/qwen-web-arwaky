@@ -12,8 +12,8 @@ def exit_code_for(exc: BaseException) -> int:
     """Map an unhandled exception to a process exit code.
 
     ``AuthRequiredError`` maps to 3 so code 2 stays argparse's exclusive
-    usage-error signal (SA-3-02): a machine can tell a bad invocation from
-    an expired session.
+    usage-error signal: a machine can tell a bad invocation from an expired
+    session.
     """
     if isinstance(exc, KeyboardInterrupt):
         return 130

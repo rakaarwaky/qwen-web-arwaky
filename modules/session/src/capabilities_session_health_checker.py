@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
@@ -54,15 +55,6 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         self._browser = browser
         self._timeout = timeout_seconds
         self._session_cfg = session_cfg
-        # Cooperatively cancels a probe running on a worker thread:
-        # asyncio.wait_for cancels the future but a thread-executor task
-        # keeps running, so without this handle a stalled probe would leave
-        # its Chromium context alive after the timeout verdict returns.
-        self._cancel = threading.Event()
-        # Set by the probe thread while its browser context is live so the
-        # timeout branch can bound how long it waits for the teardown it
-        # asked for. Read-only from the asyncio side.
-        self._browser_open = False
 
     # Block 2: Protocol Method Implementation
     async def check_session(self, session: SessionInfo) -> bool:
@@ -104,7 +96,10 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
         cfg = self._build_cfg(session)
         loop = asyncio.get_running_loop()
-        self._cancel.clear()
+        # Per-probe handles: concurrent diagnose_session calls on one checker
+        # must not share cancel state or a sibling's timeout would abort them.
+        cancel = self._new_cancel()
+        probe_done = threading.Event()
 
         probe_task = loop.run_in_executor(
             None,
@@ -113,20 +108,20 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
             session.session_id,
             session.status,
             session.reason,
+            cancel,
+            probe_done,
         )
         try:
             return await asyncio.wait_for(probe_task, timeout=self._timeout)
         except asyncio.TimeoutError:
             # Ask the probe thread to tear its own browser context down; the
             # executor thread cannot be cancelled, so the probe must do it.
-            self._cancel.set()
-            # Bounded grace: the probe's exit closes the context manager it
-            # holds, so Chromium does not outlive this call by more than
-            # CANCEL_JOIN_TIMEOUT_SECONDS. Never blocks unconditionally: a
-            # wedged page must not park the health check too.
-            for _ in range(int(self.CANCEL_JOIN_TIMEOUT_SECONDS * 20)):
-                if not self._browser_open:
-                    break
+            cancel.set()
+            # Bounded grace until the probe acknowledges cancel and exits —
+            # including the launch window before its context is open. Never
+            # blocks unconditionally: a wedged page must not park the check.
+            deadline = time.monotonic() + self.CANCEL_JOIN_TIMEOUT_SECONDS
+            while not probe_done.is_set() and time.monotonic() < deadline:
                 await asyncio.sleep(0.05)
             if session.status == SessionStatus.LIMITED:
                 return SessionHealthResult(
@@ -203,6 +198,11 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         return healthy_count, len(results)
 
     # Block 3: Dunder Methods, Factories, Helpers
+
+    def _new_cancel(self) -> threading.Event:
+        """Fresh cooperative cancel handle for one probe (never shared)."""
+        return threading.Event()
+
     def _build_cfg(self, session: SessionInfo) -> AppConfig:
         """Point the probe at *session*'s stored profile, reusing the base cfg's flags."""
         base = self._session_cfg
@@ -244,11 +244,28 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         session_id: SessionId,
         prior_status: SessionStatus,
         prior_reason: str | None,
+        cancel: threading.Event,
+        probe_done: threading.Event,
     ) -> SessionHealthResult:
         """Synchronous probe returning a reasoned SessionHealthResult.
 
         Runs on a worker thread to keep the asyncio event loop unblocked.
+        *cancel* / *probe_done* belong to this probe only.
         """
+        try:
+            return self._probe_verdict_inner(cfg, session_id, prior_status, prior_reason, cancel)
+        finally:
+            probe_done.set()
+
+    def _probe_verdict_inner(
+        self,
+        cfg: AppConfig,
+        session_id: SessionId,
+        prior_status: SessionStatus,
+        prior_reason: str | None,
+        cancel: threading.Event,
+    ) -> SessionHealthResult:
+        """Body of one probe; *cancel* is never shared across concurrent probes."""
         if self._browser is None:
             if prior_status == SessionStatus.LIMITED:
                 return SessionHealthResult(
@@ -267,43 +284,44 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
             )
 
         try:
+            # Entering the adapter context launches Chromium; teardown runs on
+            # this thread when the with-block exits (including cancel).
             with self._browser.health_probe_page(cfg) as page:
-                self._browser_open = True
-                try:
-                    if self._cancel.is_set():
-                        return self._cancelled_verdict(session_id)
-
-                    if self._body_is_rate_limited(page):
-                        evidence = self._extract_limit_evidence(page)
-                        return SessionHealthResult(
-                            session_id=session_id,
-                            status=SessionStatus.LIMITED,
-                            reason=HealthReason.QUOTA.value,
-                            evidence=evidence or "Provider daily limit reached",
-                            recovery_action="Session is rate-limited. Switch accounts or reduce request throughput.",
-                        )
-
-                    if not self._page_is_usable(page, cancel=self._cancel):
-                        return SessionHealthResult(
-                            session_id=session_id,
-                            status=SessionStatus.AUTH_REQUIRED,
-                            reason=HealthReason.EXPIRED.value,
-                            evidence="Chat input / composer not usable or login prompt displayed",
-                            recovery_action="Run 'qwen-web-arwaky session login' to authenticate.",
-                        )
-
+                if cancel.is_set():
                     return SessionHealthResult(
                         session_id=session_id,
-                        status=SessionStatus.ACTIVE,
-                        reason=None,
-                        evidence=None,
-                        recovery_action=None,
+                        status=SessionStatus.AUTH_REQUIRED,
+                        reason=HealthReason.TIMEOUT.value,
+                        evidence="Health probe cancelled before completing",
+                        recovery_action="Check network connection and responsiveness of chat.qwen.ai.",
                     )
-                finally:
-                    # Exiting the adapter's context manager tears down the
-                    # browser process group this probe launched, including on
-                    # the cancel path where the loop no longer waits for us.
-                    self._browser_open = False
+
+                if self._body_is_rate_limited(page):
+                    evidence = self._extract_limit_evidence(page)
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.LIMITED,
+                        reason=HealthReason.QUOTA.value,
+                        evidence=evidence or "Provider daily limit reached",
+                        recovery_action="Session is rate-limited. Switch accounts or reduce request throughput.",
+                    )
+
+                if not self._page_is_usable(page, cancel=cancel):
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.AUTH_REQUIRED,
+                        reason=HealthReason.EXPIRED.value,
+                        evidence="Chat input / composer not usable or login prompt displayed",
+                        recovery_action="Run 'qwen-web-arwaky session login' to authenticate.",
+                    )
+
+                return SessionHealthResult(
+                    session_id=session_id,
+                    status=SessionStatus.ACTIVE,
+                    reason=None,
+                    evidence=None,
+                    recovery_action=None,
+                )
         except AuthRequiredError as exc:
             return SessionHealthResult(
                 session_id=session_id,
@@ -384,17 +402,6 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         if not body:
             return False
         return any(pattern.search(body) for pattern in _compiled_patterns)
-
-    @staticmethod
-    def _cancelled_verdict(session_id: SessionId) -> SessionHealthResult:
-        """Verdict for a probe that observed its cancel handle mid-flight."""
-        return SessionHealthResult(
-            session_id=session_id,
-            status=SessionStatus.AUTH_REQUIRED,
-            reason=HealthReason.TIMEOUT.value,
-            evidence="Health probe cancelled before completing",
-            recovery_action="Check network connection and responsiveness of chat.qwen.ai.",
-        )
 
     def __repr__(self) -> str:
         """Return string representation of the health checker."""

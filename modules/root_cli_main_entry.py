@@ -270,8 +270,8 @@ def _resolve_session_for_prompt(args: argparse.Namespace, container: SharedConta
     if pool.total_count == 0:
         return
 
-    # rotate_sync owns the event loop so this resolver is safe to call from
-    # inside an already-running loop (SA-4-03).
+    # rotate_sync is asyncio.run under the hood: call it only from a thread
+    # that has no running loop. Inside a running loop, await rotate instead.
     try:
         response = container.session_rotator.rotate_sync(RotatorRequest())
         session_path = response.session.path if response.session else None
@@ -435,8 +435,9 @@ def _result_exit_code(result: dict[str, object], json_output: bool = False) -> i
 def _exit_code_for_result(result: dict[str, object]) -> int:
     """Map a failed response envelope to a process exit code.
 
-    Auth failures take 3, keeping 2 reserved for argparse usage errors
-    (SA-3-02); every other failure stays 1.
+    Auth failures take 3, keeping 2 reserved for argparse usage errors so a
+    machine can tell a bad invocation from an expired session; every other
+    failure stays 1.
     """
     error = str(result.get("error") or "")
     if "AUTH_REQUIRED" in error or "not authenticated" in error.lower() or "session expired" in error.lower():

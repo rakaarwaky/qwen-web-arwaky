@@ -133,6 +133,11 @@ class ISessionManagerProtocol(ABC):
         """Mark the session as requiring re-authentication or setup."""
         ...
 
+    @abstractmethod
+    def mark_used(self, session_id: SessionId, *, success: bool = True) -> None:
+        """Record a completed request against the session under the pool lock."""
+        ...
+
 
 class ISessionHealthCheckerProtocol(ABC):
     """Async session health-check contract (ping test per session)."""

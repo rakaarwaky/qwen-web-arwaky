@@ -175,7 +175,7 @@ TOOLS: list[Tool] = [
                 },
                 "timeout_sec": {
                     "type": "integer",
-                    "description": "Maximum seconds to wait for the assistant response.",
+                    "description": "Maximum seconds to wait for the assistant response when async_run is false. Ignored for async jobs.",
                     "default": 120,
                     "minimum": 1,
                 },
@@ -218,7 +218,7 @@ TOOLS: list[Tool] = [
                 },
                 "timeout_sec": {
                     "type": "integer",
-                    "description": "Maximum seconds to wait for the assistant response.",
+                    "description": "Maximum seconds to wait for the assistant response when async_run is false. Ignored for async jobs.",
                     "default": 120,
                     "minimum": 1,
                 },

@@ -44,10 +44,20 @@ class SessionManager(ISessionManagerProtocol):
 
         Missing Chromium profiles are registered so users who added a
         profile manually (or on another machine/tool) do not re-login.
+        A discovery write re-takes the pool lock and reloads so it cannot
+        clobber a concurrent locked mutation.
         """
         pool = self._load_pool_from_file()
         added = self._register_discovered_profiles(pool)
-        if added:
+        if not added:
+            return pool
+        with self._pool_lock():
+            return self._load_pool_under_lock()
+
+    def _load_pool_under_lock(self) -> SessionPool:
+        """Load and persist discoveries. Caller must already hold ``_pool_lock``."""
+        pool = self._load_pool_from_file()
+        if self._register_discovered_profiles(pool):
             self.save_pool(pool)
         return pool
 
@@ -193,7 +203,7 @@ class SessionManager(ISessionManagerProtocol):
         than adding a duplicate row.
         """
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             for i, s in enumerate(pool.sessions):
                 if s.path == profile_path:
                     # Frozen dataclass: replace the entry with a copy that has
@@ -215,7 +225,7 @@ class SessionManager(ISessionManagerProtocol):
     def remove_session(self, session_id: str) -> bool:
         """Remove a session by ID."""
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             if pool.remove_session(session_id):
                 self.save_pool(pool)
                 return True
@@ -228,7 +238,7 @@ class SessionManager(ISessionManagerProtocol):
     def remove_session_by_name(self, name: str) -> bool:
         """Remove the pool entry registered under *name*; True when found."""
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             removed = False
             for i, s in enumerate(pool.sessions):
                 if s.name == name:
@@ -303,22 +313,29 @@ class SessionManager(ISessionManagerProtocol):
     def mark_limited(self, session_id: str, reason: SessionReason | None = "QUOTA") -> None:
         """Mark session as rate-limited; a ``None`` reason normalises to ``"QUOTA"``."""
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             pool.mark_limited(session_id, reason=reason)
             self.save_pool(pool)
 
     def mark_healthy(self, session_id: str) -> None:
         """Mark session as healthy."""
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             pool.mark_healthy(session_id)
             self.save_pool(pool)
 
     def mark_auth_required(self, session_id: str, reason: SessionReason | None = None) -> None:
         """Mark session as requiring authentication or setup."""
         with self._pool_lock():
-            pool = self.load_pool()
+            pool = self._load_pool_under_lock()
             pool.mark_auth_required(session_id, reason=reason)
+            self.save_pool(pool)
+
+    def mark_used(self, session_id: str, *, success: bool = True) -> None:
+        """Record a completed request against the session under the pool lock."""
+        with self._pool_lock():
+            pool = self._load_pool_under_lock()
+            pool.sessions = [s.with_usage(success=success) if s.session_id == session_id else s for s in pool.sessions]
             self.save_pool(pool)
 
     # Block 3: Dunder Methods, Factories & Helpers

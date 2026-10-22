@@ -208,7 +208,7 @@ class SessionOrchestrator(ISessionAggregate):
             page.goto(CHAT_URL, wait_until="domcontentloaded")
 
             # The human wait ceiling is its own budget: a typed login must
-            # never be cut short by the generic run timeout (SA-4-02).
+            # never be cut short by the generic run timeout.
             deadline = time.monotonic() + login_wait_seconds()
             while True:
                 try:

@@ -82,7 +82,22 @@ def test_concurrent_mark_limited_and_add_session_lose_no_updates(
     assert limited.status == SessionStatus.LIMITED
 
 
-def test_every_mutating_path_holds_one_advisory_lock(pool_home: Path) -> None:
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        "add_session",
+        "mark_limited",
+        "mark_healthy",
+        "mark_auth_required",
+        "mark_used",
+        "remove_session",
+        "remove_session_by_name",
+    ],
+)
+def test_every_mutating_path_holds_one_advisory_lock(
+    pool_home: Path,
+    mutate: str,
+) -> None:
     """The lock file is created beside the pool and each mutation acquires it once."""
     lock_path = pool_home / "sessions.json.lock"
     acquisitions: list[int] = []
@@ -94,12 +109,47 @@ def test_every_mutating_path_holds_one_advisory_lock(pool_home: Path) -> None:
 
     manager = SessionManager(base_dir=pool_home)
     with patch.object(session_manager_module, "exclusive_file_lock", _counting):
-        manager.add_session("alpha", pool_home / "alpha")
-        manager.mark_limited("session_1")
-        manager.mark_healthy("session_1")
-        manager.remove_session_by_name("alpha")
+        if mutate == "add_session":
+            manager.add_session("alpha", pool_home / "alpha")
+        elif mutate == "mark_limited":
+            manager.mark_limited("session_1")
+        elif mutate == "mark_healthy":
+            manager.mark_healthy("session_1")
+        elif mutate == "mark_auth_required":
+            manager.mark_auth_required("session_1")
+        elif mutate == "mark_used":
+            manager.mark_used("session_1")
+        elif mutate == "remove_session":
+            manager.remove_session("session_1")
+        elif mutate == "remove_session_by_name":
+            manager.add_session("beta", pool_home / "beta")
+            acquisitions.clear()
+            manager.remove_session_by_name("beta")
+        else:  # pragma: no cover - parametrize is the allow-list
+            raise AssertionError(f"unknown mutate {mutate}")
 
-    assert acquisitions, "no mutation acquired the pool lock"
+    assert acquisitions, f"{mutate} did not acquire the pool lock"
     assert lock_path.parent == pool_home
     # The lock lives at the documented path (POOL_FILE.name + ".lock").
     assert lock_path.name == "sessions.json.lock"
+
+
+def test_discovery_save_holds_advisory_lock(pool_home: Path) -> None:
+    """load_pool's auto-discovery write must take the same lock as mutators."""
+    profile = pool_home / "discovered"
+    profile.mkdir()
+    (profile / "Local State").write_text("{}", encoding="utf-8")
+
+    acquisitions: list[int] = []
+    real_lock = session_manager_module.exclusive_file_lock
+
+    def _counting(lock: Path) -> object:
+        acquisitions.append(1)
+        return real_lock(lock)
+
+    manager = SessionManager(base_dir=pool_home)
+    with patch.object(session_manager_module, "exclusive_file_lock", _counting):
+        pool = manager.load_pool()
+
+    assert {s.name for s in pool.sessions} == {"discovered"}
+    assert acquisitions, "discovery save_pool must acquire the pool lock"

@@ -78,7 +78,14 @@ class _NeverCancels(_StalledBrowser):
 
 def _checker(browser: _StalledBrowser) -> SessionHealthChecker:
     checker = SessionHealthChecker(browser=browser, timeout_seconds=0.2)
-    browser.bind(checker._cancel)
+    real_new = checker._new_cancel
+
+    def _capturing_new() -> threading.Event:
+        cancel = real_new()
+        browser.bind(cancel)
+        return cancel
+
+    checker._new_cancel = _capturing_new
     return checker
 
 
@@ -138,6 +145,7 @@ def test_the_probe_thread_tears_its_own_context_down() -> None:
 
 def test_a_probe_that_succeeds_never_sees_the_cancel_handle() -> None:
     """The cancel handle stays unset on the happy path so no healthy run is aborted."""
+    seen: list[threading.Event] = []
 
     class _Healthy(_StalledBrowser):
         @contextmanager
@@ -149,6 +157,14 @@ def test_a_probe_that_succeeds_never_sees_the_cancel_handle() -> None:
 
     browser = _Healthy()
     checker = _checker(browser)
+    real_new = checker._new_cancel
+
+    def _recording_new() -> threading.Event:
+        cancel = real_new()
+        seen.append(cancel)
+        return cancel
+
+    checker._new_cancel = _recording_new
 
     async def _run() -> object:
         return await checker.diagnose_session(_session())
@@ -156,4 +172,54 @@ def test_a_probe_that_succeeds_never_sees_the_cancel_handle() -> None:
     verdict = asyncio.run(_run())
 
     assert verdict.status == SessionStatus.ACTIVE
-    assert checker._cancel.is_set() is False
+    assert seen, "diagnose_session must create a per-probe cancel handle"
+    assert seen[0].is_set() is False
+
+
+def test_concurrent_probes_do_not_share_one_cancel_handle() -> None:
+    """A sibling timeout must not abort an in-flight probe (issue: shared cancel)."""
+    created: list[threading.Event] = []
+
+    class _SlowHealthy(_StalledBrowser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.release = threading.Event()
+
+        @contextmanager
+        def health_probe_page(self, cfg: Any) -> Iterator[Any]:
+            page = MagicMock()
+            page.inner_text.return_value = "Qwen chat"
+            page.query_selector.return_value = MagicMock()
+            self.release.wait(timeout=5)
+            yield page
+
+    browser = _SlowHealthy()
+    checker = SessionHealthChecker(browser=browser, timeout_seconds=5.0)
+    real_new = checker._new_cancel
+
+    def _recording_new() -> threading.Event:
+        cancel = real_new()
+        created.append(cancel)
+        return cancel
+
+    checker._new_cancel = _recording_new
+
+    async def _run() -> None:
+        async def _one() -> object:
+            return await checker.diagnose_session(_session())
+
+        task_a = asyncio.create_task(_one())
+        task_b = asyncio.create_task(_one())
+        # Wait until both probes have their own cancel handle, then release
+        # only A's browser so B is still in flight when A finishes.
+        for _ in range(50):
+            if len(created) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        assert len(created) >= 2, "each concurrent probe must create its own cancel"
+        assert created[0] is not created[1]
+        browser.release.set()
+        await asyncio.gather(task_a, task_b)
+
+    asyncio.run(_run())
+    assert created[0] is not created[1]

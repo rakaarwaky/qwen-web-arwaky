@@ -638,9 +638,6 @@ STATUS_SCHEMA_VERSION: int = 2
 #: independently of ``AppConfig.timeout``.
 DEFAULT_LOGIN_WAIT_TIMEOUT_SEC: int = 1800
 
-#: Environment override for ``DEFAULT_LOGIN_WAIT_TIMEOUT_SEC``.
-LOGIN_WAIT_TIMEOUT_ENV: str = "QWEN_LOGIN_WAIT_SEC"
-
 #: The old single-profile location (pre-multi-account). Used only for migration.
 DEFAULT_SESSION_OLD: Path = XDG_DATA_HOME / "qwen_session"
 

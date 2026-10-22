@@ -122,7 +122,7 @@ class JobStorage(IJobStorageProtocol):
             rec = self.get_job(path.stem)
             if rec is None or rec.completed or rec.owner_pid is None:
                 continue
-            stale_heartbeat = self._heartbeat_is_stale(rec.heartbeat_at)
+            stale_heartbeat = self._heartbeat_is_stale(rec.heartbeat_at, rec.created_at)
             alive = True
             try:
                 os.kill(rec.owner_pid, 0)
@@ -156,13 +156,37 @@ class JobStorage(IJobStorageProtocol):
         return JobCount(reconciled)
 
     @staticmethod
-    def _heartbeat_is_stale(heartbeat_at: str | None) -> bool:
-        """True when the heartbeat is missing or older than the lease window."""
+    def _heartbeat_is_stale(heartbeat_at: str | None, created_at: str | None = None) -> bool:
+        """True when the heartbeat is missing past a submit grace, or older than the lease.
+
+        A missing stamp is only stale after one lease from ``created_at`` so
+        the submit→start window (owner alive, no worker stamp yet) is not
+        marked a zombie by a second process's construction-time reconcile.
+        """
+
+        # Legacy/corrupt records may store offset-naive stamps; attach UTC so
+        # subtraction against aware now() cannot raise TypeError and abort
+        # construction-time reconcile_zombies.
+        def _parse(stamp: str) -> datetime:
+            parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
+
         if not heartbeat_at:
-            return True
+            if not created_at:
+                return True
+            try:
+                created = _parse(created_at)
+            except (ValueError, TypeError, AttributeError):
+                # Corrupt JSON can hold a non-string stamp; `_parse` then raises
+                # AttributeError on `.replace`, which would crash the
+                # construction-time reconcile_zombies call — treat as stale.
+                return True
+            return datetime.now(timezone.utc) - created > timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC)
         try:
-            stamp = datetime.fromisoformat(heartbeat_at)
-        except ValueError:
+            stamp = _parse(heartbeat_at)
+        except (ValueError, TypeError, AttributeError):
             return True
         return datetime.now(timezone.utc) - stamp > timedelta(seconds=JOB_HEARTBEAT_LEASE_SEC)
 

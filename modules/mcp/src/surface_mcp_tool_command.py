@@ -197,18 +197,36 @@ def _format_error_payload(
     return json.dumps({"success": False, "error": err}, indent=2)
 
 
-def _format_rate_limit_payload(exc: RateLimitError) -> str:
-    """Render a throttled submission as a retryable RATE_LIMITED envelope."""
-    retry_after = getattr(exc, "retry_after_sec", None)
+def _format_retryable_error(
+    code: str,
+    message: str,
+    hint: str,
+    *,
+    retry_after_sec: float | None = None,
+    queue_depth: int | None = None,
+) -> str:
+    """Render a retryable failure envelope (RATE_LIMITED / QUEUE_FULL)."""
     payload: dict[str, Any] = {
-        "code": "RATE_LIMITED",
-        "message": str(exc),
-        "hint": "Submission quota reached. Wait for retry_after_sec, then resubmit.",
+        "code": code,
+        "message": message,
+        "hint": hint,
         "retryable": True,
     }
-    if retry_after is not None:
-        payload["retry_after_sec"] = round(float(retry_after), 1)
+    if retry_after_sec is not None:
+        payload["retry_after_sec"] = round(float(retry_after_sec), 1)
+    if queue_depth is not None:
+        payload["queue_depth"] = int(queue_depth)
     return json.dumps({"success": False, "error": payload}, indent=2)
+
+
+def _format_rate_limit_payload(exc: RateLimitError) -> str:
+    """Render a throttled submission as a retryable RATE_LIMITED envelope."""
+    return _format_retryable_error(
+        "RATE_LIMITED",
+        str(exc),
+        "Submission quota reached. Wait for retry_after_sec, then resubmit.",
+        retry_after_sec=getattr(exc, "retry_after_sec", None),
+    )
 
 
 def _format_queue_full_payload(exc: JobQueueFullError) -> str:
@@ -217,19 +235,13 @@ def _format_queue_full_payload(exc: JobQueueFullError) -> str:
     Keeps the backpressure hint the orchestrator attached (``retry_after_sec``,
     ``queue_depth``) so a client can back off deliberately.
     """
-    payload: dict[str, Any] = {
-        "code": "QUEUE_FULL",
-        "message": str(exc),
-        "hint": "Worker pool is at capacity. Wait for retry_after_sec, then resubmit.",
-        "retryable": True,
-    }
-    retry_after = getattr(exc, "retry_after_sec", None)
-    if retry_after is not None:
-        payload["retry_after_sec"] = round(float(retry_after), 1)
-    queue_depth = getattr(exc, "queue_depth", None)
-    if queue_depth is not None:
-        payload["queue_depth"] = int(queue_depth)
-    return json.dumps({"success": False, "error": payload}, indent=2)
+    return _format_retryable_error(
+        "QUEUE_FULL",
+        str(exc),
+        "Worker pool is at capacity. Wait for retry_after_sec, then resubmit.",
+        retry_after_sec=getattr(exc, "retry_after_sec", None),
+        queue_depth=getattr(exc, "queue_depth", None),
+    )
 
 
 def _resolve_prompt_path(prompt_file: str, *, field: str = "prompt_file") -> Path | str:
@@ -340,7 +352,9 @@ class McpToolCommand:
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
-            timeout_sec: Maximum seconds to wait for the assistant response (default: 120s).
+            timeout_sec: Maximum seconds to wait for the assistant response
+                when ``async_run`` is false. Ignored for async jobs, which
+                run until completion (default: 120s).
 
         Returns:
             JSON string containing success status, resolved output path, and result preview (or job_id if async).
@@ -434,7 +448,9 @@ class McpToolCommand:
             output_file: Optional output file destination path.
             headless: Run browser headlessly (default: True).
             async_run: Run job asynchronously in background to avoid MCP timeout (default: True).
-            timeout_sec: Maximum seconds to wait for the assistant response (default: 120s).
+            timeout_sec: Maximum seconds to wait for the assistant response
+                when ``async_run`` is false. Ignored for async jobs, which
+                run until completion (default: 120s).
 
         Returns:
             JSON string containing success status, resolved output path, and result (or job_id if async).
