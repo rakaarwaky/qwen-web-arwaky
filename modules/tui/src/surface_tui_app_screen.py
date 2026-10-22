@@ -45,6 +45,7 @@ from modules.tui.src.surface_tui_promptfile_action import _TuiPromptFileHandlerM
 from modules.tui.src.surface_tui_sessions_store import _TuiSessionsWorkerMixin
 from modules.tui.src.surface_tui_settings_view import _TuiSettingsMixin
 from modules.tui.src.surface_tui_utils_component import _TuiUtilsMixin
+from modules.tui.src.surface_tui_view import QwenTuiAppLike
 from modules.tui.src.surface_tui_workers_store import _TuiWorkersMixin
 
 NUM_SLOTS = max(2, int(DEFAULT_MAX_WORKERS))
@@ -240,6 +241,10 @@ class QwenTuiApp(
         if not confirmed or pending is None:
             return
         self._swarm_worker(pending)
+
+    def _app_like(self) -> QwenTuiAppLike:
+        """Conformance anchor: QwenTuiApp structurally satisfies QwenTuiAppLike (ARCH-1-003)."""
+        return self
 
     # ── Headless toggle ───────────────────────────────────────────────────
 

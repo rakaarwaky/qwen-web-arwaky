@@ -21,7 +21,7 @@ import modules.tui.src.surface_tui_sessions_store as surface_tui_sessions_store
 import modules.tui.src.surface_tui_settings_view as surface_tui_settings_view
 import modules.tui.src.surface_tui_swarm_action as surface_tui_swarm_action
 import modules.tui.src.surface_tui_utils_component as surface_tui_utils_component
-import modules.tui.src.surface_tui_view_typing as surface_tui_view_typing
+import modules.tui.src.surface_tui_view as surface_tui_view
 import modules.tui.src.surface_tui_workers_store as surface_tui_workers_store
 
 __all__ = [
@@ -39,6 +39,6 @@ __all__ = [
     "surface_tui_sessions_store",
     "surface_tui_settings_view",
     "surface_tui_utils_component",
-    "surface_tui_view_typing",
+    "surface_tui_view",
     "surface_tui_workers_store",
 ]

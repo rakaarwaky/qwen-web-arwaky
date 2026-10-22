@@ -10,7 +10,7 @@ import contract(protocol).
 
 from __future__ import annotations
 
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -19,17 +19,15 @@ class QwenTuiAppLike(Protocol):
     """Attributes and seams the TUI mixins expect on the concrete app."""
 
     _NUM_SLOTS: int
-    _slot_workers: MutableMapping[int, Any]
-    _slot_cancel_events: MutableMapping[int, Any]
-    _active_slot: int
+    _slot_workers: dict[int, Any]
+    _slot_cancel_events: dict[int, Any]
+    _active_slot_cache: int
     _sessions_loaded_once: bool
     _headless: bool
-    session_manager: Any
-    agent_session_orchestrator: Any
+    _session_manager: Any
     _session: Any
     _session_rotator: Any
     _prompt: Any
-    _observability: Any
     _log_msg: Callable[..., None]
 
 
