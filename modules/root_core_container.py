@@ -150,37 +150,12 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
-        # Session rotation infrastructure is composed before the session
-        # aggregate so the orchestrator can be wired with the rotator (the
-        # ``rotate`` verb) and the doctor smoke gate can be wired against the
-        # session aggregate at construction time (mirrors the pre-refactor
-        # ordering).
+        # Session infrastructure (health checker + renewer) is composed here;
+        # the rotator and session aggregate follow later after the prompt adapters.
         self.session_health_checker = SessionHealthChecker(browser=self.browser)
         self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
             browser=self.browser,
             observability=self.observability,
-        )
-        self.prompt_aggregate: IPromptAggregate = PromptOrchestrator(
-            direct=self.agent_direct_prompt_orchestrator,
-            file_only=self.agent_prompt_file_orchestrator,
-            attachment=self.agent_attachment_prompt_orchestrator,
-            cancel_registry=self.run_cancel_registry,
-            observability=self.observability,
-        )
-        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
-
-        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
-            session_manager=self.session_manager,
-            health_checker=self.session_health_checker,
-            prompt=self.prompt_aggregate,
-        )
-        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
-            browser=self.browser,
-            observability=self.observability,
-            sessions=self.session_manager,
-            renewer=self.session_renewer,
-            health_checker=self.session_health_checker,
-            rotator=self.session_rotator,
         )
         self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
         self.updater_upgrade: IUpdateUpgradeProtocol = UpdateUpgradeCapability(DEFAULT_PACKAGE_NAME)
@@ -188,24 +163,10 @@ class SharedContainer:
             self.updater_upgrade,
             package_name=DEFAULT_PACKAGE_NAME,
         )
-        self.updater_verify: IUpdateVerifyProtocol = UpdateVerifyCapability(
-            self.updater_check,
-            self.updater_upgrade,
-            self.updater_rollback,
-            package_name=DEFAULT_PACKAGE_NAME,
-            smoke_gate=build_smoke_gate(self.agent_session_orchestrator),
-        )
         # Feature agents sit between capabilities and surfaces so no caller
         # repeats the sequencing each feature owns.
         self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser, self.observability)
         self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
-        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(
-            self.updater_check,
-            self.updater_upgrade,
-            self.updater_verify,
-            self.updater_rollback,
-            self.observability,
-        )
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
         # AR-1: TUI slot-config resolver exposed via the Root container so the
@@ -265,8 +226,49 @@ class SharedContainer:
             folder_adapter=self.folder_adapter,
             cancel=self.run_cancel_registry,
         )
-        # Session rotation infrastructure is composed above with the session
-        # aggregate; nothing left to wire here.
+        # Shared prompt aggregate: the three adapters are composed first,
+        # then PromptOrchestrator wires them into a single IPromptAggregate.
+        self.prompt_aggregate: IPromptAggregate = PromptOrchestrator(
+            direct=self.agent_direct_prompt_orchestrator,
+            file_only=self.agent_prompt_file_orchestrator,
+            attachment=self.agent_attachment_prompt_orchestrator,
+            cancel_registry=self.run_cancel_registry,
+            observability=self.observability,
+        )
+        # Session rotation: the rotator needs the prompt aggregate so that
+        # execute_with_rotation can delegate real work instead of using a
+        # simulated response (ARCH-2-003).
+        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+
+        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
+            session_manager=self.session_manager,
+            health_checker=self.session_health_checker,
+            prompt=self.prompt_aggregate,
+        )
+        self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
+            browser=self.browser,
+            observability=self.observability,
+            sessions=self.session_manager,
+            renewer=self.session_renewer,
+            health_checker=self.session_health_checker,
+            rotator=self.session_rotator,
+        )
+        # updater_verify and the update aggregate depend on the session orchestrator
+        # (smoke gate) so they are composed after it.
+        self.updater_verify: IUpdateVerifyProtocol = UpdateVerifyCapability(
+            self.updater_check,
+            self.updater_upgrade,
+            self.updater_rollback,
+            package_name=DEFAULT_PACKAGE_NAME,
+            smoke_gate=build_smoke_gate(self.agent_session_orchestrator),
+        )
+        self.agent_update_orchestrator: IUpdateAggregate = UpdateOrchestrator(
+            self.updater_check,
+            self.updater_upgrade,
+            self.updater_verify,
+            self.updater_rollback,
+            self.observability,
+        )
         DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.job_storage = JobStorage(storage_dir=DEFAULT_JOBS_DIR)
         self.agent_job_orchestrator: IJobManagerAggregate = AgentJobOrchestrator(

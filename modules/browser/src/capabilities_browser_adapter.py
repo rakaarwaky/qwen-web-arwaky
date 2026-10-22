@@ -766,14 +766,10 @@ class BrowserAdapter(IBrowserProtocol):
         """
         master_session = cfg.session_path
         mode = getattr(cfg, "mode", "")
-        # Issue #283: scope any per-run --model override to this session so
-        # concurrent runs do not read each other's target model. The default
-        # (empty string) resolves back to the constant so unchanged runs keep
-        # their previous behavior. Non-string values (e.g. a MagicMock in a
-        # test harness) are ignored so they never pollute the contextvar.
-        override = getattr(cfg, "model", "")
-        if isinstance(override, str) and override.strip():
-            _TARGET_MODEL.set(override.strip())
+        # Per-run --model override is bound exactly once, after the ephemeral
+        # session launches, so concurrent Swarm legs never read each other's
+        # target model (Issue #283). Non-string values (e.g. a MagicMock in
+        # a test harness) are ignored so they never pollute the contextvar.
 
         with create_ephemeral_session(master_session, mode=mode) as session_dir:
             # Shared launch args (flags, sandbox/headless extras, headless-shell
@@ -789,10 +785,10 @@ class BrowserAdapter(IBrowserProtocol):
                 with sync_playwright() as p:
                     ctx = self._launch_context(p, kwargs)
                     context_started = True
-                    # Issue #283: bind per-run model override so the browser
-                    # adapter references the correct token across all nested
-                    # helpers without threading an extra parameter.
-                    _TARGET_MODEL.set(cfg.model or DEFAULT_MODEL)
+                    # Bind per-run model override after the context launches so
+                    # concurrent runs scope their model to this session only.
+                    _model = getattr(cfg, "model", "")
+                    _TARGET_MODEL.set(_model.strip() if isinstance(_model, str) and _model.strip() else DEFAULT_MODEL)
 
                     # Eagerly navigate the initial about:blank page to CHAT_URL
                     # so the browser starts loading while route/diagnostics setup

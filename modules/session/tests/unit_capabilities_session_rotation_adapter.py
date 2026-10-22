@@ -182,6 +182,34 @@ def test_execute_with_rotation_reports_outcome_on_exhausted_pool(tmp_path: Path)
     assert adapter.metrics.sessions_exhausted == 1
 
 
+def test_execute_with_rotation_delegates_to_prompt_aggregate(tmp_path: Path) -> None:
+    """``execute_with_rotation`` delegates to the injected prompt aggregate (ARCH-2-003)."""
+    pool = _pool([SessionStatus.LIMITED, SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_2"})
+    adapter = _adapter(pool, checker)
+
+    result, session = asyncio.run(adapter.execute_with_rotation("prompt"))
+
+    assert session is not None
+    assert session.session_id == "session_2"
+    # The mock prompt aggregate returns response_text="ok"; the delegation
+    # itself is proven by the value arriving at the caller.
+    assert result == "ok"
+    assert adapter.metrics.successful_rotations == 1
+
+
+def test_execute_with_rotation_requires_prompt_aggregate(tmp_path: Path) -> None:
+    """``execute_with_rotation`` raises when no prompt aggregate is wired."""
+    pool = _pool([SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_1"})
+    manager = MagicMock()
+    manager.load_pool.return_value = pool
+    adapter = SessionRotationAdapter(manager, checker)  # no prompt
+
+    with __import__("pytest").raises(RuntimeError, match="no IPromptAggregate"):
+        asyncio.run(adapter.execute_with_rotation("prompt"))
+
+
 # ── outcome/reason contract (BA-2-002, merged from unit_session_rotation_outcomes) ─
 
 
