@@ -111,7 +111,7 @@ The visual style blends **cyber-technical minimalism** with refined **tactile te
 
 ## Colors
 
-The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
+The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css_view.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
 
 | Token | Hex | Approx ANSI | Usage |
 |-------|-----|-------------|-------|
@@ -172,12 +172,16 @@ The layout is built on a tight 4px baseline sub-grid that maximizes real estate 
 
 ## Elevation & Depth
 
-This design system avoids heavy drop shadows, relying instead on **chromatic surface layering** coupled with **subtle edge luminosity**:
+This design system avoids heavy drop shadows, relying instead on **chromatic
+surface layering**: each step is a solid `$token` from the `_COLORS` palette
+in `modules/tui/src/surface_tui_css_view.py` (the shipped TUI is pixel-flat,
+so no step carries a box-shadow — depth is carried by the surface step and a
+hairline border).
 
-- **Layer 0 (Canvas)**: `#0B0F17` base background.
-- **Layer 1 (Card/Container)**: `#111827` with a 1px border of `rgba(255, 255, 255, 0.06)`.
-- **Layer 2 (Floating Modals / Bottom Sheets)**: `#151D2C` with a 1px border of `rgba(56, 189, 248, 0.22)` and a soft ambient glow: `box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.75), 0 0 12px 0 rgba(56, 189, 248, 0.08)`.
-- **Active Agent Focus**: Elements running active inference processes display a subtle pulsing rim illumination using `rgba(56, 189, 248, 0.4)` without hard edge dropouts.
+- **Layer 0 (Canvas)**: `$bg` (`#171A1F`) base background.
+- **Layer 1 (Card/Container)**: `$surface` (`#22262C`) with a 1px `$border` (`#2E343C`) hairline.
+- **Layer 2 (Floating Modals / Bottom Sheets)**: `$bg_overlay` (`#1C2026`) with a 1px `$focus_ring`-tinted border (`$accent` at reduced opacity).
+- **Active Agent Focus**: elements running active inference processes display a subtle pulsing rim illumination tinted from `$focus_ring` (`$accent`) without hard edge dropouts.
 
 ## Shapes
 
@@ -190,23 +194,23 @@ The design system enforces a **Soft (`1`)** shape language to preserve the preci
 ## Components
 
 ### Buttons & Triggers
-- **Primary Action (Run / Execute)**: Solid `#38BDF8` background, `#0B0F17` bold typography, `0.25rem` radius. Active state triggers a subtle scale down (`0.98`) with a cyan halo glow.
-- **Secondary Action (Abort / Fork)**: `#111827` surface with a 1px `rgba(99, 102, 241, 0.35)` border and `#6366F1` text.
-- **Ghost / TUI Command Buttons**: Monospaced labels wrapped in square brackets (`[kill -9]`, `[tail -f]`) rendered in muted slate with transparent backgrounds.
+- **Primary Action (Run / Execute)**: solid `$accent` (`#38BDF8`) fill with `$fg_on_accent` (`#0B1220`) bold typography, `0.25rem` radius. Active state triggers a subtle scale down (`0.98`) with an accent halo.
+- **Secondary Action (Abort / Fork)**: `$bg_raised` (`#22262C`) surface with a 1px `$border` (`#2E343C`) hairline and `$fg_accent` (`#7DD3FC`) text.
+- **Ghost / TUI Command Buttons**: monospaced labels wrapped in square brackets (`[kill -9]`, `[tail -f]`) rendered in `$fg_muted` (`#9AA4B2`) on a transparent background.
 
 ### Status Indicators & Chips
-- **Worker / Agent Badges**: Compact pill structures containing a 6px status beacon. Running states use pulsating emerald green (`#10B981`) beacons with background fill `rgba(16, 185, 129, 0.12)`.
-- **Token & Model Chips**: Micro-chips with `#1E293B` background, displaying model routing (`qwen-max`, `qwen-turbo`) and context consumption (`4.2k/8k tokens`) in `label-sm` font.
+- **Worker / Agent Badges**: compact pill structures containing a 6px status beacon. Running states use pulsating `$success` (`#4ADE80`) beacons on a `$success`-tinted fill.
+- **Token & Model Chips**: micro-chips with a `$bg_raised` (`#22262C`) background, displaying model routing (`qwen-max`, `qwen-turbo`) and context consumption (`4.2k/8k tokens`) in `label-sm` font.
 
 ### Parallel Stream Cards
 - Encapsulated cards featuring a monospaced terminal header bar: displays thread ID, live latency (`124ms`), and an execution state tag.
-- Stream content area uses monospaced text with a blinking cyan cursor (`#38BDF8`) for streaming responses, styled with an inner hairline left border to denote output nesting.
+- Stream content area uses monospaced text with a blinking `$accent` (`#38BDF8`) cursor for streaming responses, styled with an inner hairline left border to denote output nesting.
 
 ### Input Fields & Command Bar
-- Fixed bottom dock featuring a prompt-symbol indicator (`> `) in electric cyan.
-- Dark field fill (`#111827`) bounded by a 1px border that shifts from neutral gray to glowing `#38BDF8` on focus.
-- Monospace placeholder text with auto-suggest completions rendered in low-opacity slate (`#64748B`).
+- Fixed bottom dock featuring a prompt-symbol indicator (`> `) in `$accent` (`#38BDF8`).
+- Dark field fill (`$bg_surface` / `$bg_overlay` per the palette) bounded by a 1px `$border` that shifts to glowing `$focus_ring` on focus.
+- Monospace placeholder text with auto-suggest completions rendered in `$fg_muted` (`#9AA4B2`).
 
 ### Navigation & Tab Bar
-- Bottom tab dock with high-blur frosted backing (`rgba(11, 15, 23, 0.85)`).
-- Tabs feature high-contrast minimal glyphs paired with `label-sm` text. Active tab highlighted via an upper horizontal neon hairline accent in primary electric blue.
+- Bottom tab dock backed by `$bg_surface` (`#12151A`).
+- Tabs feature high-contrast minimal glyphs paired with `label-sm` text. Active tab highlighted via an upper horizontal neon hairline accent in `$accent` (`#38BDF8`).

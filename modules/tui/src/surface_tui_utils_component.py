@@ -19,11 +19,25 @@ from rich.text import Text
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
 from textual.css.query import NoMatches
-from textual.widgets import Button, Label, Static, TabbedContent
+from textual.widgets import Button, Label, TabbedContent
 
+from modules.shared.src.common.taxonomy_core_constant import STATUS_GLYPHS
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_component import QwenTuiLogHandler, QwenTuiRichLog
 from modules.tui.src.surface_tui_css_view import _COLORS, THEME
+
+# UX-5-001: one shared empty-state string for the session list, consumed by
+# the compose tree and both dynamic repaint paths so the pane never shows two
+# different wordings for the same state.
+SESSION_EMPTY_HINT = "No sessions yet — press A or click ADD SESSION to log in"
+
+# UX-3-002: the canonical failure glyph (✗, U+2717) is declared once in the
+# shared Taxonomy layer (modules/shared/src/common/taxonomy_core_constant.py)
+# so the CLI's result markers and the TUI's FAILED badge/table/event labels
+# and slot tab titles all read the same object. The TUI module may not import
+# from the CLI surface (import matrix), so the constant lives in shared and
+# the CLI surface re-exports it from there.
+_CANONICAL_FAIL_GLYPH = STATUS_GLYPHS["fail"]
 
 if TYPE_CHECKING:
     pass
@@ -35,7 +49,7 @@ _STATUS_BADGE: dict[str, str] = {
     "IDLE": "● READY",
     "RUNNING": "▶ RUNNING",
     "SUCCESS": "✓ SUCCESS",
-    "FAILED": "✕ FAILED",
+    "FAILED": f"{_CANONICAL_FAIL_GLYPH} FAILED",
     "CANCELLED": "■ CANCELLED",
     "CANCELLING": "⚠ CANCELLING…",
 }
@@ -43,7 +57,7 @@ _STATUS_TABLE: dict[str, str] = {
     "IDLE": "IDLE ●",
     "RUNNING": "RUNNING ▶",
     "SUCCESS": "DONE ✓",
-    "FAILED": "FAILED ✕",
+    "FAILED": f"FAILED {_CANONICAL_FAIL_GLYPH}",
     "CANCELLED": "CANCELLED ■",
     "CANCELLING": "CANCELLING ⚠",
 }
@@ -79,7 +93,7 @@ _EVENT_BADGE: dict[str, str] = {
     "LOGIN_VERIFIED": "✓ LOGGED IN",
     "MODEL_VERIFIED": "✓ MODEL",
     "SESSION_EXPIRED": "⚠ SESSION EXPIRED",
-    "FAILED": "✕ FAILED",
+    "FAILED": f"{_CANONICAL_FAIL_GLYPH} FAILED",
 }
 
 
@@ -225,11 +239,23 @@ class _TuiUtilsMixin:
     def _unicode_ok() -> bool:
         """Whether the terminal can paint the wide action glyphs.
 
-        A forced-ascii locale or NO_COLOR disables the wide set so the ASCII
-        fallback renders instead of a missing-glyph box.
+        A forced-ascii locale disables the wide set so the ASCII fallback
+        renders instead of a missing-glyph box.
+
+        UX-3-003: ``NO_COLOR`` is a *colour* preference and must not affect
+        iconography — it is deliberately not consulted here. A monochrome
+        terminal still renders the wide (monochrome-friendly) glyphs; only
+        the locale gate applies.
+
+        The gate matches the ``C`` / ``POSIX`` locale names exactly (they
+        carry no ``ascii`` substring) and any locale whose name contains
+        ``ascii`` (case-insensitive), so ``C``, ``POSIX``, and ``en_US.ASCII``
+        all fall back while ``en_US.UTF-8`` keeps the wide set.
         """
         locale = os.environ.get("LC_ALL") or os.environ.get("LANG", "")
-        return not (os.environ.get("NO_COLOR") or (locale and "ascii" in locale.lower()))
+        if locale in {"C", "POSIX"}:
+            return False
+        return "ascii" not in locale.lower()
 
     @staticmethod
     def _glyph(key: str) -> str:
@@ -403,9 +429,21 @@ class _TuiUtilsMixin:
             tab = tabs.get_tab(f"tab-slot-{slot_id}")
             tab.label = Content.from_text(title)
 
+    # UX-5-003: the Swarm screen's primary CTA carries the run state in its
+    # label (▶ START cold, ↻ RESTART once a run registered). The worker sets
+    # it through this helper instead of inlining a DOM query in the thread.
+    def _set_swarm_start_label(self, label: str) -> None:
+        with contextlib.suppress(NoMatches):
+            self.query_one("#btn-swarm-start", Button).label = label
+
     # Columns a slot pill needs: the "● SLOT 07" label, its border, and the
     # one-column gap the mockup puts between pills.
     _CHIP_COLUMNS = 12
+
+    # UX-2-002: the minimal tier drops the word and the beacon — one bare
+    # number per chip. 4 = the bare 2-digit number plus the chip's 1-column
+    # borders on a side.
+    _MINIMAL_CHIP_COLUMNS = 4
 
     def _refresh_slot_chips(self) -> None:
         """Fit every slot carousel to the terminal width.
@@ -413,7 +451,8 @@ class _TuiUtilsMixin:
         The ten pills share the row instead of scrolling, so the label has to
         give way when the row is narrow: below the width a full "● SLOT 07"
         needs, the pill keeps its status dot and number and drops the word, so
-        all ten slots stay readable at any size.
+        all ten slots stay readable at any size. Below the ~NUM_SLOTS * 4
+        column floor the minimal tier renders one bare number per chip.
 
         The width comes from the screen, not the carousel's region: a pane
         that is not on screen has no region yet, and its pills still need the
@@ -421,14 +460,21 @@ class _TuiUtilsMixin:
         """
         screen_width = self.screen.size.width
         # .chat-screen pads 2 a side and .slot-carousel pads 1 a side.
-        compact = screen_width - 6 < self._NUM_SLOTS * self._CHIP_COLUMNS
+        usable = screen_width - 6
+        compact = usable < self._NUM_SLOTS * self._CHIP_COLUMNS
+        minimal = usable < self._NUM_SLOTS * self._MINIMAL_CHIP_COLUMNS
         for chip in self.query(".slot-chip"):
             index = str(chip.id).rsplit("-", 1)[-1]
             try:
                 number = f"{int(index):02d}"
             except ValueError:
                 continue
-            chip.label = f"● {number}" if compact else f"● SLOT {number}"
+            if minimal:
+                chip.label = number
+            elif compact:
+                chip.label = f"● {number}"
+            else:
+                chip.label = f"● SLOT {number}"
 
     def _update_slot_status(self, slot_id: int, status_text: str) -> None:
         with contextlib.suppress(NoMatches):
@@ -508,9 +554,24 @@ class _TuiUtilsMixin:
             Label(escape(name), classes="session-cell session-cell-name"),
             Label(f"● {label}", classes=f"session-cell session-cell-status {state_class}"),
             Horizontal(
-                Button(glyph("refresh"), name=f"account-refresh-{position}", classes="account-btn account-btn-refresh"),
-                Button(glyph("health"), name=f"account-health-{position}", classes="account-btn account-btn-health"),
-                Button(glyph("delete"), name=f"account-delete-{position}", classes="account-btn account-btn-delete"),
+                Button(
+                    glyph("refresh"),
+                    name=f"account-refresh-{position}",
+                    classes="account-btn account-btn-refresh",
+                    tooltip=f"Refresh pool entry '{name}'",
+                ),
+                Button(
+                    glyph("health"),
+                    name=f"account-health-{position}",
+                    classes="account-btn account-btn-health",
+                    tooltip=f"Run a health check on '{name}'",
+                ),
+                Button(
+                    glyph("delete"),
+                    name=f"account-delete-{position}",
+                    classes="account-btn account-btn-delete",
+                    tooltip=f"Delete session '{name}' (asks confirmation first)",
+                ),
                 classes="session-cell session-cell-actions",
             ),
             classes="session-row",
@@ -527,7 +588,9 @@ class _TuiUtilsMixin:
             container = self.query_one("#session-rows", Vertical)
             container.remove_children()
             if not sessions:
-                container.mount(Static("No accounts registered.", classes="field-label"))
+                # UX-5-001: the shared empty-state string, same widget the
+                # compose tree and the store's repaint mount.
+                container.mount(Label(SESSION_EMPTY_HINT, classes="session-empty"))
                 return
             # The row actions are addressed by position, so the handler
             # resolves them against exactly the list on screen.

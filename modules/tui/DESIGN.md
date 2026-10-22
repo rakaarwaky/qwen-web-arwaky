@@ -34,7 +34,7 @@ lives in a widget; every component references a token row.
 
 | TUI token | Root `DESIGN.md` role | Usage |
 |---|---|---|
-| `bg` / `bg_base` | canvas (`#0B0F17` family → `#171A1F`) | screen background behind every panel |
+| `bg` / `bg_base` | canvas (`$bg` / `#171A1F`) | screen background behind every panel |
 | `surface` / `bg_raised` | surface / card | raised cards, table rows, slot chips |
 | `bg_surface` | recessed strip | tab-bar and dock background |
 | `border` | hairline | card and row separators |
@@ -50,6 +50,20 @@ integer multiple of it. Rounded and elevation ladders are the root ladders —
 the TUI applies `0.25rem` to cards and chips, `0.5rem` to modal frames, and
 layer elevation 0/1/2 to canvas, card, and modal surfaces respectively.
 
+### Terminal Type Projection
+
+The TUI cannot load the root design's Inter / JetBrains Mono web fonts, and a
+terminal cell grid cannot honour `rem` / `px` sizes or `letter-spacing`, so
+the root type stops are projected onto terminal **attributes** (weight, case,
+width, emphasis) carried by Textual component classes. Each stop keeps its
+role; only the rendering primitive changes.
+
+| Root type stop | Terminal attribute projection | Example widgets |
+|---|---|---|
+| `headline-*` | bold, full-width single row, reverse-aware contrast | `.app-brand-title`, `.card-title` |
+| `body-*` | default weight, wrapping flow (the only multi-row stop) | `QwenTuiRichLog` stream, `.override-purpose` |
+| `label-*` | bold, uppercase or muted single row, no wrap | `.session-cell-status`, metric tile labels |
+
 ## Components
 
 ### Layout Regions
@@ -62,11 +76,22 @@ paint order:
 | Brand row (in-page, every screen) | `>_ QWEN-CLI` title + package version label; replaces a docked Header |
 | `TabbedContent` | panes: Overview, Sessions, Slot 1…N (one Chat console each), Swarm, Settings |
 | Overview screen | telemetry banner (ACTIVE ACCOUNTS + routed MODEL tiles), swarm status card, session-pool card, streaming log card |
-| Sessions screen | session-pool card with metric tiles and one row per account; Add / Refresh / Edit / Delete actions |
+| Sessions screen | session-pool card with metric tiles, one row per account, key-hint strip (`.session-key-hint`) docked to the pane's bottom edge, and Add / Refresh / Edit / Delete actions |
 | Chat screen (per slot) | brand row, slot-carousel pill row, telemetry header (live badge, beacon), event-log card, action pills (Prompt, Attach, Templates, Headless toggle), composer input with send trigger |
-| Swarm screen | attachment card (file + Browse chip), output-inspection caption, swarm log card, Run / Stop / Restart deck |
+| Swarm screen | attachment card (file + Browse chip), output-inspection caption, swarm log card, Run / Stop / Restart deck — the primary CTA reads `▶ START` cold and flips to `↻ RESTART` once a run registers |
 | Settings screen | runtime-override card: one row per registered environment value with Apply / Reset |
 | Nav dock (docked footer) | icon + caption cells per screen, key-hint line, always visible |
+
+The session-row action buttons render the documented glyphs `↻` / `☐` / `×`
+for Refresh / Health / Delete with ASCII fallbacks `r` / `h` / `x`, and no
+emoji in the session-row spec (UX-2-001). The shipped labels come from
+`_GLYPHS` in
+[modules/tui/src/surface_tui_utils_component.py](src/surface_tui_utils_component.py),
+the documented iconography source of truth. The wide set renders only when
+the terminal is not on a forced-ASCII locale (`_unicode_ok`): `C`, `POSIX`,
+and any locale whose name contains `ascii` (case-insensitive) fall back to
+the ASCII labels, while a UTF-8 locale keeps the wide glyphs even under
+`NO_COLOR=1` — `NO_COLOR` is a colour preference and never gates iconography.
 
 ### Cards (screen-card)
 
@@ -137,7 +162,9 @@ Global bindings (from `QwenTuiApp.BINDINGS`):
 | `ctrl+l` / `ctrl+i` | login / init actions |
 | `ctrl+q` / `escape` | quit (escape again within 2s confirms, via information toast) |
 | `?` | help screen |
-| `up` / `down` / `a` / `r` / `e` / `d` | Sessions tab row navigation and add / refresh / edit / delete |
+| `up` / `down` | Sessions tab row navigation |
+| `a` | add a session — global, works on every screen |
+| `r` / `e` / `d` | Sessions-pane-gated refresh / health / delete (`_sessions_active()`); no-ops off the Sessions tab |
 
 #### Focus
 

@@ -22,6 +22,7 @@ from textual.widgets import Label
 
 from modules.shared.src.common.taxonomy_core_constant import SESSION_CHECK_TIMEOUT_SEC
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
+from modules.tui.src.surface_tui_utils_component import SESSION_EMPTY_HINT
 
 
 class _TuiSessionsWorkerMixin:
@@ -122,6 +123,15 @@ class _TuiSessionsWorkerMixin:
         self._session_check_timed_out = state == "TIMEOUT"
         self._last_session_state = state
         self._log_msg("[bold {}]SESSION:[/] {}".format(self._theme["muted"], state))
+        # UX-1-001: a non-usable verdict pairs its log line with an action
+        # line naming the login keys, mirroring the CLI doctor footer's
+        # re-login guidance (event-log CTA only this cycle — no badge tile).
+        if state in ("EXPIRED", "N/A", "TIMEOUT"):
+            self._log_msg(
+                "[bold {}]ACTION:[/] No usable session — press ctrl+l (or Sessions → ADD SESSION) to log in.".format(
+                    self._theme["warn"],
+                ),
+            )
 
     # ── Session Pool Management ────────────────────────────────────────
 
@@ -149,7 +159,7 @@ class _TuiSessionsWorkerMixin:
                 rows = self.query_one("#session-rows", Vertical)
                 rows.remove_children()
                 if not sessions:
-                    rows.mount(Label("No accounts registered.", classes="field-label"))
+                    rows.mount(Label(SESSION_EMPTY_HINT, classes="session-empty"))
                 else:
                     self._sessions_cache = list(sessions)
                     for position, s in enumerate(sessions, start=1):
@@ -348,6 +358,16 @@ class _TuiSessionsWorkerMixin:
                 self.call_from_thread(
                     self._log_msg,
                     "[bold {}]LOGIN FAILED:[/] {}".format(self._theme["err"], escape(str(error_msg))),
+                )
+                # UX-1-003: an explicit retry line in the event log. Retry is
+                # operator-initiated only — the modal never re-opens itself
+                # (an unwanted browser launch on a headless misconfiguration
+                # is worse than a silent failure).
+                self.call_from_thread(
+                    self._log_msg,
+                    "[bold {}]ACTION:[/] Press A (or ADD SESSION) to retry login for the same name.".format(
+                        self._theme["warn"],
+                    ),
                 )
                 self.call_from_thread(self.notify, f"Login failed: {error_msg}", "error", 8)
         except Exception as exc:
