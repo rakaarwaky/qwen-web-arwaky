@@ -6,13 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- feat(prompt): the response payload carries the extraction verdict — `PromptResponse.extraction_verdict` reports `complete`, `stalled`, or `incomplete` (FR-PROMPT-006). A stalled or timed-out stream also saves the partial response artifact before returning, so an interrupted run leaves an inspectable file with an honest verdict instead of a verdict-less error string.
+- feat(prompt): cancel reports the pipelines it actually stopped — `PromptResponse.pipelines_stopped` plus the honest `cancelled` flag — so a terminal, unregistered, or eventless run reports zero instead of a blanket success (FR-PROMPT-004).
+- feat(prompt): the attachment send ceiling is configurable via `QWEN_SEND_CLICK_TIMEOUT_MS` (default `120000` ms, surfaced as `AppConfig.send_click_timeout_ms`) instead of a hardcoded constant.
+
 ### Changed
 
 - refactor(prompt): run-traceability `.meta.json` sidecars now land under `~/.local/state/qwen-web-arwaky/meta/` (`DEFAULT_METADATA_DIR`), mirroring each artifact's path relative to the output root, so `~/.local/share/qwen-web-arwaky/output/` holds only prompt responses. `Saver` takes an optional `metadata_dir`; `qwa init` and `scripts/install.py` provision the directory. Existing sidecars already in the output directory are left in place for the operator to move or delete.
+- feat(output): directory-style outputs land in a collision-proof folder (UTC timestamp + run id) rather than overwriting an existing generated directory; an explicit `-o` destination keeps its overwrite semantics by design.
 
 ### Fixed
 
 - fix(prompt): auto-named direct-prompt outputs are now `direct_{YYYYMMDD-HHMMSS}_{hex4}.md` instead of `tmpXXXX_…`. The direct pipeline materializes the typed prompt as a throwaway tempfile whose stem leaked into the output filename. `resolve_pipeline_output_path` takes an explicit `stem`, and the direct adapter passes `DIRECT_PROMPT_STEM`.
+- fix(output): a sidecar write failure raises `OutputWriteError` after the main response file is on disk, so a run can no longer report success while its `.meta.json` sidecar silently went missing.
 
 ## [6.7.0] - 2026-10-18
 

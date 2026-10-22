@@ -30,6 +30,7 @@ from modules.shared.src.common.taxonomy_core_event import (
     EVENT_THINKING_STARTED,
     EVENT_WEB_LOADED,
 )
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
 
 
 @pytest.fixture
@@ -78,7 +79,7 @@ def _completed_monitor() -> MagicMock:
         emitter.emit(EVENT_THINKING_STARTED, {})
         emitter.emit(EVENT_STREAMING_GENERATION, {"char_count": len("The answer")})
         emitter.emit(EVENT_GENERATION_FINISHED, {"char_count": len("The answer")})
-        return "The answer"
+        return StreamVerdict(text="The answer", verdict="complete")
 
     monitor.wait_for_response = MagicMock(side_effect=_wait)
     return monitor

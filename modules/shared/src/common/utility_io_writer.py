@@ -28,6 +28,11 @@ ATOMIC_TEMP_SUFFIX = ".tmpwrite"
 def _atomic_write(target: Path, content: str, mode: int = 0o600) -> None:
     """Write content to a file atomically via temp + replace with secure file mode (Issue #353).
 
+    The mode is applied to the temp file **before** the rename, so no window
+    exists where the destination is world/group-readable, and re-asserted
+    on the destination afterwards because ``os.replace`` preserves the
+    source inode when the target already exists with looser permissions.
+
     Parameters
     ----------
     target : Path

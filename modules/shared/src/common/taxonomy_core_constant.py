@@ -607,6 +607,17 @@ DEFAULT_STALL_TIMEOUT_SEC: int = 300
 #: Environment override for ``DEFAULT_SAFETY_TIMEOUT_SEC``.
 SAFETY_TIMEOUT_ENV: str = "QWEN_STREAM_SAFETY_TIMEOUT_SEC"
 
+# ─── Prompt domain: attachment send ceiling ──────────────────────────────────
+#: Wall-clock ceiling on the attachment send path: how long the dispatch may
+#: hold while a large document finishes parsing before the first click
+#: (FRD Assumptions: the response ceiling is configured per environment).
+#: Override with ``QWEN_SEND_CLICK_TIMEOUT_MS``; keep the default generous
+#: because parsing a big attachment legitimately takes minutes.
+DEFAULT_SEND_CLICK_TIMEOUT_MS: int = 120_000
+
+#: Environment override for ``DEFAULT_SEND_CLICK_TIMEOUT_MS``.
+SEND_CLICK_TIMEOUT_ENV: str = "QWEN_SEND_CLICK_TIMEOUT_MS"
+
 # ─── Job domain: status document contract ──────────────────────────────────
 #: Version of the ``status.json`` document contract; bump when a field is
 #: added or its meaning changes so external monitors can branch on it

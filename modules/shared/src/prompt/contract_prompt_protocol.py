@@ -54,7 +54,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     TimeoutSec,
 )
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
-from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse, StreamVerdict
 
 
 class IDirectPromptProtocol(ABC):
@@ -74,7 +74,7 @@ class IDirectPromptProtocol(ABC):
         headless: HeadlessFlag | bool = True,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Process a direct text prompt string.
 
         ``event_observer`` optionally receives every emitted lifecycle event
@@ -108,7 +108,7 @@ class IPromptFileProtocol(ABC):
         cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Process a prompt file from disk without attachment.
 
         ``cancel_event`` targets one browser run without affecting sibling
@@ -124,13 +124,16 @@ class IPromptFileProtocol(ABC):
         ...
 
     @abstractmethod
-    def request_cancel(self, cancel_event: CancelToken) -> None:
+    def request_cancel(self, cancel_event: CancelToken) -> bool:
         """Register ``cancel_event`` so setting it stops the matching in-flight run.
 
         Cancellation is part of the seam so surfaces and the Swarm
         orchestrator can stop per-slot work without reaching for
         implementation-only methods. Registering an event must not start,
         join, or block on any run.
+
+        Returns True only when an in-flight run was stopped, so a cancel
+        aimed at a run that already finished reports zero (FR-PROMPT-004).
         """
         ...
 
@@ -153,7 +156,7 @@ class IAttachmentPromptProtocol(ABC):
         cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Process a prompt file from disk with document attachment.
 
         ``cancel_event`` targets one browser run without affecting sibling
@@ -164,13 +167,16 @@ class IAttachmentPromptProtocol(ABC):
         ...
 
     @abstractmethod
-    def request_cancel(self, cancel_event: CancelToken) -> None:
+    def request_cancel(self, cancel_event: CancelToken) -> bool:
         """Register ``cancel_event`` so setting it stops the matching in-flight run.
 
         Cancellation is part of the seam so surfaces and the Swarm
         orchestrator can stop per-slot work without reaching for
         implementation-only methods. Registering an event must not start,
         join, or block on any run.
+
+        Returns True only when an in-flight run was stopped, so a cancel
+        aimed at a run that already finished reports zero (FR-PROMPT-004).
         """
         ...
 
@@ -178,9 +184,11 @@ class IAttachmentPromptProtocol(ABC):
 class IPromptFlowProtocol(ABC):
     """Shared prompt dispatch/response-wait flow capability.
 
-    One method: the inject → send → wait flow with retry and rollback.
-    Implemented by ``PromptFlowDispatcher`` and consumed by the direct,
-    file, and attachment prompt adapters via dependency injection.
+    Two methods: the inject → send → wait flow with retry and rollback, and
+    the mid-stream cut handler that persists the partial artifact with the
+    honest verdict. Implemented by ``PromptFlowDispatcher`` and consumed by
+    the direct, file, and attachment prompt adapters via dependency
+    injection.
     """
 
     @abstractmethod
@@ -201,11 +209,38 @@ class IPromptFlowProtocol(ABC):
         sender_config: SenderConfig | None = None,
         document_parsed: bool = True,
         cancel_event: CancelToken | None = None,
-    ) -> str:
+    ) -> StreamVerdict:
         """Inject the prompt, send it, and wait for the AI response.
 
         Retries on rate-limit and response-timeout errors; raises
-        ``RunCancelledError`` when ``cancel_event`` is set.
+        ``RunCancelledError`` when ``cancel_event`` is set, and
+        ``StuckDetectedError`` is terminal without a retry. The returned
+        :class:`StreamVerdict` carries the text plus the extraction verdict.
+        """
+        ...
+
+    @abstractmethod
+    def mid_stream_cut_outcome(
+        self,
+        exc: BaseException,
+        page: Page,
+        *,
+        saver: ISaverProtocol,
+        observability: IObservabilityProtocol,
+        out_path: Path,
+        prompt_path: Path,
+        elapsed: float,
+        ctx: RunContext,
+        emitter: LifecycleEmitter | None,
+    ) -> PromptResponse:
+        """Persist the partial artifact after a mid-stream cut (BE-1-003).
+
+        Shared by the file, attachment, and direct pipelines: a stall or a
+        hard cut still saves whatever the monitor last saw, so the artifact
+        is inspectable, and reports ``stalled`` for the stall detector or
+        ``incomplete`` for any other non-terminal end (the timeout family).
+        Adapters reach it through this seam so the policy lives in one
+        implementation without a capabilities-layer self-import.
         """
         ...
 
@@ -232,17 +267,23 @@ class IRunCancelProtocol(ABC):
         ...
 
     @abstractmethod
-    def cancel_run(self, run_id: RunId) -> None:
-        """Stop the run identified by ``run_id`` and close its browser context."""
+    def cancel_run(self, run_id: RunId) -> bool:
+        """Stop the run identified by ``run_id`` and close its browser context.
+
+        Returns True only when an in-flight run was found and stopped, so a
+        cancel on a run that already reached a terminal state is reported
+        as False (FR-PROMPT-004).
+        """
         ...
 
     @abstractmethod
-    def cancel_by_event(self, cancel_event: CancelToken) -> None:
+    def cancel_by_event(self, cancel_event: CancelToken) -> bool:
         """Cancel the run that was registered with this cancel event.
 
         Convenience for surface callers that only hold the original
         ``threading.Event``.  Delegates to the stable ``run_id`` lookup
-        internally; safe no-op when the run has already finished.
+        internally; returns False when the run has already finished (no
+        pipeline stopped).
         """
         ...
 
@@ -388,8 +429,12 @@ class IStreamProtocol(ABC):
         dispatch_acknowledged: HeadlessFlag = HeadlessFlag(True),
         baseline_text: ResponseText | None = None,
         cancel_event: Any | None = None,
-    ) -> ResponseText | None:
-        """Wait for a stable assistant response; return its text.
+    ) -> StreamVerdict:
+        """Wait for a stable assistant response; return its text and verdict.
+
+        Raises ``ResponseDetectionTimeoutError`` / ``StuckDetectedError`` /
+        ``RunCancelledError`` instead of ever answering ``None``, so every
+        caller can consume one concrete verdict type.
 
         ``cancel_event`` is an optional per-run ``threading.Event``; when set
         the wait loop raises ``RunCancelledError`` instead of continuing to
