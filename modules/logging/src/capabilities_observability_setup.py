@@ -45,7 +45,7 @@ with suppress(ImportError):
     OTelTracerProvider = TracerProvider
     OTelBatchSpanProcessor = BatchSpanProcessor
 
-from modules.shared.src import utility_core_exit
+from modules.shared.src.common import utility_core_exit
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.common.taxonomy_core_error import ErrorCategory
 from modules.shared.src.common.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
