@@ -24,18 +24,19 @@ from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
+from modules.shared.src.browser.utility_browser_session_check import (
+    _in_page_expiry_banner_visible,
+    assert_on_chat_page,
+    session_is_alive,
+)
 from modules.shared.src.common.taxonomy_core_constant import (
-    AUTH_KEYWORDS,
     CHAT_URL,
     DEFAULT_MODEL,
     LAUNCH_RETRY_WAIT_SEC,
-    LOGIN_FORM_SELECTORS,
     MODEL_SELECTOR_BUTTON,
     NAVIGATION_LOAD_TIMEOUT_MS,
     NAVIGATION_TIMEOUT_MS,
     NEW_CHAT_SELECTORS,
-    SESSION_EXPIRED_BANNER_SELECTORS,
-    SESSION_EXPIRED_KEYWORDS,
     TEXTAREA_SELECTOR,
 )
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
@@ -51,7 +52,7 @@ from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
-from modules.shared.src.common.utility_dom_helper import click_first_visible_enabled, is_any_visible
+from modules.shared.src.common.utility_dom_helper import click_first_visible_enabled
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.utility_session_cloner import clean_stale_locks, create_ephemeral_session
 from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
@@ -64,7 +65,6 @@ log = get_logger("browser")
 # received an AppConfig with a non-empty ``model`` field; the constant-level
 # default (QWEN_DEFAULT_MODEL / QWEN_MODEL env var) is preserved otherwise.
 _TARGET_MODEL: contextvars.ContextVar[str] = contextvars.ContextVar("qwa_target_model", default=DEFAULT_MODEL)
-
 
 #: Hostnames that are third-party tracking/CDN pixels — their failures and
 #: console errors are noise, not domain signals. Demoted to DEBUG so they
@@ -100,129 +100,6 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
     }
 )
 
-
-# Block 1: Class Definition & Constructor
-
-
-class SessionCheck:
-    """Validates that the browser session and Qwen chat UI are alive."""
-
-    def __init__(self, page: Page) -> None:
-        """Initialize with a Playwright Page instance."""
-        self.page = page
-
-    # Block 2: Protocol Method Implementation
-
-    def is_alive(self) -> bool:
-        """Return True if the session is stable and the chat UI is responsive."""
-        try:
-            ready = self.page.evaluate("() => document.readyState")
-            if ready != "complete":
-                log.warning("session_check_failed %s %s", "page_not_ready", ready)
-                return False
-
-            if not self.page.query_selector(TEXTAREA_SELECTOR):
-                log.warning("session_check_failed %s", "textarea_missing")
-                return False
-
-            return True
-        except Error as exc:
-            log.warning("session_check_failed %s %s", "playwright_error", str(exc))
-            return False
-        except Exception as exc:  # defensive fallback beyond playwright Error
-            log.warning("session_check_failed %s %s", "unexpected_error", str(exc))
-            return False
-
-    def check_auth(self) -> None:
-        """Raise AuthRequiredError if the session is no longer authenticated or UI is missing."""
-        try:
-            _assert_on_chat_page(self.page)
-        except AuthRequiredError:
-            raise
-        except Error as exc:
-            raise AuthRequiredError(f"Session invalid (browser error): {exc}") from exc
-
-    # Block 3: Dunder Methods, Factories & Helpers
-
-    def __repr__(self) -> str:
-        """Return string representation of SessionCheck."""
-        return f"SessionCheck(page={self.page!r})"
-
-
-def _assert_on_chat_page(page: Page, strict: bool = True) -> None:
-    """Raise AuthRequiredError if the page is a login/auth/guest page (URL + DOM check).
-
-    When ``strict=False`` (used right after the initial page load in
-    ``navigate_to_chat`` where React may not have hydrated yet), a missing
-    textarea without a login form is logged at ``info`` level instead of
-    ``warning``; a missing textarea is a real signal in the steady-state
-    session-check path (``strict=True``, the default).
-    """
-    current_url = page.url.lower()
-
-    if any(k in current_url for k in AUTH_KEYWORDS):
-        raise AuthRequiredError(
-            f"Not authenticated — browser is on login or guest page ({page.url}). "
-            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
-        )
-
-    combined_login = ", ".join(LOGIN_FORM_SELECTORS)
-    if is_any_visible(page, combined_login):
-        raise AuthRequiredError(
-            f"Not authenticated — login form/button detected on page ({page.url}). "
-            "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
-        )
-
-    if not page.query_selector(TEXTAREA_SELECTOR):
-        if strict:
-            log.warning("chat_textarea_missing_but_no_login_form_detected %s", page.url)
-        else:
-            log.info("chat_textarea_missing_but_no_login_form_detected %s", page.url)
-
-    # In-page session-expiry notice: Qwen sometimes keeps the chat URL and shows
-    # an "Session expired, please login again" banner instead of redirecting.
-    # The DOM may still be hydrating, so banner detection is best-effort — skip
-    # on any read failure rather than mask a genuine auth problem.
-    if _in_page_expiry_banner_visible(page):
-        raise AuthRequiredError(
-            "Session expired — the saved Qwen login session is no longer valid "
-            f"(in-page notice detected on {page.url}). "
-            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
-            session_expired=True,
-        )
-
-
-def _in_page_expiry_banner_visible(page: Page) -> bool:
-    """True when the live page now shows an in-page session-expiry notice.
-
-    Re-runs the banner text/selector scan from ``_assert_on_chat_page``
-    against the CURRENT page state. Best-effort: a DOM that is unreadable
-    (mid-hydration) is not a signal, so the method returns False rather
-    than raising.
-    """
-    try:
-        body_text = page.inner_text("body")
-        lowered = str(body_text or "").lower()
-        if any(kw in lowered for kw in SESSION_EXPIRED_KEYWORDS):
-            return True
-        if is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
-            return True
-    except (Error, TypeError):
-        return False
-    return False
-
-
-def _raise_if_session_expired(page: Page) -> None:
-    """Raise AuthRequiredError when the in-page expiry banner is detected."""
-    if _in_page_expiry_banner_visible(page):
-        raise AuthRequiredError(
-            "Session expired — the saved Qwen login session is no longer valid "
-            f"(in-page notice detected on {page.url}). "
-            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
-            session_expired=True,
-        )
-
-
 # Block 1: Class Definition & Constructor
 
 
@@ -234,58 +111,6 @@ class BrowserAdapter(IBrowserProtocol):
         pass
 
     # Block 2: Public Contract
-
-    def _goto_chat(
-        self,
-        page: Page,
-        navigation_timeout_ms: int,
-        load_timeout_ms: int,
-    ) -> None:
-        """Navigate to chat.qwen.ai without waiting on third-party page assets.
-
-        ``domcontentloaded`` can remain pending when Qwen or an analytics asset
-        stalls. The application only needs the committed chat document before
-        its own DOM readiness checks, so navigation uses ``commit`` and treats
-        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
-        exponential backoff (2s, 4s, 8s) handle transient network failures.
-
-        If the page is already on chat.qwen.ai (e.g. from eager navigation in
-        browser_session), the goto is skipped and only DOM readiness is awaited.
-        """
-        # Fast path: eager navigation in browser_session already landed us here.
-        if "chat.qwen.ai" in (page.url or ""):
-            log.debug("browser_skip_goto_already_on_chat %s", page.url)
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
-            except Error as err:
-                log.warning("load_state_wait_failed_proceeding %s", str(err))
-            return
-
-        max_attempts = 4
-        backoff_ms = [2000, 4000, 8000]
-        last_error: Error | None = None
-        for attempt in range(max_attempts):
-            try:
-                page.goto(
-                    CHAT_URL,
-                    wait_until="commit",
-                    timeout=navigation_timeout_ms,
-                )
-                try:
-                    page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
-                except Error as err:
-                    log.warning("load_state_wait_failed_proceeding %s", str(err))
-                return
-            except Error as err:
-                last_error = err
-                if attempt < max_attempts - 1:
-                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
-                    log.warning(
-                        "page_goto_failed_retrying %s %s %s %s", attempt + 1, max_attempts, str(err), wait // 1000
-                    )
-                    page.wait_for_timeout(wait)
-        if last_error is not None:
-            raise last_error
 
     def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Reset the page to a clean state by navigating back to chat.qwen.ai."""
@@ -335,7 +160,7 @@ class BrowserAdapter(IBrowserProtocol):
         # login-form check still owns the not-authenticated case when the
         # banner is absent.
         try:
-            _assert_on_chat_page(page, strict=False)
+            assert_on_chat_page(page, strict=False)
         except AuthRequiredError as exc:
             if exc.session_expired:
                 # In-page expiry banner: emit the terminal event before
@@ -557,7 +382,7 @@ class BrowserAdapter(IBrowserProtocol):
 
     def check_auth(self, page: Page) -> None:
         """Raise AuthRequiredError if the page is on a login/auth URL or login form detected."""
-        _assert_on_chat_page(page)
+        assert_on_chat_page(page)
 
     def check_session(self, page: Page) -> bool:
         """Return True only when an authenticated chat page is ready for use.
@@ -574,8 +399,8 @@ class BrowserAdapter(IBrowserProtocol):
                 # A partially loaded page can still expose the authenticated UI;
                 # SessionCheck below is the final source of truth.
                 log.debug("session_load_state_wait_failed")
-            _assert_on_chat_page(page)
-            return SessionCheck(page).is_alive()
+            assert_on_chat_page(page)
+            return session_is_alive(page)
         except AuthRequiredError:
             return False
         except Error as exc:
@@ -631,6 +456,58 @@ class BrowserAdapter(IBrowserProtocol):
         with self._open_chat_page(cfg, mode="", strict_auth=False) as page:
             yield page
 
+    def _goto_chat(
+        self,
+        page: Page,
+        navigation_timeout_ms: int,
+        load_timeout_ms: int,
+    ) -> None:
+        """Navigate to chat.qwen.ai without waiting on third-party page assets.
+
+        ``domcontentloaded`` can remain pending when Qwen or an analytics asset
+        stalls. The application only needs the committed chat document before
+        its own DOM readiness checks, so navigation uses ``commit`` and treats
+        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
+        exponential backoff (2s, 4s, 8s) handle transient network failures.
+
+        If the page is already on chat.qwen.ai (e.g. from eager navigation in
+        browser_session), the goto is skipped and only DOM readiness is awaited.
+        """
+        # Fast path: eager navigation in browser_session already landed us here.
+        if "chat.qwen.ai" in (page.url or ""):
+            log.debug("browser_skip_goto_already_on_chat %s", page.url)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+            except Error as err:
+                log.warning("load_state_wait_failed_proceeding %s", str(err))
+            return
+
+        max_attempts = 4
+        backoff_ms = [2000, 4000, 8000]
+        last_error: Error | None = None
+        for attempt in range(max_attempts):
+            try:
+                page.goto(
+                    CHAT_URL,
+                    wait_until="commit",
+                    timeout=navigation_timeout_ms,
+                )
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+                except Error as err:
+                    log.warning("load_state_wait_failed_proceeding %s", str(err))
+                return
+            except Error as err:
+                last_error = err
+                if attempt < max_attempts - 1:
+                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
+                    log.warning(
+                        "page_goto_failed_retrying %s %s %s %s", attempt + 1, max_attempts, str(err), wait // 1000
+                    )
+                    page.wait_for_timeout(wait)
+        if last_error is not None:
+            raise last_error
+
     @contextmanager
     def _open_chat_page(
         self,
@@ -660,7 +537,7 @@ class BrowserAdapter(IBrowserProtocol):
                 try:
                     page = ctx.pages[0] if ctx.pages else ctx.new_page()
                     self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    _assert_on_chat_page(page, strict=strict_auth)
+                    assert_on_chat_page(page, strict=strict_auth)
                     yield page
                 finally:
                     ctx.close()
@@ -894,6 +771,17 @@ class BrowserAdapter(IBrowserProtocol):
     def __repr__(self) -> str:
         """Return string representation of BrowserAdapter."""
         return "BrowserAdapter()"
+
+
+def _raise_if_session_expired(page: Page) -> None:
+    """Raise AuthRequiredError when the in-page expiry banner is detected."""
+    if _in_page_expiry_banner_visible(page):
+        raise AuthRequiredError(
+            "Session expired — the saved Qwen login session is no longer valid "
+            f"(in-page notice detected on {page.url}). "
+            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
+            session_expired=True,
+        )
 
 
 def _active_model() -> str:
