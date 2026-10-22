@@ -227,6 +227,45 @@ def test_list_renders_full_auth_required_cells_at_80_columns(capsys) -> None:
         assert "..." not in row, f"no cell may truncate at the floor, got {row!r}"
 
 
+def test_status_renders_full_auth_required_cells_when_squeezed() -> None:
+    # UX-5-002 mirrors the list guard on `session status`: the Status floor of
+    # 16 keeps the whole-pool auth_required verdict readable. The fixture
+    # pairs a wide ID (10 columns) with 6-digit request/failed counters so
+    # the budget squeezes the Status column toward its floor. At budget=54
+    # the floor of 16 keeps the full "auth_required" cell, while the pre-fix
+    # floor of 8 truncates it to "auth_requi" + "...".
+    from modules.cli.src.surface_cli_sessions_command import (
+        _STATUS_COLUMNS,
+        _STATUS_FLOORS,
+        display_width,
+        render_pool_table,
+    )
+
+    pool = [
+        _info(
+            "s_12345678", "default", status=SessionStatus.AUTH_REQUIRED, total_requests=999999, failed_requests=999999
+        ),
+        _info("s_12345678", "work", status=SessionStatus.AUTH_REQUIRED, total_requests=999999, failed_requests=999999),
+        _info(
+            "s_12345678", "staging", status=SessionStatus.AUTH_REQUIRED, total_requests=999999, failed_requests=999999
+        ),
+    ]
+    table = render_pool_table(pool, _STATUS_COLUMNS, _STATUS_FLOORS, budget=54)
+    assert _STATUS_FLOORS[2] == 16, "the status floor is pinned at 16"
+
+    lines = table.splitlines()
+    assert max(display_width(line) for line in lines) <= 54, "the table must stay within the 54-column budget"
+
+    auth_required = SessionStatus.AUTH_REQUIRED.value
+    header = lines[1]
+    body = lines[2:-1]
+    assert "Status" in header, f"the real status column set must render, got {header!r}"
+    assert len(body) == 3, f"one rendered row per pool session, got {len(body)}"
+    for row in body:
+        assert auth_required in row, f"the full auth_required verdict must render in full, got {row!r}"
+        assert "..." not in row, f"no cell may truncate at the floor, got {row!r}"
+
+
 # ─── remove ─────────────────────────────────────────────────────────────────
 
 
