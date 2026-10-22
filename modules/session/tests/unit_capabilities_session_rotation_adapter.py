@@ -5,8 +5,7 @@ Covers the locked decisions (SESSION-02, BA-2-002):
   reason and recovery action) when no eligible session remains, and the
   derived ``throttled`` view reads True on that outcome.
 - ``execute_with_rotation`` returns an explicit error outcome on
-  exhaustion (never raises); ``AllSessionsLimitedError`` is a deprecated
-  alias kept for import compatibility.
+  exhaustion (never submits through a limited session).
 - Rotation iterates deterministically from ``pool.current_index`` and
   probes each session exactly once; exclusions are honored.
 """
@@ -84,7 +83,9 @@ class _StubChecker:
 def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter:
     manager = MagicMock()
     manager.load_pool.return_value = pool
-    return SessionRotationAdapter(manager, checker)
+    prompt = MagicMock()
+    prompt.execute.return_value = MagicMock(response_text="ok")
+    return SessionRotationAdapter(manager, checker, prompt=prompt)
 
 
 def test_rotation_all_sessions_limited_reports_throttle(tmp_path: Path) -> None:
@@ -179,15 +180,6 @@ def test_execute_with_rotation_reports_outcome_on_exhausted_pool(tmp_path: Path)
     assert session is None
     assert "no_eligible_session" in result
     assert adapter.metrics.sessions_exhausted == 1
-
-
-def test_all_sessions_limited_error_still_importable() -> None:
-    """``AllSessionsLimitedError`` is kept as a deprecated alias for import compatibility."""
-    from modules.session.src.capabilities_session_rotation_adapter import AllSessionsLimitedError
-
-    err = AllSessionsLimitedError(pool=SessionPool.empty())
-    assert isinstance(err, Exception)
-    assert "rate-limited" in str(err)
 
 
 # ── outcome/reason contract (BA-2-002, merged from unit_session_rotation_outcomes) ─

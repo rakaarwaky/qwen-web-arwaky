@@ -46,6 +46,7 @@ from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 
 # capabilities_attachment_prompt_adapter
+from modules.prompt.src.agent_prompt_orchestrator import PromptOrchestrator
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
 
 # capabilities_direct_prompt_adapter
@@ -159,11 +160,19 @@ class SharedContainer:
             browser=self.browser,
             observability=self.observability,
         )
+        self.prompt_aggregate: IPromptAggregate = PromptOrchestrator(
+            direct=self.agent_direct_prompt_orchestrator,
+            file_only=self.agent_prompt_file_orchestrator,
+            attachment=self.agent_attachment_prompt_orchestrator,
+            cancel_registry=self.run_cancel_registry,
+            observability=self.observability,
+        )
         from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 
         self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
             session_manager=self.session_manager,
             health_checker=self.session_health_checker,
+            prompt=self.prompt_aggregate,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
             browser=self.browser,
