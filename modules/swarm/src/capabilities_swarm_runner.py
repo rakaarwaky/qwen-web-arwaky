@@ -16,6 +16,7 @@ importing another. The stateless helpers live in
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import threading
@@ -183,7 +184,16 @@ class SwarmRunner(ISwarmStartProtocol):
         )
 
     def _run_agent(self, swarm_id: SwarmId, role: str) -> None:
-        """Execute one fan-out leg with retries, bounded by the cancel event."""
+        """Execute one fan-out leg with retries, bounded by the cancel event.
+
+        Runs under an isolated contextvars copy so each leg sees its own
+        ``_TARGET_MODEL`` (and other contextvars) rather than a sibling leg's
+        overrides from ``ThreadPoolExecutor`` context inheritance (ARCH-2-001).
+        """
+        ctx = contextvars.copy_context()
+        ctx.run(self._run_agent_isolated, swarm_id, role)
+
+    def _run_agent_isolated(self, swarm_id: SwarmId, role: str) -> None:
         start = time.perf_counter()
         events = self._registry.cancel_events(swarm_id)
         event = events.get(role)

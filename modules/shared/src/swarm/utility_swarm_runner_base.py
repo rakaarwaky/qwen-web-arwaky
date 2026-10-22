@@ -18,6 +18,7 @@ import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
+from modules.shared.src.common.utility_io_writer import atomic_write_text, ensure_dir, exclusive_file_lock
 from modules.shared.src.swarm.taxonomy_swarm_vo import (
     AgentStatus,
     SwarmAgentSnapshot,
@@ -148,34 +149,39 @@ def mark_agent_progress(
 
 
 def write_manifest(snapshot: SwarmSnapshot) -> None:
-    """Persist the snapshot as JSON next to the swarm output root."""
+    """Persist the snapshot as JSON next to the swarm output root.
+
+    Uses ``atomic_write_text`` (temp + rename) so an external reader never
+    observes a half-written manifest, and a per-file advisory lock so
+    concurrent ``revise`` callers writing outside the registry lock cannot
+    collide on the shared temp filename (ARCH-2-002).
+    """
     manifest = snapshot.root_path / "manifest.json"
-    manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(
-        json.dumps(
-            {
-                "swarm_id": snapshot.swarm_id,
-                "input_path": str(snapshot.input_path),
-                "root_path": str(snapshot.root_path),
-                "status": snapshot.status,
-                "max_attempts": snapshot.max_attempts,
-                "browser_concurrency": snapshot.browser_concurrency,
-                "agents": [
-                    {
-                        "agent_id": agent.agent_id,
-                        "status": agent.status,
-                        "attempt": agent.attempt,
-                        "output_path": str(agent.output_path),
-                        "error": agent.error,
-                        "duration_sec": agent.duration_sec,
-                    }
-                    for agent in snapshot.agents
-                ],
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+    payload = json.dumps(
+        {
+            "swarm_id": snapshot.swarm_id,
+            "input_path": str(snapshot.input_path),
+            "root_path": str(snapshot.root_path),
+            "status": snapshot.status,
+            "max_attempts": snapshot.max_attempts,
+            "browser_concurrency": snapshot.browser_concurrency,
+            "agents": [
+                {
+                    "agent_id": agent.agent_id,
+                    "status": agent.status,
+                    "attempt": agent.attempt,
+                    "output_path": str(agent.output_path),
+                    "error": agent.error,
+                    "duration_sec": agent.duration_sec,
+                }
+                for agent in snapshot.agents
+            ],
+        },
+        indent=2,
     )
+    ensure_dir(manifest)
+    with exclusive_file_lock(manifest.with_name(manifest.name + ".lock")):
+        atomic_write_text(manifest, payload + "\n")
 
 
 def new_swarm_id() -> str:
