@@ -5,8 +5,11 @@ Module-level helpers only (utility layer). Used by BrowserAdapter and tests.
 
 from __future__ import annotations
 
+import logging
+
 from playwright.sync_api import Error, Page
 
+from modules.shared.src.common import utility_dom_helper
 from modules.shared.src.common.taxonomy_core_constant import (
     AUTH_KEYWORDS,
     LOGIN_FORM_SELECTORS,
@@ -15,10 +18,8 @@ from modules.shared.src.common.taxonomy_core_constant import (
     TEXTAREA_SELECTOR,
 )
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.common.utility_dom_helper import is_any_visible
-from modules.shared.src.common.utility_logger_factory import get_logger
 
-log = get_logger("utility_browser_session_check")
+log = logging.getLogger("utility_browser_session_check")
 
 
 def session_is_alive(page: Page) -> bool:
@@ -49,7 +50,7 @@ def assert_on_chat_page(page: Page, strict: bool = True) -> None:
             "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
         )
     combined_login = ", ".join(LOGIN_FORM_SELECTORS)
-    if is_any_visible(page, combined_login):
+    if utility_dom_helper.is_any_visible(page, combined_login):
         raise AuthRequiredError(
             f"Not authenticated — login form/button detected on page ({page.url}). "
             "Please run 'qwen-web-arwaky --login' or click Login in TUI to authenticate first."
@@ -75,7 +76,7 @@ def _in_page_expiry_banner_visible(page: Page) -> bool:
         lowered = str(body_text or "").lower()
         if any(kw in lowered for kw in SESSION_EXPIRED_KEYWORDS):
             return True
-        if is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
+        if utility_dom_helper.is_any_visible(page, ", ".join(SESSION_EXPIRED_BANNER_SELECTORS)):
             return True
     except (Error, TypeError):
         return False

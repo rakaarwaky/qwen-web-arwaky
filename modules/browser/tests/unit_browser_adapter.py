@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.browser.src import capabilities_browser_adapter as adapter_mod
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter, SessionCheck
+from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_session_check import SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.browser import utility_browser_session_check as session_check_util
 from modules.shared.src.common import utility_dom_helper as dom_helper

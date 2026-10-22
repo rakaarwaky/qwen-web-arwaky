@@ -103,38 +103,6 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 # Block 1: Class Definition & Constructor
 
 
-def _raise_if_session_expired(page: Page) -> None:
-    """Raise AuthRequiredError when the in-page expiry banner is detected."""
-    if _in_page_expiry_banner_visible(page):
-        raise AuthRequiredError(
-            "Session expired — the saved Qwen login session is no longer valid "
-            f"(in-page notice detected on {page.url}). "
-            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
-            session_expired=True,
-        )
-
-
-# Block 1: Class Definition & Constructor
-
-
-class SessionCheck:
-    """Thin wrapper over utility session probe (API compatibility)."""
-
-    def __init__(self, page: Page) -> None:
-        self.page = page
-
-    def is_alive(self) -> bool:
-        return session_is_alive(self.page)
-
-    def check_auth(self) -> None:
-        try:
-            assert_on_chat_page(self.page)
-        except AuthRequiredError:
-            raise
-        except Error as exc:
-            raise AuthRequiredError(f"Session invalid (browser error): {exc}") from exc
-
-
 class BrowserAdapter(IBrowserProtocol):
     """Persistent Chromium browser context adapter implementing the browser contract."""
 
@@ -143,58 +111,6 @@ class BrowserAdapter(IBrowserProtocol):
         pass
 
     # Block 2: Public Contract
-
-    def _goto_chat(
-        self,
-        page: Page,
-        navigation_timeout_ms: int,
-        load_timeout_ms: int,
-    ) -> None:
-        """Navigate to chat.qwen.ai without waiting on third-party page assets.
-
-        ``domcontentloaded`` can remain pending when Qwen or an analytics asset
-        stalls. The application only needs the committed chat document before
-        its own DOM readiness checks, so navigation uses ``commit`` and treats
-        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
-        exponential backoff (2s, 4s, 8s) handle transient network failures.
-
-        If the page is already on chat.qwen.ai (e.g. from eager navigation in
-        browser_session), the goto is skipped and only DOM readiness is awaited.
-        """
-        # Fast path: eager navigation in browser_session already landed us here.
-        if "chat.qwen.ai" in (page.url or ""):
-            log.debug("browser_skip_goto_already_on_chat %s", page.url)
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
-            except Error as err:
-                log.warning("load_state_wait_failed_proceeding %s", str(err))
-            return
-
-        max_attempts = 4
-        backoff_ms = [2000, 4000, 8000]
-        last_error: Error | None = None
-        for attempt in range(max_attempts):
-            try:
-                page.goto(
-                    CHAT_URL,
-                    wait_until="commit",
-                    timeout=navigation_timeout_ms,
-                )
-                try:
-                    page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
-                except Error as err:
-                    log.warning("load_state_wait_failed_proceeding %s", str(err))
-                return
-            except Error as err:
-                last_error = err
-                if attempt < max_attempts - 1:
-                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
-                    log.warning(
-                        "page_goto_failed_retrying %s %s %s %s", attempt + 1, max_attempts, str(err), wait // 1000
-                    )
-                    page.wait_for_timeout(wait)
-        if last_error is not None:
-            raise last_error
 
     def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Reset the page to a clean state by navigating back to chat.qwen.ai."""
@@ -484,7 +400,7 @@ class BrowserAdapter(IBrowserProtocol):
                 # SessionCheck below is the final source of truth.
                 log.debug("session_load_state_wait_failed")
             assert_on_chat_page(page)
-            return SessionCheck(page).is_alive()
+            return session_is_alive(page)
         except AuthRequiredError:
             return False
         except Error as exc:
@@ -539,6 +455,58 @@ class BrowserAdapter(IBrowserProtocol):
         """
         with self._open_chat_page(cfg, mode="", strict_auth=False) as page:
             yield page
+
+    def _goto_chat(
+        self,
+        page: Page,
+        navigation_timeout_ms: int,
+        load_timeout_ms: int,
+    ) -> None:
+        """Navigate to chat.qwen.ai without waiting on third-party page assets.
+
+        ``domcontentloaded`` can remain pending when Qwen or an analytics asset
+        stalls. The application only needs the committed chat document before
+        its own DOM readiness checks, so navigation uses ``commit`` and treats
+        the later DOMContentLoaded wait as best-effort. Up to 4 attempts with
+        exponential backoff (2s, 4s, 8s) handle transient network failures.
+
+        If the page is already on chat.qwen.ai (e.g. from eager navigation in
+        browser_session), the goto is skipped and only DOM readiness is awaited.
+        """
+        # Fast path: eager navigation in browser_session already landed us here.
+        if "chat.qwen.ai" in (page.url or ""):
+            log.debug("browser_skip_goto_already_on_chat %s", page.url)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+            except Error as err:
+                log.warning("load_state_wait_failed_proceeding %s", str(err))
+            return
+
+        max_attempts = 4
+        backoff_ms = [2000, 4000, 8000]
+        last_error: Error | None = None
+        for attempt in range(max_attempts):
+            try:
+                page.goto(
+                    CHAT_URL,
+                    wait_until="commit",
+                    timeout=navigation_timeout_ms,
+                )
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=load_timeout_ms)
+                except Error as err:
+                    log.warning("load_state_wait_failed_proceeding %s", str(err))
+                return
+            except Error as err:
+                last_error = err
+                if attempt < max_attempts - 1:
+                    wait = backoff_ms[attempt] if attempt < len(backoff_ms) else 8000
+                    log.warning(
+                        "page_goto_failed_retrying %s %s %s %s", attempt + 1, max_attempts, str(err), wait // 1000
+                    )
+                    page.wait_for_timeout(wait)
+        if last_error is not None:
+            raise last_error
 
     @contextmanager
     def _open_chat_page(
@@ -803,6 +771,17 @@ class BrowserAdapter(IBrowserProtocol):
     def __repr__(self) -> str:
         """Return string representation of BrowserAdapter."""
         return "BrowserAdapter()"
+
+
+def _raise_if_session_expired(page: Page) -> None:
+    """Raise AuthRequiredError when the in-page expiry banner is detected."""
+    if _in_page_expiry_banner_visible(page):
+        raise AuthRequiredError(
+            "Session expired — the saved Qwen login session is no longer valid "
+            f"(in-page notice detected on {page.url}). "
+            "Run `qwen-web-arwaky session login` to re-authenticate, then retry.",
+            session_expired=True,
+        )
 
 
 def _active_model() -> str:
