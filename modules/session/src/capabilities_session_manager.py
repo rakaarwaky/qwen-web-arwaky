@@ -10,7 +10,8 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
-from modules.shared.src import utility_core_session_backup, utility_session_guard
+import modules.shared.src.session.utility_session_guard as utility_session_guard
+from modules.shared.src.common import utility_core_session_backup
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.utility_io_writer import exclusive_file_lock, harden_private_dir

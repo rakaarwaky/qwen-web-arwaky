@@ -34,6 +34,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     RunId,
     RunState,
 )
+from modules.shared.src.common.utility_core_prompt import extract_prompt_text
 from modules.shared.src.common.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.common.utility_error_mapping import to_error_response
 from modules.shared.src.common.utility_io_writer import save_orchestrator_output
@@ -263,8 +264,12 @@ class PromptFileAdapter(IPromptFileProtocol):
         Raises ``FileNotFoundError`` / ``OSError`` (mapped by
         ``to_error_response``) so an unreadable input is reported as a file
         error naming the path rather than a browser failure.
+
+        YAML frontmatter at the top of the file (a ``---`` header block) is
+        stripped so only the prompt body is sent to the browser.
         """
-        return filepath.read_text(encoding="utf-8").strip()
+        raw = filepath.read_text(encoding="utf-8")
+        return extract_prompt_text(raw)
 
     def execute(self, request: PromptRequest) -> PromptResponse:
         """Run one prompt verb and return the answer, with failures carried.
