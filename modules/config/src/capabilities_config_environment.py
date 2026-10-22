@@ -35,13 +35,9 @@ from modules.shared.src.common.utility_core_env import (
 from modules.shared.src.config.contract_config_protocol import IConfigEnvironmentProtocol
 from modules.shared.src.config.taxonomy_config_vo import ModelName, SandboxReport, WorkerCount
 
-# Block 1: Class Definition & Constructor
-
 
 class ConfigEnvironment(IConfigEnvironmentProtocol):
     """Probe the operator's environment into the values config obeys."""
-
-    # Block 2: Protocol Method Implementation
 
     def sandbox_report(self) -> SandboxReport:
         """Return the sandbox verdict, with the deciding env switch named.
@@ -112,7 +108,6 @@ __all__ = [
 ]
 
 
-# Block 3: Dunder Methods, Factories, Helpers
 def _env(name: str) -> str:
     """Return a trimmed environment value, or the empty string when unset."""
     return os.environ.get(name, "").strip()

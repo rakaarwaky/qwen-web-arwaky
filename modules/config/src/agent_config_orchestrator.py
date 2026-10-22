@@ -67,8 +67,6 @@ class ConfigOrchestrator(IConfigAggregate):
         self._slot_plan = slot_plan
         self._workspace = workspace
 
-    # Block 2: Protocol Method Implementation
-
     def execute(self, request: ConfigRequest) -> ConfigResponse:
         """Run the requested config verb and return one response shape.
 
@@ -105,8 +103,6 @@ class ConfigOrchestrator(IConfigAggregate):
             self._workspace.init_workspace(cast(FilePath, request.input_path))
             return ConfigResponse(workspace=request.input_path)
         return ConfigResponse(error=f"Unknown config verb: {request.verb!r}")
-
-    # Block 3: Dunder Methods, Factories, Helpers
 
     def _build_config(self, request: ConfigRequest) -> AppConfig:
         """Build the ``AppConfig`` a *request* describes.

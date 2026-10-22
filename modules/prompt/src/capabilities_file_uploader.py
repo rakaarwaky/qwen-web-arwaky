@@ -164,7 +164,6 @@ class FileUploader(IUploadProtocol):
         self.card_selectors = self.config.card_selectors
         self.last_error: Exception | None = None
 
-    # Block 2: Protocol Method Implementation
     def upload_attachment(
         self,
         page: Page,
@@ -263,8 +262,6 @@ class FileUploader(IUploadProtocol):
         """Public protocol method — pre-flight validation returning size in bytes."""
         limit = max_size_bytes if max_size_bytes is not None else self.max_size_bytes
         return FileSizeBytes(validate_file(filepath, max_size_bytes=limit))
-
-    # Block 3: Dunder Methods, Factories, Helpers
 
     # ── Helper for Step 2: Execute single upload attempt ──
     def _try_upload_attempt(self, page: Page, filepath: Path) -> bool:

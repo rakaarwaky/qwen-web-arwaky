@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src import is_auth_session_expired, renewal_is_possible
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError, QwenCliError
@@ -24,6 +23,10 @@ from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.session.contract_session_protocol import ISessionRenewalProtocol
+from modules.shared.src.session.utility_session_renewal_cookie_probe import (
+    is_auth_session_expired,
+    renewal_is_possible,
+)
 
 log = get_logger("session_renewal")
 
@@ -32,7 +35,6 @@ class SessionRenewalError(QwenCliError):
     """Raised when a session renewal attempt fails but the caller can retry."""
 
 
-# Block 1: Class Definition & Constructor
 class SessionRenewer(ISessionRenewalProtocol):
     """Detects stale auth sessions and renews them via browser self-heal.
 
@@ -52,7 +54,6 @@ class SessionRenewer(ISessionRenewalProtocol):
         self._browser = browser
         self._observability = observability
 
-    # Block 2: Protocol Method Implementation
     def renew_session_if_stale(
         self,
         cfg: AppConfig,
@@ -129,7 +130,6 @@ class SessionRenewer(ISessionRenewalProtocol):
         )
         return True
 
-    # Block 3: Dunder Methods, Factories & Helpers
     def __repr__(self) -> str:
         return f"SessionRenewer(browser={self._browser!r}, observability={self._observability!r})"
 

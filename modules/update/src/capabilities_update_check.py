@@ -27,9 +27,6 @@ log = get_logger("capabilities_update_check")
 _github_api_host = "api.github.com"
 
 
-# Block 1: Class Definition & Constructor
-
-
 class UpdateCheckCapability(IUpdateCheckProtocol):
     """FR-UPDATE-001: report the installed version and check for updates."""
 
@@ -41,8 +38,6 @@ class UpdateCheckCapability(IUpdateCheckProtocol):
     ) -> None:
         self.package_name = package_name
         self.http_timeout_sec = http_timeout_sec
-
-    # Block 2: Protocol Method Implementation
 
     def current_version(self) -> VersionString:
         """Return the installed package version ('unknown' when unresolvable)."""
@@ -70,8 +65,6 @@ class UpdateCheckCapability(IUpdateCheckProtocol):
             update_available=update_available,
             source=source,
         )
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def _resolve_installed_version(self) -> VersionString:
         """Resolve installed version from source, falling back to pip metadata."""

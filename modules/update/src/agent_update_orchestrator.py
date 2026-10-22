@@ -50,8 +50,6 @@ class UpdateOrchestrator(IUpdateAggregate):
         self._rollback = rollback
         self._observability = observability
 
-    # Block 2: Protocol Method Implementation
-
     def execute(self, request: UpdateRequest) -> UpdateResponse:
         """Run the requested update verb and return its outcome as a shared VO.
 
@@ -76,8 +74,6 @@ class UpdateOrchestrator(IUpdateAggregate):
             return UpdateResponse(steps=self._rollback.rollback_to(VersionString(previous)))
         # Untrusted callers (MCP) may pass any string; refuse it by name.
         return UpdateResponse(error=f"unknown update verb: {request.verb!r}")
-
-    # Block 3: Dunder Methods, Factories, Helpers
 
     def __repr__(self) -> str:
         return "UpdateOrchestrator()"

@@ -25,8 +25,6 @@ from modules.shared.src.common.utility_core_env import QWEN_WEB_MAX_WORKERS
 from modules.shared.src.config.contract_config_protocol import IConfigCapacityProtocol
 from modules.shared.src.config.taxonomy_config_vo import ByteCount, CapacityReport, WorkerCount
 
-# Block 1: Class Definition & Constructor
-
 
 class ConfigCapacityAdvisor(IConfigCapacityProtocol):
     """Report measured host capacity against the configured worker count."""
@@ -38,8 +36,6 @@ class ConfigCapacityAdvisor(IConfigCapacityProtocol):
         so the override path is reachable without mutating the real one.
         """
         self._env: Mapping[str, str] = env if env is not None else os.environ
-
-    # Block 2: Protocol Method Implementation
 
     def report(self) -> CapacityReport:
         """Return measured capacity, the recommended limit, and the effective one.
@@ -72,8 +68,6 @@ class ConfigCapacityAdvisor(IConfigCapacityProtocol):
             f"{measured} available; recommended max workers {report.recommended_max_workers}, "
             f"effective {report.effective_max_workers} ({report.source})"
         )
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def _override(self) -> int | None:
         """Return the configured worker count, or None when unset or unusable.

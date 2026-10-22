@@ -33,8 +33,6 @@ from modules.shared.src.prompt.contract_prompt_protocol import ISendProtocol
 
 log = get_logger("capabilities_send_dispatcher")
 
-# Block 1: Class Definition & Constructor
-
 
 class SendDispatcher(ISendProtocol):
     """Multi-strategy send button trigger with keyboard fallback."""
@@ -48,7 +46,6 @@ class SendDispatcher(ISendProtocol):
         self.try_enter_key_fallback = try_enter_key_fallback
 
     # ─── Block 2: Public Contract (ISendProtocol ONLY) ──
-    # Block 2: Protocol Method Implementation
     def click_send(
         self,
         page: Page,
@@ -135,7 +132,6 @@ class SendDispatcher(ISendProtocol):
 
         raise SendDispatchError("Send control dispatch timed out waiting for document parsing or user turn ACK")
 
-    # Block 3: Dunder Methods, Factories, Helpers
     def _wait_for_dispatch_ack(
         self,
         page: Page,

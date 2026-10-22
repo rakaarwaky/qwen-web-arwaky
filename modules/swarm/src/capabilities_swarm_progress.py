@@ -42,12 +42,9 @@ class SwarmProgressRunner(ISwarmProgressProtocol):
         """
         self._registry = registry
 
-    # Block 2: Protocol Method Implementation
     def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""
         return self._registry.get_snapshot(swarm_id)
-
-    # Block 3: Constructors, Std Traits, Helpers
 
 
 __all__ = ["SwarmProgressRunner"]

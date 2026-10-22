@@ -165,8 +165,6 @@ class AgentJobOrchestrator(IJobManagerAggregate):
         rand = uuid.uuid4().hex[:6]
         return JobId(f"{prefix}_{ts}_{rand}")
 
-    # Block 2: Protocol Method Implementation
-
     def execute(self, request: JobRequest) -> JobResponse:
         """Run the requested job verb and return its outcome.
 
@@ -196,8 +194,6 @@ class AgentJobOrchestrator(IJobManagerAggregate):
             return JobResponse(removed=removed)
         # ``JobVerb`` is an exhaustive Literal, so every member is handled
         # above; a trailing fallback would be unreachable (warn_unreachable).
-
-    # Block 3: Dunder Methods, Factories, Helpers
 
     def _submit_file(self, request: JobRequest) -> JobRecord:
         """Admit, persist, and dispatch a prompt-file job.

@@ -101,7 +101,6 @@ class SwarmRunner(ISwarmStartProtocol):
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
 
-    # Block 2: Protocol Method Implementation
     @property
     def browser_concurrency(self) -> BrowserCount:
         """Configured browser concurrency for a single Swarm run."""
@@ -158,7 +157,6 @@ class SwarmRunner(ISwarmStartProtocol):
             executor.submit(self._run_agent, swarm_id, role)
         return running or snapshot
 
-    # Block 3: Constructors, Std Traits, Helpers
     def _update_agent(
         self,
         swarm_id: SwarmId,

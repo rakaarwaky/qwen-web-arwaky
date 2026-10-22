@@ -20,8 +20,6 @@ from modules.shared.src.common.utility_telemetry_scrubber import harden_private_
 from modules.shared.src.logging.contract_logging_protocol import IMetricsProtocol
 from modules.shared.src.logging.taxonomy_logging_vo import ExecutionTotal, MetricsSnapshot
 
-# Block 1: Class Definition & Constructor
-
 
 class MetricsCounter(IMetricsProtocol):
     """Thread-safe metrics collector persisted in a rolling-window JSON file."""
@@ -33,8 +31,6 @@ class MetricsCounter(IMetricsProtocol):
         self._execution_events: list[dict[str, Any]] = []
         self._start_time = datetime.now(tz=timezone.utc)
         self._load()
-
-    # Block 2: Protocol Method Implementation
 
     def increment(self, key: EventMessage, amount: MessageCount = MessageCount(1)) -> None:
         """Add *amount* to the counter *key* and persist the metrics file."""
@@ -93,8 +89,6 @@ class MetricsCounter(IMetricsProtocol):
                 successful_executions=ExecutionTotal(successful),
                 success_rate=round(successful / total, 6) if total else None,
             )
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         return f"MetricsCounter(path={self._metrics_path!s})"

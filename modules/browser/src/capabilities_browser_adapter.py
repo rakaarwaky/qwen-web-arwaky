@@ -101,17 +101,12 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 )
 
 
-# Block 1: Class Definition & Constructor
-
-
 class SessionCheck:
     """Validates that the browser session and Qwen chat UI are alive."""
 
     def __init__(self, page: Page) -> None:
         """Initialize with a Playwright Page instance."""
         self.page = page
-
-    # Block 2: Protocol Method Implementation
 
     def is_alive(self) -> bool:
         """Return True if the session is stable and the chat UI is responsive."""
@@ -141,8 +136,6 @@ class SessionCheck:
             raise
         except Error as exc:
             raise AuthRequiredError(f"Session invalid (browser error): {exc}") from exc
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         """Return string representation of SessionCheck."""
@@ -223,17 +216,12 @@ def _raise_if_session_expired(page: Page) -> None:
         )
 
 
-# Block 1: Class Definition & Constructor
-
-
 class BrowserAdapter(IBrowserProtocol):
     """Persistent Chromium browser context adapter implementing the browser contract."""
 
     def __init__(self) -> None:
         """Initialize BrowserAdapter."""
         pass
-
-    # Block 2: Public Contract
 
     def _goto_chat(
         self,
@@ -888,8 +876,6 @@ class BrowserAdapter(IBrowserProtocol):
                     raise
                 log.critical("browser_launch_failed %s", str(e))
                 raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:
         """Return string representation of BrowserAdapter."""

@@ -16,9 +16,6 @@ from modules.shared.src.prompt.contract_prompt_protocol import IFolderCompilePro
 log = get_logger("capabilities_folder_to_attachment")
 
 
-# Block 1: Class Definition & Constructor
-
-
 class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
     """Adapter that resolves path to attachment-ready file.
 
@@ -33,8 +30,6 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
             folder_compiler: Folder compiler instance (injected via DI).
         """
         self._compiler = folder_compiler
-
-    # Block 2: Protocol Method Implementation
 
     def resolve_to_attachment(
         self,
@@ -80,5 +75,3 @@ class FolderToAttachmentAdapter(IFolderToAttachmentProtocol):
 
 
 __all__ = ["FolderToAttachmentAdapter"]
-
-# Block 3: Dunder Methods, Factories & Helpers

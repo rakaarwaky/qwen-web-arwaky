@@ -39,9 +39,6 @@ from modules.shared.src.update.utility_update_version import compare_versions
 log = get_logger("capabilities_update_verify")
 
 
-# Block 1: Class Definition & Constructor
-
-
 class UpdateVerifyCapability(IUpdateVerifyProtocol):
     """FR-UPDATE-003: run the full pipeline and verify the post-update state."""
 
@@ -59,8 +56,6 @@ class UpdateVerifyCapability(IUpdateVerifyProtocol):
         self.rollback = rollback
         self.package_name = package_name
         self._smoke_gate = smoke_gate or (lambda: ())
-
-    # Block 2: Protocol Method Implementation
 
     def perform_update(self, force: ForceFlag = ForceFlag(False)) -> UpdateReport:
         """Run the full update pipeline and return the aggregated report."""
@@ -195,8 +190,6 @@ class UpdateVerifyCapability(IUpdateVerifyProtocol):
             rolled_back=rolled_back,
             rollback_status=rollback_status,
         )
-
-    # Block 3: Dunder Methods, Factories & Helpers
 
     def _snapshot_dir(self) -> Path:
         """Return the directory holding pre-upgrade environment snapshots."""
