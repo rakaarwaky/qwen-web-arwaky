@@ -46,7 +46,7 @@ def _patch_proc(monkeypatch, status_text: str) -> None:
     """Point the doctor's ``/proc`` reads at a fixed status document."""
     fake = _FakePath(Path("/proc/self/status"), exists=True, text=status_text)
     monkeypatch.setattr(
-        "modules.cli.src.surface_cli_doctor_command.Path",
+        "modules.config.src.capabilities_config_health_probe.Path",
         lambda *args, **kwargs: fake,
     )
 
@@ -72,7 +72,7 @@ def _patch_sysctls(monkeypatch, *, seccomp: str = "2", userns: str, max_user: st
                 raise OSError("missing path")
             return originals[self._target]
 
-    monkeypatch.setattr("modules.cli.src.surface_cli_doctor_command.Path", _SysctlPath)
+    monkeypatch.setattr("modules.config.src.capabilities_config_health_probe.Path", _SysctlPath)
 
 
 # ─── non-Linux short-circuit ────────────────────────────────────────────────
@@ -134,7 +134,7 @@ def test_sandbox_mode_precedence_matrix(monkeypatch) -> None:
     """QWEN_DISABLE_SANDBOX > host detection > QWEN_ENABLE_SANDBOX > default."""
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(
-        "modules.cli.src.surface_cli_doctor_command._sandbox_unavailable",
+        "modules.config.src.capabilities_config_health_probe._sandbox_unavailable",
         lambda: False,
     )
 
@@ -150,7 +150,7 @@ def test_sandbox_mode_precedence_matrix(monkeypatch) -> None:
     monkeypatch.delenv("QWEN_DISABLE_SANDBOX")
 
     monkeypatch.setattr(
-        "modules.cli.src.surface_cli_doctor_command._sandbox_unavailable",
+        "modules.config.src.capabilities_config_health_probe._sandbox_unavailable",
         lambda: True,
     )
     assert _sandbox_mode() == "disabled (host has no seccomp filter or user namespaces)"
@@ -176,7 +176,7 @@ def test_deep_probe_notice_before_the_playwright_probe(capsys, monkeypatch) -> N
         lambda: None,
     )
     monkeypatch.setattr(
-        "modules.cli.src.surface_cli_doctor_command.playwright_browsers_path",
+        "modules.config.src.capabilities_config_health_probe.playwright_browsers_path",
         lambda: Path("/nonexistent-playwright-cache"),
     )
 

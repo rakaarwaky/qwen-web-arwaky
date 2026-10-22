@@ -439,9 +439,7 @@ __all__ = [
     "IJobManagerAggregate",
     "IObservabilityAggregate",
     "IPromptAggregate",
-    "IPromptFlowAggregate",
     "IUpdateAggregate",
-    "IPromptFlowAggregate",
     "ISessionAggregate",
     "ISwarmAggregate",
     # Swarm VOs
@@ -478,22 +476,50 @@ __all__ = [
     "is_refresh_token_valid",
     "is_safe_session_target",
     "renewal_is_possible",
-    # Sub-package re-exports (AES702)
-    "modules",
-    "browser",
-    "common",
-    "config",
-    "jobs",
-    "logging",
-    "prompt",
-    "session",
-    "swarm",
-    "update",
+    # Contract: browser
+    "contract_browser_aggregate",
+    "contract_browser_protocol",
+    "utility_browser_async_loop",
+    # Contract: swarm
+    "contract_swarm_aggregate",
+    "contract_swarm_protocol",
+    "taxonomy_swarm_vo",
+    # Contract: update
+    "contract_update_aggregate",
+    "contract_update_protocol",
+    "taxonomy_update_vo",
+    "utility_update_browser_binary",
+    # Contract: logging
+    "contract_logging_aggregate",
+    "contract_logging_protocol",
+    "taxonomy_logging_vo",
+    # Contract: jobs
+    "contract_jobs_aggregate",
+    "contract_jobs_protocol",
+    "taxonomy_jobs_vo",
+    # Contract: session
+    "contract_session_aggregate",
+    "contract_session_protocol",
+    "taxonomy_session_vo",
+    "utility_session_cloner",
+    "utility_session_guard",
+    "utility_session_renewal_cookie_probe",
+    # Contract: config
+    "contract_config_aggregate",
+    "contract_config_protocol",
+    "taxonomy_config_vo",
+    "utility_config_app_factory",
+    # Contract: prompt
+    "contract_prompt_aggregate",
+    "contract_prompt_protocol",
+    "taxonomy_prompt_vo",
+    # Taxonomy: core modules
     "taxonomy_core_constant",
     "taxonomy_core_entity",
     "taxonomy_core_error",
     "taxonomy_core_event",
     "taxonomy_core_vo",
+    # Utility: core modules
     "utility_core_capacity",
     "utility_core_env",
     "utility_core_events",
@@ -507,6 +533,7 @@ __all__ = [
     "utility_core_text",
     "utility_core_validation",
     "utility_core_version",
+    # Utility: domain modules
     "utility_dom_helper",
     "utility_dom_query",
     "utility_error_mapping",
@@ -515,50 +542,9 @@ __all__ = [
     "utility_logger_factory",
     "utility_response_normalizer",
     "utility_telemetry_scrubber",
-    "contract_browser_aggregate",
-    "contract_browser_protocol",
-    "utility_browser_async_loop",
-    "contract_swarm_aggregate",
-    "contract_swarm_protocol",
-    "taxonomy_swarm_vo",
-    "contract_update_aggregate",
-    "contract_update_protocol",
-    "taxonomy_update_vo",
-    "utility_update_browser_binary",
-    "contract_logging_aggregate",
-    "contract_logging_protocol",
-    "taxonomy_logging_vo",
-    "contract_jobs_aggregate",
-    "contract_jobs_protocol",
-    "taxonomy_jobs_vo",
-    "contract_session_aggregate",
-    "contract_session_protocol",
-    "taxonomy_session_vo",
-    "utility_session_cloner",
-    "utility_session_guard",
-    "utility_session_renewal_cookie_probe",
-    "contract_config_aggregate",
-    "contract_config_protocol",
-    "taxonomy_config_vo",
-    "utility_config_app_factory",
-    "contract_prompt_aggregate",
-    "contract_prompt_protocol",
-    "taxonomy_prompt_vo",
 ]
 
-# ─── Sub-package imports (AES702 feature subfolders) ───────────────
-# Import each subpackage and re-export every module name it owns as an
-# attribute of modules.shared.src, so that
-# `from modules.shared.src import <module>` keeps working after the move.
-import modules.shared.src.browser
-import modules.shared.src.common
-import modules.shared.src.config
-import modules.shared.src.jobs
-import modules.shared.src.logging
-import modules.shared.src.prompt
-import modules.shared.src.session
-import modules.shared.src.swarm
-import modules.shared.src.update
+# ─── Explicit re-exports from subpackages (replaces bare sub-package imports) ───────────────
 from modules.shared.src.browser import contract_browser_aggregate, contract_browser_protocol, utility_browser_async_loop
 from modules.shared.src.common import (
     taxonomy_core_constant,

@@ -57,6 +57,24 @@ jobs:
       - name: Mypy check
         run: uv run mypy modules/
 
+      - name: Validate shared barrel __all__
+        run: python -c "
+import sys
+import modules.shared.src as shared
+missing = [n for n in shared.__all__ if not hasattr(shared, n)]
+if missing:
+    print('ERROR: __all__ names not importable:', missing)
+    sys.exit(1)
+bare = {n for n in shared.__all__ if n in {'modules','browser','common','config','jobs','logging','prompt','session','swarm','update'}}
+if bare:
+    print('ERROR: bare package names in __all__:', bare)
+    sys.exit(1)
+if 'IPromptFlowAggregate' in shared.__all__:
+    print('ERROR: phantom IPromptFlowAggregate remains in __all__')
+    sys.exit(1)
+print('OK: shared barrel __all__ validated')
+"
+
   build:
     name: Build package
     runs-on: ubuntu-latest
