@@ -23,6 +23,31 @@ from modules.shared.src.common.taxonomy_core_vo import MessageCount, ResponseTex
 _PAGINATION_RE = re.compile(r"^\s*\d+\s*/\s*\d+\s*$")
 
 
+def partial_text_after_stream_cut(exc: BaseException, page: Page) -> str | None:
+    """Partial assistant text for a run the monitor cut mid-stream (BE-1-003).
+
+    Prefers the ``partial_text`` the stream monitor attached to
+    ``StuckDetectedError`` / ``ResponseDetectionTimeoutError`` — the last
+    forward-progress text this run confirmed — and falls back to reading the
+    live DOM, which still holds a rendered partial answer when the cut fired
+    before any forward event registered (e.g. a first-poll timeout on text
+    that never differed from the baseline).
+
+    Returns ``None`` when neither source has non-blank text: a stall before
+    the first token legitimately has nothing to persist.
+    """
+    carried = getattr(exc, "partial_text", None)
+    if isinstance(carried, str) and carried.strip():
+        return carried.strip()
+    try:
+        dom_text = latest_message_text(page)
+    except Exception:
+        return None
+    if isinstance(dom_text, str) and dom_text.strip():
+        return dom_text.strip()
+    return None
+
+
 def count_messages(page: Page) -> MessageCount:
     """Count chat turns via injected JS with locator fallback.
 

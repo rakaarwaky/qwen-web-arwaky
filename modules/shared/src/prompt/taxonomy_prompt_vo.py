@@ -29,6 +29,12 @@ from modules.shared.src.common.taxonomy_core_vo import (
     TimeoutSec,
 )
 
+#: The extraction verdict a stream monitor reports for one response
+#: (FR-PROMPT-006). ``complete`` reached a terminal generation event;
+#: ``stalled`` was cut by the stall detector; ``incomplete`` ended any
+#: other way without one.
+ExtractionVerdict = Literal["complete", "stalled", "incomplete"]
+
 #: Which prompt verb a ``PromptRequest`` asks for. The agent behind
 #: ``IPromptAggregate`` routes each one to the matching protocol method.
 PromptVerb = Literal[
@@ -72,19 +78,43 @@ class PromptRequest:
 
 
 @dataclass(frozen=True)
+class StreamVerdict:
+    """One assistant answer plus the verdict its extraction earned (FR-PROMPT-006).
+
+    ``StreamMonitor.wait_for_response`` returns this so a caller can tell a
+    complete response from one the stall detector cut; the adapters forward
+    the verdict into ``PromptResponse.extraction_verdict``.
+    """
+
+    text: ResponseText
+    verdict: ExtractionVerdict = "complete"
+
+
+@dataclass(frozen=True)
 class PromptResponse:
     """What a prompt verb produced.
 
-    ``response_text`` carries the assistant's answer for the three
-    processing verbs; ``cancelled`` reports the outcome of
-    ``request_cancel``.
+    ``response_text`` carries the result message for the three processing
+    verbs; ``extraction_verdict`` reports the monitor's verdict for the
+    response the message describes (FR-PROMPT-001/002/003); ``cancelled``
+    and ``pipelines_stopped`` report the outcome of ``request_cancel``
+    (FR-PROMPT-004): how many in-flight pipelines the cancel actually
+    stopped, so a terminal or absent run reports zero instead of a blanket
+    success. The verb methods return this type directly — the verdict
+    rides the call because the adapters are singletons wired once per
+    container, and no second consumer distinguishes a narrower outcome
+    shape.
     """
 
     response_text: ResponseText | None = None
     cancelled: bool = False
+    pipelines_stopped: int = 0
+    extraction_verdict: ExtractionVerdict | None = None
 
 
 __all__ = [
+    "ExtractionVerdict",
+    "StreamVerdict",
     "PromptRequest",
     "PromptResponse",
     "PromptVerb",

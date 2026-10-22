@@ -24,7 +24,7 @@ surfaces and job runners see one pipeline.
 - **Business Rules**:
   - An empty prompt is rejected at the surface, so an adapter never receives an empty text.
   - The response is saved to the operator's named output destination.
-- **Edge Cases**: A response the stream never stops emitting is cut off at the configured stall detector and reported as incomplete.
+- **Edge Cases**: A response the stream never stops emitting is cut off at the configured stall detector and reported as `stalled` (partial saved); a hard wall-clock response timeout is reported as `incomplete`.
 - **Error Handling**: A send that fails surfaces a prompt failure carrying the reason, and the run records a failure outcome in metrics.
 
 ### FR-PROMPT-002: Run a file prompt
@@ -146,11 +146,11 @@ The class is named in the Description column.
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `process_direct_prompt` | text, timeout, headless, output path | prompt response | prompt failure | generation finished | Run a direct prompt. (IDirectPromptProtocol) |
-| `process_prompt_file_only` | file path, timeout, headless, output path | prompt response | file error, prompt failure | generation finished | Run a file prompt. (IPromptFileProtocol) |
-| `process_prompt_with_attachment` | text, attachment path, timeout, headless, output path | prompt response | upload error, prompt failure | generation finished | Run an attachment prompt. (IAttachmentPromptProtocol) |
-| `request_cancel` | run cancel event | stopped-pipelines count | none | none | Stop the file and attachment pipelines a run owns. (IPromptFlowProtocol) |
-| `dispatch_and_wait_for_response` | dispatch input, stream configuration | extraction verdict | stream error | generation finished | Drive one send and follow its stream. (IPromptFlowProtocol) |
+| `process_direct_prompt` | text, timeout, headless, output path | prompt response carrying `extraction_verdict` | prompt failure | generation finished | Run a direct prompt. (IDirectPromptProtocol) |
+| `process_prompt_file_only` | file path, timeout, headless, output path | prompt response carrying `extraction_verdict` | file error, prompt failure | generation finished | Run a file prompt. (IPromptFileProtocol) |
+| `process_prompt_with_attachment` | prompt file, attachment path, timeout, headless, output path | prompt response carrying `extraction_verdict` | upload error, prompt failure | generation finished | Run an attachment prompt. (IAttachmentPromptProtocol) |
+| `request_cancel` | run cancel event | stopped-pipelines count (`pipelines_stopped` on the prompt response) | none | none | Stop the file and attachment pipelines a run owns. (IPromptFileProtocol / IAttachmentPromptProtocol) |
+| `dispatch_and_wait_for_response` | dispatch input, stream configuration | stream verdict (text + `extraction_verdict`) | stream error | generation finished | Drive one send and follow its stream. (IPromptFlowProtocol) |
 | `register` | run-scoped cancel state | registered verdict | none | none | Register a run's cancel state. (IRunCancelProtocol) |
 | `release` | run-scoped cancel state | released verdict | none | none | Release a run's cancel state. (IRunCancelProtocol) |
 | `cancel_run` | run-scoped cancel state | cancelled verdict | none | none | Cancel one run and close its browser context. (IRunCancelProtocol) |
@@ -165,7 +165,7 @@ The class is named in the Description column.
 | `click_send` | page, emitter, config, document_parsed | none | send dispatch error | send clicked | Trigger the send action. (ISendProtocol) |
 | `count_messages` | page | chat turn count | none | none | Count chat turns. (ISendProtocol) |
 | `latest_message_text` | page | response text | none | none | Return the latest assistant response text. (ISendProtocol) |
-| `wait_for_response` | page, timeout, msg_count_before, emitter, config, cancel_event | response text | stream error, run cancelled | generation finished | Wait for a stable assistant response. (IStreamProtocol) |
+| `wait_for_response` | page, timeout, msg_count_before, emitter, config, cancel_event | response text + `extraction_verdict` | stream error, run cancelled | generation finished | Wait for a stable assistant response. (IStreamProtocol) |
 | `is_generation_complete` | page | generation flag | none | none | True when Qwen has finished generating. (IStreamProtocol) |
 | `is_thinking_active` | page | thinking flag | none | none | True when Qwen is currently thinking/streaming. (IStreamProtocol) |
 | `write_output` | path, content, ctx, src, dur, input_chars, output_chars, config | none | output write error | output copied | Write processed output with metadata header + sidecar. (ISaverProtocol) |
@@ -174,7 +174,7 @@ The class is named in the Description column.
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
-| `execute` | prompt request naming the verb | prompt response carrying the saved path or the failure reason | verb error | generation finished, failed | Single entry point every surface and job runner calls to run any prompt verb. |
+| `execute` | prompt request naming the verb | prompt response carrying the saved path or the failure reason, plus `extraction_verdict` for processing verbs and `pipelines_stopped` for cancel | verb error | generation finished, failed | Single entry point every surface and job runner calls to run any prompt verb. |
 
 ## Integration Points
 
@@ -189,14 +189,15 @@ The class is named in the Description column.
 
 | Metric | Target | Measurement method |
 |---|---|---|
-| Stream stall detection | every stalled stream reports incomplete, not complete | injection of a stream that emits no forward event |
+| Stream stall detection | every stalled stream reports `stalled`, not complete | injection of a stream that emits no forward event |
 | Response save | every completed run writes the response file | file presence after a completed run |
 | Cancel latency | a running pipeline stops on the first poll after the cancel event | timing the cancel verb against pipeline state |
 
 ## Test Scenarios
 
 - A direct prompt produces a response file at the operator's named destination.
-- A stalled stream reports incomplete and does not retry the send.
+- A stalled stream reports `stalled` (and saves the partial) and does not retry the send.
+- A hard response timeout reports `incomplete` (and saves the partial).
 - A cancel on a file pipeline reports one stopped pipeline.
 - An attachment exceeding the upload limit is rejected with the limit named.
 - A response file survives a mid-stream extraction failure so an operator can inspect it.
@@ -212,3 +213,4 @@ The class is named in the Description column.
 - **Stream monitor**: The seam that follows the response until a terminal state.
 - **Stall detector**: The check that distinguishes a slow response from a wedged one.
 - **Extraction verdict**: The result of the monitor: complete, stalled, or incomplete.
+- **Stalled vs incomplete**: `stalled` is the incomplete-family verdict the stall detector emits (no forward event within the stall window); `incomplete` is the verdict for a hard wall-clock response timeout or an unreadable stream. Both save the partial artifact.

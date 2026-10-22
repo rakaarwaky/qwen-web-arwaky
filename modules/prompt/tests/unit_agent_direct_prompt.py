@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_OUTPUT, DIRECT_PROMPT_STEM
 from modules.shared.src.common.taxonomy_core_error import ResponseDetectionTimeoutError, SendDispatchError
 from modules.shared.src.common.taxonomy_core_event import (
@@ -20,6 +21,7 @@ from modules.shared.src.common.taxonomy_core_event import (
     STANDARD_PROMPT_EVENTS,
 )
 from modules.shared.src.common.taxonomy_core_vo import MessageCount
+from modules.shared.src.prompt.taxonomy_prompt_vo import StreamVerdict
 
 
 def _browser_stub(emitter_events: tuple = ()) -> MagicMock:
@@ -55,6 +57,9 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
     observability.get_logger.return_value = MagicMock()
 
     flow = MagicMock()
+    # The cut handler is the real shared policy on the flow seam (issue 9):
+    # bind it so timeout/cut tests exercise the production save+verdict path.
+    flow.mid_stream_cut_outcome.side_effect = PromptFlowDispatcher().mid_stream_cut_outcome
     orchestrator = DirectPromptAdapter(
         browser=browser,
         injector=injector,
@@ -83,13 +88,14 @@ def test_process_direct_prompt_happy_path() -> None:
     def flow_stub(*, emitter, **_kwargs):
         for event in STANDARD_PROMPT_EVENTS[3:-1]:
             emitter.emit(event)
-        return "Hello from Qwen AI!"
+        return StreamVerdict(text="Hello from Qwen AI!", verdict="complete")
 
     mocks["flow"].dispatch_and_wait_for_response.side_effect = flow_stub
 
     response = orch.process_direct_prompt("What is Python?", timeout_sec=30, headless=True)
 
-    assert str(response) == "Hello from Qwen AI!"
+    assert "Successfully processed" in str(response.response_text)
+    assert response.extraction_verdict == "complete"
     mocks["flow"].dispatch_and_wait_for_response.assert_called_once()
     assert mocks["flow"].dispatch_and_wait_for_response.call_args.kwargs["prompt"] == "What is Python?"
     saved_path = mocks["saver"].write_output.call_args.args[0]
@@ -114,6 +120,7 @@ def test_process_direct_prompt_timeout_error() -> None:
     response = orch.process_direct_prompt("Test prompt", timeout_sec=10)
 
     assert "Timeout waiting for response" in str(response)
+    assert "no partial response available to save" in str(response)
 
 
 def test_process_direct_prompt_emits_session_expired_when_banner_appears_after_send() -> None:

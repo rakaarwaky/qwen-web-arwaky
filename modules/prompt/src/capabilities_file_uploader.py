@@ -34,6 +34,111 @@ from modules.shared.src.prompt.contract_prompt_protocol import IUploadProtocol
 
 log = get_logger("capabilities_file_uploader")
 
+# ─── BE-4-001: single-evaluate DOM probes ───────────────────────────────────
+#: One Chromium IPC round-trip answers "how many visible attachment cards show
+#: this exact filename" across all eight (selector, expected) families. Both
+#: sides of the comparison normalize identically: collapse every whitespace
+#: run to a single space, trim, and lowercase — Python
+#: ``" ".join(name.split()).lower()`` on the expected side, JS
+#: ``text.replace(/\s+/g, ' ').trim().toLowerCase()`` on the element side, so
+#: a multi-word name like ``quarterly report.md`` matches on a live page.
+#: ``str.lower()`` is the deliberate counterpart of ``toLowerCase()`` (not
+#: ``casefold()``): the pair keeps aggressive casefold mappings such as ß→ss
+#: out of the contract, and the ASCII-shaped attachment stems Qwen renders
+#: are identical under both (issue 15).
+JS_ATTACHMENT_MATCH_COUNT: str = r"""
+(pairs) => {
+  for (const [selector, expected] of pairs) {
+    let els;
+    try { els = document.querySelectorAll(selector); } catch (e) { continue; }
+    let matches = 0;
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      const text = (el.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (text === expected) matches++;
+    }
+    if (matches > 0) return matches;
+  }
+  return 0;
+}
+"""
+
+#: Toast shells checked for parse-pending copy. This tuple is the single
+#: source for the toast-selector argument list the readiness probe's JS
+#: receives.
+PARSE_TOAST_SELECTORS: tuple[str, ...] = (
+    ".ant-message",
+    "[role='alert']",
+    "[class*='toast']",
+    "[class*='message-notice']",
+    "[class*='ant-notification']",
+)
+
+#: One Chromium IPC round-trip answers the whole parse-ready question
+#: (toast visible? attachment card present? pending/spinner elements
+#: visible? parsing keywords?). ``found=False`` means no card matched the
+#: stem yet; ``ready`` mirrors the previous per-element locator scan:
+#: no parse toast, no visible pending/spinner node on the last card, and
+#: no "parsing"/"processing" copy in the card text.
+JS_PARSE_READINESS: str = r"""
+(arg) => {
+  const cardSelector = arg.card_selector;
+  const stem = String(arg.stem || '').toLowerCase();
+  const pendingSelectors = arg.pending_selectors || [];
+  const toastSelectors = arg.toast_selectors || [];
+  const toastKeywords = arg.toast_keywords || [];
+  const visible = (el) => {
+    try {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) return false;
+      return window.getComputedStyle(el).visibility !== 'hidden';
+    } catch (e) { return false; }
+  };
+  let toastVisible = false;
+  for (const sel of toastSelectors) {
+    let els;
+    try { els = document.querySelectorAll(sel); } catch (e) { continue; }
+    let seen = 0;
+    for (const el of els) {
+      if (seen >= 5) break;
+      seen += 1;
+      if (!visible(el)) continue;
+      const txt = (el.innerText || '').toLowerCase();
+      if (toastKeywords.some((kw) => txt.includes(kw))) { toastVisible = true; break; }
+    }
+    if (toastVisible) break;
+  }
+  let cards = [];
+  try {
+    for (const el of document.querySelectorAll(cardSelector)) {
+      const txt = (el.innerText || el.textContent || '').toLowerCase();
+      if (txt.includes(stem)) cards.push(el);
+    }
+  } catch (e) {}
+  if (cards.length === 0) return {found: false, ready: false};
+  const card = cards[cards.length - 1];
+  const cardText = (card.innerText || '').toLowerCase();
+  let pendingVisible = false;
+  for (const sel of pendingSelectors) {
+    let els;
+    try { els = card.querySelectorAll(sel); } catch (e) { continue; }
+    if (els.length > 0 && visible(els[0])) { pendingVisible = true; break; }
+  }
+  let spinnerVisible = false;
+  try {
+    const spinners = card.querySelectorAll(
+      "svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='spin']");
+    for (const el of spinners) {
+      if (visible(el)) { spinnerVisible = true; break; }
+    }
+  } catch (e) {}
+  const ready = !toastVisible && !pendingVisible && !spinnerVisible
+    && !cardText.includes('parsing') && !cardText.includes('processing');
+  return {found: true, ready: ready};
+}
+"""
+
 
 # ─── Block 1: Class Definition & Constructor ────────────
 class FileUploader(IUploadProtocol):
@@ -203,21 +308,43 @@ class FileUploader(IUploadProtocol):
 
     # ── Helper for Step 2 DOM Verification: Attachment card render ──
     def _wait_for_attachment_card(self, page: Page, filepath: Path, baseline_matches: int = 0) -> None:
-        """Wait for a newly rendered exact filename node in Qwen's live attachment DOM."""
+        """Wait for a newly rendered exact filename node in Qwen's live attachment DOM.
+
+        Transient Playwright faults (navigation, a destroyed execution
+        context) interrupt the poll loop instead of the whole wait: the
+        poll keeps its 100ms cadence until the deadline, and only a
+        deadline overrun fails the step. A wrong-shaped ``page.evaluate``
+        answer is a contract violation and propagates unchanged.
+        """
         log.debug("Waiting for exact Qwen attachment filename node: %s", filepath.name)
         deadline = time.monotonic() + (self.card_render_timeout_ms / 1000)
         while time.monotonic() < deadline:
-            matches = self._attachment_match_count(page, filepath)
+            try:
+                matches = self._attachment_match_count(page, filepath)
+            except (TimeoutError, Error) as e:
+                log.debug("Transient evaluate fault while waiting for attachment card: %s", e)
+                page.wait_for_timeout(100)
+                continue
             if matches > baseline_matches or (baseline_matches == 0 and matches > 0):
                 return
             page.wait_for_timeout(100)
         raise TimeoutError(f"Exact uploaded filename was not rendered in Qwen attachment DOM: {filepath.name}")
 
     def _attachment_match_count(self, page: Page, filepath: Path) -> int:
-        """Count exact filename matches using card-scoped and filename selectors ONLY."""
-        normalized_name = " ".join(filepath.name.split()).casefold()
-        normalized_stem = " ".join(filepath.stem.split()).casefold()
-        for selector, expected in (
+        """Count exact filename matches across card selectors (BE-4-001).
+
+        All eight (selector, expected) families are walked inside ONE
+        ``page.evaluate``, so each ``_wait_for_attachment_card`` poll costs a
+        single Chromium IPC round-trip instead of per-element
+        ``count()``/``is_visible()``/``inner_text()`` trips. The evaluate is
+        the authoritative path (issue 10): a live page always answers it,
+        an answer of the wrong type is a contract violation and fails
+        loudly, and transient evaluate failures surface as Playwright
+        errors that the upload retry loop already owns.
+        """
+        normalized_name = " ".join(filepath.name.split()).lower()
+        normalized_stem = " ".join(filepath.stem.split()).lower()
+        pairs: tuple[tuple[str, str], ...] = (
             (".fileitem-file-name", normalized_name),
             ("[class*='fileitem-file-name']", normalized_name),
             (".fileitem-file-name-text", normalized_stem),
@@ -226,23 +353,14 @@ class FileUploader(IUploadProtocol):
             ("[class*='fileitem']", normalized_name),
             ("[class*='file-card']", normalized_name),
             ("[class*='file-item']", normalized_name),
-        ):
-            try:
-                locator = page.locator(selector)
-                visible_texts = []
-                for index in range(locator.count()):
-                    item = locator.nth(index)
-                    try:
-                        if item.is_visible():
-                            visible_texts.append(item.inner_text())
-                    except (TimeoutError, Error):
-                        continue
-            except (TimeoutError, Error):
-                continue
-            matches = sum("".join(text.split()).casefold() == expected for text in visible_texts)
-            if matches:
-                return matches
-        return 0
+        )
+        count = page.evaluate(JS_ATTACHMENT_MATCH_COUNT, pairs)
+        if not isinstance(count, int) or isinstance(count, bool):
+            raise TypeError(
+                "JS_ATTACHMENT_MATCH_COUNT must answer an int match count; "
+                f"got {type(count).__name__!r} — script page.evaluate in this double"
+            )
+        return count
 
     # ── Helper for Step 3: Sequential document parse ready check ──
     def _wait_for_parse_ready(self, page: Page, filepath: Path) -> None:
@@ -257,7 +375,15 @@ class FileUploader(IUploadProtocol):
             log.info("Qwen backend files/parse API completed for %s", filepath.name)
 
     def _wait_for_dom_parse_ready(self, page: Page, filepath: Path) -> None:
-        """Step 3b: Poll visual DOM attachment cards until loading spinners and toasts clear."""
+        """Step 3b: Poll visual DOM attachment cards until loading spinners and toasts clear.
+
+        BE-4-001: each poll asks ONE ``page.evaluate`` (``JS_PARSE_READINESS``)
+        for the combined toast/card/pending/spinner state instead of a dozen
+        locator round-trips (cadence: 200ms without a card, 300ms while not
+        ready, 500ms grace after ready). Transient Playwright errors during
+        the poll are swallowed here so a navigation mid-wait keeps the
+        cadence; wrong-shaped answers fail loudly via ``_parse_readiness``.
+        """
         deadline = time.monotonic() + (self.parse_ready_timeout_ms / 1000)
         container_selectors = (
             ".message-input-column-file",
@@ -282,57 +408,56 @@ class FileUploader(IUploadProtocol):
 
         while time.monotonic() < deadline:
             try:
-                toast_visible = False
-                with contextlib.suppress(Exception):
-                    for sel in (
-                        ".ant-message",
-                        "[role='alert']",
-                        "[class*='toast']",
-                        "[class*='message-notice']",
-                        "[class*='ant-notification']",
-                    ):
-                        loc = page.locator(sel)
-                        if loc.count() > 0:
-                            for idx in range(min(loc.count(), 5)):
-                                item = loc.nth(idx)
-                                if item.is_visible(timeout=100):
-                                    txt = item.inner_text(timeout=100).casefold()
-                                    if any(kw in txt for kw in parse_keywords):
-                                        toast_visible = True
-                                        break
-                        if toast_visible:
-                            break
-
-                cards = page.locator(card_selector).filter(has_text=filepath.stem)
-                cc = cards.count()
-                if not isinstance(cc, int) or cc == 0:
-                    page.wait_for_timeout(200)
-                    continue
-
-                card = cards.last
-                card_text = card.inner_text().casefold()
-                pending_visible = any(
-                    card.locator(selector).count() > 0 and card.locator(selector).first.is_visible(timeout=100)
-                    for selector in self.config.parse_pending_selectors
-                )
-                spinners = card.locator("svg[class*='spin'], svg[class*='loading'], .ant-spin, [class*='spin']")
-                spinners_visible = any(spinners.nth(index).is_visible(timeout=100) for index in range(spinners.count()))
-
-                is_ready = (
-                    not toast_visible
-                    and not pending_visible
-                    and not spinners_visible
-                    and "parsing" not in card_text
-                    and "processing" not in card_text
-                )
-                if is_ready:
+                found, ready = self._parse_readiness(page, filepath, card_selector, parse_keywords)
+                if ready:
                     page.wait_for_timeout(500)
                     log.debug("Qwen document parsing DOM is ready for %s", filepath.name)
                     return
+                if not found:
+                    page.wait_for_timeout(200)
+                    continue
             except (TimeoutError, Error):
                 pass
             page.wait_for_timeout(300)
         raise TimeoutError(f"Qwen document parsing did not reach ready state: {filepath.name}")
+
+    def _parse_readiness(
+        self,
+        page: Page,
+        filepath: Path,
+        card_selector: str,
+        parse_keywords: tuple[str, ...],
+    ) -> tuple[bool, bool]:
+        """Single-evaluate parse-readiness answer: ``(card_found, ready)``.
+
+        The evaluate is the authoritative path (issue 10): the JS answers a
+        strict ``{found, ready}`` boolean pair, and anything else is a
+        contract violation that fails loudly rather than silently running a
+        second implementation of the same scan.
+        """
+        outcome = page.evaluate(
+            JS_PARSE_READINESS,
+            {
+                "card_selector": card_selector,
+                "stem": filepath.stem,
+                "pending_selectors": list(self.config.parse_pending_selectors),
+                "toast_selectors": list(PARSE_TOAST_SELECTORS),
+                "toast_keywords": list(parse_keywords),
+            },
+        )
+        if not isinstance(outcome, dict):
+            raise TypeError(
+                "JS_PARSE_READINESS must answer {found, ready}; "
+                f"got {type(outcome).__name__!r} — script page.evaluate in this double"
+            )
+        found = outcome.get("found")
+        ready = outcome.get("ready")
+        if not isinstance(found, bool) or not isinstance(ready, bool):
+            raise TypeError(
+                "JS_PARSE_READINESS must answer boolean found/ready fields; "
+                f"got {outcome!r} — script page.evaluate in this double"
+            )
+        return found, ready
 
     def __repr__(self) -> str:
         """Return string representation of FileUploader."""

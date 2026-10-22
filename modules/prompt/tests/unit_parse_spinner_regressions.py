@@ -198,12 +198,15 @@ class TestWaitForSendEnabledHoldFlag:
 
 
 class TestWaitForDomParseReadySpinnerVisibility:
-    """_wait_for_dom_parse_ready must exit when only hidden spinners remain."""
+    """_wait_for_dom_parse_ready must exit when the JS probe reports ready,
+    and time out when it never does (the visibility logic itself lives in
+    ``JS_PARSE_READINESS``; these pin the poll loop's contract)."""
 
     def test_hidden_spinners_complete(self, tmp_path):
         filepath = tmp_path / "test.md"
         filepath.write_text("hello")
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=False, spinner_count=2)
+        page.evaluate.return_value = {"found": True, "ready": True}
 
         with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
             # Call 1 (deadline base) → 0.0; call 2 (while check) → 0.0 (< 0.001, body
@@ -222,11 +225,12 @@ class TestWaitForDomParseReadySpinnerVisibility:
         filepath = tmp_path / "test.md"
         filepath.write_text("hello")
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=True, spinner_count=2)
+        page.evaluate.return_value = {"found": True, "ready": False}
 
         with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
             # The loop runs one iteration: deadline = 0.0 + 0.001, while check at 0.0
-            # enters the body. The visible spinner makes is_ready False, so the body
-            # falls through to wait_for_timeout(300) and loops back; the third
+            # enters the body. The JS probe reports not-ready, so the body falls
+            # through to wait_for_timeout(300) and loops back; the third
             # monotonic call returns 99999.0 which exceeds the deadline → exit.
             mod_time.monotonic.side_effect = [0.0, 0.0, 99999.0, 99999.0, 99999.0]
             mod_time.sleep = lambda s: None

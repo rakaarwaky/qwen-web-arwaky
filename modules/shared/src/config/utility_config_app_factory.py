@@ -12,8 +12,10 @@ from pathlib import Path
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_LOG,
     DEFAULT_OUTPUT,
+    DEFAULT_SEND_CLICK_TIMEOUT_MS,
     DEFAULT_SESSION,
     REQUEST_TIMEOUT_ENV,
+    SEND_CLICK_TIMEOUT_ENV,
     TRUE_VALUES,
 )
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -29,6 +31,24 @@ def _resolve_request_timeout(override: int) -> int:
     except ValueError:
         return override
     return parsed if parsed > 0 else override
+
+
+def _resolve_send_click_timeout_ms() -> int:
+    """Resolve the attachment send ceiling from the env or the default.
+
+    ``QWEN_SEND_CLICK_TIMEOUT_MS`` overrides the ceiling per environment
+    (FRD Assumptions). Unparseable or non-positive values keep
+    ``DEFAULT_SEND_CLICK_TIMEOUT_MS`` so a malformed override cannot
+    disable the send wait.
+    """
+    raw = os.environ.get(SEND_CLICK_TIMEOUT_ENV, "").strip()
+    if not raw:
+        return DEFAULT_SEND_CLICK_TIMEOUT_MS
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return DEFAULT_SEND_CLICK_TIMEOUT_MS
+    return parsed if parsed > 0 else DEFAULT_SEND_CLICK_TIMEOUT_MS
 
 
 def sandbox_unavailable() -> bool:
@@ -125,6 +145,7 @@ def build_app_config(
         storage_state_file=storage_state_file,
         disable_sandbox=disable_sandbox,
         request_timeout=_resolve_request_timeout(request_timeout),
+        send_click_timeout_ms=_resolve_send_click_timeout_ms(),
         poll_interval=poll_interval,
         streaming_timeout=streaming_timeout,
         rate_limit_per_minute=rate_limit_per_minute,

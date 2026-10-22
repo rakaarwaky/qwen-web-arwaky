@@ -45,9 +45,9 @@ def test_streamer_implements_the_stream_protocol() -> None:
     assert IStreamProtocol in inspect.getmro(StreamMonitor)
 
 
-def test_the_flow_capability_declares_only_the_one_door() -> None:
+def test_the_flow_capability_declares_the_dispatch_and_cut_doors() -> None:
     public = {name for name, _ in inspect.getmembers(IPromptFlowProtocol, predicate=inspect.isfunction)}
-    assert public == {"dispatch_and_wait_for_response"}
+    assert public == {"dispatch_and_wait_for_response", "mid_stream_cut_outcome"}
 
 
 def test_every_protocol_method_is_abstract_with_a_return_annotation() -> None:

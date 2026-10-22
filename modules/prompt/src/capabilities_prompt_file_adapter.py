@@ -13,7 +13,11 @@ from playwright.sync_api import Page
 
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
-from modules.shared.src.common.taxonomy_core_error import RunCancelledError
+from modules.shared.src.common.taxonomy_core_error import (
+    ResponseDetectionTimeoutError,
+    RunCancelledError,
+    StuckDetectedError,
+)
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     STANDARD_PROMPT_EVENTS,
@@ -48,7 +52,11 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
     IStreamProtocol,
     LifecycleObserver,
 )
-from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptResponse
+from modules.shared.src.prompt.taxonomy_prompt_vo import (
+    PromptRequest,
+    PromptResponse,
+    StreamVerdict,
+)
 
 
 def new_run_state(cancel_event: CancelToken | None = None) -> RunState:
@@ -86,8 +94,8 @@ class PromptFileAdapter(IPromptFileProtocol):
 
     # Block 2: Protocol Method Implementation
 
-    def request_cancel(self, cancel_event: CancelToken) -> None:
-        """Cancel a specific in-flight run identified by its cancel event.
+    def request_cancel(self, cancel_event: CancelToken) -> bool:
+        """Cancel the in-flight run identified by its cancel event.
 
         The caller (e.g. the TUI slot worker) creates its own
         ``threading.Event`` per run, passes it into
@@ -97,8 +105,13 @@ class PromptFileAdapter(IPromptFileProtocol):
 
         The registry resolves the event to a stable run_id internally, so the
         lookup never depends on event object identity outliving the run.
+
+        Returns:
+            bool: True only when an in-flight pipeline was stopped, so a
+            cancel for a run that already finished reports zero stopped
+            pipelines (FR-PROMPT-004).
         """
-        self._cancel.cancel_by_event(cancel_event)
+        return self._cancel.cancel_by_event(cancel_event)
 
     @staticmethod
     def _resolve_session_path(session_resolver: Callable[[], Path | None] | None) -> Path | None:
@@ -118,7 +131,7 @@ class PromptFileAdapter(IPromptFileProtocol):
         cancel_event: CancelToken | None = None,
         event_observer: LifecycleObserver | None = None,
         session_resolver: Callable[[], Path | None] | None = None,
-    ) -> ResponseText:
+    ) -> PromptResponse:
         """Pipeline 2: Process a prompt file from disk without attachment.
 
         Pass ``cancel_event`` to enable targeted cancellation: the TUI
@@ -137,6 +150,11 @@ class PromptFileAdapter(IPromptFileProtocol):
         self._cancel.register(run_state)
         try:
             p_path, out_path = resolve_pipeline_output_path(prompt_file, output_file)
+            # FR-PROMPT-002: the file must exist and be readable before any
+            # browser launch or observability binding, so a bad input fails
+            # at pre-flight — the same pre-flight position the attachment
+            # adapter uses.
+            read_prompt = self._read_prompt_text(p_path)
             cfg = build_app_config(
                 input_path=p_path,
                 output_path=out_path,
@@ -156,17 +174,43 @@ class PromptFileAdapter(IPromptFileProtocol):
                     if run_state.cancel_event.is_set():
                         raise RunCancelledError("Cancelled by user before browser launch")
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
-                    text = self._execute_file_on_page(
-                        page, p_path, cfg.request_timeout, cfg, emitter, state, run_state.cancel_event
-                    )
+                    try:
+                        text = self._execute_file_on_page(
+                            page,
+                            p_path,
+                            cfg.request_timeout,
+                            cfg,
+                            emitter,
+                            state,
+                            prompt=read_prompt,
+                            cancel_event=run_state.cancel_event,
+                        )
+                    except (StuckDetectedError, ResponseDetectionTimeoutError) as exc:
+                        # BE-1-003: the flow's shared cut handler saves the
+                        # partial artifact and returns the honest verdict
+                        # (stalled / incomplete) for all three pipelines.
+                        return self._flow.mid_stream_cut_outcome(
+                            exc,
+                            page,
+                            saver=self._saver,
+                            observability=self._observability,
+                            out_path=out_path,
+                            prompt_path=p_path,
+                            elapsed=time.time() - t0,
+                            ctx=ctx,
+                            emitter=emitter,
+                        )
 
                 finally:
                     self._cancel.set_active_bctx(run_state.run_id, None)
             dur = time.time() - t0
-            save_orchestrator_output(self._saver, out_path, p_path, text, dur, ctx, emitter=emitter)
-            return ResponseText(f"Successfully processed {p_path.name} -> {out_path}")
+            save_orchestrator_output(self._saver, out_path, p_path, text.text, dur, ctx, emitter=emitter)
+            return PromptResponse(
+                response_text=ResponseText(f"Successfully processed {p_path.name} -> {out_path}"),
+                extraction_verdict=text.verdict,
+            )
         except Exception as exc:
-            return to_error_response(exc)
+            return PromptResponse(response_text=to_error_response(exc), extraction_verdict=None)
         finally:
             self._cancel.release(run_state)
             self._observability.detach_run_log(RunId(ctx.run_id))
@@ -182,10 +226,9 @@ class PromptFileAdapter(IPromptFileProtocol):
         active_cfg: AppConfig,
         emitter: LifecycleEmitter,
         state: LifecycleState,
+        prompt: str,
         cancel_event: CancelToken | None = None,
-    ) -> str:
-        prompt = filepath.read_text(encoding="utf-8").strip()
-
+    ) -> StreamVerdict:
         self._browser.navigate_to_chat(page, emitter)
         self._browser.check_auth(page)
         msg_count_before = self._sender.count_messages(page)
@@ -213,6 +256,16 @@ class PromptFileAdapter(IPromptFileProtocol):
                 emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "post_send_banner"})
             raise
 
+    @staticmethod
+    def _read_prompt_text(filepath: Path) -> str:
+        """Read and normalize the prompt file, naming the path on failure (FR-PROMPT-002).
+
+        Raises ``FileNotFoundError`` / ``OSError`` (mapped by
+        ``to_error_response``) so an unreadable input is reported as a file
+        error naming the path rather than a browser failure.
+        """
+        return filepath.read_text(encoding="utf-8").strip()
+
     def execute(self, request: PromptRequest) -> PromptResponse:
         """Run one prompt verb and return the answer, with failures carried.
 
@@ -221,20 +274,17 @@ class PromptFileAdapter(IPromptFileProtocol):
         surface renders the problem without a try/except.
         """
         if request.verb == "process_prompt_file_only":
-            return PromptResponse(
-                response_text=self.process_prompt_file_only(
-                    prompt_file=request.prompt_file,
-                    output_file=request.output_file,
-                    headless=request.headless,
-                    cancel_event=request.cancel_event,
-                    event_observer=request.event_observer,
-                    session_resolver=request.session_resolver,
-                )
+            return self.process_prompt_file_only(
+                prompt_file=request.prompt_file,
+                output_file=request.output_file,
+                headless=request.headless,
+                cancel_event=request.cancel_event,
+                event_observer=request.event_observer,
+                session_resolver=request.session_resolver,
             )
         if request.verb == "request_cancel":
-            if request.cancel_event is not None:
-                self.request_cancel(request.cancel_event)
-            return PromptResponse(cancelled=True)
+            stopped = self.request_cancel(request.cancel_event) if request.cancel_event is not None else False
+            return PromptResponse(cancelled=stopped, pipelines_stopped=1 if stopped else 0)
         return PromptResponse(response_text=ResponseText(f"ERROR: unknown prompt verb {request.verb!r}"))
 
 
