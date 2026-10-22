@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from modules.shared.src.prompt.contract_prompt_aggregate import IPromptAggregate
+from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptText
 from modules.shared.src.session.contract_session_protocol import (
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
@@ -15,7 +17,6 @@ from modules.shared.src.session.taxonomy_session_vo import (
     RotatorResponse,
     SessionId,
     SessionInfo,
-    SessionPool,
     SessionStatus,
 )
 
@@ -28,16 +29,6 @@ class RotationMetrics:
     successful_rotations: int = 0
     sessions_exhausted: int = 0
     average_rotation_time_ms: float = 0.0
-
-
-class AllSessionsLimitedError(Exception):
-    """Deprecated exception: callers branch on RotatorResponse.outcome == 'no_eligible_session'."""
-
-    def __init__(self, pool: SessionPool | None = None) -> None:
-        count = pool.total_count if pool else 0
-        super().__init__(
-            f"All {count} sessions are rate-limited. Please reduce request throughput or add authorized accounts."
-        )
 
 
 #: Caller-facing recovery prose for the ``no_eligible_session`` reasons
@@ -60,9 +51,11 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
         self,
         session_manager: ISessionManagerProtocol,
         health_checker: ISessionHealthCheckerProtocol | None = None,
+        prompt: IPromptAggregate | None = None,
     ) -> None:
         self._manager = session_manager
         self._checker: ISessionHealthCheckerProtocol | None = health_checker
+        self._prompt: IPromptAggregate | None = prompt
         self._metrics = RotationMetrics()
 
     # Block 2: Protocol Method Implementation
@@ -168,7 +161,7 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
             )
 
         session = rot_resp.session
-        response = await self._execute_request(prompt, attachment, session)
+        response = self._execute_request(prompt, attachment, session)
         self._manager.mark_used(session.session_id, success=True)
 
         return response, session
@@ -186,27 +179,34 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
             raise RuntimeError("Health checker not configured — pass one to SessionRotationAdapter()")
         return self._checker
 
-    async def _execute_request(
+    def _execute_request(
         self,
         prompt: str,
         _attachment: object | None,
         session: SessionInfo,
     ) -> str:
-        """Execute actual request with session.
+        """Execute actual request via the injected prompt aggregate.
 
-        In real implementation, this would:
-        1. Launch browser with session profile
-        2. Navigate to chat.qwen.ai
-        3. Inject prompt
-        4. Wait for response
-        5. Return response text
+        Delegates to ``IPromptAggregate.execute`` with ``process_direct_prompt``
+        so rotation produces a real response through the direct-prompt pipeline
+        instead of a simulated one.
         """
-        # Simulated response for now
-        return f"Response using session {session.session_id}: {prompt}"
+        if self._prompt is None:
+            raise RuntimeError(
+                "SessionRotationAdapter has no IPromptAggregate wired — "
+                "pass prompt=PromptOrchestrator(...) when constructing"
+            )
+        response = self._prompt.execute(
+            PromptRequest(
+                verb="process_direct_prompt",
+                prompt=PromptText(prompt),
+                session_resolver=lambda: session.path,
+            )
+        )
+        return str(response.response_text or "")
 
 
 __all__ = [
     "SessionRotationAdapter",
-    "AllSessionsLimitedError",
     "RotationMetrics",
 ]

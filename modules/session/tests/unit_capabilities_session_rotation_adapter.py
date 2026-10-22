@@ -5,8 +5,7 @@ Covers the locked decisions (SESSION-02, BA-2-002):
   reason and recovery action) when no eligible session remains, and the
   derived ``throttled`` view reads True on that outcome.
 - ``execute_with_rotation`` returns an explicit error outcome on
-  exhaustion (never raises); ``AllSessionsLimitedError`` is a deprecated
-  alias kept for import compatibility.
+  exhaustion (never submits through a limited session).
 - Rotation iterates deterministically from ``pool.current_index`` and
   probes each session exactly once; exclusions are honored.
 """
@@ -84,7 +83,9 @@ class _StubChecker:
 def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter:
     manager = MagicMock()
     manager.load_pool.return_value = pool
-    return SessionRotationAdapter(manager, checker)
+    prompt = MagicMock()
+    prompt.execute.return_value = MagicMock(response_text="ok")
+    return SessionRotationAdapter(manager, checker, prompt=prompt)
 
 
 def test_rotation_all_sessions_limited_reports_throttle(tmp_path: Path) -> None:
@@ -181,13 +182,32 @@ def test_execute_with_rotation_reports_outcome_on_exhausted_pool(tmp_path: Path)
     assert adapter.metrics.sessions_exhausted == 1
 
 
-def test_all_sessions_limited_error_still_importable() -> None:
-    """``AllSessionsLimitedError`` is kept as a deprecated alias for import compatibility."""
-    from modules.session.src.capabilities_session_rotation_adapter import AllSessionsLimitedError
+def test_execute_with_rotation_delegates_to_prompt_aggregate(tmp_path: Path) -> None:
+    """``execute_with_rotation`` delegates to the injected prompt aggregate (ARCH-2-003)."""
+    pool = _pool([SessionStatus.LIMITED, SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_2"})
+    adapter = _adapter(pool, checker)
 
-    err = AllSessionsLimitedError(pool=SessionPool.empty())
-    assert isinstance(err, Exception)
-    assert "rate-limited" in str(err)
+    result, session = asyncio.run(adapter.execute_with_rotation("prompt"))
+
+    assert session is not None
+    assert session.session_id == "session_2"
+    # The mock prompt aggregate returns response_text="ok"; the delegation
+    # itself is proven by the value arriving at the caller.
+    assert result == "ok"
+    assert adapter.metrics.successful_rotations == 1
+
+
+def test_execute_with_rotation_requires_prompt_aggregate(tmp_path: Path) -> None:
+    """``execute_with_rotation`` raises when no prompt aggregate is wired."""
+    pool = _pool([SessionStatus.ACTIVE], tmp_path)
+    checker = _StubChecker(healthy_ids={"session_1"})
+    manager = MagicMock()
+    manager.load_pool.return_value = pool
+    adapter = SessionRotationAdapter(manager, checker)  # no prompt
+
+    with __import__("pytest").raises(RuntimeError, match="no IPromptAggregate"):
+        asyncio.run(adapter.execute_with_rotation("prompt"))
 
 
 # ── outcome/reason contract (BA-2-002, merged from unit_session_rotation_outcomes) ─

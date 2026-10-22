@@ -117,5 +117,6 @@ __all__ = [
     "StreamVerdict",
     "PromptRequest",
     "PromptResponse",
+    "PromptText",
     "PromptVerb",
 ]
