@@ -74,7 +74,6 @@ class _TuiAppHandlerMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
-    _last_delete_name: str
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 

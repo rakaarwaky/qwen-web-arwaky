@@ -40,6 +40,10 @@ class _TuiNavLogHandlerMixin:
     _session_row: int
     # Issue #341: per-slot attachment path chosen via the Attach pill.
     _slot_attachments: dict[int, str]
+    # FE-3-01: per-slot prompt-file path chosen via the Prompt pill.
+    _slot_prompt_files: dict[int, str]
+    # FE-4-01: cached active slot id for unscoped log fan-out.
+    _active_slot_cache: int
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _run_slot: Any
@@ -78,23 +82,42 @@ class _TuiNavLogHandlerMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
-    _last_delete_name: str
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 
     def _get_active_slot_id(self) -> int:
+        """FE-4-01: return the cached active slot id (default 1).
+
+        The historical contract never returns 0 for "no slot tab active" —
+        Overview is key 0 and only ``_log_msg``'s special case reaches it.
+        ``_refresh_active_slot_cache`` owns the DOM resolution.
+        """
+        return self._active_slot_cache
+
+    def _set_active_slot_cache_from_tab_id(self, active_id: str) -> None:
+        """FE-4-01: write the cache from an already-resolved tab id."""
+        active = 1
+        if active_id.startswith("tab-slot-"):
+            try:
+                active = int(active_id.split("-")[-1])
+            except ValueError:
+                active = 1
+        self._active_slot_cache = active
+
+    def _refresh_active_slot_cache(self) -> None:
+        """FE-4-01: resolve the active slot tab from the DOM into the cache."""
+        active_id = ""
         with contextlib.suppress(Exception):
-            tabs = self.query_one(TabbedContent)
-            active_id = tabs.active or ""
-            if active_id.startswith("tab-slot-"):
-                return int(active_id.split("-")[-1])
-        return 1
+            active_id = self.query_one(TabbedContent).active or ""
+        self._set_active_slot_cache_from_tab_id(active_id)
 
     def _refresh_nav_dock(self) -> None:
         """Update the bottom nav dock's active indicator to match the tab bar."""
+        active_id = ""
         with contextlib.suppress(Exception):
             tabs = self.query_one(TabbedContent)
             active = tabs.active or ""
+            active_id = active
             overview_btn = self.query_one("#nav-overview", Button)
             login_btn = self.query_one("#nav-login", Button)
             chat_btn = self.query_one("#nav-chat", Button)
@@ -117,6 +140,9 @@ class _TuiNavLogHandlerMixin:
             if active_btn is not None:
                 active_btn.set_class(False, "nav-inactive")
                 active_btn.set_class(True, "nav-active")
+        # FE-4-01: feed the already-read tab id so the switch path queries
+        # TabbedContent once, not twice.
+        self._set_active_slot_cache_from_tab_id(active_id)
 
     def _nav_dock_go(self, button_id: str) -> None:
         with contextlib.suppress(Exception):
@@ -287,11 +313,26 @@ class _TuiNavLogHandlerMixin:
         the slot's file indicator instead of being written into an Input.
         """
         return_focus_id = f"btn-pill-attach-{slot_id}"
+        target_state = self._slot_attachments
 
         def _on_picked(path: str | None) -> None:
-            if not path:
+            if path is None:
+                # R2-1: picker cancel/Escape clears this slot's attachment pick
+                # so a refused slot is never stuck until the app restarts.
+                target_state.pop(slot_id, None)
+                with contextlib.suppress(NoMatches):
+                    indicator = self.query_one(f"#file-indicator-{slot_id}", Label)
+                    indicator.update("")
+                    indicator.display = False
                 return
-            self._slot_attachments[slot_id] = path
+            target_state[slot_id] = path
+            # R2-1: re-picking the attachment clears any pending Prompt-pill
+            # file so the dual-input refusal always has a reachable exit.
+            self._slot_prompt_files.pop(slot_id, None)
+            with contextlib.suppress(NoMatches):
+                prompt_indicator = self.query_one(f"#prompt-file-indicator-{slot_id}", Label)
+                prompt_indicator.update("")
+                prompt_indicator.display = False
             with contextlib.suppress(NoMatches):
                 indicator = self.query_one(f"#file-indicator-{slot_id}", Label)
                 indicator.update(f"📎 {_attachment_label(path)}")
@@ -304,6 +345,53 @@ class _TuiNavLogHandlerMixin:
         self.push_screen(
             FilePickerModal(
                 select_directories=True,
+                return_focus_id=return_focus_id,
+            ),
+            _on_picked,
+        )
+
+    def _open_prompt_file_picker(self, slot_id: int) -> None:
+        """FE-3-01: open the file picker for the Prompt pill.
+
+        Mirrors ``_open_attachment_picker`` (issue #341): the picked path is
+        stored in per-slot state and shown on the slot's prompt-file
+        indicator (a separate Label from the attach indicator so the two
+        picks cannot overwrite each other's display). It is never written
+        into the composer Input — a path there is read as prompt text, so
+        Qwen would receive the path string instead of the file's contents.
+        """
+        return_focus_id = f"btn-pill-prompt-{slot_id}"
+
+        def _on_picked(path: str | None) -> None:
+            if path is None:
+                # R2-1: picker cancel/Escape clears this slot's prompt-file pick
+                # so a refused slot is never stuck until the app restarts.
+                self._slot_prompt_files.pop(slot_id, None)
+                with contextlib.suppress(NoMatches):
+                    indicator = self.query_one(f"#prompt-file-indicator-{slot_id}", Label)
+                    indicator.update("")
+                    indicator.display = False
+                return
+            self._slot_prompt_files[slot_id] = path
+            # R2-1: re-picking the prompt file clears any pending Attach-pill
+            # pick so the dual-input refusal always has a reachable exit.
+            self._slot_attachments.pop(slot_id, None)
+            with contextlib.suppress(NoMatches):
+                attach_indicator = self.query_one(f"#file-indicator-{slot_id}", Label)
+                attach_indicator.update("")
+                attach_indicator.display = False
+            with contextlib.suppress(NoMatches):
+                indicator = self.query_one(f"#prompt-file-indicator-{slot_id}", Label)
+                indicator.update(f"📄 {escape(Path(path).name)}")
+                indicator.display = True
+            self._log_msg(
+                "[bold {}]PROMPT FILE:[/] Slot {} ← {}".format(THEME["ok"], slot_id, escape(str(Path(path)))),
+                slot_id,
+            )
+
+        self.push_screen(
+            FilePickerModal(
+                select_directories=False,
                 return_focus_id=return_focus_id,
             ),
             _on_picked,

@@ -302,6 +302,11 @@ class _TuiComposeMixin:
                     file_indicator = Label("", id=f"file-indicator-{s}", classes="file-indicator")
                     file_indicator.display = False
                     yield file_indicator
+                    # FE-3-01: separate indicator for the Prompt-pill pick so
+                    # the two picks cannot visually overwrite each other.
+                    prompt_file_indicator = Label("", id=f"prompt-file-indicator-{s}", classes="file-indicator")
+                    prompt_file_indicator.display = False
+                    yield prompt_file_indicator
                     # Composer: prompt glyph, free-text task, send button.
                     with Horizontal(classes="composer"):
                         yield Label(">", classes="composer-glyph")
