@@ -22,16 +22,6 @@ from modules.shared.src.common.taxonomy_core_constant import STATUS_GLYPHS
 #: envelope and ``error_code`` never diverge in exit status.
 EXIT_FAILURE = 1
 
-#: Re-exported from the shared Taxonomy layer so every CLI report surface
-#: reads the canonical glyph object (``✗`` U+2717 is the failure marker).
-__all__ = [
-    "EXIT_FAILURE",
-    "STATUS_GLYPHS",
-    "_fail_json",
-    "print_error",
-    "status_glyph",
-]
-
 _ERROR_PREFIX = "[ERROR]"
 
 
@@ -57,3 +47,12 @@ def _fail_json(message: str, error_code: str, json_output: bool) -> int:
     else:
         print_error(message)
     return EXIT_FAILURE
+
+
+__all__ = [
+    "EXIT_FAILURE",
+    "STATUS_GLYPHS",
+    "_fail_json",
+    "print_error",
+    "status_glyph",
+]

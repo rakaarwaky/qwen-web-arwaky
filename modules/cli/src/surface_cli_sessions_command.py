@@ -424,7 +424,8 @@ def _remove_confirmed(token: str) -> bool:
     as a traceback.
     """
     try:
-        answer = input(f"Remove session '{token}' and delete its profile? [y/N]: ").strip().lower()
+        print(f"Remove session '{token}' and delete its profile? [y/N]: ", end="", file=sys.stderr)
+        answer = input("").strip().lower()
     except EOFError:
         return False
     return answer in ("y", "yes")
@@ -465,8 +466,9 @@ def cmd_remove(session: ISessionAggregate, args: argparse.Namespace, json_output
 
     # UX-4-003: only an interactive TTY without --json and without --force
     # prompts; every scripted path (--json, --force, non-TTY) runs straight.
-    if not json_output and not getattr(args, "force", False) and sys.stdin.isatty() and not _remove_confirmed(token):
-        print("Aborted — session kept.")
+    interactive = not json_output and not getattr(args, "force", False) and sys.stdin.isatty()
+    if interactive and not _remove_confirmed(token):
+        print("Aborted — session kept.", file=sys.stderr)
         return 0
 
     response = session.execute(

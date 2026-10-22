@@ -188,8 +188,10 @@ def test_status_json_payload_carries_counts(capsys) -> None:
 
 def test_list_renders_full_auth_required_cells_at_80_columns(capsys) -> None:
     # UX-5-002: the Status floor of 16 keeps a whole-pool auth_required verdict
-    # readable — the full cell renders with no "…" truncation at the narrowest
-    # budget a real terminal reports.
+    # readable. The test runs at a budget narrow enough that the Status column
+    # is actually squeezed: with the pre-fix floor of 8 the cell truncates to
+    # "..." and the assertion below fails, while the floor of 16 keeps the full
+    # "..." cell so it never truncates.
     from modules.cli.src.surface_cli_sessions_command import (
         _LIST_COLUMNS,
         _LIST_FLOORS,
@@ -202,11 +204,18 @@ def test_list_renders_full_auth_required_cells_at_80_columns(capsys) -> None:
         _info("session_2", "work", status=SessionStatus.AUTH_REQUIRED),
         _info("session_3", "staging", status=SessionStatus.AUTH_REQUIRED),
     ]
-    table = render_pool_table(pool, _LIST_COLUMNS, _LIST_FLOORS, budget=80)
+    # budget=50 is the narrowest setting where the Status column is squeezed:
+    # the content widths (ID 9 + Name 8 + Status 16 + Last Used 16 = 49) plus
+    # the 6 columns of inter-column padding exceed the 44-column gapless
+    # budget, so the widest columns shrink toward their floors. The Status
+    # floor of 16 keeps the full "auth_required" cell; the pre-fix floor of 8
+    # would truncate it.
+    table = render_pool_table(pool, _LIST_COLUMNS, _LIST_FLOORS, budget=50)
     assert _LIST_FLOORS[2] == 16, "the Status floor is pinned at 16"
 
     lines = table.splitlines()
-    assert max(display_width(line) for line in lines) <= 80, "the table must stay within the 80-column budget"
+
+    assert max(display_width(line) for line in lines) <= 50, "the table must stay within the 50-column budget"
 
     auth_required = SessionStatus.AUTH_REQUIRED.value
     header = lines[1]
@@ -215,7 +224,7 @@ def test_list_renders_full_auth_required_cells_at_80_columns(capsys) -> None:
     assert len(body) == 3, f"one rendered row per pool session, got {len(body)}"
     for row in body:
         assert auth_required in row, f"the full auth_required verdict must render in full, got {row!r}"
-        assert "…" not in row, f"no cell may truncate at the floor, got {row!r}"
+        assert "..." not in row, f"no cell may truncate at the floor, got {row!r}"
 
 
 # ─── remove ─────────────────────────────────────────────────────────────────
@@ -288,6 +297,51 @@ def test_remove_fails_when_the_aggregate_answers_with_an_error(capsys) -> None:
     aggregate.execute = _raise_error
     assert cmd_remove(aggregate, args) == 1
     assert "[ERROR]" in capsys.readouterr().err
+
+
+def test_remove_tty_declined_aborts_and_keeps_the_session(capsys) -> None:
+    """A declined [y/N] on an interactive TTY aborts with exit 0 and keeps the
+    session; the prompt and the abort line land on stderr (UX-4-003)."""
+    aggregate = InMemorySessions([_info("session_1", "default", path="/tmp/prof-1")])
+    args = _args("remove", session_id="default", force=False, keep_profile=False)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", return_value="n"),
+    ):
+        assert cmd_remove(aggregate, args) == 0
+    captured = capsys.readouterr()
+    assert "Aborted" in captured.err
+    assert len(aggregate.pool) == 1, "the session must be kept on a declined prompt"
+    # The prompt itself must reach stderr, not stdout.
+    assert "Remove session" in captured.err
+
+
+def test_remove_tty_accepted_deletes_the_session(capsys) -> None:
+    """An accepted [y/N] on an interactive TTY proceeds with the delete."""
+    aggregate = InMemorySessions([_info("session_1", "default", path="/tmp/prof-1")])
+    args = _args("remove", session_id="default", force=False, keep_profile=False)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", return_value="y"),
+    ):
+        assert cmd_remove(aggregate, args) == 0
+    captured = capsys.readouterr()
+    assert "Removed session 'default' from the pool" in captured.out
+    assert aggregate.pool == []
+
+
+def test_remove_tty_eof_aborts(capsys) -> None:
+    """A closed stdin (EOF) on the confirmation aborts instead of raising."""
+    aggregate = InMemorySessions([_info("session_1", "default", path="/tmp/prof-1")])
+    args = _args("remove", session_id="default", force=False, keep_profile=False)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=EOFError),
+    ):
+        assert cmd_remove(aggregate, args) == 0
+    captured = capsys.readouterr()
+    assert "Aborted" in captured.err
+    assert len(aggregate.pool) == 1, "the session must be kept on an EOF abort"
 
 
 # ─── health ─────────────────────────────────────────────────────────────────

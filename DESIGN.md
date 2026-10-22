@@ -111,7 +111,7 @@ The visual style blends **cyber-technical minimalism** with refined **tactile te
 
 ## Colors
 
-The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
+The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css_view.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
 
 | Token | Hex | Approx ANSI | Usage |
 |-------|-----|-------------|-------|

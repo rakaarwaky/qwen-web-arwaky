@@ -677,12 +677,10 @@ RATE_LIMIT_PATTERNS: list[str] = [
     r"usage\s+limit",
 ]
 
-# ─── Cross-surface status glyphs (UX-3-002) ─────────────────────────────────
-#: Canonical status glyph vocabulary shared by the CLI and TUI surfaces:
-#: ``✓ / ✗ / ⚠`` for results, ``● / ◐ / ○`` for health, ``…`` for pending.
-#: Declared in the shared Taxonomy layer so both surfaces import the same
-#: object — a per-surface duplicated literal was the bug this replaces (the
-#: TUI shipped ``✕`` while the CLI shipped ``✗``).
+# ─── Cross-surface status glyphs ────────────────────────────────────────────
+#: Canonical status glyph vocabulary: ``✓ / ✗ / ⚠`` for results,
+#: ``● / ◐ / ○`` for health, ``...`` for pending. Declared once in the
+#: shared Taxonomy layer so both surfaces import the same object.
 STATUS_GLYPHS: dict[str, str] = {
     "ok": "✓",
     "fail": "✗",

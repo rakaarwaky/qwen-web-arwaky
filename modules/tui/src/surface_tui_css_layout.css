@@ -10,6 +10,22 @@
     overflow-y: auto;
 }
 
+/* The Sessions pane: a scrolling body above a docked key-hint strip. The
+   strip is docked here (not on the screen) so it clears the app-level nav
+   dock while the metric card and add row scroll away on a short terminal. */
+#session-pane {
+    height: 1fr;
+    width: 100%;
+    background: $bg_base;
+}
+
+#session-pane .screen-body {
+    /* The docked strip costs one row; the band gives it up so the strip
+       never overlaps the pane's last content row. */
+    height: 1fr;
+    overflow-y: auto;
+}
+
 /* Vertical's default is height: 1fr with overflow hidden, so a card would take
    an equal share of the pane and clip everything past its first rows. Cards
    size to their content and let .screen-body scroll instead. */
@@ -205,16 +221,16 @@
 
 /* The session table: one static head row (NAME / STATUS / ACTIONS) and one
    row per account. Every row carries the same three cells plus the three
-   action buttons, so the columns line up because the widths are fixed. */
-/* The session table fills the pane's remaining height so there is no dead
-   space below the last row: the card owns 1fr and the row list scrolls. */
+   action buttons, so the columns line up because the widths are fixed.
+   The card sizes to its content: the pane's remaining height belongs to
+   the scroll band, and the key-hint strip is docked below it. */
 #session-table {
-    height: 1fr;
-    min-height: 4;
+    height: auto;
 }
 
 #session-rows {
-    height: 1fr;
+    height: auto;
+    max-height: 20;
     overflow-y: auto;
 }
 
@@ -227,16 +243,18 @@
     content-align: center middle;
 }
 
-/* UX-1-002: the one-line key-hint strip under the session table. It is a
-   sibling of #session-rows inside the #session-table card, so a row repaint
-   must never remove it: it stays visible on an empty pool and with ≥1
-   session. */
+/* UX-1-002: the one-line key-hint strip under the session table, docked to
+   the pane's bottom edge. Docking — not flow — is what keeps it visible on
+   a short terminal: the metric card and add row are fixed-height, so a
+   flow-positioned strip is pushed under the app's nav dock below ~30 rows. */
 .session-key-hint {
+    dock: bottom;
     width: 100%;
     height: 1;
     color: $status_muted;
     text-style: italic;
     padding: 0 1;
+    background: $bg_base;
 }
 
 .session-row {

@@ -29,10 +29,13 @@ controlling TTY.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+from textual.worker import WorkerFailed
 
 from modules.tui.src.surface_tui_utils_component import (
     _CANONICAL_FAIL_GLYPH,
@@ -56,6 +59,11 @@ def _make_app() -> Any:
         updater=MagicMock(),
         job_storage=MagicMock(),
     )
+
+
+class _ScreenSizeStub:
+    def __init__(self, width: int) -> None:
+        self.width = width
 
 
 class TestCanonicalFailureGlyph:
@@ -292,7 +300,7 @@ class TestLoginFailureRetryGuidance:
                 with patch.object(app, "notify"):
                     worker = app._run_add_session_worker("work")
                     if worker is not None:
-                        with contextlib_suppress():
+                        with contextlib.suppress(WorkerFailed):
                             await worker.wait()
 
         asyncio.run(_run())
@@ -310,7 +318,7 @@ class TestLoginFailureRetryGuidance:
                 with patch.object(app, "notify"):
                     worker = app._run_add_session_worker("work")
                     if worker is not None:
-                        with contextlib_suppress():
+                        with contextlib.suppress(WorkerFailed):
                             await worker.wait()
 
         asyncio.run(_run())
@@ -375,19 +383,6 @@ class TestSlotCarouselTiers:
         asyncio.run(_run())
 
 
-class _ScreenSizeStub:
-    """A ``screen.size`` stand-in carrying one injected width budget."""
-
-    def __init__(self, width: int) -> None:
-        self.width = width
-
-
-def contextlib_suppress():
-    import contextlib
-
-    return contextlib.suppress(Exception)
-
-
 class TestSessionKeyHintStrip:
     """UX-1-002: the key-hint strip under the session table."""
 
@@ -418,6 +413,26 @@ class TestSessionKeyHintStrip:
                 hints = list(app.query(".session-key-hint"))
                 assert len(hints) == 1, "the strip must not be duplicated or removed by a repaint"
                 assert isinstance(hints[0], Label)
+
+        asyncio.run(_run())
+
+    def test_the_strip_is_painted_on_a_short_terminal(self) -> None:
+        from textual.widgets import Label, TabbedContent
+
+        app = _make_app()
+
+        async def _run() -> None:
+            async with app.run_test(size=(80, 24)) as pilot:
+                # Switch to the Sessions pane where the key-hint strip lives.
+                app.query_one(TabbedContent).active = "tab-sessions"
+                await pilot.pause(0.2)
+                strips = list(app.screen._compositor.render_strips())
+                rendered = "".join(s.text for s in strips)
+                assert "select row" in rendered, (
+                    f"the key-hint strip must be painted on an 80x24 terminal, got strips: {[s.text for s in strips]}"
+                )
+                hint = app.query_one(".session-key-hint", Label)
+                assert hint.region.height > 0, "the hint must have a non-zero rendered region"
 
         asyncio.run(_run())
 
@@ -472,7 +487,7 @@ class TestSwarmStartLabel:
                 with patch.object(app, "call_from_thread", _sync_call_from_thread(app)):
                     worker = app._swarm_worker(Path("/in"))
                     if worker is not None:
-                        with contextlib_suppress():
+                        with contextlib.suppress(WorkerFailed):
                             await worker.wait()
                 label = app.query_one("#btn-swarm-start", Button)
                 assert str(label.label) == "↻ RESTART", f"got {label.label!r}"

@@ -247,9 +247,10 @@ class _TuiUtilsMixin:
         terminal still renders the wide (monochrome-friendly) glyphs; only
         the locale gate applies.
 
-        The gate treats the ``C`` / ``POSIX`` locale family (codeset
-        ``ANSI_X3.4-1968``) as forced-ascii — their names carry no
-        ``ascii`` substring, so they must be matched explicitly.
+        The gate matches the ``C`` / ``POSIX`` locale names exactly (they
+        carry no ``ascii`` substring) and any locale whose name contains
+        ``ascii`` (case-insensitive), so ``C``, ``POSIX``, and ``en_US.ASCII``
+        all fall back while ``en_US.UTF-8`` keeps the wide set.
         """
         locale = os.environ.get("LC_ALL") or os.environ.get("LANG", "")
         if locale in {"C", "POSIX"}:
@@ -440,7 +441,8 @@ class _TuiUtilsMixin:
     _CHIP_COLUMNS = 12
 
     # UX-2-002: the minimal tier drops the word and the beacon — one bare
-    # number per chip — whose floor is NUM_SLOTS * _MINIMAL_CHIP_COLUMNS.
+    # number per chip. 4 = the bare 2-digit number plus the chip's 1-column
+    # borders on a side.
     _MINIMAL_CHIP_COLUMNS = 4
 
     def _refresh_slot_chips(self) -> None:
@@ -450,9 +452,7 @@ class _TuiUtilsMixin:
         give way when the row is narrow: below the width a full "● SLOT 07"
         needs, the pill keeps its status dot and number and drops the word, so
         all ten slots stay readable at any size. Below the ~NUM_SLOTS * 4
-        column floor the minimal tier renders one bare number per chip — an
-        honest floor rather than a claim ten full pills fit a 40-column
-        terminal.
+        column floor the minimal tier renders one bare number per chip.
 
         The width comes from the screen, not the carousel's region: a pane
         that is not on screen has no region yet, and its pills still need the

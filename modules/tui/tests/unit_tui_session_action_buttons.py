@@ -241,9 +241,19 @@ class TestDeleteSessionWorker:
         mock_manager = MagicMock()
         app._session_manager = mock_manager
 
+        # Seed the cache with a real entry so the declined-delete assertion is
+        # not vacuous: the worker must not remove the entry when the answer
+        # is False.
+        session_info = MagicMock()
+        session_info.name = "arwaky007"
+        session_info.session_id = "session_1"
+        session_info.path = MagicMock()
+        app._sessions_cache = [session_info]
+        app._sessions_loaded_once = True
+        app._last_delete_name = "arwaky007"
+
         async def _run() -> None:
             async with app.run_test(size=(150, 44)):
-                app._sessions_cache = []
                 _sync_cft(app)
                 worker = app._run_delete_session(False)
                 from textual.worker import WorkerFailed

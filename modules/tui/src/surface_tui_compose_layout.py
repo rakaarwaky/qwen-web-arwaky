@@ -174,7 +174,17 @@ class _TuiComposeMixin:
                         )
 
             # ─── Screen 2: Login / Session Manager ───────────────
-            with TabPane("Sessions", id="tab-sessions"), Vertical(classes="screen-body"):
+            # The pane is one outer container (#session-pane) that owns the
+            # scroll band, plus a docked key-hint strip. Docking the strip to
+            # the pane (not the screen) keeps it clear of the app-level nav
+            # dock while the band scrolls — on a short terminal the strip
+            # stays pinned to the pane's bottom edge instead of being pushed
+            # under the nav dock by the fixed-height metric card.
+            with (
+                TabPane("Sessions", id="tab-sessions"),
+                Vertical(id="session-pane"),
+                Vertical(classes="screen-body"),
+            ):
                 with Horizontal(classes="app-brand-row"):
                     yield Label(">_ QWEN-CLI", classes="app-brand-title")
                     yield Label(f"v{get_package_version()}", classes="app-brand-version")
@@ -218,14 +228,15 @@ class _TuiComposeMixin:
                             SESSION_EMPTY_HINT,
                             classes="session-empty",
                         )
-                    # UX-1-002: a dim one-line key-hint strip under the table.
-                    # It is a sibling of #session-rows, so a row repaint must
-                    # not remove it — it stays visible on an empty pool and
-                    # with ≥1 session.
-                    yield Label(
-                        "↑/↓ select row · A add · R refresh · E health · D delete · ?: all shortcuts",
-                        classes="session-key-hint",
-                    )
+                # UX-1-002: a dim one-line key-hint strip under the table. It
+                # is docked to the pane's bottom edge so it stays visible at
+                # every terminal height — the metric card and add row above
+                # are fixed-height, so a strip in the flow would be pushed
+                # under the app's nav dock on a short terminal.
+                yield Label(
+                    "↑/↓ select row · A add · R refresh · E health · D delete · ?: all shortcuts",
+                    classes="session-key-hint",
+                )
 
             # ─── Screen 3: Chat (per-slot console) ─────────────────
             # The mockup's chat console carries no configuration form: it is a

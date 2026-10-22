@@ -35,9 +35,8 @@ from modules.shared.src.session.taxonomy_session_vo import RotatorRequest
 from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmRequest
 from modules.tui.src.surface_tui_css_view import THEME
 
-# UX-3-002: the tab-title result marker must match the canonical failure
-# glyph the CLI declares in STATUS_GLYPHS (imported through the utils mixin
-# so the two surfaces never disagree).
+# The tab-title marker must be the canonical glyph from STATUS_GLYPHS so
+# both surfaces agree.
 from modules.tui.src.surface_tui_utils_component import _CANONICAL_FAIL_GLYPH
 
 # A badge write can land while the app is tearing down: the worker thread's

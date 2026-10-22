@@ -231,9 +231,7 @@
     color: $status_muted;
 }
 
-/* Stop / Restart action deck under the log card. UX-5-003: .btn-restart
-   styles the primary CTA in both its cold-start (▶ START) and registered-run
-   (↻ RESTART) states — the label, not the style, carries the run state. */
+/* Stop / Restart action deck under the log card. */
 .swarm-action-deck {
     layout: horizontal;
     width: 100%;
