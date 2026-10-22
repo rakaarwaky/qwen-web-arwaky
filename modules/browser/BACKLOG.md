@@ -15,7 +15,7 @@ Last Updated: 2026-10-05
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|---|
+|---|---:|---|---|---|---|
 | BROWSER-01 | P0 | Ready | None | Add an acceptance scenario proving a PATH-discovered browser binary that fails the ownership check is refused even when no managed build is present. | 2026-10-05 |
 | BROWSER-02 | P1 | Ready | None | Map every navigation retry path to a pinned DOM selector so a selector drift fails the browser suite, not a live run. | 2026-10-05 |
 | BROWSER-03 | P2 | Ready | `SESSION-01` | Specify session-directory permission repair for a host that launches the context under a different user. | 2026-10-05 |

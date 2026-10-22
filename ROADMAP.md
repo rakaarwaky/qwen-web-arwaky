@@ -44,8 +44,8 @@ State: **In Review**. Last Updated: **2026-09-24**.
 Dates are target windows, not evidence that work shipped.
 
 | Phase | Target window | Exit gate | Rows | State |
-|---|---|---|---|---|---|
-| v6.4 baseline | 2026-09-21 | GitHub release is published and source baseline is identifiable. | — | Released | Released |
+|---|---|---|---|---|
+| v6.4 baseline | 2026-09-21 | GitHub release is published and source baseline is identifiable. | — | Released |
 | Documentation governance baseline | 2026-09-24–2026-09-25 | Root roadmap exists; every feature has an FRD/backlog pair and is indexed. | `WS-01` | In Review |
 | Backlog and infrastructure convergence | 2026-09-26–2026-10-02 | Duplicate benchmark work is resolved; open findings are revalidated and assigned or deferred with reasons. | `WS-02`, `WS-04` | Ready |
 | Reliability qualification | 2026-10-03–2026-10-09 | Single-attachment and 10-role swarm paths pass authenticated headed QA without aggressive resend or bot-verification loops. | `WS-03`, `CORE-01` | Ready |
@@ -66,7 +66,7 @@ This table tracks branches with current roadmap relevance; the existence of an o
 Only work spanning multiple features or repository infrastructure belongs here.
 
 | ID | Item | Priority | State | Owner | Target | Actual Condition | Next | Updated |
-|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|
 | WS-01 | Establish roadmap and paired feature backlogs | P0 | In Review | — | 2026-09-25 | Commit `4d4e2c0` adds the root roadmap and three paired feature backlogs; the documentation contract check passed, and PR [#432](https://github.com/rakaarwaky/qwen-web-arwaky/pull/432) is open. Drift finding #386 remains in the revalidation scope. | Address review, rerun the documentation contract check on the final commit, and record merge evidence. | 2026-09-24 |
 | WS-02 | Converge benchmark and test layout | P1 | In Review | — | 2026-10-02 | PR [#428](https://github.com/rakaarwaky/qwen-web-arwaky/pull/428) at `fb13aa9` passes tests/self-lint but fails lint/mypy; overlapping PR [#426](https://github.com/rakaarwaky/qwen-web-arwaky/pull/426) remains open after #427 merged. | Select the surviving layout, fix its required checks, and close superseded work. | 2026-09-24 |
 | WS-03 | Qualify attachment, swarm, and release reliability end to end | P0 | QA | — | 2026-10-09 | Patient-send fixes from PRs #423/#424 are in the `d8a9b60` baseline, but the authenticated manual scenarios in [`ISSUE.md`](ISSUE.md) remain unchecked and stakeholder walkthrough finding #321 remains open. | Re-run one attachment and a 10-role headed swarm; record command, commit, outcomes, and challenge behavior. | 2026-09-24 |
@@ -77,7 +77,7 @@ Only work spanning multiple features or repository infrastructure belongs here.
 Every feature directory is indexed here; implementation detail remains in its backlog. Per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and its `modules/shared/templates` role-template package data, so neither is a feature directory.
 
 | ID | Item | Priority | Spec | Backlog | State | Owner | Next | Updated |
-|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|
 | `modules/prompt` | Prompt execution and attachment | P0 | [FRD](modules/prompt/FRD.md) | [BACKLOG](modules/prompt/BACKLOG.md) | QA | — | `PROMPT-01` | 2026-09-24 |
 | `modules/session` | Session pool and rotation | P0 | [FRD](modules/session/FRD.md) | [BACKLOG](modules/session/BACKLOG.md) | In Review | — | `SESSION-02` | 2026-10-18 |
 | `modules/jobs` | Async job and folder compilation | P1 | [FRD](modules/jobs/FRD.md) | [BACKLOG](modules/jobs/BACKLOG.md) | Refinement | — | `JOB-01` | 2026-09-24 |

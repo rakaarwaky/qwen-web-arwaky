@@ -15,7 +15,7 @@ Last Updated: 2026-10-22
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|---|
+|---|---:|---|---|---|---|
 | PROMPT-01 | P1 | Ready | `CONFIG-02` | Retry budget stays with `CONFIG-02`; the stall-ceiling interaction is pinned by `unit_transcript_selector_regression.py` and `unit_agent_shared_flow_retry.py` (`test_dispatch_does_not_retry_a_stalled_stream`). | 2026-10-22 |
 | PROMPT-02 | P1 | Done | None | None — covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. | 2026-10-22 |
 | PROMPT-03 | P2 | Done | `SHARED-02` | None — the pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. | 2026-10-22 |
