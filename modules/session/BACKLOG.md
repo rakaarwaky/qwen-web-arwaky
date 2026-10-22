@@ -2,7 +2,7 @@
 
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md).
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-18
 
 ## Current Condition
@@ -14,11 +14,11 @@ Last Updated: 2026-10-18
 
 ## Backlog
 
-| ID | Priority | State | Health | Dependencies | Next Action | Updated |
+| ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| SESSION-01 | P0 | Done | On Track | `SHARED-01` | Acceptance test proving a backup write failure refuses the deletion and leaves the master profile in place — landed in `modules/session/tests/unit_capabilities_session_manager.py`. | 2026-10-18 |
-| SESSION-02 | P1 | Done | On Track | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). | 2026-10-18 |
-| SESSION-03 | P2 | Ready | On Track | `BROWSER-03` | Specify the session-directory permission repair when the browser launches the context under a different user. | 2026-10-05 |
+| SESSION-01 | P0 | Done | `SHARED-01` | Acceptance test proving a backup write failure refuses the deletion and leaves the master profile in place — landed in `modules/session/tests/unit_capabilities_session_manager.py`. | 2026-10-18 |
+| SESSION-02 | P1 | Done | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). | 2026-10-18 |
+| SESSION-03 | P2 | Ready | `BROWSER-03` | Specify the session-directory permission repair when the browser launches the context under a different user. | 2026-10-05 |
 
 ## Scenario Evidence
 
