@@ -36,6 +36,7 @@ def test_dogfood_counters_persist_to_the_metrics_file(tmp_path: Path) -> None:
     path = tmp_path / "metrics.json"
     metrics = MetricsCounter(metrics_path=path)
     metrics.increment("dogfood_persisted")
+    metrics.flush()
 
     persisted = json.loads(path.read_text(encoding="utf-8"))
     assert persisted["counters"]["dogfood_persisted"] == 1
@@ -59,3 +60,25 @@ def test_dogfood_an_unknown_failure_category_is_ignored(tmp_path: Path) -> None:
     metrics.record_failure("SomethingNobodyCategorised")
 
     assert metrics.failure_counts() == {}
+
+
+def test_lazy_persist_until_flush(tmp_path: Path) -> None:
+    path = tmp_path / "metrics_lazy.json"
+    metrics = MetricsCounter(metrics_path=path)
+    metrics.increment("lazy_key")
+    assert not path.exists()
+    metrics.flush()
+    assert path.exists()
+    import json
+
+    data = json.loads(path.read_text())
+    assert data["counters"]["lazy_key"] == 1
+
+
+def test_snapshot_flushes_dirty_file(tmp_path: Path) -> None:
+    path = tmp_path / "metrics_snap.json"
+    metrics = MetricsCounter(metrics_path=path)
+    metrics.increment("snap_key")
+    snap = metrics.snapshot()
+    assert snap.counters["snap_key"] == 1
+    assert path.exists()
