@@ -37,6 +37,7 @@ class _TuiEventsMixin:
     _show_slot_log: Any
     _open_picker: Any
     _open_attachment_picker: Any
+    _open_prompt_file_picker: Any
     _toggle_slot_config: Any
     _apply_template_chip: Any
     _run_slot: Any
@@ -113,7 +114,10 @@ class _TuiEventsMixin:
         # hidden until a pill asks for it, so each pill reveals it first.
         if button_id.startswith("btn-pill-prompt-"):
             slot_id = int(button_id.removeprefix("btn-pill-prompt-"))
-            self._open_picker(f"composer-{slot_id}")
+            # FE-3-01: the Prompt pill must not write a path into the composer.
+            # A path there is read as the prompt source, so Send would dispatch
+            # the path string instead of the file's contents.
+            self._open_prompt_file_picker(slot_id)
             return
         if button_id.startswith("btn-pill-attach-"):
             slot_id = int(button_id.removeprefix("btn-pill-attach-"))

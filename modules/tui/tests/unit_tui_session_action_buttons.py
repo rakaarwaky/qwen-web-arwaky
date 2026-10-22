@@ -187,17 +187,9 @@ class TestDeleteSessionWorker:
     remove the pool entry, then delete the profile via the manager."""
 
     def test_delete_removes_pool_entry_and_profile(self) -> None:
-        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+        from modules.tui.tests.fixture_tui_app import make_app
 
-        app = QwenTuiApp(
-            workspace=MagicMock(),
-            prompt=MagicMock(),
-            slot_config=MagicMock(),
-            session=MagicMock(),
-            jobs=MagicMock(),
-            updater=MagicMock(),
-            job_storage=MagicMock(),
-        )
+        app = make_app()
 
         mock_manager = MagicMock()
         mock_manager.remove_session.return_value = True
@@ -211,7 +203,6 @@ class TestDeleteSessionWorker:
         session_info.session_id = "session_1"
         session_info.path = MagicMock()
         app._sessions_cache = [session_info]
-        app._last_delete_name = "arwaky007"
         app._sessions_loaded_once = True
 
         async def _run() -> None:
@@ -219,7 +210,7 @@ class TestDeleteSessionWorker:
                 from textual.worker import WorkerFailed
 
                 _sync_cft(app)
-                worker = app._run_delete_session(True)
+                worker = app._run_delete_session("arwaky007")
                 with contextlib.suppress(WorkerFailed):
                     if worker is not None:
                         await worker.wait()
@@ -229,29 +220,21 @@ class TestDeleteSessionWorker:
         asyncio.run(_run())
 
     def test_delete_declined_is_noop(self) -> None:
-        from modules.tui.src.surface_tui_app_screen import QwenTuiApp
+        from modules.tui.tests.fixture_tui_app import make_app
 
-        app = QwenTuiApp(
-            workspace=MagicMock(),
-            prompt=MagicMock(),
-            slot_config=MagicMock(),
-            session=MagicMock(),
-            jobs=MagicMock(),
-            updater=MagicMock(),
-            job_storage=MagicMock(),
-        )
+        app = make_app()
         mock_manager = MagicMock()
         app._session_manager = mock_manager
 
         async def _run() -> None:
-            async with app.run_test(size=(150, 44)):
-                from textual.worker import WorkerFailed
+            async with app.run_test(size=(150, 44)) as pilot:
+                # Declining the confirm modal must not start a delete worker.
+                app._confirm_delete_session("arwaky007")
+                await pilot.pause(0.1)
+                from textual.widgets import Button
 
-                _sync_cft(app)
-                worker = app._run_delete_session(False)
-                with contextlib.suppress(WorkerFailed):
-                    if worker is not None:
-                        await worker.wait()
+                app.screen.query_one("#btn-cancel", Button).press()
+                await pilot.pause(0.2)
                 mock_manager.remove_session.assert_not_called()
                 mock_manager.delete_session_profile.assert_not_called()
 
@@ -385,13 +368,13 @@ class TestSessionsPaneLayout:
 
 
 def _sync_cft(app: Any) -> None:
-    """Patch call_from_thread so it invokes the callback synchronously."""
+    """Point call_from_thread at a synchronous callback for the test."""
 
     def _cft(callback, *args, **kwargs):
         callback(*args, **kwargs)
         return None
 
-    patch.object(app, "call_from_thread", _cft).start()
+    app.call_from_thread = _cft
 
 
 __all__ = [
