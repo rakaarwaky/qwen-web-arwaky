@@ -96,6 +96,7 @@ def test_failure_counts_survive_a_restart(tmp_path: Path) -> None:
     mc1 = MetricsCounter(metrics_path=path)
     mc1.record_failure("network")
     mc1.record_failure("network")
+    mc1.flush()
     mc2 = MetricsCounter(metrics_path=path)
     assert mc2.failure_counts().get("network", 0) == 2
 

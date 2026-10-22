@@ -2,7 +2,7 @@
 
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md).
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-05
 
 ## Current Condition
@@ -14,11 +14,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Health | Dependencies | Next Action | Updated |
+| ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| LOGGING-01 | P1 | Ready | On Track | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-05 |
-| LOGGING-02 | P1 | Ready | At Risk | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 |
-| LOGGING-03 | P2 | Done | Healthy | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 |
+| LOGGING-01 | P1 | Ready | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-05 |
+| LOGGING-02 | P1 | Ready | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 |
+| LOGGING-03 | P2 | Done | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 |
 
 ## Scenario Evidence
 
