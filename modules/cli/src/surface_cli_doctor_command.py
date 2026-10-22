@@ -360,10 +360,13 @@ def run_doctor_checks(
 ) -> list[dict[str, Any]]:
     """Run every diagnostic check and return the records as plain dictionaries.
 
-    The library form of ``doctor``: the post-update smoke gate injected by the
-    Root layer calls the same function, so the interactive report and the
-    postflight gate cannot disagree (issue #294). The session aggregate is
-    required: the pool is doctor's single source of truth for session state.
+    The library form of ``doctor``: the CLI ``build_smoke_gate`` calls the
+    same function, so the interactive report and the CLI smoke gate cannot
+    disagree (issue #294). Root injects the Capabilities health probe
+    (``capabilities_config_health_probe``) as the update pipeline's gate,
+    and that probe runs the same non-interactive checks at gate-execution
+    time. The session aggregate is required: the pool is doctor's single
+    source of truth for session state.
     """
     checks: list[dict[str, Any]] = [
         _check_python(),

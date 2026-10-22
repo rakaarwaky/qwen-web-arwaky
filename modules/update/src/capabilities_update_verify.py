@@ -254,8 +254,9 @@ class UpdateVerifyCapability(IUpdateVerifyProtocol):
         """Run the injected functional smoke gate and normalize its results.
 
         The gate yields ``(name, passed, detail)`` triples (see
-        ``utility_core_doctor.build_smoke_gate``); failures of the gate itself
-        become a failing health check so the update pipeline still rolls back.
+        ``capabilities_config_health_probe.build_smoke_gate``); failures of
+        the gate itself become a failing health check so the update pipeline
+        still rolls back.
         """
         try:
             gate_results = self._smoke_gate()
