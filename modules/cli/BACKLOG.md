@@ -14,9 +14,9 @@ Last Updated: 2026-10-21
 
 ## Backlog
 
-| ID | Item | Priority | State | Owner | Actual Condition | Next | Updated |
-|---|---|---|---|---|---|---|---|
-| CLIC-01 | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md` | P2 | Ready | — | TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-18 |
+| ID | Priority | State | Dependencies | Next Action | Updated |
+|---|---|---|---|---|---|
+| CLIC-01 | P2 | Ready | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md`. TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-18 |
 
 ## Scenario Evidence
 

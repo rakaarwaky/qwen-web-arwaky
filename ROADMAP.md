@@ -76,19 +76,19 @@ Only work spanning multiple features or repository infrastructure belongs here.
 
 Every feature directory is indexed here; implementation detail remains in its backlog. Per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and its `modules/shared/templates` role-template package data, so neither is a feature directory.
 
-| ID | Item | Priority | Spec | Backlog | State | Owner | Next | Updated |
-|---|---|---|---|---|---|---|---|---|
-| `modules/prompt` | Prompt execution and attachment | P0 | [FRD](modules/prompt/FRD.md) | [BACKLOG](modules/prompt/BACKLOG.md) | QA | — | `PROMPT-01` | 2026-09-24 |
-| `modules/session` | Session pool and rotation | P0 | [FRD](modules/session/FRD.md) | [BACKLOG](modules/session/BACKLOG.md) | In Review | — | `SESSION-02` | 2026-10-18 |
-| `modules/jobs` | Async job and folder compilation | P1 | [FRD](modules/jobs/FRD.md) | [BACKLOG](modules/jobs/BACKLOG.md) | Refinement | — | `JOB-01` | 2026-09-24 |
-| `modules/swarm` | Swarm execution | P1 | [FRD](modules/swarm/FRD.md) | [BACKLOG](modules/swarm/BACKLOG.md) | Refinement | — | `SWARM-01` | 2026-09-24 |
-| `modules/logging` | Observability and metrics | P1 | [FRD](modules/logging/FRD.md) | [BACKLOG](modules/logging/BACKLOG.md) | Refinement | — | `LOG-01` | 2026-09-24 |
-| `modules/browser` | Browser adapter | P0 | [FRD](modules/browser/FRD.md) | [BACKLOG](modules/browser/BACKLOG.md) | Refinement | — | `BROWSER-01` | 2026-09-24 |
-| `modules/config` | Configuration | P1 | [FRD](modules/config/FRD.md) | [BACKLOG](modules/config/BACKLOG.md) | Refinement | — | `CFG-01` | 2026-09-24 |
-| `modules/update` | Product update | P2 | [FRD](modules/update/FRD.md) | [BACKLOG](modules/update/BACKLOG.md) | Deferred | — | `UPDATE-01` | 2026-09-24 |
-| `modules/cli` | CLI and Textual TUI | P1 | [DESIGN](modules/cli/DESIGN.md) | [BACKLOG](modules/cli/BACKLOG.md) | Refinement | — | `CLI-01` | 2026-09-24 |
-| `modules/tui` | Textual TUI | P1 | [DESIGN](modules/tui/DESIGN.md) | [BACKLOG](modules/tui/BACKLOG.md) | Refinement | — | `TUI-01` | 2026-09-24 |
-| `modules/mcp` | MCP Server Surface | P1 | [DESIGN](modules/mcp/DESIGN.md) | [BACKLOG](modules/mcp/BACKLOG.md) | Refinement | — | `MCP-01` | 2026-09-24 |
+| ID | Feature | Priority | State | Dependencies | Next Action | Updated |
+|---|---|---|---|---|---|---|
+| `modules/prompt` | Prompt execution and attachment | P0 | QA | Spec: [FRD](modules/prompt/FRD.md) · Backlog: [BACKLOG](modules/prompt/BACKLOG.md) | `PROMPT-01` | 2026-09-24 |
+| `modules/session` | Session pool and rotation | P0 | In Review | Spec: [FRD](modules/session/FRD.md) · Backlog: [BACKLOG](modules/session/BACKLOG.md) | `SESSION-02` | 2026-10-18 |
+| `modules/jobs` | Async job and folder compilation | P1 | Refinement | Spec: [FRD](modules/jobs/FRD.md) · Backlog: [BACKLOG](modules/jobs/BACKLOG.md) | `JOB-01` | 2026-09-24 |
+| `modules/swarm` | Swarm execution | P1 | Refinement | Spec: [FRD](modules/swarm/FRD.md) · Backlog: [BACKLOG](modules/swarm/BACKLOG.md) | `SWARM-01` | 2026-09-24 |
+| `modules/logging` | Observability and metrics | P1 | Refinement | Spec: [FRD](modules/logging/FRD.md) · Backlog: [BACKLOG](modules/logging/BACKLOG.md) | `LOG-01` | 2026-09-24 |
+| `modules/browser` | Browser adapter | P0 | Refinement | Spec: [FRD](modules/browser/FRD.md) · Backlog: [BACKLOG](modules/browser/BACKLOG.md) | `BROWSER-01` | 2026-09-24 |
+| `modules/config` | Configuration | P1 | Refinement | Spec: [FRD](modules/config/FRD.md) · Backlog: [BACKLOG](modules/config/BACKLOG.md) | `CFG-01` | 2026-09-24 |
+| `modules/update` | Product update | P2 | Deferred | Spec: [FRD](modules/update/FRD.md) · Backlog: [BACKLOG](modules/update/BACKLOG.md) | `UPDATE-01` | 2026-09-24 |
+| `modules/cli` | CLI and Textual TUI | P1 | Refinement | Spec: [DESIGN](modules/cli/DESIGN.md) · Backlog: [BACKLOG](modules/cli/BACKLOG.md) | `CLI-01` | 2026-09-24 |
+| `modules/tui` | Textual TUI | P1 | Refinement | Spec: [DESIGN](modules/tui/DESIGN.md) · Backlog: [BACKLOG](modules/tui/BACKLOG.md) | `TUI-01` | 2026-09-24 |
+| `modules/mcp` | MCP Server Surface | P1 | Refinement | Spec: [DESIGN](modules/mcp/DESIGN.md) · Backlog: [BACKLOG](modules/mcp/BACKLOG.md) | `MCP-01` | 2026-09-24 |
 
 Note: `modules/core` was removed during the AES module split. Its feature rows are now owned by `modules/prompt` and `modules/session`; the legacy `CORE-*` identifiers in the risk register map to `PROMPT-*` and `SESSION-*` respectively.
 
