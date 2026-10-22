@@ -15,7 +15,7 @@ Last Updated: 2026-10-05
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|---|
+|---|---:|---|---|---|---|
 | CONFIG-01 | P1 | Ready | None | Add an acceptance scenario proving a config with several invalid fields reports every one in one call. | 2026-10-05 |
 | CONFIG-02 | P1 | Done | `PROMPT-01` | None — `timeout_sec` is the absolute per-attempt response ceiling (FR-PROMPT-006), pinned with PROMPT-01 on 2026-10-22. | 2026-10-22 |
 | CONFIG-03 | P2 | Ready | None | Specify the capacity ceiling behavior on a host that reports no usable memory. | 2026-10-05 |
