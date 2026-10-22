@@ -32,6 +32,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     RunId,
     TimeoutSec,
 )
+from modules.shared.src.common.utility_core_path import cleanup_empty_dirs
 from modules.shared.src.common.utility_dom_helper import setup_lifecycle_state
 from modules.shared.src.common.utility_error_mapping import to_error_response
 from modules.shared.src.common.utility_io_writer import save_orchestrator_output
@@ -159,6 +160,10 @@ class DirectPromptAdapter(IDirectPromptProtocol):
                 p = Path(tmp_path)
                 if p.exists():
                     p.unlink()
+                # Prune any empty subdirectories left under the temp dir by a
+                # failed or interrupted run (the scanner only removes empty
+                # dirs, so non-empty user files in the temp dir are safe).
+                cleanup_empty_dirs(p.parent, root_limit=Path(tempfile.gettempdir()))
         except Exception as exc:
             return PromptResponse(response_text=to_error_response(exc), extraction_verdict=None)
         finally:

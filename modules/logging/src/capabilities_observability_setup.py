@@ -45,10 +45,10 @@ with suppress(ImportError):
     OTelTracerProvider = TracerProvider
     OTelBatchSpanProcessor = BatchSpanProcessor
 
-from modules.shared.src.common import utility_core_exit
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_JOBS_DIR
 from modules.shared.src.common.taxonomy_core_error import ErrorCategory
 from modules.shared.src.common.taxonomy_core_vo import ExitCode, JobName, RunId, ServiceName
+from modules.shared.src.common.utility_core_exit import exit_code_for
 from modules.shared.src.common.utility_core_status import status_path_for
 from modules.shared.src.common.utility_io_writer import atomic_write_json
 from modules.shared.src.common.utility_logger_factory import get_logger
@@ -369,7 +369,7 @@ class ObservabilitySetup(IObservabilityProtocol):
 
     def exit_code_for(self, exc: BaseException) -> ExitCode:
         """Map an exception to the process exit code contract."""
-        return ExitCode(utility_core_exit.exit_code_for(exc))
+        return ExitCode(exit_code_for(exc))
 
     def write_status(
         self,

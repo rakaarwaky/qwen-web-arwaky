@@ -25,6 +25,7 @@ from modules.shared.src.common.taxonomy_core_constant import (
     SWARM_OUTPUT_ROOT,
 )
 from modules.shared.src.common.taxonomy_core_vo import FilePath
+from modules.shared.src.common.utility_telemetry_scrubber import harden_private_dir
 from modules.shared.src.config.contract_config_protocol import IWorkspaceProtocol
 
 # Block 1: Class Definition & Constructor
@@ -50,10 +51,10 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
         target_path = Path(str(target_dir)).resolve()
 
         # Step 1: Ensure XDG directories exist
-        DEFAULT_JOBS_DIR.mkdir(parents=True, exist_ok=True)
-        DEFAULT_OUTPUT.mkdir(parents=True, exist_ok=True)
-        DEFAULT_METADATA_DIR.mkdir(parents=True, exist_ok=True)
-        DEFAULT_LOG.mkdir(parents=True, exist_ok=True)
+        harden_private_dir(DEFAULT_JOBS_DIR)
+        harden_private_dir(DEFAULT_OUTPUT)
+        harden_private_dir(DEFAULT_METADATA_DIR)
+        harden_private_dir(DEFAULT_LOG)
 
         # Step 2: Create .agents/skills/qwen-web-arwaky/SKILL.md from the
         # shared skills package data file.
@@ -85,7 +86,7 @@ class WorkspaceProvisioner(IWorkspaceProtocol):
 
         for link_name, xdg_target in links.items():
             link_path = dot_qwen / link_name
-            xdg_target.mkdir(parents=True, exist_ok=True)
+            harden_private_dir(xdg_target)
 
             if link_path.is_symlink() or link_path.exists():
                 if link_path.is_dir() and not link_path.is_symlink():
