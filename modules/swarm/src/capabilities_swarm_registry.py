@@ -58,12 +58,16 @@ class SwarmRegistry(ISwarmRegistryProtocol):
 
         The snapshot is written before the cancel events are published, so
         a leg that reads its event can already find the run it belongs to.
+
+        The manifest write happens outside the lock (ARCH-2-002) so disk
+        I/O never blocks concurrent ``revise`` calls from fan-out legs.
         """
         with self._lock:
             self._snapshots[snapshot.swarm_id] = snapshot
             self._cancel_events[snapshot.swarm_id] = dict(cancel_events)
             self._attachments[snapshot.swarm_id] = attachment
-            write_manifest(snapshot)
+            snapshot_copy = snapshot
+        write_manifest(snapshot_copy)
 
     def get_snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when it is unknown."""
@@ -77,7 +81,9 @@ class SwarmRegistry(ISwarmRegistryProtocol):
 
         The whole read-decide-write cycle runs under one lock, so two legs
         of the same swarm cannot interleave their status updates and lose
-        one another's changes.
+        one another's changes. The manifest write happens outside the lock
+        (ARCH-2-002): the snapshot is a frozen dataclass, so the copy is
+        safe, and disk I/O never blocks concurrent ``revise`` calls.
         """
         with self._lock:
             current = self._snapshots.get(swarm_id)
@@ -87,8 +93,9 @@ class SwarmRegistry(ISwarmRegistryProtocol):
             if updated is None:
                 return current
             self._snapshots[swarm_id] = updated
-            write_manifest(updated)
-            return updated
+            snapshot_copy = updated
+        write_manifest(snapshot_copy)
+        return snapshot_copy
 
     def cancel_events(self, swarm_id: SwarmId) -> Mapping[str, CancelToken]:
         """Return the per-role cancel events of a swarm, empty when unknown."""
