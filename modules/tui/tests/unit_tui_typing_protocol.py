@@ -1,6 +1,6 @@
 """ARCH-1-003: TUI typing protocol exists and declares mixin seams."""
 
-from modules.tui.src.surface_tui_typing import QwenTuiAppLike
+from modules.tui.src.surface_tui_view_typing import QwenTuiAppLike
 
 
 def test_protocol_declares_slot_seams() -> None:
