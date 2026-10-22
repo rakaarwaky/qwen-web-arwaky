@@ -319,10 +319,11 @@ def test_doctor_json_includes_environment_capacity_and_runbooks(capsys) -> None:
 
 
 def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
-    """build_smoke_gate is the callable the Root layer injects (#294)."""
-    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+    """The config health-probe gate is the callable the Root layer injects (#294)."""
+    from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+    from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 
-    gate = build_smoke_gate(_healthy_pool_aggregate())
+    gate = ConfigHealthProbe().build_gate(_healthy_pool_aggregate(), run_doctor_checks)
     results = gate()
     assert results
     for name, passed, detail in results:
@@ -338,18 +339,20 @@ def test_smoke_gate_builder_returns_name_passed_detail_triples() -> None:
 
 
 def test_smoke_gate_builder_requires_an_aggregate() -> None:
-    """build_smoke_gate requires a session aggregate — no default."""
+    """The health-probe gate requires a session aggregate — no default."""
     import pytest
 
-    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+    from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+    from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 
-    with pytest.raises(TypeError, match="required positional argument: 'session'"):
-        build_smoke_gate()  # type: ignore[call-arg]  # deliberately omitting required session arg
+    with pytest.raises(TypeError, match="session"):
+        ConfigHealthProbe().build_gate(run_checks=run_doctor_checks)  # type: ignore[call-arg]  # deliberately omitting required session arg
 
 
 def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> None:
-    """build_smoke_gate(session=…) threads the pool check into the gate triples."""
-    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+    """The health-probe gate threads the pool check into the gate triples."""
+    from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+    from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 
     # A mock pool with one healthy session so _check_session takes the multi-account path
     session = MagicMock()
@@ -364,7 +367,7 @@ def test_smoke_gate_builder_includes_session_check_when_manager_injected() -> No
         message="1 session(s)",
     )
 
-    gate = build_smoke_gate(session=aggregate)
+    gate = ConfigHealthProbe().build_gate(aggregate, run_doctor_checks)
     results = gate()
     names = {name for name, _, _ in results}
     assert "Session Authentication Token" in names

@@ -79,6 +79,18 @@ config the other features read.
 - **Edge Cases**: A directory the host refuses to create surfaces a file error naming the path.
 - **Error Handling**: A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location.
 
+### FR-CONFIG-007: Build the functional health gate the update pipeline verifies against
+
+- **Description**: Compose the callable the update pipeline runs as its post-update functional health gate (FR-UPDATE-003, issue #294 / #506), so a postflight smoke gate is a reusable capability rather than a CLI-surface symbol.
+- **Input**: The session aggregate the gate checks against, and the check runner the caller injects (the doctor surface's `run_doctor_checks`), so the capability never imports a Surface.
+- **Output**: A callable that yields the non-interactive doctor checks as `(name, passed, detail)` triples.
+- **Business Rules**:
+  - The gate runs the same checks the operator's `doctor` report runs, so the postflight gate and the report share one source of truth.
+  - The checks run at gate-execution time, not at container-construction time, so a post-update gate reflects the post-upgrade state.
+  - The session aggregate has no default: a missing one is a wiring gap, so a caller that omits it cannot silently pass an empty pool.
+- **Edge Cases**: A missing or unwired session aggregate is reported as a wiring gap by the caller rather than a synthetic pass.
+- **Error Handling**: The capability reports no error of its own; a failing gate check is a failing postflight step that the update pipeline rolls back on.
+
 ## API Contract
 
 ### Protocol API
@@ -97,6 +109,7 @@ config the other features read.
 | `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
 | `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
 | `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and a nested `.qwen-web-arwaky/.gitignore` that keeps the workspace dir local. |
+| `build_gate` | session aggregate + injected check runner | functional health-gate callable | none | none | Build the post-update functional health gate the update pipeline verifies against. |
 
 ### Aggregate API
 

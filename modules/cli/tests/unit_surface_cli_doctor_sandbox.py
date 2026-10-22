@@ -232,10 +232,11 @@ def test_deep_env_alias_drives_the_heavy_probe(monkeypatch) -> None:
 
 
 def test_smoke_gate_runs_with_an_injected_aggregate() -> None:
-    """build_smoke_gate yields name/passed/detail triples from the pool."""
-    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+    """The config health-probe gate yields name/passed/detail triples from the pool."""
+    from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
+    from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 
-    gate = build_smoke_gate(_pool_aggregate())
+    gate = ConfigHealthProbe().build_gate(_pool_aggregate(), run_doctor_checks)
     results = gate()
     assert results
     for name, passed, detail in results:
@@ -246,15 +247,16 @@ def test_smoke_gate_runs_with_an_injected_aggregate() -> None:
 
 
 def test_doctor_and_gate_require_an_aggregate() -> None:
-    """run_doctor and build_smoke_gate require a session aggregate — no default, no raise site."""
+    """run_doctor and the health-probe gate require a session aggregate — no default, no raise site."""
     import pytest
 
-    from modules.cli.src.surface_cli_doctor_command import build_smoke_gate, run_doctor
+    from modules.cli.src.surface_cli_doctor_command import run_doctor, run_doctor_checks
+    from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 
     with pytest.raises(TypeError, match="required positional argument: 'session'"):
         run_doctor(json_output=False)  # type: ignore[call-arg]  # deliberately omitting required session arg
-    with pytest.raises(TypeError, match="required positional argument: 'session'"):
-        build_smoke_gate()  # type: ignore[call-arg]  # deliberately omitting required session arg
+    with pytest.raises(TypeError, match="session"):
+        ConfigHealthProbe().build_gate(run_checks=run_doctor_checks)  # type: ignore[call-arg]  # deliberately omitting required session arg
 
 
 def _pool_aggregate():

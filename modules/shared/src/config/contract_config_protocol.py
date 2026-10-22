@@ -190,9 +190,39 @@ class IWorkspaceProtocol(ABC):
         ...
 
 
+class IConfigHealthProbeProtocol(ABC):
+    """Build the functional health gate the update pipeline verifies against.
+
+    FR-UPDATE-003 (issue #294 / #506): after an upgrade the pipeline
+    re-runs the operator diagnostics and rolls back when they fail. The
+    gate is a callable the Root layer injects into the update pipeline, so
+    the Capabilities update code depends on an injected callable and never
+    on a Surface. The check runner itself is injected too, so this
+    capability — and not the CLI doctor surface — owns the gate, keeping
+    the dependency one-way between the two layers.
+    """
+
+    @abstractmethod
+    def build_gate(self, session: object, run_checks: object) -> object:
+        """Return the callable the update pipeline runs as its postflight functional gate.
+
+        ``run_checks`` is the check runner the Root layer injects (the
+        doctor surface's ``run_doctor_checks``); the gate calls it at
+        execution time so the post-update gate reflects the post-upgrade
+        state, without the capability importing the Surface.
+
+        Yields the non-interactive diagnostic checks as ``(name, passed,
+        detail)`` triples, composed from the same check function the
+        operator's ``doctor`` report uses, so the gate and the report share
+        one source of truth.
+        """
+        ...
+
+
 __all__ = [
     "IConfigCapacityProtocol",
     "IConfigEnvironmentProtocol",
+    "IConfigHealthProbeProtocol",
     "IConfigPathResolverProtocol",
     "IConfigSlotPlanProtocol",
     "IConfigValidatorProtocol",
@@ -203,6 +233,7 @@ __all__ = [
 _layer_symbols: dict[str, object] = {
     "IConfigCapacityProtocol": IConfigCapacityProtocol,
     "IConfigEnvironmentProtocol": IConfigEnvironmentProtocol,
+    "IConfigHealthProbeProtocol": IConfigHealthProbeProtocol,
     "IConfigPathResolverProtocol": IConfigPathResolverProtocol,
     "IConfigSlotPlanProtocol": IConfigSlotPlanProtocol,
     "IConfigValidatorProtocol": IConfigValidatorProtocol,

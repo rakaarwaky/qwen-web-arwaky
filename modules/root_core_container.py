@@ -14,14 +14,16 @@ from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 
 # Root is the composition layer, so it wires the functional doctor gate into
 # the updater: after an upgrade the pipeline re-runs the operator diagnostics
-# and rolls back when they fail (issue #294). The gate itself lives in the
-# doctor Surface; Capabilities only ever sees an injected callable.
-from modules.cli.src.surface_cli_doctor_command import build_smoke_gate
+# and rolls back when they fail (issue #294). The gate is composed by the
+# config-health-probe capability; the Root layer injects the surface's check
+# runner so the capability never imports a Surface.
+from modules.cli.src.surface_cli_doctor_command import run_doctor_checks
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
 from modules.config.src.capabilities_config_capacity import ConfigCapacityAdvisor
 from modules.config.src.capabilities_config_environment import ConfigEnvironment
+from modules.config.src.capabilities_config_health_probe import ConfigHealthProbe
 from modules.config.src.capabilities_config_path_resolver import ConfigPathResolver
 from modules.config.src.capabilities_config_slot_resolver import SlotRunPlanResolver
 from modules.config.src.capabilities_config_validator import ConfigValidator
@@ -184,7 +186,10 @@ class SharedContainer:
             self.updater_upgrade,
             self.updater_rollback,
             package_name=DEFAULT_PACKAGE_NAME,
-            smoke_gate=build_smoke_gate(self.agent_session_orchestrator),
+            smoke_gate=ConfigHealthProbe().build_gate(
+                self.agent_session_orchestrator,
+                run_doctor_checks,
+            ),
         )
         # Feature agents sit between capabilities and surfaces so no caller
         # repeats the sequencing each feature owns.

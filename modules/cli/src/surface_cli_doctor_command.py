@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -360,10 +359,11 @@ def run_doctor_checks(
 ) -> list[dict[str, Any]]:
     """Run every diagnostic check and return the records as plain dictionaries.
 
-    The library form of ``doctor``: the post-update smoke gate injected by the
-    Root layer calls the same function, so the interactive report and the
-    postflight gate cannot disagree (issue #294). The session aggregate is
-    required: the pool is doctor's single source of truth for session state.
+    The library form of ``doctor``: the post-update smoke gate composed by the
+    config-health-probe capability calls the same function, so the interactive
+    report and the postflight gate cannot disagree (issue #294). The session
+    aggregate is required: the pool is doctor's single source of truth for
+    session state.
     """
     checks: list[dict[str, Any]] = [
         _check_python(),
@@ -380,30 +380,6 @@ def run_doctor_checks(
         smoke_ok, smoke_detail = _smoke_check(session)
         checks.append(_check("Browser Smoke Test", smoke_ok, smoke_detail))
     return checks
-
-
-def build_smoke_gate(
-    session: ISessionAggregate,
-) -> Callable[[], tuple[tuple[str, bool, str], ...]]:
-    """Return a callable the update pipeline runs as its postflight functional gate.
-
-    Returns the non-interactive diagnostic checks as ``(name, passed, detail)``
-    triples. The Root layer composes this so the Capabilities update pipeline
-    depends only on an injected callable, never on a Surface. The checks run
-    at gate-execution time (not container-construction time) so the post-update
-    gate reflects the post-upgrade state (issue #506).
-
-    Pass the aggregate, e.g. ``session_manager.load_pool()`` or a production
-    ``ISessionAggregate`` — there is no default, so a wiring gap cannot
-    masquerade as an empty pool.
-    """
-    aggregate = session
-
-    def _gate() -> tuple[tuple[str, bool, str], ...]:
-        checks = run_doctor_checks(session=aggregate)
-        return tuple((str(check["name"]), bool(check["passed"]), str(check["detail"])) for check in checks)
-
-    return _gate
 
 
 def summarize(checks: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]]]:
@@ -478,7 +454,6 @@ def run_doctor(
 
 __all__ = [
     "PRODUCTION_ENV",
-    "build_smoke_gate",
     "run_doctor",
     "run_doctor_checks",
     "summarize",
