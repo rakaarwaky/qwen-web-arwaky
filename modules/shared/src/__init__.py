@@ -439,9 +439,7 @@ __all__ = [
     "IJobManagerAggregate",
     "IObservabilityAggregate",
     "IPromptAggregate",
-    "IPromptFlowAggregate",
     "IUpdateAggregate",
-    "IPromptFlowAggregate",
     "ISessionAggregate",
     "ISwarmAggregate",
     # Swarm VOs
@@ -479,16 +477,6 @@ __all__ = [
     "is_safe_session_target",
     "renewal_is_possible",
     # Sub-package re-exports (AES702)
-    "modules",
-    "browser",
-    "common",
-    "config",
-    "jobs",
-    "logging",
-    "prompt",
-    "session",
-    "swarm",
-    "update",
     "taxonomy_core_constant",
     "taxonomy_core_entity",
     "taxonomy_core_error",
@@ -550,15 +538,9 @@ __all__ = [
 # Import each subpackage and re-export every module name it owns as an
 # attribute of modules.shared.src, so that
 # `from modules.shared.src import <module>` keeps working after the move.
-import modules.shared.src.browser
-import modules.shared.src.common
-import modules.shared.src.config
-import modules.shared.src.jobs
-import modules.shared.src.logging
-import modules.shared.src.prompt
-import modules.shared.src.session
-import modules.shared.src.swarm
-import modules.shared.src.update
+# The `from modules.shared.src.X import ...` statements below import the
+# parent packages as a side effect, so every subpackage stays reachable as
+# an attribute of modules.shared.src without separate bare imports.
 from modules.shared.src.browser import contract_browser_aggregate, contract_browser_protocol, utility_browser_async_loop
 from modules.shared.src.common import (
     taxonomy_core_constant,
