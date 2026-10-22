@@ -75,7 +75,6 @@ class _TuiSessionsHandlerMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
-    _last_delete_name: str
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 
@@ -102,29 +101,37 @@ class _TuiSessionsHandlerMixin:
         self._confirm_delete_session(name)
 
     def _confirm_delete_session(self, name: str) -> None:
-        """Ask for confirmation before deleting a session from the pool."""
-        self._last_delete_name = name
+        """Ask for confirmation before deleting a session from the pool.
+
+        FE-2-02: the name is captured in the confirm closure. A shared
+        field let two stacked modals race — the second push overwrote the
+        field, so confirming the first modal deleted the wrong session.
+        """
+
+        def _on_confirm(confirmed: bool | None) -> None:
+            if confirmed:
+                self._run_delete_session(name)
+
         self.push_screen(
             ConfirmModal(
                 "Delete Session",
-                f"Delete '{name}' from the pool and remove its browser profile?\n"
+                f"Delete '{escape(name)}' from the pool and remove its browser profile?\n"
                 "This cannot be undone without re-logging in.",
                 confirm_label="Delete",
             ),
-            self._run_delete_session,
+            _on_confirm,
         )
 
     @work(thread=True)
-    def _run_delete_session(self, confirmed: bool) -> None:
+    def _run_delete_session(self, name: str) -> None:
         """Run the session delete in a background thread.
 
         Mirrors the CLI 'session remove' command: remove the pool entry,
         then delete the Chromium profile (the profile delete runs through
         SessionManager.delete_session_profile which carries all the
-        path-safety guards).
+        path-safety guards). ``name`` is the parameter the confirm closure
+        captured — never a shared field.
         """
-        if not confirmed:
-            return
         manager = getattr(self, "_session_manager", None)
         cache: list[Any] = getattr(self, "_sessions_cache", [])
         if manager is None or not cache:
@@ -132,7 +139,6 @@ class _TuiSessionsHandlerMixin:
             return
         # Resolve the captured name against the current pool so a stale card
         # (re-rendered while the modal was up) can't delete the wrong session.
-        name = str(getattr(self, "_last_delete_name", ""))
         session = next((s for s in cache if str(getattr(s, "name", "")) == name), None)
         if session is None:
             self.call_from_thread(self._log_msg, "[yellow]Session no longer in pool — nothing to delete.[/]")

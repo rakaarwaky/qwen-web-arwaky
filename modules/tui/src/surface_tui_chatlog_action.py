@@ -66,7 +66,6 @@ class _TuiChatLogHandlerMixin:
     # duplicate method definitions in this file.
     _run_doctor_worker: Any
     _run_update_worker: Any
-    _last_delete_name: str
 
     # ── System Actions (Settings pane) ──────────────────────────────────
 
@@ -74,11 +73,12 @@ class _TuiChatLogHandlerMixin:
         """Echo the typed task into the transcript and dispatch it."""
         text = ""
         with contextlib.suppress(NoMatches):
-            composer = self.query_one(f"#composer-{slot_id}", Input)
-            text = composer.value.strip()
-            if text:
-                composer.value = ""
-        if not text:
+            text = self.query_one(f"#composer-{slot_id}", Input).value.strip()
+        # FE-3-01: an empty composer is only a warning when no prompt file
+        # is pending either. Typed text is cleared only when a prompt file
+        # is not pending, so a dual-input refusal keeps the task on screen.
+        prompt_file = getattr(self, "_slot_prompt_files", {}).get(slot_id, "")
+        if not text and not prompt_file:
             with contextlib.suppress(Exception):
                 self.notify(
                     "Type a task before sending.",
@@ -86,6 +86,9 @@ class _TuiChatLogHandlerMixin:
                     title=f"Slot {slot_id}",
                 )
             return
+        if text and not prompt_file:
+            with contextlib.suppress(NoMatches):
+                self.query_one(f"#composer-{slot_id}", Input).value = ""
         # Issue #341: the attachment comes from the Attach pill's picker
         # state, not a composer field (the chat console has no file input).
         attachment = getattr(self, "_slot_attachments", {}).get(slot_id, "")

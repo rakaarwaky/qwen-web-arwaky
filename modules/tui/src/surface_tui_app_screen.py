@@ -41,6 +41,7 @@ from modules.tui.src.surface_tui_compose_layout import _TuiComposeMixin
 from modules.tui.src.surface_tui_css_view import THEME, TUI_CSS
 from modules.tui.src.surface_tui_events_action import _TuiEventsMixin
 from modules.tui.src.surface_tui_main_action import _TuiHandlersMixin
+from modules.tui.src.surface_tui_promptfile_action import _TuiPromptFileHandlerMixin
 from modules.tui.src.surface_tui_sessions_store import _TuiSessionsWorkerMixin
 from modules.tui.src.surface_tui_settings_view import _TuiSettingsMixin
 from modules.tui.src.surface_tui_utils_component import _TuiUtilsMixin
@@ -59,6 +60,7 @@ class QwenTuiApp(
     _TuiComposeMixin,
     _TuiHandlersMixin,
     _TuiEventsMixin,
+    _TuiPromptFileHandlerMixin,
     _TuiWorkersMixin,
     _TuiSessionsWorkerMixin,
     _TuiSettingsMixin,
@@ -196,6 +198,20 @@ class QwenTuiApp(
         # composer must stay prompt-only; writing a path into it made the run
         # treat the folder as the prompt source.
         self._slot_attachments: dict[int, str] = {}
+        # FE-3-01: the Prompt pill's picker stores a prompt-file path per slot.
+        # Writing the path into the composer made Send dispatch the path
+        # string as prompt text; the file contents never reached Qwen.
+        self._slot_prompt_files: dict[int, str] = {}
+        # FE-2-01: swarm log-dedup caches. Lazily-created and never cleared,
+        # a second run over the same roles started with the previous run's
+        # terminal states, so unchanged agents emitted no log line.
+        self._swarm_agent_states: dict[str, tuple[str, int]] = {}
+        self._swarm_aggregate: tuple[str, int, int] | None = None
+        # FE-4-01: cached active slot id. _log_msg fans unscoped records
+        # through _get_active_slot_id; resolving the DOM per record hammered
+        # query_one during a 10-slot swarm. Default 1 matches the historical
+        # no-slot fallback (never 0 — 0 is the Overview log).
+        self._active_slot_cache: int = 1
 
     # ── Swarm resource-governance presentation (issue #277) ────────────────────
     # Lives on the App so the Workers mixin stays within its AES406
@@ -264,6 +280,18 @@ class QwenTuiApp(
                     )
 
         self.push_screen(TemplatePickerModal(self._template_options), _on_picked)
+
+    def on_tabbed_content_tab_activated(self, event: Any) -> None:
+        """FE-4-01: refresh the active-slot cache from the DOM on tab change.
+
+        Always re-queries TabbedContent rather than trusting the event
+        payload. A stale/queued TabActivated fires after a programmatic
+        switch and would write an old tab id into the cache if the payload
+        were used; the DOM already holds the live tab, so a stale event
+        walks the cache to the correct value, not backwards.
+        """
+        del event  # payload is intentionally unused; DOM is the source of truth
+        self._refresh_active_slot_cache()
 
     def _check_template_roles(self) -> None:
         """Ensure the in-memory template_roles set matches disk, lazy-loaded."""

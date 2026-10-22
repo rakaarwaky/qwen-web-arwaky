@@ -8,7 +8,6 @@ Imported by :class:`~modules.tui.src.surface_tui_app_screen.QwenTuiApp`.
 from __future__ import annotations
 
 import contextlib
-import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -70,6 +69,11 @@ class _TuiWorkersMixin:
     _last_session_state: str | None
     _slot_generation: dict[int, int]
     _slot_cancel_events: dict[int, threading.Event]
+    # FE-3-01: per-slot prompt-file path from the Prompt pill picker.
+    _slot_prompt_files: dict[int, str]
+    # FE-2-01: swarm log-dedup caches, reset at the top of each run.
+    _swarm_agent_states: dict[str, tuple[str, int]]
+    _swarm_aggregate: tuple[str, int, int] | None
 
     # Stubs for methods/attrs provided by other mixins / App at runtime.
     _log_msg: Any
@@ -132,9 +136,16 @@ class _TuiWorkersMixin:
         # Issue #341: the Attach pill's picker state holds the slot's
         # attachment; the composer itself never carries a path anymore.
         attachment_val = getattr(self, "_slot_attachments", {}).get(slot_id, "")
+        # FE-3-01 / Retry: a pending Prompt-pill pick is re-read on Run and
+        # Retry so a failed file run can be re-dispatched without re-picking.
+        prompt_file = getattr(self, "_slot_prompt_files", {}).get(slot_id, "")
         file_val = ""
         out_val = ""
         headless_val = getattr(self, "_headless", True)
+
+        if prompt_file:
+            self._dispatch_prompt_file_composer_slot(slot_id, prompt_val, prompt_file)
+            return
 
         if attachment_val and prompt_val:
             # A typed task plus an attachment runs through the attachment
@@ -207,6 +218,13 @@ class _TuiWorkersMixin:
                 self.notify(f"Slot {slot_id} is already running.", severity="warning", title=f"Slot {slot_id}")
             return
 
+        # FE-3-01: a Prompt-pill pick runs the file pipeline. It never writes
+        # the path into the composer, so the path lives only in this state.
+        prompt_file = getattr(self, "_slot_prompt_files", {}).get(slot_id, "")
+        if prompt_file:
+            self._dispatch_prompt_file_composer_slot(slot_id, text, prompt_file)
+            return
+
         # A role picked from the Templates pill is stored in the composer as
         # its display label (``Frontend Engineer``). Without this the Send
         # path would hand that label to ``process_direct_prompt`` verbatim
@@ -263,6 +281,11 @@ class _TuiWorkersMixin:
             self.query_one(f"#loading-{slot_id}", LoadingIndicator).display = True
 
         self._slot_workers[slot_id] = self._execute_direct_worker(slot_id, text, headless, out_val)
+
+    # FE-3-01: implemented on _TuiPromptFileHandlerMixin (AES406 budget).
+    _dispatch_prompt_file_composer_slot: Callable[[int, str, str], None]
+    _execute_prompt_file_worker: Callable[..., Any]
+    _write_prompt_temp_file: Callable[[int, str], Path | None]
 
     def _run_composer_slot_with_attachment(
         self,
@@ -486,6 +509,10 @@ class _TuiWorkersMixin:
 
     @work(thread=True)
     def _swarm_worker(self, input_path: Path) -> None:
+        # FE-2-01: clear the previous run's dedup caches so the first
+        # snapshot of this run emits a line per agent and one aggregate.
+        self._swarm_agent_states = {}
+        self._swarm_aggregate = None
         try:
             snapshot = self._swarm.execute(
                 SwarmRequest(verb="start", input_path=input_path, headless=self._headless)
@@ -690,24 +717,7 @@ class _TuiWorkersMixin:
             )
             self.call_from_thread(self._finalize_slot, slot_id, "FAILED", filename, dur, False, gen)
 
-    def _write_prompt_temp_file(self, slot_id: int, text: str) -> Path | None:
-        """Write a composer task to a temporary prompt file (issue #341).
-
-        ``process_prompt_with_attachment`` takes a prompt file on disk, so
-        the typed task is materialized as a .md file first. Returns None and
-        notifies when the write fails, so the caller can abort the run.
-        """
-        try:
-            tmp_dir = Path(tempfile.mkdtemp(prefix=f"qwen_slot_{slot_id}_"))
-            prompt_path = tmp_dir / "prompt.md"
-            prompt_path.write_text(text, encoding="utf-8")
-        except OSError as exc:
-            msg = f"Cannot write prompt file for Slot {slot_id}: {exc}"
-            self._log_msg("[bold {}]ERROR:[/] {}".format(THEME["err"], escape(msg)), slot_id)
-            with contextlib.suppress(Exception):
-                self.notify(msg, severity="error", title=f"Slot {slot_id}")
-            return None
-        return prompt_path
+    # Moved to _TuiPromptFileHandlerMixin (AES406): _write_prompt_temp_file.
 
     @work(thread=True)
     def _execute_attachment_worker(
