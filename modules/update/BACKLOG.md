@@ -2,7 +2,7 @@
 
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md).
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-05
 
 ## Current Condition
@@ -14,11 +14,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Health | Dependencies | Next Action | Updated |
+| ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|---|
-| UPDATE-01 | P0 | Ready | At Risk | None | Add an acceptance scenario proving a failed health gate restores the install before the browser build. | 2026-10-05 |
-| UPDATE-02 | P1 | Ready | At Risk | None | Define the rollback acceptance criteria the surface reports on, and re-validate the six open findings against the current contract. | 2026-10-05 |
-| UPDATE-03 | P2 | Ready | On Track | None | Add an acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses. | 2026-10-05 |
+| UPDATE-01 | P0 | Ready | None | Add an acceptance scenario proving a failed health gate restores the install before the browser build. | 2026-10-05 |
+| UPDATE-02 | P1 | Ready | None | Define the rollback acceptance criteria the surface reports on, and re-validate the six open findings against the current contract. | 2026-10-05 |
+| UPDATE-03 | P2 | Ready | None | Add an acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses. | 2026-10-05 |
 
 ## Scenario Evidence
 

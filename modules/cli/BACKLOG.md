@@ -2,7 +2,7 @@
 
 DESIGN: [DESIGN.md](DESIGN.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-State / Health: values from root [ROADMAP.md](../../ROADMAP.md) — do not redefine here.
+State: values from root [ROADMAP.md](../../ROADMAP.md) — do not redefine here.
 Last Updated: 2026-10-21
 
 ## Current Condition
@@ -14,9 +14,9 @@ Last Updated: 2026-10-21
 
 ## Backlog
 
-| ID | Item | Priority | State | Health | Owner | Actual Condition | Next | Updated |
+| ID | Item | Priority | State | Owner | Actual Condition | Next | Updated |
 |---|---|---|---|---|---|---|---|---|
-| CLIC-01 | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md` | P2 | Ready | On Track | — | TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-18 |
+| CLIC-01 | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md` | P2 | Ready | — | TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-18 |
 
 ## Scenario Evidence
 
