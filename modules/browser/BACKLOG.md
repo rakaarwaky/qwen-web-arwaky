@@ -9,7 +9,6 @@ Last Updated: 2026-10-05
 
 - Done: `uv run python -m pytest modules/browser/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Blocked: None.
 - Next Action: `BROWSER-01`, the binary-trust acceptance gap.
 
 ## Backlog
