@@ -9,7 +9,6 @@ Last Updated: 2026-10-18
 
 - Done: `uv run python -m pytest modules/session/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: `SESSION-01` and `SESSION-02` — acceptance tests landing in this pass.
-- Blocked: None.
 - Next Action: `SESSION-03`, the session-directory permission repair spec.
 
 ## Backlog

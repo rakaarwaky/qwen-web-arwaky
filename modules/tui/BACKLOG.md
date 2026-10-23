@@ -7,8 +7,7 @@ State vocabulary, verification requirements, ownership rules, and ID policy are 
 ## Current Condition
 
 - Done: `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` reports **138 passed** (15 test files) on branch `rakaarwaky/ux-tui-cli-surface`, 2026-10-21.
-- In Progress: None.
-- Blocked: None.
+- In Progress: `TUI-03`, the DESIGN.md rework tracked in the release PR.
 - Next: `TUI-01`, `TUI-02`, `TUI-03`, `TUI-04`.
 
 ## Scenario Evidence
@@ -50,7 +49,7 @@ None.
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---|---|---|---|---|
-| TUI-01 | P1 | Done | Ship the five shipped screens: Overview, Sessions, per-slot Chat, Swarm, and Settings under one token system. `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` — 138 passed, 0 failed on `rakaarwaky/ux-tui-cli-surface`, 2026-10-21; compose tree in `surface_tui_compose_layout.py`, tokens in `surface_tui_css_view.py`. | Record a released version containing `modules/tui` via `gh release view` and update this row to Released. | 2026-10-21 |
+| TUI-01 | P1 | Done | Ship the five shipped screens: Overview, Sessions, per-slot Chat, Swarm, and Settings under one token system. `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` — 138 passed, 0 failed on `rakaarwaky/ux-tui-cli-surface`, 2026-10-21; compose tree in `surface_tui_compose_layout.py`, tokens in `surface_tui_css_view.py`. | Record a released version containing `modules/tui` via `gh release view` and attach the release evidence to this row. | 2026-10-21 |
 | TUI-02 | P1 | Done | TUI modal layout and toast-region crash guard. `uv run python -m pytest modules/tui/tests/unit_tui_modal_layout.py modules/tui/tests/unit_tui_confirm_modal_layout.py modules/tui/tests/unit_tui_toast_region_crash.py -m "not benchmark"` — 10 passed, 0 failed on commit `73aee43`. | Verify the toast crash guard against the next Textual upgrade. | 2026-10-18 |
 | TUI-03 | P1 | In Progress | TUI visual and interaction contract for designers and surface engineers. `DESIGN.md` (this folder) is reworked to the aes-docs DESIGN contract; the token map cites the root `DESIGN.md` palette and `modules/tui/src/surface_tui_css_view.py` as the single source of truth. | Close this row when `DESIGN.md` passes `lint-arwaky-cli docs modules/tui` at Total: 0 in a release PR. | 2026-10-18 |
 | TUI-04 | P1 | Done | TUI log containment: the log panel keeps its height on every terminal size. `uv run python -m pytest modules/tui/tests/unit_tui_log_containment.py -m "not benchmark"` — 34 passed, 0 failed on commit `73aee43`. | No action; monitor for regressions in future Textual releases. | 2026-10-18 |

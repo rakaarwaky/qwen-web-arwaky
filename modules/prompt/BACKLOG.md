@@ -9,7 +9,6 @@ Last Updated: 2026-10-22
 
 - Done: `uv run python -m pytest modules/prompt/tests/ -m "not benchmark and not e2e" -q` green on 2026-10-22 (worktree `be-prompt-plan`, changes uncommitted).
 - In Progress: None.
-- Blocked: None.
 - Next Action: `PROMPT-01`, the retry budget (`CONFIG-02`); the stall-ceiling interaction is now pinned by tests.
 
 ## Backlog
