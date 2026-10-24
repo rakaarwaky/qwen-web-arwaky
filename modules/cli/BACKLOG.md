@@ -3,19 +3,19 @@
 DESIGN: [DESIGN.md](DESIGN.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md) — do not redefine here.
-Last Updated: 2026-10-21
+Last Updated: 2026-10-24
 
 ## Current Condition
 
-- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 178 passed, on branch `rakaarwaky/ux-tui-cli-surface`, on 2026-10-21.
+- Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 178 passed on 2026-10-21 (branch `rakaarwaky/ux-tui-cli-surface`); `CLIC-01` closed Done — surface boundary partition confirmed, no CLI-only surface findings open as of 2026-10-24.
 - In Progress: None.
-- Next Action: `CLIC-01`, track CLI-only surface issues as they surface.
+- Next Action: None.
 
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---|---|---|---|---|
-| CLIC-01 | P2 | Ready | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md`. TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time. | Move any CLI-specific finding into a new row with issue links and verification commands. | 2026-10-18 |
+| CLIC-01 | P2 | Done | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md`. TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time, so this row closes with no new rows needed. Verified: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 197 passed, 0 failed on branch `rakaarwaky/cl01` (issue #671). | No action; open a new `CLIC-NN` row with issue links when a CLI-surface finding lands. | 2026-10-24 |
 
 ## Scenario Evidence
 
@@ -67,3 +67,4 @@ None.
 | 2026-10-18 | Reworked BACKLOG.md to match aes-docs template: corrected section order, scenario evidence table format, release readiness table; re-based Done line on `73aee43` with 92-test count | @rakaarwaky |
 | 2026-10-18 | v6.7.0: JSON envelope + `session --json`, doctor pool-only session check with `--deep`, iterative login re-prompt, rotation `[WARN]`, glyph/table helpers, barrel completion; test count 92 → 149; review rounds 1–3 closed on top (envelope contract, host-independent doctor fixture, run-surface failure pin, dead adapter removal, required session injection, `job cleanup` payload docs); count 149 → 176 at `b93d2ba` | @rakaarwaky |
 | 2026-10-21 | UX remediation on `rakaarwaky/ux-tui-cli-surface`: shared `STATUS_GLYPHS` re-export (UX-3-002), `session remove` TTY confirmation (UX-4-003), and the UX-5-002 floor-of-16 regression in `unit_surface_cli_sessions_command.py`; count 176 → 178 verified this session | @rakaarwaky |
+| 2026-10-24 | CLIC-01 closed Done: surface boundary partition confirmed (TUI items in `modules/tui/BACKLOG.md`); no CLI-only findings open; 197 tests re-verified on `rakaarwaky/cl01` (issue #671) | @rakaarwaky |
