@@ -45,11 +45,6 @@ None.
 | Scenario evidence | Done | 4 of 4 scenarios mapped to an automated test. |
 | Docs | Done | [DATA.md](DATA.md) is specification-only. |
 
-## Deferred
-
-- Per-feature data contracts stay in each feature FRD; the kernel document
-  carries only the shapes every feature shares.
-
 ## Change Log
 
 | Date | Change | By |

@@ -45,10 +45,6 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `BROWSER-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- Managed-build-only binary discovery for hosts that cannot run any sandbox stays behind the environment verdict.
-
 ## Change Log
 
 | Date | Change | By |

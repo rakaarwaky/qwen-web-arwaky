@@ -46,10 +46,6 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `SWARM-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- Per-leg prompt variation and heterogeneous leg configuration stay out of scope.
-
 ## Change Log
 
 | Date | Change | By |

@@ -46,11 +46,6 @@ None.
 | Scenario evidence | Done | 5 of 5 scenarios mapped; the `SESSION-01` gap closed by the backup-guard tests in `unit_capabilities_session_manager.py`. |
 | Docs | Done | [FRD.md](FRD.md) reconciled with the eight implemented verbs and the ratified code behavior. |
 
-## Deferred
-
-- Session pool replication across machines stays out of scope; the pool is local to the workspace.
-- BE-4-003 pool mtime cache: the pool is ≤ ~10 sessions in a single-process CLI, so per-operation JSON parse + directory scan is not a measured bottleneck. Revisit if `check_pool_sync` benchmarks show otherwise.
-
 ## Change Log
 
 | Date | Change | By |

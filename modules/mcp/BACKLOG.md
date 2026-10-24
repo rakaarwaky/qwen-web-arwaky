@@ -33,9 +33,7 @@ None.
 | Scenario evidence | Done | 4 test suites mapped with 26 passing automated tests. |
 | Docs | Done | [DESIGN.md](DESIGN.md) specifies tool schemas, response envelopes, session flow, and UAT matrix. |
 
-## Deferred
-
-None.
+## Change Log
 
 ## Change Log
 

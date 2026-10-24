@@ -34,10 +34,6 @@ None.
 | Docs | In Progress | `DESIGN.md` rework tracked in TUI-03; pending lint-arwaky-cli docs Total: 0 |
 | Backlog items | In Progress | TUI-01 pending release recording; TUI-03 DESIGN.md rework |
 
-## Deferred
-
-None.
-
 ## Change Log
 
 | Date | Change | By |

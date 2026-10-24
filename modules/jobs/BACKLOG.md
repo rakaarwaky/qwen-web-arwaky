@@ -44,10 +44,6 @@ None.
 | Scenario evidence | Done | All 3 scenarios mapped; the former `JOBS-01` gap closed on 2026-10-22. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- Cross-process pool sharing stays out of scope; each process owns its workers and its storage.
-
 ## Change Log
 
 | Date | Change | By |

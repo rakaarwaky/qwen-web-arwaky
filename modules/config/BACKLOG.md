@@ -45,10 +45,6 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `CONFIG-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- The slot resolver's widget mapping stays behind the slot surface; this feature only decides what the values mean.
-
 ## Change Log
 
 | Date | Change | By |

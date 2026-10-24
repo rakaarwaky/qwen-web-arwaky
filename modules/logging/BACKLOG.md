@@ -45,10 +45,6 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `LOGGING-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- Per-subsystem span tracing stays outside the run lifecycle; only the run's quality report reads the counters.
-
 ## Change Log
 
 | Date | Change | By |

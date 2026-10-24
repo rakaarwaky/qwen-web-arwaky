@@ -45,10 +45,6 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `UPDATE-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
-## Deferred
-
-- In-place upgrade without a network-fetched artifact stays out of scope; an upgrade always installs a fetched release.
-
 ## Change Log
 
 | Date | Change | By |
