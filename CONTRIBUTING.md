@@ -18,7 +18,7 @@ uv sync
 
 The command succeeds when pip ends with a `Successfully installed` line (or reports that every package is already satisfied).
 
-## Feature Change
+### Feature Change
 
 1. Add or update a test that demonstrates the intended behavior.
 2. Keep feature code in the correct vertical slice under `modules/`.
@@ -28,7 +28,7 @@ The command succeeds when pip ends with a `Successfully installed` line (or repo
 
 See [`TEST.md`](TEST.md) for the full test strategy and browser-fixture workflow.
 
-## Documentation Change
+### Documentation Change
 
 1. Change the specification document the change belongs to: `PRD.md`, `ARCHITECTURE.md`, a module `FRD.md`, or `ROADMAP.md`.
 2. Update the owning module's `BACKLOG.md` row in the same pull request, so a merged fix never leaves a stale row.
