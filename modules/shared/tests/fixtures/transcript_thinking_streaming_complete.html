@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--
+  Pinned transcript: one captured chat.qwen.ai DOM snapshot exercising the
+  shared DOM query helpers' three phases (SHARED-02).
+
+  phases:
+    1. thinking: the status card says "Thinking", the stop button is visible,
+       no assistant response text exists yet.
+    2. streaming: the stop button is still visible and the assistant bubble
+       carries the first partial answer.
+    3. complete: no stop button, the thinking card reads "Thinking completed",
+       and the assistant bubble carries the full answer.
+    4. stale: an older assistant turn plus a stale "Thought stopped" status
+       card sit ahead of the live answer, pinning the JS_GET_RESPONSE_TEXT
+       filters (reverse walk + marker skip) so an old bubble or leftover card
+       can never be adopted as the current response.
+
+  The regression test loads each <section data-phase="..."> into a DOM shim
+  and runs the real helpers (count_messages, count_user_messages,
+  latest_message_text, partial_text_after_stream_cut) against it, so a
+  renamed class in the live DOM fails the kernel suite here before it fails
+  a run.
+-->
+<html lang="en">
+  <body>
+    <section data-phase="thinking" id="phase-thinking" hidden>
+      <div class="chat-page">
+        <div class="qwen-chat-thinking-status-card">
+          <span class="status-indicator-label">Thinking</span>
+          <span> analyzing the request </span>
+        </div>
+        <div class="message-input-column">
+          <div class="message-input-right-button-send">
+            <button aria-label="Stop generating">
+              <svg><rect></rect></svg>
+            </button>
+          </div>
+        </div>
+        <div class="chat-conversation">
+          <div class="qwen-chat-message-user">
+            <div class="message-content">Summarize the quarterly report.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-phase="streaming" id="phase-streaming" hidden>
+      <div class="chat-page">
+        <div class="qwen-chat-thinking-status-card">
+          <span class="thinking-status-label">Thinking completed</span>
+        </div>
+        <div class="message-input-column">
+          <div class="message-input-right-button-send">
+            <button aria-label="Stop generating">
+              <svg><rect></rect></svg>
+            </button>
+          </div>
+        </div>
+        <div class="chat-conversation">
+          <div class="qwen-chat-message-user">
+            <div class="message-content">Summarize the quarterly report.</div>
+          </div>
+          <div class="qwen-chat-message-assistant">
+            <div class="qwen-markdown">
+              <div class="qwen-markdown-text"><p>Revenue grew 12% quarter over quarter.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-phase="complete" id="phase-complete" hidden>
+      <div class="chat-page">
+        <div class="qwen-chat-thinking-status-card">
+          <span class="thinking-status-label">Thinking completed</span>
+        </div>
+        <div class="message-input-column">
+          <div class="message-input-right-button-send">
+            <button aria-label="Send message" disabled></button>
+          </div>
+        </div>
+        <div class="chat-conversation">
+          <div class="qwen-chat-message-user">
+            <div class="message-content">Summarize the quarterly report.</div>
+          </div>
+          <div class="qwen-chat-message-assistant">
+            <div class="qwen-markdown">
+              <div class="qwen-markdown-text">
+                <p>Revenue grew 12% quarter over quarter.</p>
+                <p>Operating margin improved by 3 points, driven by lower cloud spend.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section data-phase="stale" id="phase-stale" hidden>
+      <div class="chat-page">
+        <div class="chat-conversation">
+          <div class="qwen-chat-message-user">
+            <div class="message-content">Summarize the quarterly report.</div>
+          </div>
+          <div class="qwen-chat-message-assistant">
+            <div class="qwen-markdown">
+              <div class="qwen-markdown-text"><p>Old answer from the previous turn of this conversation.</p></div>
+            </div>
+          </div>
+          <div class="qwen-chat-message-assistant">
+            <div class="qwen-chat-thinking-status-card">
+              <span class="status-indicator-label">Thought stopped</span>
+            </div>
+          </div>
+          <div class="qwen-chat-message-assistant">
+            <div class="qwen-markdown">
+              <div class="qwen-markdown-text">
+                <p>Live answer: Revenue grew 12% quarter over quarter.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

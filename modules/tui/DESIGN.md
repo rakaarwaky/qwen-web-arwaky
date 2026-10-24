@@ -9,10 +9,7 @@ this document binds that theme to the concrete Textual surface and defines the
 component anatomy, interaction contract, and empty/error states of the TUI.
 It never forks the shared palette, type scale, spacing unit, rounded ladder,
 or elevation ladder — a TUI visual decision that cannot trace to a root
-`DESIGN.md` token is out of contract. The terminal palette (the TUI-specific
-projection of the shared theme) is canonical in `modules/tui/src/surface_tui_css_view.py`
-(`_COLORS` / `THEME` / `SEMANTIC_ALIASES`); every hex below is mirrored from
-that file and must change in the same commit.
+`DESIGN.md` token is out of contract.
 
 ## Brand & Style
 
@@ -27,22 +24,24 @@ navigation bar.
 
 ### Color / Type Mapping
 
-The TUI reads the theme through `THEME` in `surface_tui_css_view.py`. The root
-[DESIGN.md](../../DESIGN.md) (Obsidian Terminal) defines the canonical color
-roles; the TUI projects them onto terminal-safe tokens as follows. No raw hex
-lives in a widget; every component references a token row.
+The TUI reads the theme through `THEME` in
+[modules/tui/src/surface_tui_css_view.py](src/surface_tui_css_view.py)
+(`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for
+every hex. The root [DESIGN.md](../../DESIGN.md) palette table mirrors that
+dict; a value that changes in code must change there in the same commit.
+No raw hex lives in a widget; every component references a token row.
 
 | TUI token | Root `DESIGN.md` role | Usage |
 |---|---|---|
 | `bg` / `bg_base` | canvas (`$bg` / `#171A1F`) | screen background behind every panel |
-| `surface` / `bg_raised` | surface / card | raised cards, table rows, slot chips |
-| `bg_surface` | recessed strip | tab-bar and dock background |
-| `border` | hairline | card and row separators |
+| `surface` / `bg_raised` | surface / card (`#22262C`) | raised cards, table rows, slot chips |
+| `bg_surface` | recessed strip (`#12151A`) | tab-bar and dock background |
+| `border` | hairline (`#2E343C`) | card and row separators |
 | `accent` | primary accent (`#38BDF8`) | primary actions, focus ring, active tab, live beacon |
-| `success` | diagnostic success | READY / DONE / ACTIVE state beacons |
-| `warning` | diagnostic warning | LIMITED / EXPIRED / WARN notices |
-| `danger` | diagnostic error | FAILED state, destructive confirm fills |
-| `text` / `text_muted` | type roles | primary text / captions and placeholders |
+| `success` | diagnostic success (`#4ADE80`) | READY / DONE / ACTIVE state beacons |
+| `warning` | diagnostic warning (`#FACC15`) | LIMITED / EXPIRED / WARN notices |
+| `danger` | diagnostic error (`#E5484D`) | FAILED state, destructive confirm fills |
+| `text` / `text_muted` | type roles (`#E5E7EB` / `#9AA4B2`) | primary text / captions and placeholders |
 | `label-*` type stops | one fixed type scale | panel titles `headline-*`, body `body-*`, badges and key hints `label-*` in JetBrains Mono |
 
 Spacing multiplies from the root 4px base unit; every declared TUI value is an
