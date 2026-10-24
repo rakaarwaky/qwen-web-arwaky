@@ -8,7 +8,7 @@ previous release rather than a half-installed state.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from modules.shared.src.common.taxonomy_core_vo import UpdateCheckResult, UpdateStepResult
 from modules.update.src import capabilities_update_verify as verify_module
@@ -74,7 +74,7 @@ def _verify(
     return capability, rollback
 
 
-def _patch_version_and_snapshot() -> tuple[patch, patch, patch]:
+def _patch_version_and_snapshot() -> tuple[Mock, Mock, Mock]:
     """Stub out the version-resolver, chromium check, and snapshot seams."""
     return (
         patch.object(verify_module, "chromium_present", return_value=True),
