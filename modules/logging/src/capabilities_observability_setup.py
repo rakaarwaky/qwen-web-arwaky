@@ -243,19 +243,21 @@ class ObservabilitySetup(IObservabilityProtocol):
             self._formatter = _make_json_formatter()
             root = logging.getLogger()
             root.setLevel(log_level)
-            if attach_stderr:
+            if attach_stderr and not any(getattr(h, "stream", None) is sys.stderr for h in root.handlers):
                 stderr_handler = logging.StreamHandler(sys.stderr)
                 stderr_handler.setFormatter(self._formatter)
                 root.addHandler(stderr_handler)
-            try:
-                file_handler = RotatingFileHandler(
-                    log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
-                )
-                file_handler.setFormatter(self._formatter)
-                root.addHandler(file_handler)
-                harden_private_file(log_path / "app.jsonl")
-            except OSError:
-                pass
+            target = log_path / "app.jsonl"
+            if not _handler_already_attached(root, target):
+                try:
+                    file_handler = RotatingFileHandler(
+                        target, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+                    )
+                    file_handler.setFormatter(self._formatter)
+                    root.addHandler(file_handler)
+                    harden_private_file(target)
+                except OSError:
+                    pass
             return
 
         shared_processors: list[Any] = [
@@ -296,19 +298,19 @@ class ObservabilitySetup(IObservabilityProtocol):
             if handler.__class__.__name__.endswith("LogHandler"):
                 continue
             root.removeHandler(handler)
-        if attach_stderr:
+        if attach_stderr and not any(getattr(h, "stream", None) is sys.stderr for h in root.handlers):
             stderr_handler = logging.StreamHandler(sys.stderr)
             stderr_handler.setFormatter(formatter)
             root.addHandler(stderr_handler)
-        try:
-            file_handler = RotatingFileHandler(
-                log_path / "app.jsonl", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
-            )
-            file_handler.setFormatter(formatter)
-            root.addHandler(file_handler)
-            harden_private_file(log_path / "app.jsonl")
-        except OSError:
-            pass
+        target = log_path / "app.jsonl"
+        if not _handler_already_attached(root, target):
+            try:
+                file_handler = RotatingFileHandler(target, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+                file_handler.setFormatter(formatter)
+                root.addHandler(file_handler)
+                harden_private_file(target)
+            except OSError:
+                pass
 
     def get_logger(self, name: str = "qwen-web-arwaky") -> Any:
         """Return a bound structlog logger."""
@@ -547,6 +549,23 @@ def _json_format(record: logging.LogRecord) -> str:
 def _make_json_formatter() -> Any:
     """Return a JSON-lines formatter-compatible object (no class definitions)."""
     return types.SimpleNamespace(format=_json_format)
+
+
+def _handler_already_attached(root: logging.Logger, target: Path) -> bool:
+    """Return True when a file handler on *target* is already on the root logger.
+
+    ``setup_observability`` may run twice for one run id (CLI bootstrap plus
+    the orchestrator's call). RotatingFileHandler identity is the file it
+    wraps, so the ``baseFilename`` (resolved path) is the dedup key; matching
+    by path also covers a handler opened by a different bootstrap instance.
+    """
+    base = os.path.realpath(target)
+    for handler in root.handlers:
+        if not isinstance(handler, logging.FileHandler):
+            continue
+        if os.path.realpath(handler.baseFilename) == base:
+            return True
+    return False
 
 
 def _make_run_id_filter(run_id: str) -> Any:
