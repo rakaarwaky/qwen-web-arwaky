@@ -17,7 +17,7 @@ Last Updated: 2026-10-05
 | ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|
 | SHARED-01 | P1 | Done | None | — | 2026-10-24 |
-| SHARED-02 | P1 | Ready | None | Pin the DOM query helpers against one captured chat transcript so selector drift fails the kernel suite before it fails a run. | 2026-10-05 |
+| SHARED-02 | P1 | Done | None | Pinned DOM query helpers in unit_transcript_selector_regression.py against captured transcript fixture (2026-10-25). Evidence: `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). | 2026-10-25 |
 | SHARED-03 | P2 | Ready | `CONFIG-02` | Specify the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settles. | 2026-10-05 |
 
 ## Scenario Evidence
@@ -55,4 +55,5 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-24 | SHARED-01 advanced to Done: acceptance test `test_restore_is_byte_identical_after_a_full_corruption_cycle` added to `unit_utility_session_backup.py`. | @qwen-web-arwaky |
+| 2026-10-25 | Evidence cells completed (three-proof rule). | @qwen-web-arwaky |
 | 2026-10-05 | Initial kernel backlog created with the AES701 doc pair. | @qwen-web-arwaky |
