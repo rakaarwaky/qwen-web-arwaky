@@ -3,7 +3,7 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-22
+Last Updated: 2026-10-24
 
 ## Current Condition
 
@@ -13,11 +13,11 @@ Last Updated: 2026-10-22
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| PROMPT-01 | P1 | Ready | `CONFIG-02` | Retry budget stays with `CONFIG-02`; the stall-ceiling interaction is pinned by `unit_transcript_selector_regression.py` and `unit_agent_shared_flow_retry.py` (`test_dispatch_does_not_retry_a_stalled_stream`). | 2026-10-22 |
-| PROMPT-02 | P1 | Done | None | None — covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. | 2026-10-22 |
-| PROMPT-03 | P2 | Done | `SHARED-02` | None — the pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. | 2026-10-22 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| PROMPT-01 | P1 | Ready | `CONFIG-02` | Retry budget stays with `CONFIG-02`; the stall-ceiling interaction is pinned by `unit_transcript_selector_regression.py` and `unit_agent_shared_flow_retry.py` (`test_dispatch_does_not_retry_a_stalled_stream`). | 2026-10-22 | FR-PROMPT-001, FR-PROMPT-003, FR-PROMPT-006 |
+| PROMPT-02 | P1 | Done | None | None — covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. | 2026-10-22 | FR-PROMPT-004, FR-PROMPT-005 |
+| PROMPT-03 | P2 | Done | `SHARED-02` | None — the pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. | 2026-10-22 | FR-PROMPT-008 |
 
 ## Scenario Evidence
 
@@ -59,6 +59,7 @@ None.
 
 | Date | Change | By |
 |---|---|---|
+| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
 | 2026-10-22 | Scenario evidence completed (7 automated rows, 0 gaps); `PROMPT-02`/`PROMPT-03` closed; `PROMPT-01` stall-ceiling pinning done, retry budget remains with `CONFIG-02`. | @qwen-web-arwaky |
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-22 | Sidecars moved to `DEFAULT_METADATA_DIR` (XDG state `meta/`); direct-prompt outputs named `direct_*` instead of `tmpXXXX_*` (FR-PROMPT-009). | @qwen-web-arwaky |

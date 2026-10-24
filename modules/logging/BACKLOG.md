@@ -3,7 +3,7 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-05
+Last Updated: 2026-10-24
 
 ## Current Condition
 
@@ -13,11 +13,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| LOGGING-01 | P1 | Ready | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-05 |
-| LOGGING-02 | P1 | Ready | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 |
-| LOGGING-03 | P2 | Done | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| LOGGING-01 | P1 | Ready | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-05 | FR-LOGGING-001 |
+| LOGGING-02 | P1 | Ready | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 | FR-LOGGING-001, FR-LOGGING-002 |
+| LOGGING-03 | P2 | Done | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 | FR-LOGGING-002 |
 
 ## Scenario Evidence
 
@@ -54,3 +54,4 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
+| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
