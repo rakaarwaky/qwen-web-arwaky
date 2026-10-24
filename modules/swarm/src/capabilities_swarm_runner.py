@@ -280,4 +280,26 @@ class SwarmRunner(ISwarmStartProtocol):
         self._update_agent(swarm_id, role, "failed", self._max_attempts, output_path, last_error, start)
 
 
-__all__ = ["SwarmRunner"]
+def submitted_leg_count(
+    requested_browsers: int,
+    healthy_sessions: int,
+) -> tuple[int, int]:
+    """Resolve the submitted leg count and the session shortfall for one run.
+
+    The clamped browser count is the fan-out's request (``requested_browsers``
+    is the ceiling-clamped value). When the session pool offers fewer healthy
+    sessions (``healthy_sessions``) than that, the runner submits one leg per
+    healthy session and reports the shortfall ``max(0, requested - healthy)``
+    on the snapshot instead of padding or re-using a known-LIMITED session
+    (FR-SWARM-003, consistent with the rotation ``no_eligible_session`` rule).
+    A request below one is clamped to one rather than producing an empty
+    fan-out. The healthy-session count is floored at zero.
+    """
+    bounded = max(1, requested_browsers)
+    available = max(0, healthy_sessions)
+    submitted = min(bounded, available)
+    shortfall = bounded - available
+    return submitted, max(0, shortfall)
+
+
+__all__ = ["SwarmRunner", "submitted_leg_count"]

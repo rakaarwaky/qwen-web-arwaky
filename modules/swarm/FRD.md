@@ -20,10 +20,12 @@ snapshot while it runs, and cancel it; they never own a browser or a thread.
 - **Input**: A swarm request naming the verb, the prompt source, the browser count, and the run configuration.
 - **Output**: A swarm response carrying the fan-out handle, or the reason it could not start.
 - **Business Rules**:
-  - The fan-out never exceeds the host's concurrency ceiling; a request above it is clamped and the clamp is reported.
+  - The fan-out never exceeds the host's concurrency ceiling; a request above it is clamped and the clamp is reported on the snapshot as `clamped_browser_count` (0 when no clamp happened).
+  - A browser count below one is clamped to one rather than producing an empty fan-out.
+  - When the session pool offers fewer healthy sessions (N) than the clamped browser count (B), the runner submits one leg per healthy session and reports the shortfall `session_shortfall = max(0, B - N)` on the snapshot instead of padding or re-using a known-LIMITED session; a pool with zero healthy sessions submits no legs. This is consistent with the session rotation `no_eligible_session` rule: a known-LIMITED session is never submitted through.
   - Each leg runs against its own session, so one leg's rate limit does not stop the others.
   - Legs are bounded by a per-leg retry budget; a leg that exhausts it fails while the rest continue.
-- **Edge Cases**: A browser count below one is clamped to one rather than producing an empty fan-out.
+- **Edge Cases**: A request above the ceiling and a request below one are both reported on the snapshot, not silently dropped.
 - **Error Handling**: A leg that fails records its own error in the snapshot; the fan-out as a whole reports completed with per-leg verdicts.
 
 ### FR-SWARM-002: Report fan-out progress
@@ -34,6 +36,7 @@ snapshot while it runs, and cancel it; they never own a browser or a thread.
 - **Business Rules**:
   - A snapshot is a read that never mutates the fan-out.
   - A leg that has not started yet reports pending rather than absent.
+  - The fan-out progress envelope a poller (MCP `get_job_status` consumer) relies on is the snapshot: run-level `status` in `queued` / `running` / `completed` / `partial` / `failed` / `cancelled`; per-leg `agents` each carrying `agent_id`, `status` in `queued` / `running` / `retrying` / `completed` / `failed` / `cancelled`, `attempt`, `output_path`, `error`, and `duration_sec`; plus run-level `browser_concurrency`, `clamped_browser_count`, and `session_shortfall`. A poller maps the run-level `status` onto the MCP envelope `status` field, maps each `agent.status` onto the per-leg status, and reads `clamped_browser_count` / `session_shortfall` to explain any submitted leg count below the request.
 - **Edge Cases**: A snapshot of a fan-out that never started reports no legs.
 - **Error Handling**: A snapshot whose handle is unknown reports no legs rather than raising.
 

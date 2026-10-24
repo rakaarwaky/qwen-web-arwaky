@@ -67,6 +67,10 @@ class SwarmSnapshot:
     max_attempts: int
     browser_concurrency: int
     clamped_browser_count: int = 0
+    #: How many clamped legs were not submitted because the session pool
+    #: offered fewer healthy sessions than the clamped browser count
+    #: (FR-SWARM-003). Zero when the shortfall did not occur.
+    session_shortfall: int = 0
     agents: tuple[SwarmAgentSnapshot, ...] = field(default_factory=tuple)
 
     @property
