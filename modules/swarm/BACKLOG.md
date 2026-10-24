@@ -16,7 +16,7 @@ Last Updated: 2026-10-24
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
 | SWARM-01 | P1 | Ready | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 | FR-SWARM-001 |
-| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 | FR-SWARM-002 |
+| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 | FR-SWARM-002, FR-SWARM-003 |
 | SWARM-03 | P2 | Ready | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 | FR-SWARM-001, FR-SWARM-004 |
 
 ## Scenario Evidence
