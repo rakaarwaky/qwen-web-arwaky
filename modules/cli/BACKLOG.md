@@ -15,7 +15,7 @@ Last Updated: 2026-10-24
 
 | ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---|---|---|---|---|
-| CLIC-01 | P2 | Done | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md`. TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time, so this row closes with no new rows needed. Verified: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 197 passed, 0 failed on branch `rakaarwaky/cl01` (issue #671). | No action; open a new `CLIC-NN` row with issue links when a CLI-surface finding lands. | 2026-10-24 |
+| CLIC-01 | P2 | Done | Track CLI-only surface issues (commands, controllers, doctor/sessions) here; TUI items live in `modules/tui/BACKLOG.md`. TUI split landed on `refactor/separate-cli-tui-modules`; no CLI-surface findings open at split time, so this row closes with no new rows needed. Verified: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 197 passed, 0 failed on branch `rakaarwaky/cl01` (issue #671). Evidence: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 197 passed (2026-10-25, commit 02e54b7). | No action; open a new `CLIC-NN` row with issue links when a CLI-surface finding lands. | 2026-10-25 |
 
 ## Scenario Evidence
 
