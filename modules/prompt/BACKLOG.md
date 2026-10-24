@@ -15,9 +15,9 @@ Last Updated: 2026-10-24
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| PROMPT-01 | P1 | Done | `CONFIG-02` | None — retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. | 2026-10-24 | FR-PROMPT-001, FR-PROMPT-003, FR-PROMPT-006 |
+| PROMPT-01 | P1 | Done | `CONFIG-02` | None — retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. | 2026-10-24 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
 | PROMPT-02 | P1 | Done | None | None — covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. | 2026-10-22 | FR-PROMPT-004, FR-PROMPT-005 |
-| PROMPT-03 | P2 | Done | `SHARED-02` | None — the pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. | 2026-10-22 | FR-PROMPT-008 |
+| PROMPT-03 | P2 | Done | `SHARED-02` | None — the pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. | 2026-10-22 | FR-PROMPT-008, FR-PROMPT-011, FR-PROMPT-012 |
 
 ## Scenario Evidence
 
@@ -59,6 +59,7 @@ None.
 
 | Date | Change | By |
 |---|---|---|
+| 2026-10-25 | Closed FR-orphan gaps: FR-PROMPT-002/007/009/010 attached to PROMPT-01, FR-PROMPT-011/012 to PROMPT-03; ROADMAP roll-up advanced to Done. | @qwen-web-arwaky |
 | 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
 | 2026-10-24 | PROMPT-01 closed: dispatch retry budget coordinated with CONFIG-02 (`unit_prompt_dispatch_retry_budget.py`). | @qwen-web-arwaky |
 | 2026-10-22 | Scenario evidence completed (7 automated rows, 0 gaps); `PROMPT-02`/`PROMPT-03` closed; `PROMPT-01` stall-ceiling pinning done, retry budget remains with `CONFIG-02`. | @qwen-web-arwaky |
