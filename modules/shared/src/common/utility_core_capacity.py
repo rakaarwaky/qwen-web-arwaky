@@ -48,14 +48,15 @@ def recommended_max_workers() -> int:
     """Return how many browsers this host can carry, clamped to 1..DEFAULT_MAX_WORKERS.
 
     One worker is always allowed so a low-memory host degrades to serial
-    execution instead of refusing to run. When memory is unmeasurable the
-    constant cap applies unchanged, preserving the previous behaviour.
+    execution instead of refusing to run. When no usable memory is reported —
+    neither available nor total — the single-worker default applies so an
+    under-provisioned host cannot fan out a constant-cap fleet (FR-CONFIG-004).
     """
     budget = available_memory_bytes()
     if not budget or budget <= 0:
         total = total_memory_bytes()
         if not total or total <= 0:
-            return DEFAULT_MAX_WORKERS
+            return 1
         budget = int(total * (1.0 - MEMORY_RESERVED_FRACTION))
     return min(DEFAULT_MAX_WORKERS, max(1, int(budget) // MIN_MEMORY_PER_WORKER_BYTES))
 

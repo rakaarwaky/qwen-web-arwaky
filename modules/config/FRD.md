@@ -141,6 +141,7 @@ answers into a single config the other features read.
 - A folder input holding three prompts discovers them in a deterministic order.
 - A workspace init creates owner-only directories, provisions SKILL.md and symlinks, and reuses an existing workspace.
 - A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; the update smoke gate reflects the post-upgrade state because the probe re-runs the checks at gate-execution time.
+- A host that reports no usable memory derives a ceiling of one worker, so an unmeasurable host runs serially instead of fanning out at the constant cap.
 
 ## Assumptions & Constraints
 

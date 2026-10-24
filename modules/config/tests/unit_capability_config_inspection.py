@@ -244,6 +244,31 @@ def test_resolver_skips_fields_the_config_left_unset(tmp_path: Path) -> None:
 # ─── ConfigCapacityAdvisor ────────────────────────────────────────────────
 
 
+def test_capacity_falls_back_to_one_when_no_memory_is_reported() -> None:
+    # FR-CONFIG-004: a host that reports no usable memory (neither available
+    # nor total) falls back to the single-worker default, not the constant cap.
+    with (
+        patch("modules.shared.src.common.utility_core_capacity.available_memory_bytes", return_value=None),
+        patch("modules.shared.src.common.utility_core_capacity.total_memory_bytes", return_value=None),
+    ):
+        report = ConfigCapacityAdvisor(env={}).report()
+
+    assert report.recommended_max_workers == 1
+    assert report.effective_max_workers == 1
+    assert report.over_capacity is False
+
+
+def test_capacity_falls_back_to_one_when_memory_is_reported_as_zero() -> None:
+    with (
+        patch("modules.shared.src.common.utility_core_capacity.available_memory_bytes", return_value=0),
+        patch("modules.shared.src.common.utility_core_capacity.total_memory_bytes", return_value=0),
+    ):
+        report = ConfigCapacityAdvisor(env={}).report()
+
+    assert report.recommended_max_workers == 1
+    assert report.effective_max_workers == 1
+
+
 def test_capacity_uses_the_derived_limit_without_an_override() -> None:
     report = ConfigCapacityAdvisor(env={}).report()
 
