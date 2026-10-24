@@ -241,10 +241,10 @@ def test_master_lock_is_a_real_threading_lock() -> None:
 def test_parallel_clones_yield_distinct_complete_profiles(tmp_path: Path) -> None:
     """Four concurrent clones of one master all succeed and never collide.
 
-    This is the ``DEFAULT_MAX_WORKERS`` path the host gate in
-    ``utility_core_host_gate`` protects; the clones must overlap rather than
-    queue behind one another, and none may leak a worker's files into
-    another's profile.
+    Four clones mirror the host-gated worker count: on this host the gate in
+    ``recommended_max_workers`` caps fan-out at the available-memory budget,
+    and the clones must overlap rather than queue behind one another, with
+    none leaking a worker's files into another's profile.
     """
     master = tmp_path / "master"
     master.mkdir()

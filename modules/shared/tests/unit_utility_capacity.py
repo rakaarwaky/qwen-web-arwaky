@@ -39,12 +39,14 @@ def test_recommended_workers_degrades_to_one_on_a_tiny_host():
         assert recommended_max_workers() == 1
 
 
-def test_recommended_workers_degrades_to_one_when_memory_is_unreadable():
+def test_recommended_workers_falls_back_to_one_when_no_memory_is_reported():
+    # FR-CONFIG-004: a host that reports no usable memory degrades to the
+    # single-worker default instead of the constant cap.
     with (
         patch("modules.shared.src.common.utility_core_capacity.available_memory_bytes", return_value=None),
         patch("modules.shared.src.common.utility_core_capacity.total_memory_bytes", return_value=None),
     ):
-        assert recommended_max_workers() == DEFAULT_MAX_WORKERS
+        assert recommended_max_workers() == 1
 
 
 def test_recommended_workers_falls_back_to_total_memory_when_available_is_unreadable():
