@@ -15,8 +15,8 @@ Last Updated: 2026-10-24
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| SESSION-01 | P0 | Done | `SHARED-01` | Acceptance test proving a backup write failure refuses the deletion and leaves the master profile in place — landed in `modules/session/tests/unit_capabilities_session_manager.py`. | 2026-10-18 | FR-SESSION-001, FR-SESSION-003 |
-| SESSION-02 | P1 | Done | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). | 2026-10-18 | FR-SESSION-002, FR-SESSION-004 |
+| SESSION-01 | P0 | Done | `SHARED-01` | Acceptance test proving a backup write failure refuses the deletion and leaves the master profile in place — landed in `modules/session/tests/unit_capabilities_session_manager.py`. Evidence: `uv run python -m pytest modules/session/tests/unit_capabilities_session_manager.py -v` → 24 passed (2026-10-25, commit e4f5341). | 2026-10-25 | FR-SESSION-001, FR-SESSION-003 |
+| SESSION-02 | P1 | Done | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). Evidence: `uv run python -m pytest modules/session/tests/ -v` → 24 passed (2026-10-25, commit 03d72dc). | 2026-10-25 | FR-SESSION-002, FR-SESSION-004 |
 | SESSION-03 | P2 | Ready | `BROWSER-03` | Specify the session-directory permission repair when the browser launches the context under a different user. | 2026-10-05 | FR-SESSION-004 |
 
 ## Scenario Evidence
@@ -57,4 +57,5 @@ None.
 | 2026-10-18 | `SESSION-01`/`SESSION-02` tests landed; FRD reconciled with the eight implemented verbs (aggregate API table, FR-SESSION-001/002/004). | @qwen-web-arwaky |
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-25 | ROADMAP roll-up advanced to Done; FR-orphan refs added: FR-SESSION-001 to SESSION-01, FR-SESSION-002 to SESSION-02. | @qwen-web-arwaky |
+| 2026-10-25 | Evidence cells completed for SESSION-01/02 (three-proof rule: command + pass-result + commit SHA). | @qwen-web-arwaky |
 | 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
