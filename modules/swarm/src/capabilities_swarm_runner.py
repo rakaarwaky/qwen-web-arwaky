@@ -93,10 +93,16 @@ class SwarmRunner(ISwarmStartProtocol):
         self._headless_for_run = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get("QWA_SWARM_CONCURRENCY", "").strip()
-            concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
+            requested = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
         else:
-            concurrency = int(browser_concurrency)
-        self._browser_concurrency = min(recommended_max_workers(), max(1, concurrency))
+            requested = int(browser_concurrency)
+        ceiling = recommended_max_workers()
+        self._browser_concurrency = min(ceiling, max(1, requested))
+        #: How many of the requested browsers were clamped off by the ceiling
+        #: (or the below-one floor raising the count to one). Zero means no
+        #: clamp happened; a positive value is reported on the snapshot so a
+        #: caller can see its request was reduced (FR-SWARM-001).
+        self._clamped_browser_count = max(0, requested - self._browser_concurrency)
         self._max_attempts = max(1, int(max_attempts))
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
@@ -137,6 +143,7 @@ class SwarmRunner(ISwarmStartProtocol):
             status="queued",
             max_attempts=self._max_attempts,
             browser_concurrency=self._browser_concurrency,
+            clamped_browser_count=self._clamped_browser_count,
             agents=tuple(
                 SwarmAgentSnapshot(agent_id=role, status="queued", output_path=root / role / "output.md")
                 for role in roles

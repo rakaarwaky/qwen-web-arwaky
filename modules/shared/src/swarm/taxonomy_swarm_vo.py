@@ -66,6 +66,7 @@ class SwarmSnapshot:
     status: SwarmStatus
     max_attempts: int
     browser_concurrency: int
+    clamped_browser_count: int = 0
     agents: tuple[SwarmAgentSnapshot, ...] = field(default_factory=tuple)
 
     @property
