@@ -4,9 +4,8 @@ State: **In Review**. Last Updated: **2026-09-24**.
 
 ## Current Condition
 
-- Done: `gh release view v6.4.0` reports a published release; source evidence is baseline commit `d8a9b60`.
-- In Progress: `WS-01` documentation governance and `WS-02` benchmark and test layout convergence.
-- Next: `WS-01`, `WS-02`, `WS-03`, `WS-04`.
+- Done: `gh release view v6.4.0` reports a published release; source evidence is baseline commit `d8a9b60` · In Progress: `WS-01` documentation governance, `WS-02` benchmark and test layout convergence · Blocked: None
+- Next: `WS-01`, `WS-02`, `WS-03`, `WS-04`
 
 ### Release Readiness
 
@@ -52,7 +51,7 @@ Only work spanning multiple features or repository infrastructure belongs here.
 | In Review | PR open; awaiting verification pass. |
 | Done | Command + commit evidence; shipped releases carry release evidence. |
 
-## Status Policy
+### Status Policy
 
 - Verified, not self-reported: re-run the relevant command on the represented commit and cite the command, result, and commit hash (not “today”).
 - The same PR updates every roadmap or backlog row invalidated by its changes.
