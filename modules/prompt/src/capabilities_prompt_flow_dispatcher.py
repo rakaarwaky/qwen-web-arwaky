@@ -37,6 +37,7 @@ from modules.shared.src.common.taxonomy_core_vo import (
     TimeoutSec,
 )
 from modules.shared.src.common.utility_core_prompt import strip_input_from_output
+from modules.shared.src.common.utility_core_retry_budget import resolve_dispatch_retry_budget
 from modules.shared.src.common.utility_dom_query import latest_message_text, partial_text_after_stream_cut
 from modules.shared.src.common.utility_error_mapping import to_error_response
 from modules.shared.src.common.utility_io_writer import save_orchestrator_output
@@ -85,15 +86,18 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
 
         The returned :class:`StreamVerdict` carries the monitor's extraction
         verdict so a caller can tell a complete response from one the stall
-        detector cut. ``StuckDetectedError`` is not retried here: a stalled
-        stream is terminal for this run (FRD PROMPT-01, "reports `stalled`
-        and does not retry the send") until ``CONFIG-02`` supplies a retry
-        budget.
+        detector cut. ``StuckDetectedError`` retries only inside
+        ``retry_budget``: a stall detector cut spends one of the
+        CONFIG-02-resolved dispatch retry slots, and the send is terminal
+        when the budget is 0 (FRD PROMPT-01, "reports `stalled` and does
+        not retry the send" — the default) or when every slot is spent.
         """
         if cancel_event is not None and cancel_event.is_set():
             raise RunCancelledError("Cancelled by user before dispatch")
         logger = observability.get_logger()
 
+        budget = resolve_dispatch_retry_budget(active_cfg.dispatch_retry_budget)
+        stall_retries_used = 0
         last_error: Exception
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
@@ -114,6 +118,34 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
                     document_parsed,
                     cancel_event,
                 )
+            except StuckDetectedError as e:
+                # The stall detector is event-driven and retriable, but only
+                # inside the CONFIG-02 budget; the response ceiling stays
+                # absolute and terminal for the attempt (FR-PROMPT-006).
+                last_error = e
+                if cancel_event is not None and cancel_event.is_set():
+                    break
+                if stall_retries_used >= int(budget):
+                    raise
+                stall_retries_used += 1
+                delay = RETRY_BASE_DELAY_SEC * attempt
+                logger.warning(
+                    "Dispatch attempt %d/%d stalled; retry budget %d/%d, retrying in %ds",
+                    attempt,
+                    MAX_ATTEMPTS,
+                    stall_retries_used,
+                    int(budget),
+                    delay,
+                )
+                gate = emitter.gate
+                if gate is not None:
+                    boundary = self._attempt_boundary_index(emitter)
+                    gate.reset(completed_prefix=EventSequenceVO(gate.completed[:boundary]))
+                if cancel_event is not None:
+                    _interruptible_sleep(cancel_event, delay)
+                else:
+                    time.sleep(delay)
+                continue
             except (RateLimitError, ResponseDetectionTimeoutError) as e:
                 last_error = e
                 if cancel_event is not None and cancel_event.is_set():
@@ -225,9 +257,11 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
         if not state.dispatch_acknowledged:
             raise RuntimeError("Cannot wait for response: prompt dispatch is incomplete")
 
-        # timeout_sec is a hard response cutoff (issue #372), enforced by the
-        # stream monitor; a budget overrun surfaces as
-        # ResponseDetectionTimeoutError and this loop retries per MAX_ATTEMPTS.
+        # timeout_sec is the absolute per-attempt response ceiling
+        # (CONFIG-02 / FR-PROMPT-006); a budget overrun surfaces as
+        # ResponseDetectionTimeoutError and the loop retries per MAX_ATTEMPTS.
+        # A stall-detector cut raises StuckDetectedError instead, which the
+        # loop retries only inside the CONFIG-02 dispatch retry budget.
         try:
             # The protocol annotates this as StreamVerdict (issue #18): the
             # monitor either returns one or raises, so the verdict below is
