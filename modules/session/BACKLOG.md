@@ -46,6 +46,10 @@ None.
 | Scenario evidence | Done | 5 of 5 scenarios mapped; the `SESSION-01` gap closed by the backup-guard tests in `unit_capabilities_session_manager.py`. |
 | Docs | Done | [FRD.md](FRD.md) reconciled with the eight implemented verbs and the ratified code behavior. |
 
+## Deferred
+
+None.
+
 ## Change Log
 
 | Date | Change | By |

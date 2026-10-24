@@ -45,6 +45,10 @@ None.
 | Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `UPDATE-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
+## Deferred
+
+None.
+
 ## Change Log
 
 | Date | Change | By |

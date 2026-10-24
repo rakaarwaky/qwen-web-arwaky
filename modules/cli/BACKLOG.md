@@ -55,6 +55,10 @@ None.
 | Scenario evidence | Done | 14 of 14 scenarios mapped |
 | Docs | Done | [DESIGN.md](DESIGN.md) is specification-only for the CLI surface. |
 
+## Deferred
+
+None.
+
 ## Change Log
 
 | Date | Change | By |

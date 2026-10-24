@@ -45,6 +45,10 @@ None.
 | Scenario evidence | Done | 4 of 4 scenarios mapped to an automated test. |
 | Docs | Done | [DATA.md](DATA.md) is specification-only. |
 
+## Deferred
+
+None.
+
 ## Change Log
 
 | Date | Change | By |

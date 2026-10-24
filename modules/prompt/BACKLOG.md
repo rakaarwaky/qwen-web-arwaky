@@ -51,6 +51,10 @@ None.
 | Scenario evidence | Done | 6 of 6 FRD scenarios mapped across 7 automated rows; no gaps. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
+## Deferred
+
+None.
+
 ## Change Log
 
 | Date | Change | By |
