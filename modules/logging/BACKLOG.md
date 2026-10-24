@@ -3,21 +3,21 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-24
+Last Updated: 2026-10-05
 
 ## Current Condition
 
 - Done: `uv run python -m pytest modules/logging/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Next Action: `LOGGING-01`, the flush-completeness acceptance gap.
+- Next Action: None.
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
-|---|---:|---|---|---|---|---|
-| LOGGING-01 | P1 | Ready | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-05 | FR-LOGGING-001 |
-| LOGGING-02 | P1 | Ready | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 | FR-LOGGING-001, FR-LOGGING-002 |
-| LOGGING-03 | P2 | Done | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 | FR-LOGGING-002 |
+| ID | Priority | State | Dependencies | Next Action | Updated |
+|---|---:|---|---|---|---|
+| LOGGING-01 | P1 | Done | None | Add an acceptance scenario proving close flushes every record emitted before it into the log file. | 2026-10-24 |
+| LOGGING-02 | P1 | Ready | None | Add a regression proving a double bootstrap with one run id attaches no duplicate handler. | 2026-10-05 |
+| LOGGING-03 | P2 | Done | `JOBS-03` | None — closed into the single contract owner `modules/shared/tests/contract_status_schema.py` (see JOBS-03). | 2026-10-22 |
 
 ## Scenario Evidence
 
@@ -26,7 +26,7 @@ Last Updated: 2026-10-24
 | An interactive bootstrap attaches no standard-error handler | Automated | `modules/logging/tests/unit_observability_stderr.py` | stderr regression | 2026-10-05 |
 | The run stamp attaches to records from worker threads | Automated | `modules/logging/tests/unit_observability_stderr.py` | thread stamp | 2026-10-05 |
 | A failure category separates retried from terminal faults | Automated | `modules/logging/tests/unit_observability_stderr.py` | failure count | 2026-10-05 |
-| A close flushes every record before returning | Gap | none yet | see `LOGGING-01` | 2026-10-05 |
+| A close flushes every record before returning | Automated | `modules/logging/tests/acceptance_logging_flush.py` | close flush | 2026-10-24 |
 
 ## Blockers
 
@@ -42,7 +42,7 @@ None.
 | Area | Status | Notes |
 |---|---|---|
 | Tests | Done | `uv run python -m pytest modules/logging/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `LOGGING-01`. |
+| Scenario evidence | Done | 4 of 4 scenarios mapped; none left open as a gap. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
 ## Deferred
@@ -54,4 +54,3 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
-| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
