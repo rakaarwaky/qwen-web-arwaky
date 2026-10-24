@@ -9,7 +9,6 @@ Last Updated: 2026-10-05
 
 - Done: `uv run python -m pytest modules/jobs/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Blocked: None.
 - Next Action: None. `JOBS-01` shipped on 2026-10-22; next open item is `JOBS-02`.
 
 ## Backlog
@@ -47,7 +46,7 @@ None.
 
 ## Deferred
 
-- Cross-process pool sharing stays out of scope; each process owns its workers and its storage.
+None.
 
 ## Change Log
 

@@ -9,7 +9,6 @@ Last Updated: 2026-10-05
 
 - Done: `uv run python -m pytest modules/logging/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Blocked: None.
 - Next Action: `LOGGING-01`, the flush-completeness acceptance gap.
 
 ## Backlog
@@ -48,7 +47,7 @@ None.
 
 ## Deferred
 
-- Per-subsystem span tracing stays outside the run lifecycle; only the run's quality report reads the counters.
+None.
 
 ## Change Log
 

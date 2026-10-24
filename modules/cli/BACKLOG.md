@@ -9,7 +9,6 @@ Last Updated: 2026-10-21
 
 - Done: `uv run python -m pytest modules/cli/tests/ -m "not benchmark" -v` → 178 passed, on branch `rakaarwaky/ux-tui-cli-surface`, on 2026-10-21.
 - In Progress: None.
-- Blocked: None.
 - Next Action: `CLIC-01`, track CLI-only surface issues as they surface.
 
 ## Backlog

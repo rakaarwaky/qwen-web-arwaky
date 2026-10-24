@@ -9,7 +9,6 @@ Last Updated: 2026-10-05
 
 - Done: `uv run python -m pytest modules/swarm/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Blocked: None.
 - Next Action: `SWARM-01`, the clamp-reporting acceptance gap.
 
 ## Backlog
@@ -49,7 +48,7 @@ None.
 
 ## Deferred
 
-- Per-leg prompt variation and heterogeneous leg configuration stay out of scope.
+None.
 
 ## Change Log
 

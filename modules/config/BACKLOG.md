@@ -9,7 +9,6 @@ Last Updated: 2026-10-05
 
 - Done: `uv run python -m pytest modules/config/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Blocked: None.
 - Next Action: `CONFIG-01`, the multi-fault finding acceptance gap.
 
 ## Backlog
@@ -48,7 +47,7 @@ None.
 
 ## Deferred
 
-- The slot resolver's widget mapping stays behind the slot surface; this feature only decides what the values mean.
+None.
 
 ## Change Log
 

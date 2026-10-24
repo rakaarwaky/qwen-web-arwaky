@@ -9,7 +9,6 @@ Last Updated: 2026-10-18
 
 - Done: `uv run python -m pytest modules/session/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: `SESSION-01` and `SESSION-02` — acceptance tests landing in this pass.
-- Blocked: None.
 - Next Action: `SESSION-03`, the session-directory permission repair spec.
 
 ## Backlog
@@ -49,8 +48,7 @@ None.
 
 ## Deferred
 
-- Session pool replication across machines stays out of scope; the pool is local to the workspace.
-- BE-4-003 pool mtime cache: the pool is ≤ ~10 sessions in a single-process CLI, so per-operation JSON parse + directory scan is not a measured bottleneck. Revisit if `check_pool_sync` benchmarks show otherwise.
+None.
 
 ## Change Log
 
