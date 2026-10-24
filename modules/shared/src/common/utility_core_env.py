@@ -51,6 +51,7 @@ OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME"
 PLAYWRIGHT_BROWSERS_PATH = "PLAYWRIGHT_BROWSERS_PATH"
 QWA_SWARM_HEADLESS = "QWA_SWARM_HEADLESS"
 QWEN_DEFAULT_MODEL = "QWEN_DEFAULT_MODEL"
+QWEN_DISPATCH_RETRY_BUDGET = "QWEN_DISPATCH_RETRY_BUDGET"
 QWEN_DISABLE_SANDBOX = "QWEN_DISABLE_SANDBOX"
 QWEN_DOCTOR_DEEP = "QWEN_DOCTOR_DEEP"
 QWEN_DOCTOR_SHOW_PATH = "QWEN_DOCTOR_SHOW_PATH"
@@ -74,6 +75,12 @@ REGISTERED_ENV: tuple[tuple[str, str, str, bool], ...] = (
     (PLAYWRIGHT_BROWSERS_PATH, "override the Playwright browser cache directory", "platform default", False),
     (QWA_SWARM_HEADLESS, "force Swarm browsers headed when '0' or 'false' (default: headless)", "headless", False),
     (QWEN_DEFAULT_MODEL, "model pinned at chat start; empty falls back to Qwen3.8-Max", "Qwen3.8-Max", False),
+    (
+        QWEN_DISPATCH_RETRY_BUDGET,
+        "extra dispatch attempts after a stall-detector cut; 0 keeps a stall terminal",
+        "0",
+        False,
+    ),
     (QWEN_DISABLE_SANDBOX, "explicitly drop Chromium's OS sandbox (1/true/yes)", "unset", False),
     (QWEN_DOCTOR_DEEP, "enable the slow Playwright cold-start probe in doctor", "0", False),
     (QWEN_DOCTOR_SHOW_PATH, "print the effective Chromium binary path in doctor", "0", False),
@@ -209,6 +216,9 @@ def validate_env(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     response_ceiling = source.get(QWEN_REQUEST_TIMEOUT_SEC, "").strip()
     if response_ceiling and not response_ceiling.isdigit():
         problems.append(f"{QWEN_REQUEST_TIMEOUT_SEC}: {response_ceiling!r} is not a positive integer")
+    retry_budget = source.get(QWEN_DISPATCH_RETRY_BUDGET, "").strip()
+    if retry_budget and not retry_budget.isdigit():
+        problems.append(f"{QWEN_DISPATCH_RETRY_BUDGET}: {retry_budget!r} is not a non-negative integer")
     login_wait = source.get(QWEN_LOGIN_WAIT_SEC, "").strip()
     if login_wait and not login_wait.isdigit():
         problems.append(f"{QWEN_LOGIN_WAIT_SEC}: {login_wait!r} is not a positive integer")
