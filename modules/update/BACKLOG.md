@@ -13,11 +13,11 @@ Last Updated: 2026-10-24
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| UPDATE-01 | P0 | Done | None | None — acceptance scenario proving a failed health gate restores the install before the browser build added to `acceptance_update_rollback_ordering.py`. | 2026-10-24 |
-| UPDATE-02 | P1 | Done | None | None — rollback acceptance criteria defined in FRD.md matching surface report contract; six cross-cutting findings (#299, #355, #329, #340, #325, #289/#349) revalidated against current contract. | 2026-10-24 |
-| UPDATE-03 | P2 | Done | None | None — acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses; landed in `modules/update/tests/acceptance_update_postflight_rollback.py`. | 2026-10-24 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| UPDATE-01 | P0 | Done | None | None — acceptance scenario proving a failed health gate restores the install before the browser build added to `acceptance_update_rollback_ordering.py`. | 2026-10-24 | FR-UPDATE-001, FR-UPDATE-004 |
+| UPDATE-02 | P1 | Done | None | None — rollback acceptance criteria defined in FRD.md matching surface report contract; six cross-cutting findings (#299, #355, #329, #340, #325, #289/#349) revalidated against current contract. | 2026-10-24 | FR-UPDATE-002, FR-UPDATE-003, FR-UPDATE-004 |
+| UPDATE-03 | P2 | Done | None | None — acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses; landed in `modules/update/tests/acceptance_update_postflight_rollback.py`. | 2026-10-24 | FR-UPDATE-003, FR-UPDATE-004 |
 
 ## Scenario Evidence
 
@@ -57,4 +57,5 @@ None.
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-24 | Advance UPDATE-01 to Done with rollback-ordering acceptance scenario. | @qwen-web-arwaky |
 | 2026-10-24 | UPDATE-02 advanced to Done: rollback acceptance criteria defined in FRD.md; six cross-cutting findings revalidated against the current contract. | @qwen-web-arwaky |
+| 2026-10-25 | Added FRD Ref column to header + separator + all 3 rows: UPDATE-01 -> FR-UPDATE-001/004, UPDATE-02 -> FR-UPDATE-002/003/004, UPDATE-03 -> FR-UPDATE-003/004. | @qwen-web-arwaky |
 | 2026-10-24 | UPDATE-03 advanced to Done: postflight-failure rollback acceptance test added in `modules/update/tests/acceptance_update_postflight_rollback.py`. | @qwen-web-arwaky |

@@ -7,8 +7,8 @@ State vocabulary, verification requirements, ownership rules, and ID policy are 
 ## Current Condition
 
 - Done: `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` reports **138 passed** (15 test files) on branch `rakaarwaky/ux-tui-cli-surface`, 2026-10-21.
-- In Progress: `TUI-01` release evidence recording; `TUI-03`, the DESIGN.md rework.
-- Next: `TUI-01`, `TUI-03`.
+- In Progress: `TUI-01` release evidence recording.
+- Next: `TUI-01`.
 
 ## Scenario Evidence
 
@@ -42,6 +42,7 @@ None.
 
 | Date | Change | By |
 |---|---|---|
+| 2026-10-25 | TUI-03 DESIGN.md rework closed (lint evidence at `a00c66a`); TUI-03 removed from In Progress/Next, only `TUI-01` release evidence remains open. | @qwen-web-arwaky |
 | 2026-10-24 | TUI-03 Done: `DESIGN.md` reworked to the aes-docs DESIGN contract; `uv run lint-arwaky-cli docs modules/tui` reports 0 DESIGN.md findings at `a00c66a` | @rakaarwaky |
 | 2026-10-25 | Evidence cells completed (three-proof rule). | @qwen-web-arwaky |
 | 2026-10-21 | UX remediation: 138 passed (15 test files); added `unit_tui_ux_remediation.py` (25 tests) and re-verified `unit_tui_session_action_buttons.py` (10 passed) | @rakaarwaky |
