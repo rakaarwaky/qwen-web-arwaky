@@ -250,14 +250,16 @@ class StreamMonitor(IStreamProtocol):
         tracks the last *forward event* (thinking started, streamed text
         change, or terminal completion). When no forward event arrives within
         ``stall_timeout_sec``, a ``StuckDetectedError`` is raised. A stall is
-        **terminal for this run** (FRD "A stalled stream reports `stalled`
-        and does not retry the send", PROMPT-01): the send is not retried by
-        this monitor or its dispatcher, and the exception reaches the adapter
-        so the partial response is still saved and the run can be reported
-        with a ``stalled``/``incomplete`` verdict. A retry budget belongs to
-        ``CONFIG-02``, not to this seam. Slow-but-alive generations keep
-        emitting forward events and are never misclassified as stuck — but
-        they are still bounded by the ``timeout_sec`` ceiling, and the
+        terminal for this run under the default dispatch retry budget (FRD
+        "A stalled stream reports `stalled` and does not retry the send",
+        PROMPT-01): the monitor and the dispatcher never re-send on a stall,
+        and the exception reaches the adapter so the partial response is
+        still saved and the run reports a ``stalled`` verdict. The retry
+        budget belongs to ``CONFIG-02`` (the dispatch retry budget
+        ``AppConfig.dispatch_retry_budget``); this monitor only detects the
+        stall and raises. Slow-but-alive generations keep emitting forward
+        events and are never misclassified as stuck — but they are still
+        bounded by the ``timeout_sec`` ceiling, and the
         ``safety_timeout_sec`` circuit breaker remains an absolute backstop
         for pathological cases.
 

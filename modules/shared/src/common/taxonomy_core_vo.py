@@ -224,6 +224,9 @@ WaitTimeoutMs = NewType("WaitTimeoutMs", int)
 ClickTimeoutMs = NewType("ClickTimeoutMs", int)
 BackoffDelaySec = NewType("BackoffDelaySec", float)
 MaxRetries = NewType("MaxRetries", int)
+#: How many extra attempts the dispatch loop grants after a stall detector cut
+#: (FR-PROMPT-006 retry budget, resolved against CONFIG-02's env probe).
+DispatchRetryBudget = NewType("DispatchRetryBudget", int)
 StabilityChecks = NewType("StabilityChecks", int)
 MinTextLength = NewType("MinTextLength", int)
 
@@ -674,6 +677,13 @@ class AppConfig:
     rate_limit_per_minute: int = 60
     circuit_breaker_threshold: int = 5
     circuit_breaker_window: int = 30
+
+    # How many extra dispatch attempts the prompt dispatcher grants after a
+    # stall-detector cut (FR-PROMPT-006 retry budget, PROMPT-01). 0 keeps a
+    # stall terminal for the run; a positive value caps the re-send budget.
+    # The config feature's env probe (CONFIG-02) resolves the per-environment
+    # override off this field before the adapter builds the dispatch loop.
+    dispatch_retry_budget: int = 0
 
     # Issue #283: stakeholder-configurable model override. When set, the
     # browser adapter tries this model first; when the picker does not expose

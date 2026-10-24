@@ -569,6 +569,17 @@ DEFAULT_REQUEST_TIMEOUT_SEC: int = 600
 #: Environment override for ``DEFAULT_REQUEST_TIMEOUT_SEC``.
 REQUEST_TIMEOUT_ENV: str = "QWEN_REQUEST_TIMEOUT_SEC"
 
+# ─── Config domain: dispatch retry budget (PROMPT-01 / CONFIG-02) ─────────
+#: How many times the prompt dispatcher may re-attempt a send after the
+#: event-driven stall detector (``stall_timeout_sec``) cuts a stream. 0
+#: keeps a stall terminal for the run — the FR-PROMPT-006 default, pinned
+#: by ``unit_agent_shared_flow_retry.py`` and
+#: ``unit_transcript_selector_regression.py``.
+DEFAULT_DISPATCH_RETRY_BUDGET: int = 0
+
+#: Environment override for ``DEFAULT_DISPATCH_RETRY_BUDGET``.
+DISPATCH_RETRY_BUDGET_ENV: str = "QWEN_DISPATCH_RETRY_BUDGET"
+
 #: Truthy spellings for boolean env switches.
 TRUE_VALUES: frozenset[str] = frozenset({"1", "true", "yes"})
 
