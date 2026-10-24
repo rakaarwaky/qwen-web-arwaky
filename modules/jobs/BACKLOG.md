@@ -3,7 +3,7 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-05
+Last Updated: 2026-10-24
 
 ## Current Condition
 
@@ -13,11 +13,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| JOBS-01 | P0 | Done | None | None — zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. | 2026-10-22 |
-| JOBS-02 | P1 | Done | `MCP-01` | None — the saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. | 2026-10-22 |
-| JOBS-03 | P2 | Done | `LOGGING-03` | None — single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. | 2026-10-22 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| JOBS-01 | P0 | Done | None | None — zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. | 2026-10-22 | FR-JOBS-001 |
+| JOBS-02 | P1 | Done | `MCP-01` | None — the saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. | 2026-10-22 | FR-JOBS-001, FR-JOBS-002 |
+| JOBS-03 | P2 | Done | `LOGGING-03` | None — single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. | 2026-10-22 | FR-JOBS-002 |
 
 ## Scenario Evidence
 
@@ -54,3 +54,4 @@ None.
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-14 | FRD requirements matched to the two declared capability seams; folder compilation left to the feature whose contract declares it. | @qwen-web-arwaky |
+| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |

@@ -3,7 +3,7 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-05
+Last Updated: 2026-10-24
 
 ## Current Condition
 
@@ -13,11 +13,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| UPDATE-01 | P0 | Ready | None | Add an acceptance scenario proving a failed health gate restores the install before the browser build. | 2026-10-05 |
-| UPDATE-02 | P1 | Ready | None | Define the rollback acceptance criteria the surface reports on, and re-validate the six open findings against the current contract. | 2026-10-05 |
-| UPDATE-03 | P2 | Ready | None | Add an acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses. | 2026-10-05 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| UPDATE-01 | P0 | Ready | None | Add an acceptance scenario proving a failed health gate restores the install before the browser build. | 2026-10-05 | FR-UPDATE-001, FR-UPDATE-004 |
+| UPDATE-02 | P1 | Ready | None | Define the rollback acceptance criteria the surface reports on, and re-validate the six open findings against the current contract. | 2026-10-05 | FR-UPDATE-002, FR-UPDATE-004 |
+| UPDATE-03 | P2 | Ready | None | Add an acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses. | 2026-10-05 | FR-UPDATE-003, FR-UPDATE-004 |
 
 ## Scenario Evidence
 
@@ -54,3 +54,4 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
+| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |

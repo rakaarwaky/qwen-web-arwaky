@@ -3,7 +3,7 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-05
+Last Updated: 2026-10-24
 
 ## Current Condition
 
@@ -13,11 +13,11 @@ Last Updated: 2026-10-05
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| SWARM-01 | P1 | Ready | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 |
-| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 |
-| SWARM-03 | P2 | Ready | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 |
+| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|
+| SWARM-01 | P1 | Ready | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 | FR-SWARM-001 |
+| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 | FR-SWARM-002 |
+| SWARM-03 | P2 | Ready | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 | FR-SWARM-001, FR-SWARM-004 |
 
 ## Scenario Evidence
 
@@ -55,3 +55,4 @@ None.
 | Date | Change | By |
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
+| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
