@@ -56,6 +56,14 @@ so a caller never sequences the steps itself.
 - **Business Rules**:
   - Rollback runs in reverse order of the upgrade steps, so the install is restored before the browser build.
   - Rollback is attempted once per failed health gate; a second failure surfaces rather than looping.
+- **Acceptance Criteria**:
+  - Rollback restores the install before the browser build in reverse order of the upgrade steps (package restore, dependency snapshot reconciliation, browser sync).
+  - Rollback status is classified and reported on the surface as one of `none`, `full`, `partial`, or `skipped`.
+  - When all executed restore steps succeed, the surface reports `Rolled back : yes (full)` and sets the rolled-back outcome to true.
+  - When package code is restored but browser synchronization fails, the surface reports `Rolled back : yes (partial)` and displays remediation instructions to run `update --force`.
+  - When rollback cannot proceed due to an unresolvable version, an editable development checkout, or an unpinnable source, the surface reports `Rolled back : no (skipped)` and provides actionable manual recovery commands.
+  - When invoked explicitly via the rollback CLI flag with a target version, the surface reports the execution status and detail of each restore step in order.
+  - When invoked with a missing target version, the surface rejects the invocation with an actionable error.
 - **Edge Cases**: A rollback to the version already installed reports that no restore was needed.
 - **Error Handling**: Each restore step carries its own reason; a partially restored install surfaces the step that failed and the version now installed.
 
@@ -100,11 +108,21 @@ so a caller never sequences the steps itself.
 - Rollback restores the install before the browser build.
 - A postflight failure routes through the same rollback path a health-gate failure uses.
 - A rollback with no target version names the reason rather than restoring something arbitrary.
+- Rollback status is reported on the surface as full, partial, skipped, or none.
+- An editable install rollback refuses automated reinstall and provides manual git checkout instructions.
+- A partial rollback reports the failed browser sync and instructs the operator on forced browser synchronization.
 
 ## Assumptions & Constraints
 
 - Upgrading writes outside the repository; it needs explicit operator approval and never runs unattended.
 - The health gate is the only authority that decides a release is acceptable; the update path does not second-guess it.
+- Open findings re-validation against current contract:
+  - Finding #299 (Operator runbooks per error category): Closed and verified. Operator runbooks exist under `docs/` for each error category, indexed by the environment utility and echoed by diagnostic surface commands.
+  - Finding #355 (Incident response and containment): Closed and verified. Incident containment and recovery procedures are documented, supported by session backup guards and safe deletion confirmation.
+  - Finding #329 (Parallel browser execution test environment): Closed and verified. Resource requirements (memory and shared memory sizing) are documented in the test strategy and concurrency is capped based on host capacity.
+  - Finding #340 (Defect density and quality gates): Closed and verified. Defect counters are tracked per error category in observability metrics and asserted by automated quality report suites.
+  - Finding #325 (Code freeze and release branching): Closed and verified. Branching policies and quality gates are established in project governance documents and roadmap exit gates.
+  - Findings #289 and #349 (Dependency lockfile and pinned runtime dependencies): Closed and verified. Dependencies are locked via `uv.lock` checked in CI, and dependencies are declared in package configuration.
 
 ## Glossary
 

@@ -16,7 +16,7 @@ Last Updated: 2026-10-24
 | ID | Priority | State | Dependencies | Next Action | Updated |
 |---|---:|---|---|---|---|
 | UPDATE-01 | P0 | Done | None | None — acceptance scenario proving a failed health gate restores the install before the browser build added to `acceptance_update_rollback_ordering.py`. | 2026-10-24 |
-| UPDATE-02 | P1 | Ready | None | Define the rollback acceptance criteria the surface reports on, and re-validate the six open findings against the current contract. | 2026-10-05 |
+| UPDATE-02 | P1 | Done | None | None — rollback acceptance criteria defined in FRD.md matching surface report contract; six cross-cutting findings (#299, #355, #329, #340, #325, #289/#349) revalidated against current contract. | 2026-10-24 |
 | UPDATE-03 | P2 | Ready | None | Add an acceptance scenario proving a postflight failure routes through the same rollback path a health-gate failure uses. | 2026-10-05 |
 
 ## Scenario Evidence
@@ -55,3 +55,4 @@ None.
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-24 | Advance UPDATE-01 to Done with rollback-ordering acceptance scenario. | @qwen-web-arwaky |
+| 2026-10-24 | UPDATE-02 advanced to Done: rollback acceptance criteria defined in FRD.md; six cross-cutting findings revalidated against the current contract. | @qwen-web-arwaky |
