@@ -159,9 +159,7 @@ def test_restore_is_byte_identical_after_a_full_corruption_cycle(tmp_path: Path)
     # Build a richer profile than the minimal helper for stronger coverage.
     _write_profile(tmp_path)
     (tmp_path / "Default" / "Network").mkdir(exist_ok=True)
-    (tmp_path / "Default" / "Network" / "Cookies").write_text(
-        "session-token=abc123", encoding="utf-8"
-    )
+    (tmp_path / "Default" / "Network" / "Cookies").write_text("session-token=abc123", encoding="utf-8")
     (tmp_path / "Default" / "Login Data").write_text("user@example.com", encoding="utf-8")
 
     # Take the snapshot — this is the reference state.
