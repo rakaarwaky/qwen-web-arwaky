@@ -47,7 +47,7 @@ None.
 
 ## Deferred
 
-- Managed-build-only binary discovery for hosts that cannot run any sandbox stays behind the environment verdict.
+None.
 
 ## Change Log
 

@@ -47,7 +47,7 @@ None.
 
 ## Deferred
 
-- Per-subsystem span tracing stays outside the run lifecycle; only the run's quality report reads the counters.
+None.
 
 ## Change Log
 

@@ -47,7 +47,7 @@ None.
 
 ## Deferred
 
-- In-place upgrade without a network-fetched artifact stays out of scope; an upgrade always installs a fetched release.
+None.
 
 ## Change Log
 

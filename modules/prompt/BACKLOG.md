@@ -53,7 +53,7 @@ None.
 
 ## Deferred
 
-- Multi-attachment prompts stay out of scope; one attachment per request.
+None.
 
 ## Change Log
 

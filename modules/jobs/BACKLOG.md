@@ -46,7 +46,7 @@ None.
 
 ## Deferred
 
-- Cross-process pool sharing stays out of scope; each process owns its workers and its storage.
+None.
 
 ## Change Log
 

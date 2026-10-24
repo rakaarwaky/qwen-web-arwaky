@@ -47,8 +47,7 @@ None.
 
 ## Deferred
 
-- Per-feature data contracts stay in each feature FRD; the kernel document
-  carries only the shapes every feature shares.
+None.
 
 ## Change Log
 

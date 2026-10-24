@@ -47,7 +47,7 @@ None.
 
 ## Deferred
 
-- The slot resolver's widget mapping stays behind the slot surface; this feature only decides what the values mean.
+None.
 
 ## Change Log
 

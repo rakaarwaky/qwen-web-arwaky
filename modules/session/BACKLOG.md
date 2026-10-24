@@ -48,8 +48,7 @@ None.
 
 ## Deferred
 
-- Session pool replication across machines stays out of scope; the pool is local to the workspace.
-- BE-4-003 pool mtime cache: the pool is ≤ ~10 sessions in a single-process CLI, so per-operation JSON parse + directory scan is not a measured bottleneck. Revisit if `check_pool_sync` benchmarks show otherwise.
+None.
 
 ## Change Log
 

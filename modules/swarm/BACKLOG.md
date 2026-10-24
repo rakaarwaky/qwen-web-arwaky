@@ -48,7 +48,7 @@ None.
 
 ## Deferred
 
-- Per-leg prompt variation and heterogeneous leg configuration stay out of scope.
+None.
 
 ## Change Log
 
