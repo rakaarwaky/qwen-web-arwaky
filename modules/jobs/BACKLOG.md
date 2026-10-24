@@ -15,9 +15,9 @@ Last Updated: 2026-10-24
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| JOBS-01 | P0 | Done | None | None — zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. | 2026-10-22 | FR-JOBS-001 |
-| JOBS-02 | P1 | Done | `MCP-01` | None — the saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. | 2026-10-22 | FR-JOBS-001, FR-JOBS-002 |
-| JOBS-03 | P2 | Done | `LOGGING-03` | None — single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. | 2026-10-22 | FR-JOBS-002 |
+| JOBS-01 | P0 | Done | None | Zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. Evidence: `uv run python -m pytest modules/jobs/tests/acceptance_job_zombie_reconciliation.py -v` → 7 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001 |
+| JOBS-02 | P1 | Done | `MCP-01` | The saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. Evidence: `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001, FR-JOBS-002 |
+| JOBS-03 | P2 | Done | `LOGGING-03` | Single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. Evidence: `uv run python -m pytest modules/shared/tests/contract_status_schema.py -v` → 3 passed (2026-10-25, commit 16de58b). | 2026-10-25 | FR-JOBS-002 |
 
 ## Scenario Evidence
 
