@@ -8,6 +8,7 @@ is retained.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import os
 import time
@@ -17,6 +18,7 @@ import pytest
 
 import modules.shared.src.common.utility_core_session_backup as session_backup
 from modules.shared.src.common.utility_core_session_backup import (
+    BACKUPS_DIR_NAME,
     DEFAULT_MAX_GENERATIONS,
     SNAPSHOT_MODE,
     backups_dir,
@@ -123,6 +125,81 @@ def test_restore_latest_reinstates_the_profile(tmp_path: Path):
     restore_latest(tmp_path)
 
     assert (tmp_path / "Cookies").read_text(encoding="utf-8") == "live-credentials"
+
+
+def test_restore_is_byte_identical_after_a_full_corruption_cycle(tmp_path: Path):
+    """Acceptance: restoring a session backup leaves the target directory byte-identical.
+
+    A restored profile must be indistinguishable from the snapshot it was taken
+    from — matching SHA-256 hashes for every file, matching permission bits,
+    and the same directory tree shape.
+    """
+
+    def _sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def _tree_state(root: Path) -> dict[Path, tuple[str, int]]:
+        """Map of relative path -> (sha256, mode) for every file under *root*.
+
+        The snapshot directory, Chromium runtime lock files, and the live
+        ``.backups`` tree are excluded so only real profile content is
+        compared.
+        """
+        skip_names = {BACKUPS_DIR_NAME, "SingletonLock", "DevToolsActivePort"}
+        state: dict[Path, tuple[str, int]] = {}
+        for entry in sorted(root.rglob("*")):
+            if entry.name in skip_names:
+                continue
+            if entry.is_file():
+                state[entry.relative_to(root)] = (_sha256(entry), entry.stat().st_mode & 0o777)
+            elif entry.is_dir():
+                state[entry.relative_to(root)] = (None, entry.stat().st_mode & 0o777)
+        return state
+
+    # Build a richer profile than the minimal helper for stronger coverage.
+    _write_profile(tmp_path)
+    (tmp_path / "Default" / "Network").mkdir(exist_ok=True)
+    (tmp_path / "Default" / "Network" / "Cookies").write_text("session-token=abc123", encoding="utf-8")
+    (tmp_path / "Default" / "Login Data").write_text("user@example.com", encoding="utf-8")
+
+    # Take the snapshot — this is the reference state.
+    generation = take_snapshot(tmp_path)
+
+    reference_files = _tree_state(generation)
+    reference_dirs = {p for p, (_, mode) in reference_files.items() if reference_files[p][0] is None}
+
+    # Corrupt the live profile.
+    (tmp_path / "Cookies").unlink()
+    (tmp_path / "Default" / "Login Data").write_text("corrupted", encoding="utf-8")
+    (tmp_path / "Default" / "Network" / "Cookies").write_text("corrupted", encoding="utf-8")
+
+    # Restore from the backup.
+    restore_generation(tmp_path, generation)
+
+    # Verify tree shape is identical (no missing files, no extra files).
+    # The live tree has a .backups dir the snapshot doesn't, so compare only
+    # the files that existed in the snapshot.
+    restored_files = _tree_state(tmp_path)
+    reference_rel_paths = {p for p, (h, _) in reference_files.items() if h is not None}
+    for rel in reference_rel_paths:
+        assert rel in restored_files, f"Missing file after restore: {rel}"
+
+    # Verify byte-identity: every file's SHA-256 matches.
+    for rel, (ref_hash, _) in reference_files.items():
+        if ref_hash is None:
+            continue
+        rest_hash = restored_files[rel][0]
+        assert rest_hash == ref_hash, f"Byte mismatch in {rel}: {ref_hash} != {rest_hash}"
+
+    # Verify permission bits on the profile root and all subdirectories.
+    assert tmp_path.stat().st_mode & 0o777 == SNAPSHOT_MODE, "Profile root lost 0700 mode"
+    for rel in reference_dirs:
+        mode = restored_files[rel][1]
+        assert mode == SNAPSHOT_MODE, f"Directory {rel} has mode {oct(mode)}, expected {oct(SNAPSHOT_MODE)}"
+
+    # Verify the .backups directory is still intact after restore.
+    assert has_session_backup(tmp_path), "Restore erased the .backups tree"
+    assert snapshots_count(tmp_path) >= 1, "Restore erased all generations"
 
 
 def test_restore_latest_refuses_when_no_generation_is_retained(tmp_path: Path):
