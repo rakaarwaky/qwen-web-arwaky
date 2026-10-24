@@ -82,6 +82,7 @@ call the aggregate and receive a page already proven usable.
 - A page redirected to a login URL raises an authentication error instead of yielding.
 - A requested model the picker does not expose falls back to the first offered model and records a warning.
 - A pre-existing session directory with world-readable permissions is repaired before launch.
+- A session directory owned by a different uid than the launching user is detected before launch; when the launcher has write access it is repaired in place, otherwise launch is refused with reason code `session_dir_cross_user` before any browser process starts (BROWSER-03).
 - An event-loop-hosting worker thread gets an isolated event loop so the sync browser API never raises.
 
 ## Assumptions & Constraints
