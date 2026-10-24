@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+  Pinned chat DOM snapshot for the browser adapter's navigation retry paths
+  (BROWSER-02). A renamed class in the live Qwen DOM that the navigation
+  retry paths rely on (textarea hydration, new-chat reset, model picker,
+  expiry banner) must fail the browser suite here before it fails a run.
+
+  Each <section data-scenario="..."> is a separate DOM state:
+
+    chat_ready — hydrated chat page: the input textarea, the model picker
+                 trigger with its default option, and a visible New-Chat
+                 button that the clean-conversation reset targets.
+    chat_not_hydrated — same page before React hydration: the textarea and
+                 the model trigger are absent, so a retry path must wait
+                 for them to appear.
+    expired_banner — chat page whose body carries a Qwen in-page
+                 session-expiry notice; the banner shells and keyword
+                 text must fire the auth probe.
+
+  The regression test loads each section into a DOM shim and runs the
+  adapter's real selector logic against it.
+-->
+<html lang="en">
+  <body>
+    <section data-scenario="chat_ready" id="chat_ready" hidden>
+      <div class="chat-page">
+        <!-- Model picker trigger button -->
+        <button aria-label="Select Model" class="wms-trigger">
+          <span>Select Model</span>
+          <span class="wms-trigger__label">Qwen3.8-Max</span>
+        </button>
+        <!-- Model picker option list (shown on open) -->
+        <div class="wms-list" style="display: none;">
+          <div class="wms-list__item">Qwen3.8-Max</div>
+          <div class="wms-list__item">Qwen3.7-Plus</div>
+        </div>
+        <!-- New-Chat reset button -->
+        <button aria-label="New Chat" class="new-chat-button">
+          <span>＋</span>
+        </button>
+        <!-- The chat input textarea -->
+        <div class="message-input-column">
+          <textarea class="message-input-textarea" placeholder="Ask Qwen anything"></textarea>
+          <div class="message-input-right-button-send">
+            <button aria-label="Send message" type="button"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-scenario="chat_not_hydrated" id="chat_not_hydrated" hidden>
+      <div class="chat-page">
+        <!-- No textarea, no model trigger: hydration not complete -->
+        <div class="message-input-column" style="display: none;"></div>
+      </div>
+    </section>
+
+    <section data-scenario="expired_banner" id="expired_banner" hidden>
+      <div class="chat-page">
+        <div class="session-expired-banner">
+          <p class="session-expired-banner__text">
+            Your session has expired. Please log in again.
+          </p>
+        </div>
+        <div class="message-input-column">
+          <textarea class="message-input-textarea" placeholder="Ask Qwen anything"></textarea>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
