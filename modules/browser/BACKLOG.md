@@ -15,9 +15,9 @@ Last Updated: 2026-10-24
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| BROWSER-01 | P0 | Done | None | Add an acceptance scenario proving a PATH-discovered browser binary that fails the ownership check is refused even when no managed build is present. | 2026-10-24 | FR-BROWSER-001 |
-| BROWSER-02 | P1 | Done | None | None — the pinned DOM fixture and `unit_navigation_selector_regression.py` fail the browser suite on selector drift. | 2026-10-24 | FR-BROWSER-002 |
-| BROWSER-03 | P2 | Done | `SESSION-01` | None — cross-user ownership detection, in-place repair, refusal escalation, and safety constraints are specified in FRD.md under FR-BROWSER-001 Business Rules (BROWSER-03). | 2026-10-24 | FR-BROWSER-001, FR-BROWSER-002 |
+| BROWSER-01 | P0 | Done | None | Add an acceptance scenario proving a PATH-discovered browser binary that fails the ownership check is refused even when no managed build is present. Evidence: `uv run python -m pytest modules/browser/tests/acceptance_browser_binary_trust.py -v` → 2 passed (2026-10-25, commit `fa5ba41`). | 2026-10-25 | FR-BROWSER-001 |
+| BROWSER-02 | P1 | Done | None | None — the pinned DOM fixture and `unit_navigation_selector_regression.py` fail the browser suite on selector drift. Evidence: `uv run python -m pytest modules/browser/tests/unit_navigation_selector_regression.py -v` → 8 passed (2026-10-25, commit `d76437b`). | 2026-10-25 | FR-BROWSER-002 |
+| BROWSER-03 | P2 | Done | `SESSION-01` | None — cross-user ownership detection, in-place repair, refusal escalation, and safety constraints are specified in FRD.md under FR-BROWSER-001 Business Rules (BROWSER-03). Evidence: `uv run python -m pytest modules/browser/tests/ -v` → 87 passed (2026-10-25, commit `668daae` + `75748ff`). | 2026-10-25 | FR-BROWSER-001, FR-BROWSER-002 |
 
 ## Scenario Evidence
 
@@ -58,3 +58,4 @@ None.
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
 | 2026-10-24 | BROWSER-03 specified in FRD.md under FR-BROWSER-001; row advanced to Done. | @qwen-web-arwaky |
+| 2026-10-25 | Evidence cells completed (three-proof rule). | @qwen-web-arwaky |
