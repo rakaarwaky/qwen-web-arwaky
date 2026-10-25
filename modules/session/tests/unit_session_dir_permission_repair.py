@@ -9,7 +9,6 @@ owner-only ``0o700`` if writable, or launch is refused with reason
 from __future__ import annotations
 
 import os
-import stat
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,9 +26,12 @@ def test_repair_cross_user_dir_with_write_access_hardens_to_0700(tmp_path: Path)
     target.mkdir()
 
     fake_stat = _fake_stat(0o755, 999)
-    with patch.object(os, "getuid", return_value=1000), patch.object(
-        Path, "stat", return_value=fake_stat
-    ), patch.object(Path, "chmod") as chmod, patch.object(os, "access", return_value=True):
+    with (
+        patch.object(os, "getuid", return_value=1000),
+        patch.object(Path, "stat", return_value=fake_stat),
+        patch.object(Path, "chmod") as chmod,
+        patch.object(os, "access", return_value=True),
+    ):
         SessionManager(base_dir=target)
         chmod.assert_called_once_with(0o700)
 
@@ -39,9 +41,11 @@ def test_repair_cross_user_dir_without_write_access_refuses(tmp_path: Path) -> N
     target.mkdir()
 
     fake_stat = _fake_stat(0o755, 999)
-    with patch.object(os, "getuid", return_value=1000), patch.object(
-        Path, "stat", return_value=fake_stat
-    ), patch.object(os, "access", return_value=False):
+    with (
+        patch.object(os, "getuid", return_value=1000),
+        patch.object(Path, "stat", return_value=fake_stat),
+        patch.object(os, "access", return_value=False),
+    ):
         with pytest.raises(Exception) as exc:
             SessionManager(base_dir=target)
         assert "session_dir_cross_user" in str(exc.value)
@@ -52,8 +56,11 @@ def test_repair_same_user_dir_hardens_to_0700(tmp_path: Path) -> None:
     target.mkdir()
 
     fake_stat = _fake_stat(0o755, 1000)
-    with patch.object(os, "getuid", return_value=1000), patch.object(
-        Path, "stat", return_value=fake_stat
-    ), patch.object(Path, "chmod") as chmod, patch.object(os, "access", return_value=True):
+    with (
+        patch.object(os, "getuid", return_value=1000),
+        patch.object(Path, "stat", return_value=fake_stat),
+        patch.object(Path, "chmod") as chmod,
+        patch.object(os, "access", return_value=True),
+    ):
         SessionManager(base_dir=target)
         chmod.assert_called_once_with(0o700)

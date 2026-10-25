@@ -383,7 +383,12 @@ class SessionManager(ISessionManagerProtocol):
             return
         if st.st_uid != os.getuid():
             if not os.access(path, os.W_OK):
-                raise QwenCliError(f"Refusing to launch: session directory owned by a different user and not writable: {path} (session_dir_cross_user)")
+                msg = (
+                    f"Refusing to launch: session directory owned by a "
+                    f"different user and not writable: {path} "
+                    f"(session_dir_cross_user)"
+                )
+                raise QwenCliError(msg)
             path.chmod(0o700)
             return
         path.chmod(0o700)
