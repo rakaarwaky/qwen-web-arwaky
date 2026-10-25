@@ -15,7 +15,7 @@ Last Updated: 2026-10-05
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| CONFIG-01 | P1 | Ready | None | Add an acceptance scenario proving a config with several invalid fields reports every one in one call. | 2026-10-05 | FR-CONFIG-002 |
+| CONFIG-01 | P1 | Done | None | Add an acceptance scenario proving a config with several invalid fields reports every one in one call. Evidence: `uv run python -m pytest modules/config/tests/acceptance_config_finding_completeness.py -v` → 2 passed (2026-10-25, commit 00124e4). | 2026-10-25 | FR-CONFIG-002 |
 | CONFIG-02 | P1 | Done | `PROMPT-01` | `timeout_sec` is the absolute per-attempt response ceiling (FR-PROMPT-006), pinned with PROMPT-01 on 2026-10-22. Evidence: `uv run python -m pytest modules/config/tests/unit_agent_config_orchestrator.py -v` → 10 passed (2026-10-25, commit 75748ff). | 2026-10-25 | FR-CONFIG-001 |
 | CONFIG-03 | P2 | Done | None | Capacity ceiling returns the single-worker default when the host reports no usable memory (FR-CONFIG-004), pinned in `unit_capability_config_inspection.py`. Evidence: `uv run python -m pytest modules/config/tests/unit_capability_config_inspection.py -v` → 22 passed (2026-10-25, commit 68eb0fb). | 2026-10-25 | FR-CONFIG-003, FR-CONFIG-004, FR-CONFIG-005, FR-CONFIG-006, FR-CONFIG-007 |
 
