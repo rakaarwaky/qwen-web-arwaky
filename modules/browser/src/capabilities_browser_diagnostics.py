@@ -13,7 +13,7 @@ Chromium process group.
 
 from __future__ import annotations
 
-from playwright.sync_api import BrowserContext
+from playwright.sync_api import BrowserContext, Page
 
 from modules.shared.src.browser.contract_browser_protocol import (
     IBrowserDiagnosticsProtocol,
@@ -49,6 +49,10 @@ class BrowserDiagnostics(IBrowserDiagnosticsProtocol):
         """Attach all diagnostics to *ctx* (asset-abort route, page-creation
         hook, per-page listeners, URL scrubbing, noise demotion)."""
         self._browser.wire_diagnostics(ctx)
+
+    def detect_session_expired(self, page: Page) -> bool:
+        """True when the live page now shows an in-page session-expiry notice."""
+        return self._browser.detect_session_expired(page)
 
     # Block 3: Dunder Methods, Factories & Helpers
 

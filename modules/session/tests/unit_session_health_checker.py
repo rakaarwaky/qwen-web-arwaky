@@ -55,7 +55,9 @@ class _FakeBrowser:
 
 
 def _checker(page: Any, *, raise_auth: bool = False, timeout_seconds: float = 5.0) -> SessionHealthChecker:
-    return SessionHealthChecker(browser=_FakeBrowser(page, raise_auth=raise_auth), timeout_seconds=timeout_seconds)
+    return SessionHealthChecker(
+        browser_lifecycle=_FakeBrowser(page, raise_auth=raise_auth), timeout_seconds=timeout_seconds
+    )
 
 
 def test_check_session_is_healthy_on_a_clean_authenticated_chat_page() -> None:

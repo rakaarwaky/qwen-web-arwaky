@@ -22,7 +22,7 @@ from modules.shared.src.session.taxonomy_session_vo import (
 )
 
 if TYPE_CHECKING:
-    from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+    from modules.shared.src.browser.contract_browser_protocol import IBrowserLifecycleProtocol
 
 
 # Compiled patterns for performance
@@ -47,12 +47,12 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
     def __init__(
         self,
-        browser: IBrowserProtocol | None = None,
+        browser_lifecycle: IBrowserLifecycleProtocol | None = None,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         session_cfg: AppConfig | None = None,
     ) -> None:
-        self._browser = browser
+        self._browser_lifecycle = browser_lifecycle
         self._timeout = timeout_seconds
         self._session_cfg = session_cfg
 
@@ -77,7 +77,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
           quota evidence (transient failure on LIMITED session leaves it LIMITED).
         """
         session_id = session.session_id
-        if self._browser is None:
+        if self._browser_lifecycle is None:
             if session.status == SessionStatus.LIMITED:
                 return SessionHealthResult(
                     session_id=session_id,
@@ -266,7 +266,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         cancel: threading.Event,
     ) -> SessionHealthResult:
         """Body of one probe; *cancel* is never shared across concurrent probes."""
-        if self._browser is None:
+        if self._browser_lifecycle is None:
             if prior_status == SessionStatus.LIMITED:
                 return SessionHealthResult(
                     session_id=session_id,
@@ -286,7 +286,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         try:
             # Entering the adapter context launches Chromium; teardown runs on
             # this thread when the with-block exits (including cancel).
-            with self._browser.health_probe_page(cfg) as page:
+            with self._browser_lifecycle.health_probe_page(cfg) as page:
                 if cancel.is_set():
                     return SessionHealthResult(
                         session_id=session_id,
@@ -405,7 +405,7 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
 
     def __repr__(self) -> str:
         """Return string representation of the health checker."""
-        return f"SessionHealthChecker(browser={self._browser!r}, timeout_seconds={self._timeout})"
+        return f"SessionHealthChecker(browser_lifecycle={self._browser_lifecycle!r}, timeout_seconds={self._timeout})"
 
 
 __all__ = ["SessionHealthChecker"]

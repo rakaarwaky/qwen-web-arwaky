@@ -186,9 +186,9 @@ class SharedContainer:
         self.session_manager: ISessionManagerProtocol = SessionManager()
         # Session infrastructure (health checker + renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.
-        self.session_health_checker = SessionHealthChecker(browser=self.browser)
+        self.session_health_checker = SessionHealthChecker(browser_lifecycle=self.browser_lifecycle)
         self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
             observability=self.observability,
         )
         self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
@@ -230,7 +230,9 @@ class SharedContainer:
 
         # The 5 specialized agent orchestrators
         self.agent_direct_prompt_orchestrator: IDirectPromptProtocol = DirectPromptAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
@@ -239,7 +241,9 @@ class SharedContainer:
             flow=self.prompt_flow_dispatcher,
         )
         self.agent_prompt_file_orchestrator: IPromptFileProtocol = PromptFileAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
@@ -249,7 +253,9 @@ class SharedContainer:
             cancel=self.run_cancel_registry,
         )
         self.agent_attachment_prompt_orchestrator: IAttachmentPromptProtocol = AttachmentPromptAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,

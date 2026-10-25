@@ -77,7 +77,7 @@ class _NeverCancels(_StalledBrowser):
 
 
 def _checker(browser: _StalledBrowser) -> SessionHealthChecker:
-    checker = SessionHealthChecker(browser=browser, timeout_seconds=0.2)
+    checker = SessionHealthChecker(browser_lifecycle=browser, timeout_seconds=0.2)
     real_new = checker._new_cancel
 
     def _capturing_new() -> threading.Event:
@@ -194,7 +194,7 @@ def test_concurrent_probes_do_not_share_one_cancel_handle() -> None:
             yield page
 
     browser = _SlowHealthy()
-    checker = SessionHealthChecker(browser=browser, timeout_seconds=5.0)
+    checker = SessionHealthChecker(browser_lifecycle=browser, timeout_seconds=5.0)
     real_new = checker._new_cancel
 
     def _recording_new() -> threading.Event:

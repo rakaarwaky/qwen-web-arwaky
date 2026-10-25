@@ -19,11 +19,11 @@ from modules.shared.src.common.taxonomy_core_vo import RunState
 
 
 def _make_file_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> PromptFileAdapter:
-    return PromptFileAdapter(*(MagicMock() for _ in range(7)), cancel=cancel)
+    return PromptFileAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
 
 
 def _make_attachment_orchestrator(cancel: CapabilitiesRunCancelRegistry) -> AttachmentPromptAdapter:
-    return AttachmentPromptAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
+    return AttachmentPromptAdapter(*(MagicMock() for _ in range(11)), cancel=cancel)
 
 
 @pytest.mark.parametrize(

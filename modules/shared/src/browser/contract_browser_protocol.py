@@ -222,6 +222,18 @@ class IBrowserDiagnosticsProtocol(ABC):
         launch-pool warm path)."""
         ...
 
+    @abstractmethod
+    def detect_session_expired(self, page: Page) -> bool:
+        """True when the live page now shows an in-page session-expiry notice.
+
+        Re-runs the banner text/selector scan against the CURRENT page
+        state. Best-effort: a DOM that is unreadable (mid-hydration) is
+        not a signal, so the method returns False rather than raising.
+        Used by prompt pipelines after a failed dispatch to surface
+        ``EVENT_SESSION_EXPIRED``.
+        """
+        ...
+
 
 class IBrowserProtocol(ABC):
     """Browser lifecycle capability contract (Playwright adaptation).
@@ -320,11 +332,11 @@ class IBrowserProtocol(ABC):
     def detect_session_expired(self, page: Page) -> bool:
         """True when the live page now shows an in-page session-expiry notice.
 
-        Re-runs the banner text/selector scan from ``_assert_on_chat_page``
-        against the CURRENT page state. Best-effort: a DOM that is unreadable
-        (mid-hydration) is not a signal, so the method returns False rather
-        than raising. Used by prompt pipelines after a failed dispatch to
-        surface ``EVENT_SESSION_EXPIRED``.
+        Re-runs the banner text/selector scan against the CURRENT page
+        state. Best-effort: a DOM that is unreadable (mid-hydration) is
+        not a signal, so the method returns False rather than raising.
+        Used by prompt pipelines after a failed dispatch to surface
+        ``EVENT_SESSION_EXPIRED``.
         """
         ...
 

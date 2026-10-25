@@ -62,7 +62,7 @@ class _FakeBrowser:
 
 
 def _checker(page: Any, **kwargs: Any) -> SessionHealthChecker:
-    return SessionHealthChecker(browser=_FakeBrowser(page, **kwargs), timeout_seconds=5.0)
+    return SessionHealthChecker(browser_lifecycle=_FakeBrowser(page, **kwargs), timeout_seconds=5.0)
 
 
 def test_active_from_successful_authenticated_probe() -> None:

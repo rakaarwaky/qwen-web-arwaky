@@ -41,6 +41,8 @@ def _browser_stub(emitter_events: tuple = ()) -> MagicMock:
 
 
 def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMock]]:
+    browser_lifecycle = MagicMock()
+    browser_diagnostics = MagicMock()
     browser = _browser_stub()
     injector = MagicMock()
     sender = MagicMock()
@@ -61,7 +63,9 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
     # bind it so timeout/cut tests exercise the production save+verdict path.
     flow.mid_stream_cut_outcome.side_effect = PromptFlowDispatcher().mid_stream_cut_outcome
     orchestrator = DirectPromptAdapter(
-        browser=browser,
+        browser_lifecycle=browser_lifecycle,
+        browser_navigation=browser,
+        browser_diagnostics=browser_diagnostics,
         injector=injector,
         sender=sender,
         streamer=streamer,
@@ -70,7 +74,9 @@ def _make_direct_orchestrator() -> tuple[DirectPromptAdapter, dict[str, MagicMoc
         flow=flow,
     )
     mocks = {
-        "browser": browser,
+        "browser_lifecycle": browser_lifecycle,
+        "browser_navigation": browser,
+        "browser_diagnostics": browser_diagnostics,
         "injector": injector,
         "sender": sender,
         "streamer": streamer,
@@ -131,7 +137,7 @@ def test_process_direct_prompt_emits_session_expired_when_banner_appears_after_s
     mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
 
     # Mock the browser to return True for detect_session_expired
-    mocks["browser"].detect_session_expired.return_value = True
+    mocks["browser_diagnostics"].detect_session_expired.return_value = True
 
     with pytest.raises(SendDispatchError, match="Send failed"):
         orch._execute_direct_on_page(
@@ -144,7 +150,7 @@ def test_process_direct_prompt_emits_session_expired_when_banner_appears_after_s
             state=MagicMock(),
         )
 
-    mocks["browser"].detect_session_expired.assert_called_once()
+    mocks["browser_diagnostics"].detect_session_expired.assert_called_once()
     # The emitter emit should have been called with EVENT_SESSION_EXPIRED
     emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
     assert len(emit_calls) == 1
@@ -158,7 +164,7 @@ def test_process_direct_prompt_no_session_expired_emit_when_clean() -> None:
     mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
 
     # Mock the browser to return False for detect_session_expired
-    mocks["browser"].detect_session_expired.return_value = False
+    mocks["browser_diagnostics"].detect_session_expired.return_value = False
 
     with pytest.raises(SendDispatchError, match="Send failed"):
         orch._execute_direct_on_page(
@@ -171,7 +177,7 @@ def test_process_direct_prompt_no_session_expired_emit_when_clean() -> None:
             state=MagicMock(),
         )
 
-    mocks["browser"].detect_session_expired.assert_called_once()
+    mocks["browser_diagnostics"].detect_session_expired.assert_called_once()
     emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
     assert len(emit_calls) == 0
 
@@ -195,7 +201,7 @@ class TestDirectPromptSessionResolver:
             output_file=Path("/tmp/direct_resolver_out.md"),
         )
 
-        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        cfg_arg = mocks["browser_lifecycle"].browser_session.call_args.args[0]
         assert cfg_arg.session_path == pool_path
 
     def test_resolver_returning_none_falls_back_to_the_default_session(self) -> None:
@@ -210,7 +216,7 @@ class TestDirectPromptSessionResolver:
             output_file=Path("/tmp/direct_resolver_none.md"),
         )
 
-        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        cfg_arg = mocks["browser_lifecycle"].browser_session.call_args.args[0]
         assert cfg_arg.session_path == DEFAULT_SESSION
 
     def test_resolver_reraising_reports_no_session(self) -> None:
@@ -228,5 +234,5 @@ class TestDirectPromptSessionResolver:
             output_file=Path("/tmp/direct_resolver_fail.md"),
         )
 
-        cfg_arg = mocks["browser"].browser_session.call_args.args[0]
+        cfg_arg = mocks["browser_lifecycle"].browser_session.call_args.args[0]
         assert cfg_arg.session_path == DEFAULT_SESSION
