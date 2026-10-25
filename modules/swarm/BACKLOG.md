@@ -7,17 +7,17 @@ Last Updated: 2026-10-24
 
 ## Current Condition
 
-- Done: `uv run python -m pytest modules/swarm/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
+- Done: `uv run python -m pytest modules/swarm/tests/ -v` at commit `00124e4`, on 2026-10-25.
 - In Progress: None.
-- Next Action: `SWARM-01`, the clamp-reporting acceptance gap.
+- Next Action: None; `SWARM-01`, `SWARM-02`, and `SWARM-03` are Done.
 
 ## Backlog
 
-| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
-|---|---:|---|---|---|---|---|
-| SWARM-01 | P1 | Ready | None | Add an acceptance scenario proving a browser count above the ceiling clamps and reports the clamp. | 2026-10-05 | FR-SWARM-001 |
-| SWARM-02 | P1 | Ready | `MCP-01` | Specify the fan-out progress envelope a poller can rely on. | 2026-10-05 | FR-SWARM-002, FR-SWARM-003 |
-| SWARM-03 | P2 | Ready | `BROWSER-03` | Specify behavior when the session pool offers fewer healthy sessions than the clamped browser count. | 2026-10-05 | FR-SWARM-001, FR-SWARM-004 |
+| ID | Priority | State | Dependencies | Next Action | Evidence | Updated | FRD Ref |
+|---|---:|---|---|---|---|---|---|
+| SWARM-01 | P1 | Done | None | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/acceptance_swarm_concurrency_clamp.py -v` — 2 passed. | 2026-10-25 | FR-SWARM-001 |
+| SWARM-02 | P1 | Done | `MCP-01` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_progress_envelope.py -v` — 11 passed. | 2026-10-25 | FR-SWARM-002, FR-SWARM-003 |
+| SWARM-03 | P2 | Done | `BROWSER-03` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_session_shortfall.py -v` — 9 passed. | 2026-10-25 | FR-SWARM-001, FR-SWARM-004 |
 
 ## Scenario Evidence
 
@@ -26,7 +26,7 @@ Last Updated: 2026-10-24
 | A fan-out starts and reports per-leg progress | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | start and snapshot | 2026-10-05 |
 | A cancel stops the running legs | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | cancel | 2026-10-05 |
 | A rate-limited session does not stop the other legs | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | leg isolation | 2026-10-05 |
-| A browser count above the ceiling clamps and reports | Gap | none yet | see `SWARM-01` | 2026-10-05 |
+| A browser count above the ceiling clamps and reports | Automated | `modules/swarm/tests/acceptance_swarm_concurrency_clamp.py` | clamp and report | 2026-10-25 |
 
 ## Blockers
 
@@ -42,8 +42,8 @@ None.
 
 | Area | Status | Notes |
 |---|---|---|
-| Tests | Done | `uv run python -m pytest modules/swarm/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 3 of 4 scenarios mapped; one gap tracked as `SWARM-01`. |
+| Tests | Done | `uv run python -m pytest modules/swarm/tests/ -v` passes at `00124e4`, on 2026-10-25. |
+| Scenario evidence | Done | All 4 scenarios mapped; the clamp-and-report scenario landed in `SWARM-01`. |
 | Docs | Done | [FRD.md](FRD.md) is specification-only. |
 
 ## Deferred
@@ -56,3 +56,4 @@ None.
 |---|---|---|
 | 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
 | 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
+| 2026-10-25 | Advanced `SWARM-01`, `SWARM-02`, `SWARM-03` to Done with clamp, progress-envelope, and shortfall evidence at `00124e4` (#761, #762, #763). | @qwen-web-arwaky |
