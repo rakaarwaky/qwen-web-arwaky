@@ -22,7 +22,6 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import (
 )
 from modules.swarm.src.capabilities_swarm_registry import SwarmRegistry
 
-
 # The field vocabulary the FR-SWARM-002 envelope spec names.
 RUN_FIELDS = {
     "swarm_id",
