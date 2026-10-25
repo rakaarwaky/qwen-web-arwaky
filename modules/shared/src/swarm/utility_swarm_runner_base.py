@@ -68,6 +68,8 @@ def replace_status(snapshot: SwarmSnapshot, status: SwarmStatus) -> SwarmSnapsho
         status=status,
         max_attempts=snapshot.max_attempts,
         browser_concurrency=snapshot.browser_concurrency,
+        clamped_browser_count=snapshot.clamped_browser_count,
+        session_shortfall=snapshot.session_shortfall,
         agents=snapshot.agents,
     )
 
@@ -81,6 +83,8 @@ def replace_agent(snapshot: SwarmSnapshot, agent: SwarmAgentSnapshot) -> SwarmSn
         status=snapshot.status,
         max_attempts=snapshot.max_attempts,
         browser_concurrency=snapshot.browser_concurrency,
+        clamped_browser_count=snapshot.clamped_browser_count,
+        session_shortfall=snapshot.session_shortfall,
         agents=tuple(agent if current.agent_id == agent.agent_id else current for current in snapshot.agents),
     )
 
@@ -99,6 +103,8 @@ def mark_cancelled(snapshot: SwarmSnapshot) -> SwarmSnapshot:
         status=cancelled.status,
         max_attempts=cancelled.max_attempts,
         browser_concurrency=cancelled.browser_concurrency,
+        clamped_browser_count=cancelled.clamped_browser_count,
+        session_shortfall=cancelled.session_shortfall,
         agents=tuple(
             agent
             if agent.status in {"completed", "failed"}
@@ -231,6 +237,8 @@ def _manifest_payload(snapshot: SwarmSnapshot) -> Mapping[str, object]:
         "status": snapshot.status,
         "max_attempts": snapshot.max_attempts,
         "browser_concurrency": snapshot.browser_concurrency,
+        "clamped_browser_count": snapshot.clamped_browser_count,
+        "session_shortfall": snapshot.session_shortfall,
         "agents": [
             {
                 "agent_id": agent.agent_id,

@@ -93,10 +93,16 @@ class SwarmRunner(ISwarmStartProtocol):
         self._headless_for_run = bool(headless)
         if browser_concurrency is None:
             swarm_env = os.environ.get("QWA_SWARM_CONCURRENCY", "").strip()
-            concurrency = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
+            requested = int(swarm_env) if swarm_env.isdigit() and int(swarm_env) > 0 else recommended_max_workers()
         else:
-            concurrency = int(browser_concurrency)
-        self._browser_concurrency = min(recommended_max_workers(), max(1, concurrency))
+            requested = int(browser_concurrency)
+        ceiling = recommended_max_workers()
+        self._browser_concurrency = min(ceiling, max(1, requested))
+        #: How many of the requested browsers were clamped off by the ceiling
+        #: (or the below-one floor raising the count to one). Zero means no
+        #: clamp happened; a positive value is reported on the snapshot so a
+        #: caller can see its request was reduced (FR-SWARM-001).
+        self._clamped_browser_count = max(0, requested - self._browser_concurrency)
         self._max_attempts = max(1, int(max_attempts))
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
@@ -137,6 +143,7 @@ class SwarmRunner(ISwarmStartProtocol):
             status="queued",
             max_attempts=self._max_attempts,
             browser_concurrency=self._browser_concurrency,
+            clamped_browser_count=self._clamped_browser_count,
             agents=tuple(
                 SwarmAgentSnapshot(agent_id=role, status="queued", output_path=root / role / "output.md")
                 for role in roles
@@ -273,4 +280,26 @@ class SwarmRunner(ISwarmStartProtocol):
         self._update_agent(swarm_id, role, "failed", self._max_attempts, output_path, last_error, start)
 
 
-__all__ = ["SwarmRunner"]
+def submitted_leg_count(
+    requested_browsers: int,
+    healthy_sessions: int,
+) -> tuple[int, int]:
+    """Resolve the submitted leg count and the session shortfall for one run.
+
+    The clamped browser count is the fan-out's request (``requested_browsers``
+    is the ceiling-clamped value). When the session pool offers fewer healthy
+    sessions (``healthy_sessions``) than that, the runner submits one leg per
+    healthy session and reports the shortfall ``max(0, requested - healthy)``
+    on the snapshot instead of padding or re-using a known-LIMITED session
+    (FR-SWARM-003, consistent with the rotation ``no_eligible_session`` rule).
+    A request below one is clamped to one rather than producing an empty
+    fan-out. The healthy-session count is floored at zero.
+    """
+    bounded = max(1, requested_browsers)
+    available = max(0, healthy_sessions)
+    submitted = min(bounded, available)
+    shortfall = bounded - available
+    return submitted, max(0, shortfall)
+
+
+__all__ = ["SwarmRunner", "submitted_leg_count"]

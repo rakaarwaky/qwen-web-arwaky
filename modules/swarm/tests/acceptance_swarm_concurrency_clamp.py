@@ -40,14 +40,14 @@ class _PromptSeam:
         event.set()
 
 
-def _orchestrator(tmp_path: Path, ceiling: int) -> SwarmOrchestrator:
+def _orchestrator(tmp_path: Path, ceiling: int, requested: int) -> SwarmOrchestrator:
     registry = SwarmRegistry()
     attachment = _PromptSeam()
     return SwarmOrchestrator(
         start=SwarmStartRunner(
             registry=registry,
             output_root=tmp_path,
-            browser_concurrency=ceiling,
+            browser_concurrency=requested,
             attachment=attachment,
         ),
         progress=SwarmProgressRunner(registry=registry),
@@ -65,7 +65,7 @@ def _await_terminal(orchestrator: SwarmOrchestrator, swarm_id: str):
     raise AssertionError("the fan-out did not finish")
 
 
-def test_acceptance_a_requested_leg_count_above_the_ceiling_is_clamped(
+def test_acceptance_a_requested_leg_count_above_the_ceiling_is_clamped_and_reported(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
@@ -76,12 +76,43 @@ def test_acceptance_a_requested_leg_count_above_the_ceiling_is_clamped(
         "modules.swarm.src.capabilities_swarm_runner.materialize_role_template",
         lambda role: tmp_path / f"{role}.md",
     )
+    # Pin the host ceiling so a request above it is deterministically clamped.
+    monkeypatch.setattr("modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 2)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
-    orchestrator = _orchestrator(tmp_path, ceiling=2)
 
+    # Request 8 browsers against a ceiling of 2: the fan-out clamps to 2.
+    orchestrator = _orchestrator(tmp_path, ceiling=2, requested=8)
     started = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path))
     final = _await_terminal(orchestrator, started.snapshot.swarm_id)
 
     assert final.status in {"completed", "partial"}, f"the clamped fan-out must still run, got {final.status}"
-    assert final.browser_concurrency <= 2, f"a ceiling of 2 must cap the concurrency, got {final.browser_concurrency}"
+    assert final.browser_concurrency == 2, f"a ceiling of 2 must cap the concurrency, got {final.browser_concurrency}"
+    assert final.clamped_browser_count == 6, (
+        f"the 6 clamped browsers must be reported, got {final.clamped_browser_count}"
+    )
+
+
+def test_acceptance_a_browser_count_below_one_is_clamped_to_one(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        "modules.swarm.src.capabilities_swarm_runner.list_prompt_templates",
+        lambda: tuple(f"role-{index}" for index in range(2)),
+    )
+    monkeypatch.setattr(
+        "modules.swarm.src.capabilities_swarm_runner.materialize_role_template",
+        lambda role: tmp_path / f"{role}.md",
+    )
+    monkeypatch.setattr("modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 16)
+    input_path = tmp_path / "project.md"
+    input_path.write_text("source", encoding="utf-8")
+
+    # Request zero browsers: the floor clamps the fan-out to one rather than
+    # producing an empty fan-out.
+    orchestrator = _orchestrator(tmp_path, ceiling=16, requested=0)
+    started = orchestrator.execute(SwarmRequest(verb="start", input_path=input_path))
+    final = _await_terminal(orchestrator, started.snapshot.swarm_id)
+
+    assert final.status in {"completed", "partial"}, f"the floor-clamped fan-out must still run, got {final.status}"
+    assert final.browser_concurrency == 1, f"a count below one must be clamped to one, got {final.browser_concurrency}"
