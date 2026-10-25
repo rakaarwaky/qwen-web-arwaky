@@ -379,7 +379,7 @@ class SessionManager(ISessionManagerProtocol):
         """
         try:
             st = path.stat()
-        except FileNotFoundError:
+        except OSError:
             return
         if st.st_uid != os.getuid():
             if not os.access(path, os.W_OK):
