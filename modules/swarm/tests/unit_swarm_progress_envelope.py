@@ -57,10 +57,38 @@ def _running_snapshot() -> SwarmSnapshot:
         clamped_browser_count=1,
         session_shortfall=0,
         agents=(
-            SwarmAgentSnapshot(agent_id="architect", status="completed", attempt=1, output_path=Path("/tmp/swarm-progress/architect/output.md"), error=None, duration_sec=42.0),
-            SwarmAgentSnapshot(agent_id="security", status="running", attempt=1, output_path=Path("/tmp/swarm-progress/security/output.md"), error=None, duration_sec=None),
-            SwarmAgentSnapshot(agent_id="ux", status="retrying", attempt=2, output_path=Path("/tmp/swarm-progress/ux/output.md"), error=None, duration_sec=None),
-            SwarmAgentSnapshot(agent_id="backend", status="queued", attempt=0, output_path=Path("/tmp/swarm-progress/backend/output.md"), error=None, duration_sec=None),
+            SwarmAgentSnapshot(
+                agent_id="architect",
+                status="completed",
+                attempt=1,
+                output_path=Path("/tmp/swarm-progress/architect/output.md"),
+                error=None,
+                duration_sec=42.0,
+            ),
+            SwarmAgentSnapshot(
+                agent_id="security",
+                status="running",
+                attempt=1,
+                output_path=Path("/tmp/swarm-progress/security/output.md"),
+                error=None,
+                duration_sec=None,
+            ),
+            SwarmAgentSnapshot(
+                agent_id="ux",
+                status="retrying",
+                attempt=2,
+                output_path=Path("/tmp/swarm-progress/ux/output.md"),
+                error=None,
+                duration_sec=None,
+            ),
+            SwarmAgentSnapshot(
+                agent_id="backend",
+                status="queued",
+                attempt=0,
+                output_path=Path("/tmp/swarm-progress/backend/output.md"),
+                error=None,
+                duration_sec=None,
+            ),
         ),
     )
 

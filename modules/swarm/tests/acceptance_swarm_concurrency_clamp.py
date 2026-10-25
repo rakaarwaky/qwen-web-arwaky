@@ -77,9 +77,7 @@ def test_acceptance_a_requested_leg_count_above_the_ceiling_is_clamped_and_repor
         lambda role: tmp_path / f"{role}.md",
     )
     # Pin the host ceiling so a request above it is deterministically clamped.
-    monkeypatch.setattr(
-        "modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 2
-    )
+    monkeypatch.setattr("modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 2)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
@@ -90,7 +88,9 @@ def test_acceptance_a_requested_leg_count_above_the_ceiling_is_clamped_and_repor
 
     assert final.status in {"completed", "partial"}, f"the clamped fan-out must still run, got {final.status}"
     assert final.browser_concurrency == 2, f"a ceiling of 2 must cap the concurrency, got {final.browser_concurrency}"
-    assert final.clamped_browser_count == 6, f"the 6 clamped browsers must be reported, got {final.clamped_browser_count}"
+    assert final.clamped_browser_count == 6, (
+        f"the 6 clamped browsers must be reported, got {final.clamped_browser_count}"
+    )
 
 
 def test_acceptance_a_browser_count_below_one_is_clamped_to_one(
@@ -104,9 +104,7 @@ def test_acceptance_a_browser_count_below_one_is_clamped_to_one(
         "modules.swarm.src.capabilities_swarm_runner.materialize_role_template",
         lambda role: tmp_path / f"{role}.md",
     )
-    monkeypatch.setattr(
-        "modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 16
-    )
+    monkeypatch.setattr("modules.swarm.src.capabilities_swarm_runner.recommended_max_workers", lambda: 16)
     input_path = tmp_path / "project.md"
     input_path.write_text("source", encoding="utf-8")
 
