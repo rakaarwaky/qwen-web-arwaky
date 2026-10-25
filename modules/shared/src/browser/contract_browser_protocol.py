@@ -1,9 +1,14 @@
 """Browser-domain capability contract (AES102 `_protocol`).
 
-One file for the browser feature. The browser feature has one capability
-seam, ``IBrowserProtocol``: it carries every method ``BrowserAdapter``
-implements, with one concrete return type each, so the capability
-implements its class outright and never carries stubs.
+One file for the browser feature. The browser feature exposes five
+capability seams, all defined here:
+
+- ``IBrowserLifecycleProtocol`` — launch/teardown, ephemeral probes, renewal
+- ``IBrowserNavigationProtocol`` — goto, auth assert, page reset, login window
+- ``IBrowserModelPolicyProtocol`` — model selection/verification (issue #283/#374)
+- ``IBrowserDiagnosticsProtocol`` — network/console listeners, URL scrubbing
+- ``IBrowserProtocol`` — thin facade composing all four; kept until all
+  call sites migrate to the narrow protocols
 
 ``IBrowserAggregate`` in ``contract_browser_aggregate.py`` is the outward
 export surface for outer layers.
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
+from pathlib import Path
 from typing import Any
 
 from playwright.sync_api import BrowserContext, Page
@@ -101,15 +107,147 @@ class IBrowserModelPolicyProtocol(ABC):
         ...
 
 
+class IBrowserLifecycleProtocol(ABC):
+    """Launch/teardown, ephemeral-context probes, and master-profile renewal.
+
+    Owns the Playwright process group and the executable-path injection.
+    Does not navigate, select models, or probe liveness.
+    """
+
+    @abstractmethod
+    def browser_session(
+        self,
+        cfg: AppConfig,
+        session_path: Path | None = None,
+        executable_path: str | None = None,
+    ) -> AbstractContextManager[BrowserContext]:
+        """Launch an isolated persistent Chromium context for *cfg*.
+
+        Exiting tears the browser down, so a raising caller cannot leak a
+        process. *session_path* is the profile path prepared by the session
+        `ProfilePreparer` (a plain path; the browser capability no longer
+        clones the profile). *executable_path* is injected by the update
+        module (binary-selection concern); when omitted, the adapter
+        resolves it.
+        """
+        ...
+
+    @abstractmethod
+    def health_probe_page(
+        self,
+        cfg: AppConfig,
+        session_path: Path | None = None,
+        executable_path: str | None = None,
+    ) -> AbstractContextManager[Page]:
+        """Open one fresh, authenticated chat page on *cfg*'s session profile.
+
+        Launches an ephemeral persistent context, navigates to the chat URL,
+        asserts authentication, and yields one ready page. Performs no model
+        selection and no prompt dispatch. Used by `SessionHealthChecker`
+        (`modules/session/src/capabilities_session_health_checker.py` L289).
+        """
+        ...
+
+    @abstractmethod
+    def renew_session(
+        self,
+        cfg: AppConfig,
+        session_path: Path | None = None,
+        executable_path: str | None = None,
+    ) -> None:
+        """Renew session credentials on *cfg*'s master profile in place
+        (master-profile warm-up, no ephemeral clone). Raises
+        ``AuthRequiredError`` when renewal is impossible. Used by
+        `SessionRenewer` (`modules/session/src/capabilities_session_renewal.py`
+        L114).
+        """
+        ...
+
+
+class IBrowserNavigationProtocol(ABC):
+    """Page navigation, authentication assert, and new-chat reset.
+
+    Pure browser mechanics: goto, auth assert, page reset. No model
+    selection policy and no profile-cloning.
+    """
+
+    @abstractmethod
+    def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
+        """Navigate *page* to the chat, assert auth, reset to a clean conversation.
+
+        Raises:
+            AuthRequiredError: When the page resolves to a login or guest view.
+        """
+        ...
+
+    @abstractmethod
+    def check_auth(self, page: Page) -> None:
+        """Raise ``AuthRequiredError`` when *page* is not authenticated."""
+        ...
+
+    @abstractmethod
+    def reset_page(self, page: Page, emitter: LifecycleEmitter) -> None:
+        """Reset *page* to a clean chat state."""
+        ...
+
+    @abstractmethod
+    def open_login_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+        """Open one fresh page on *cfg*'s profile and go to the chat URL.
+
+        Thin wrapper over ``browser_session`` + first page + ``goto``. Used
+        by the manual login window flow; performs no model selection.
+        """
+        ...
+
+
+class IBrowserDiagnosticsProtocol(ABC):
+    """Page and context diagnostics: asset-abort route, page-creation hook,
+    network/console listeners, URL scrubbing, noise demotion.
+
+    Today the adapter wires diagnostics at TWO levels inside
+    `browser_session` (`modules/browser/src/capabilities_browser_adapter.py`
+    L686–749): a **context-level** asset-abort route
+    (`ctx.route("**/*.{png,…}", abort)`) and a page-creation hook
+    (`ctx.on("page", attach_page_diagnostics)`), plus **per-page** listeners
+    (`page.on("request"/"requestfailed"/"console"/"response")`). The protocol
+    therefore covers both levels, not just the per-page half.
+    """
+
+    @abstractmethod
+    def wire_diagnostics(self, ctx: BrowserContext) -> None:
+        """Attach all diagnostics to *ctx*: the context-level asset-abort
+        route, the `ctx.on("page", …)` hook that attaches per-page listeners
+        to new and existing pages, URL scrubbing, and third-party noise
+        demotion. Called once per context from `browser_session` (or the
+        launch-pool warm path)."""
+        ...
+
+
 class IBrowserProtocol(ABC):
     """Browser lifecycle capability contract (Playwright adaptation).
 
     One named method per operation. No ``execute(op, …)`` dispatch;
     each operation has its own typed signature and concrete return type.
+
+    After the protocol split (PR 2a) this class is a thin facade: each
+    method delegates to one of the four narrow protocols
+    (``IBrowserLifecycleProtocol``, ``IBrowserNavigationProtocol``,
+    ``IBrowserModelPolicyProtocol``, ``IBrowserDiagnosticsProtocol``).
+    The facade is kept until all call sites migrate to the narrow
+    protocols; the ``check_session`` / ``detect_session_expired`` probe
+    methods are removed in PR 5 and routed through the shared
+    ``utility_browser_session_check`` helpers instead.
+
+    The narrow protocols are composed into the adapter separately (the
+    adapter implements all five classes), so this facade keeps its own
+    method set and does not inherit from them — the adapter is the
+    composition point, not the contract.
     """
 
     @abstractmethod
-    def browser_session(self, cfg: AppConfig) -> AbstractContextManager[BrowserContext]:
+    def browser_session(
+        self, cfg: AppConfig, session_path: Path | None = None, executable_path: str | None = None
+    ) -> AbstractContextManager[BrowserContext]:
         """Launch an isolated persistent Chromium context for *cfg*.
 
         The returned context manager owns the Chromium process group and
@@ -150,7 +288,9 @@ class IBrowserProtocol(ABC):
         ...
 
     @abstractmethod
-    def health_probe_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+    def health_probe_page(
+        self, cfg: AppConfig, session_path: Path | None = None, executable_path: str | None = None
+    ) -> AbstractContextManager[Page]:
         """Open one fresh, authenticated chat page on *cfg*'s session profile.
 
         The returned context manager launches an ephemeral persistent
@@ -189,7 +329,9 @@ class IBrowserProtocol(ABC):
         ...
 
     @abstractmethod
-    def renew_session(self, cfg: AppConfig) -> None:
+    def renew_session(
+        self, cfg: AppConfig, session_path: Path | None = None, executable_path: str | None = None
+    ) -> None:
         """Attempt to renew the session credentials on *cfg*'s profile in place.
 
         Opens the chat page on the MASTER profile (login mode, no ephemeral
@@ -215,6 +357,35 @@ class IBrowserProtocol(ABC):
         event, so the observer sees the reset as a recoverable dip
         rather than a new session.
         """
+        ...
+
+    @abstractmethod
+    def open_login_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+        """Open one fresh page on *cfg*'s profile and go to the chat URL.
+
+        Thin wrapper over ``browser_session`` + first page + ``goto``. Used
+        by the manual login window flow; performs no model selection.
+        """
+        ...
+
+    @abstractmethod
+    def wire_diagnostics(self, ctx: BrowserContext) -> None:
+        """Attach all diagnostics to *ctx* (asset-abort route, page-creation
+        hook, per-page listeners, URL scrubbing, noise demotion)."""
+        ...
+
+    @abstractmethod
+    def select_model(self, page: Page, emitter: LifecycleEmitter) -> ModelLabel:
+        """Read/select the default model on *page*; return the chosen label.
+
+        Raises:
+            ModelSwitchError: When no model label can be read at all.
+        """
+        ...
+
+    @abstractmethod
+    def verify_model(self, page: Page, expected: ModelLabel) -> bool:
+        """Return True when *page* shows *expected* as the active model."""
         ...
 
 
@@ -253,14 +424,20 @@ class ISessionCheckProtocol(ABC):
 
 
 __all__ = [
+    "IBrowserDiagnosticsProtocol",
+    "IBrowserLifecycleProtocol",
     "IBrowserModelPolicyProtocol",
+    "IBrowserNavigationProtocol",
     "IBrowserProtocol",
     "ISessionCheckProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
+    "IBrowserDiagnosticsProtocol": IBrowserDiagnosticsProtocol,
+    "IBrowserLifecycleProtocol": IBrowserLifecycleProtocol,
     "IBrowserModelPolicyProtocol": IBrowserModelPolicyProtocol,
+    "IBrowserNavigationProtocol": IBrowserNavigationProtocol,
     "IBrowserProtocol": IBrowserProtocol,
     "ISessionCheckProtocol": ISessionCheckProtocol,
 }

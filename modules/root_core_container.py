@@ -11,6 +11,9 @@ from typing import cast
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.browser.src.capabilities_browser_session_check import SessionCheck
 
 # agent_config_orchestrator
@@ -67,7 +70,12 @@ from modules.session.src.capabilities_session_health_checker import SessionHealt
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
-from modules.shared.src.browser.contract_browser_protocol import IBrowserModelPolicyProtocol
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserDiagnosticsProtocol,
+    IBrowserLifecycleProtocol,
+    IBrowserModelPolicyProtocol,
+    IBrowserNavigationProtocol,
+)
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -152,6 +160,13 @@ class SharedContainer:
         # itself never imports a sibling capability, AES201).
         self.browser_model_policy = _new_browser_model_policy()
         self.browser = BrowserAdapter(model_policy=self.browser_model_policy)
+        # Narrow browser views: each capability implements exactly one split
+        # protocol and delegates to the facade (AES201: a capability never
+        # imports a sibling capability; the container wires the adapter into
+        # both views so every view drives one Chromium process group).
+        self.browser_lifecycle: IBrowserLifecycleProtocol = BrowserLifecycle(self.browser)
+        self.browser_navigation: IBrowserNavigationProtocol = BrowserNavigation(self.browser)
+        self.browser_diagnostics: IBrowserDiagnosticsProtocol = BrowserDiagnostics(self.browser)
         # Browser capability: the session probe (page liveness + auth
         # assertion) the adapter delegates to; registered here so the
         # container owns the seam.

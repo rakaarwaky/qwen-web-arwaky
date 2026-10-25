@@ -97,7 +97,9 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 # Block 1: Class Definition & Constructor
 
 
-class BrowserAdapter(IBrowserProtocol):
+class BrowserAdapter(
+    IBrowserProtocol,
+):
     """Persistent Chromium browser context adapter implementing the browser contract."""
 
     def __init__(self, model_policy: IBrowserModelPolicyProtocol) -> None:
@@ -188,6 +190,65 @@ class BrowserAdapter(IBrowserProtocol):
         # ``fallback=True`` so the substitution is auditable (issue #374).
         verified, detected = self._verify_default_model(page, require_switch=switched)
         emitter.emit(EVENT_MODEL_VERIFIED, {"model": detected, "fallback": not verified})
+
+    def select_model(self, page: Page, emitter: LifecycleEmitter) -> ModelLabel:
+        """Read/select the default model on *page*; return the chosen label.
+
+        Delegates to the model-policy capability (issue #283/#374 fallback
+        rules).
+        """
+        return self._model_policy.select_model(page, emitter)
+
+    def verify_model(self, page: Page, expected: ModelLabel) -> bool:
+        """Return True when *page* shows *expected* as the active model.
+
+        Delegates to the model-policy capability.
+        """
+        return self._model_policy.verify_model(page, expected)
+
+    def verify_default_model(
+        self, page: Page, target: ModelLabel, require_switch: bool = True
+    ) -> tuple[bool, ModelLabel]:
+        """Confirm the active model is *target*, degrading when it is not.
+
+        Delegates to the model-policy capability.
+        """
+        return self._model_policy.verify_default_model(page, target, require_switch)
+
+    def select_first_available_model(self, page: Page) -> ModelLabel | None:
+        """Select the first model the picker offers, or return None when unreadable.
+
+        Delegates to the model-policy capability.
+        """
+        return self._model_policy.select_first_available_model(page)
+
+    def wait_for_picker_ready(self, page: Page, timeout_ms: WaitTimeoutMs = WaitTimeoutMs(15_000)) -> None:
+        """Wait until the hydrated picker exposes the configured default option.
+
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.wait_for_picker_ready(page, timeout_ms)
+
+    def retry_default_model_selection(self, page: Page) -> None:
+        """Close a stale picker, allow hydration, and retry default-model selection.
+
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.retry_default_model_selection(page)
+
+    def get_model_trigger(self, page: Page) -> Any:
+        """Return locator for active model selector trigger button/div.
+
+        Delegates to the model-policy capability.
+        """
+        return self._model_policy.get_model_trigger(page)
+
+    def try_set_as_default(self, page: Page) -> None:
+        """Best-effort attempt to click 'Set default' in Qwen UI picker.
+
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.try_set_as_default(page)
 
     def _verify_default_model(self, page: Page, require_switch: bool = True) -> tuple[bool, str]:
         """Confirm the active model is the configured default, degrading when it is not.
@@ -298,7 +359,7 @@ class BrowserAdapter(IBrowserProtocol):
         """
         return _in_page_expiry_banner_visible(page)
 
-    def renew_session(self, cfg: Any) -> None:
+    def renew_session(self, cfg: Any, session_path: Path | None = None, executable_path: str | None = None) -> None:
         """Attempt to renew the session credentials on *cfg*'s master profile in place.
 
         Opens the chat page on the master profile (login mode, no ephemeral
@@ -308,19 +369,120 @@ class BrowserAdapter(IBrowserProtocol):
         loads. The renewed cookies are persisted to the master profile on
         context close.
 
+        ``session_path`` overrides the profile directory when provided;
+        ``executable_path`` is the Chromium binary to launch (injected by
+        the update module); both default to ``None`` (resolve from *cfg*).
+
         Raises:
             AuthRequiredError: When the session could not be renewed — either
                 the page still lands on a login/guest view, shows a login
                 form, or the refresh token itself is dead (manual re-login
                 is the only path left).
         """
+        del session_path, executable_path
         # Login mode: create_ephemeral_session yields the master path directly,
         # so any cookie the browser writes persists to the master profile.
         with self._open_chat_page(cfg, mode="login", strict_auth=True):
             pass
 
     @contextmanager
-    def health_probe_page(self, cfg: Any) -> Iterator[Page]:
+    def open_login_page(self, cfg: Any) -> Iterator[Page]:
+        """Open one fresh page on ``cfg``'s profile and go to the chat URL.
+
+        Thin wrapper over ``browser_session`` + first page + ``goto``.
+        Used by the manual login window flow; performs no model selection.
+        No auth assertion: the page is handed to the operator to log in.
+        """
+        master_session = cfg.session_path
+        with create_ephemeral_session(master_session, mode="login") as session_dir:
+            kwargs = self._launch_kwargs(session_dir, cfg)
+            with sync_playwright() as p:
+                ctx = self._launch_context(p, kwargs)
+                try:
+                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
+                    yield page
+                finally:
+                    ctx.close()
+
+    def wire_diagnostics(self, ctx: BrowserContext) -> None:
+        """Attach all diagnostics to *ctx*: the context-level asset-abort
+        route, the page-creation hook, URL scrubbing, and third-party noise
+        demotion. Called once per context from `browser_session` (or the
+        launch-pool warm path).
+
+        The context-level asset-abort route blocks known binary/static asset
+        types for non-login sessions. The page-creation hook attaches
+        per-page listeners (request, requestfailed, console, response) to
+        both existing and newly created pages. URLs are scrubbed before
+        logging so credentials and query tokens never exfiltrate.
+        """
+        if "_qwa_diagnostics_wired" in vars(ctx):
+            return
+        vars(ctx)["_qwa_diagnostics_wired"] = True
+
+        def _sanitize_url(url: str) -> str:
+            """Sanitize URL for logging to prevent credential/query token exfiltration."""
+            try:
+                from urllib.parse import urlparse, urlunparse
+
+                parsed = urlparse(url)
+                return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+            except Exception:
+                return url.split("?")[0]
+
+        def attach_page_diagnostics(page: Page) -> None:
+            """Wire network and console listeners onto *page* for run diagnostics."""
+
+            def on_request_failed(request: Any) -> None:
+                """Log failed browser requests with sanitized URLs."""
+                if _is_third_party_noise(request.url):
+                    log.debug("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
+                    return
+                log.warning("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
+
+            def on_console(message: Any) -> None:
+                """Log page console errors and warnings."""
+                if message.type not in {"error", "warning"}:
+                    return
+                text = (message.text or "").lower()
+                is_noise = any(pat in text for pat in _NOISE_CONSOLE_PATTERNS)
+                if is_noise:
+                    log.debug("browser_console_message %s %s", message.type, message.text)
+                else:
+                    log.warning("browser_console_message %s %s", message.type, message.text)
+
+            def on_request(request: Any) -> None:
+                """Log mutating requests sent to qwen.ai."""
+                if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
+                    log.info("browser_mutation_request %s %s", request.method, _sanitize_url(request.url))
+
+            def on_response(response: Any) -> None:
+                """Log API error responses and qwen.ai mutation responses."""
+                url = response.url.lower()
+                if response.status >= 400 and any(
+                    token in url for token in ("chat", "completion", "generate", "conversation", "api")
+                ):
+                    if _is_third_party_noise(response.url):
+                        log.debug("browser_http_error %s %s", response.status, _sanitize_url(response.url))
+                    else:
+                        log.warning("browser_http_error %s %s", response.status, _sanitize_url(response.url))
+                elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
+                    log.info("browser_mutation_response %s %s", response.status, _sanitize_url(response.url))
+
+            page.on("request", on_request)
+            page.on("requestfailed", on_request_failed)
+            page.on("console", on_console)
+            page.on("response", on_response)
+
+        for existing_page in ctx.pages:
+            attach_page_diagnostics(existing_page)
+        ctx.on("page", attach_page_diagnostics)
+
+    @contextmanager
+    def health_probe_page(
+        self, cfg: Any, session_path: Path | None = None, executable_path: str | None = None
+    ) -> Iterator[Page]:
         """Open one ready, authenticated chat page on ``cfg``'s session profile.
 
         Mirrors the navigation half of ``browser_session`` (fresh ephemeral
@@ -333,6 +495,7 @@ class BrowserAdapter(IBrowserProtocol):
             AuthRequiredError: When the page lands on a login or guest
                 view, or shows a login form.
         """
+        del session_path, executable_path
         with self._open_chat_page(cfg, mode="", strict_auth=False) as page:
             yield page
 
@@ -513,15 +676,23 @@ class BrowserAdapter(IBrowserProtocol):
         raise RuntimeError("browser launch failed after retries")  # pragma: no cover
 
     @contextmanager
-    def browser_session(self, cfg: Any) -> Iterator[BrowserContext]:
+    def browser_session(
+        self, cfg: Any, session_path: Path | None = None, executable_path: str | None = None
+    ) -> Iterator[BrowserContext]:
         """Manage persistent Chromium browser context with session caching and asset optimization.
 
         For login mode, connects directly to the master session profile so credentials
         are saved permanently. For prompt jobs, runs in an isolated ephemeral copy of
         the session directory so multiple jobs can execute concurrently in parallel
         (1 browser process per job) without Chromium SingletonLock conflicts.
+
+        ``session_path`` overrides the profile directory when provided
+        (a plain path prepared by the session `ProfilePreparer`); when
+        omitted, the adapter resolves it from *cfg.session_path*.
+        ``executable_path`` is the Chromium binary to launch (injected by
+        the update module); when omitted, the adapter resolves it.
         """
-        master_session = cfg.session_path
+        master_session = session_path if session_path is not None else cfg.session_path
         mode = getattr(cfg, "mode", "")
         # Per-run --model override is bound exactly once, after the ephemeral
         # session launches, so concurrent Swarm legs never read each other's
@@ -534,6 +705,8 @@ class BrowserAdapter(IBrowserProtocol):
             # only the prompt pipeline needs (clipboard permissions).
             kwargs = self._launch_kwargs(session_dir, cfg)
             kwargs["permissions"] = ["clipboard-read", "clipboard-write"]
+            if executable_path is not None:
+                kwargs["executable_path"] = executable_path
 
             isolate_thread_event_loop()
 
@@ -569,67 +742,8 @@ class BrowserAdapter(IBrowserProtocol):
                             lambda r: r.abort(),
                         )
 
-                    def _sanitize_url(url: str) -> str:
-                        """Sanitize URL for logging to prevent credential/query token exfiltration."""
-                        try:
-                            from urllib.parse import urlparse, urlunparse
+                    self.wire_diagnostics(ctx)
 
-                            parsed = urlparse(url)
-                            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
-                        except Exception:
-                            return url.split("?")[0]
-
-                    def attach_page_diagnostics(page: Page) -> None:
-                        """Wire network and console listeners onto *page* for run diagnostics."""
-
-                        def on_request_failed(request: Any) -> None:
-                            """Log failed browser requests with sanitized URLs."""
-                            if _is_third_party_noise(request.url):
-                                log.debug("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
-                                return
-                            log.warning("browser_request_failed %s %s", _sanitize_url(request.url), request.failure)
-
-                        def on_console(message: Any) -> None:
-                            """Log page console errors and warnings."""
-                            if message.type not in {"error", "warning"}:
-                                return
-                            text = (message.text or "").lower()
-                            is_noise = any(pat in text for pat in _NOISE_CONSOLE_PATTERNS)
-                            if is_noise:
-                                log.debug("browser_console_message %s %s", message.type, message.text)
-                            else:
-                                log.warning("browser_console_message %s %s", message.type, message.text)
-
-                        def on_request(request: Any) -> None:
-                            """Log mutating requests sent to qwen.ai."""
-                            if request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in request.url:
-                                log.info("browser_mutation_request %s %s", request.method, _sanitize_url(request.url))
-
-                        def on_response(response: Any) -> None:
-                            """Log API error responses and qwen.ai mutation responses."""
-                            url = response.url.lower()
-                            if response.status >= 400 and any(
-                                token in url for token in ("chat", "completion", "generate", "conversation", "api")
-                            ):
-                                if _is_third_party_noise(response.url):
-                                    log.debug("browser_http_error %s %s", response.status, _sanitize_url(response.url))
-                                else:
-                                    log.warning(
-                                        "browser_http_error %s %s", response.status, _sanitize_url(response.url)
-                                    )
-                            elif response.request.method in {"POST", "PUT", "PATCH"} and "qwen.ai" in url:
-                                log.info(
-                                    "browser_mutation_response %s %s", response.status, _sanitize_url(response.url)
-                                )
-
-                        page.on("request", on_request)
-                        page.on("requestfailed", on_request_failed)
-                        page.on("console", on_console)
-                        page.on("response", on_response)
-
-                    for existing_page in ctx.pages:
-                        attach_page_diagnostics(existing_page)
-                    ctx.on("page", attach_page_diagnostics)
                     try:
                         yield ctx
                     finally:
