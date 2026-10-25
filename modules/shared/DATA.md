@@ -39,6 +39,7 @@ data contract here without opening source files.
 - Paths carried in VOs are absolute; relative paths are a surface-layer bug.
 - Status JSON written by the jobs kernel is read by humans and agents alike;
   field removal is a breaking change.
+
 ### Rate-limiter window semantics
 
 The shared kernel owns the sliding-window throttle state (D-12) that every
