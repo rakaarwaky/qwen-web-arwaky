@@ -9,7 +9,7 @@ Last Updated: 2026-10-24
 
 - Done: `uv run python -m pytest modules/session/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: `SESSION-01` and `SESSION-02` — acceptance tests landing in this pass.
-- Next Action: `SESSION-03`, the session-directory permission repair spec.
+- Next Action: `SESSION-03`, the session-directory permission repair spec — implemented (see Done row above).
 
 ## Backlog
 
@@ -17,7 +17,7 @@ Last Updated: 2026-10-24
 |---|---:|---|---|---|---|---|
 | SESSION-01 | P0 | Done | `SHARED-01` | Acceptance test proving a backup write failure refuses the deletion and leaves the master profile in place — landed in `modules/session/tests/unit_capabilities_session_manager.py`. Evidence: `uv run python -m pytest modules/session/tests/unit_capabilities_session_manager.py -v` → 24 passed (2026-10-25, commit e4f5341). | 2026-10-25 | FR-SESSION-001, FR-SESSION-003 |
 | SESSION-02 | P1 | Done | None | Rotation returns an explicit `no_eligible_session` outcome when no eligible session remains; FR-SESSION-002 and docs/MULTI_ACCOUNT_ROTATION.md record the decision (2026-10-18, Raka). Evidence: `uv run python -m pytest modules/session/tests/ -v` → 24 passed (2026-10-25, commit 03d72dc). | 2026-10-25 | FR-SESSION-002, FR-SESSION-004 |
-| SESSION-03 | P2 | Ready | `BROWSER-03` | Specify the session-directory permission repair when the browser launches the context under a different user. | 2026-10-05 | FR-SESSION-004 |
+| SESSION-03 | P2 | Done | `BROWSER-03` | Cross-user session-directory permission repair implemented in `SessionManager.repair_session_dir_permissions`, wired into `_ensure_dirs` so a cross-user-owned dir is repaired in place when writable or refused with reason `session_dir_cross_user` before any browser process starts. Evidence: `uv run python -m pytest modules/session/tests/ -v` → 147 passed (this commit). FR-SESSION-004 carries to Done. | 2026-10-25 | FR-SESSION-004 |
 
 ## Scenario Evidence
 

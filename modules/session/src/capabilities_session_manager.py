@@ -14,7 +14,7 @@ import modules.shared.src.session.utility_session_guard as utility_session_guard
 from modules.shared.src.common import utility_core_session_backup
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD, POOL_FILE, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
-from modules.shared.src.common.utility_io_writer import exclusive_file_lock, harden_private_dir
+from modules.shared.src.common.utility_io_writer import exclusive_file_lock
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
 from modules.shared.src.session.taxonomy_session_vo import (
@@ -356,10 +356,37 @@ class SessionManager(ISessionManagerProtocol):
         """Create session storage directories and migrate the legacy profile.
 
         Session dirs hold live login cookies, so they are owner-only 0700
-        (ISSUE-001 / session FRD NFR).
+        (ISSUE-001 / session FRD NFR). A cross-user-owned dir is repaired
+        in place when writable, otherwise launch is refused before any
+        browser process starts.
         """
-        harden_private_dir(self._base_dir)
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+        self.repair_session_dir_permissions(self._base_dir)
         self._migrate_legacy_session()
+
+    def repair_session_dir_permissions(self, path: Path) -> None:
+        """Repair cross-user ownership of *path* or refuse launch.
+
+        Cross-user means ``st_uid != os.getuid()``:
+
+        - same user: ensure owner-only ``0o700`` (harden).
+        - cross-user with write access: repair in place via ``chmod(0o700)``.
+        - cross-user without write access: refuse launch with reason
+          ``session_dir_cross_user`` before any browser process starts.
+
+        ``os.getuid``/``os.stat``/``os.chmod``/``os.access`` are used
+        directly so tests can monkeypatch them without touching real uids.
+        """
+        try:
+            st = path.stat()
+        except FileNotFoundError:
+            return
+        if st.st_uid != os.getuid():
+            if not os.access(path, os.W_OK):
+                raise QwenCliError(f"Refusing to launch: session directory owned by a different user and not writable: {path} (session_dir_cross_user)")
+            path.chmod(0o700)
+            return
+        path.chmod(0o700)
 
     def _migrate_legacy_session(self) -> None:
         """One-time move of the old single-profile dir into the new layout.
