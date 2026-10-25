@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.jobs.src.agent_job_orchestrator import AgentJobOrchestrator
 from modules.jobs.src.capabilities_job_storage import JobStorage
 from modules.root_core_container import SharedContainer
@@ -73,7 +74,7 @@ def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
 
 
 def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None:
-    adapter = BrowserAdapter()
+    adapter = BrowserAdapter(model_policy=BrowserModelPolicy())
     master_session = tmp_path / "master_session"
     master_session.mkdir()
     (master_session / "Cookies").write_text("cookie_auth", encoding="utf-8")
@@ -105,7 +106,7 @@ def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None
 
 
 def test_browser_adapter_login_mode_uses_master_session(tmp_path: Path) -> None:
-    adapter = BrowserAdapter()
+    adapter = BrowserAdapter(model_policy=BrowserModelPolicy())
     master_session = tmp_path / "master_session"
 
     cfg = MagicMock()

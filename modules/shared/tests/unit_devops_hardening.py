@@ -107,7 +107,9 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     session.mkdir()
     (session / "Cookies").write_text("x", encoding="utf-8")
 
-    adapter = adapter_module.BrowserAdapter()
+    from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+
+    adapter = adapter_module.BrowserAdapter(model_policy=BrowserModelPolicy())
     with (
         patch.object(adapter_module, "create_ephemeral_session") as ephemeral,
         patch.object(adapter_module, "find_chrome_binary", return_value="/usr/bin/chromium"),

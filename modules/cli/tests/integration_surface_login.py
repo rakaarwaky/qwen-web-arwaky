@@ -9,6 +9,9 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+
+_adapter = BrowserAdapter(model_policy=BrowserModelPolicy())
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -207,10 +210,10 @@ def test_browser_check_session_requires_authenticated_chat_ui() -> None:
     page.query_selector.return_value = MagicMock()
     page.locator.return_value.count.return_value = 0
     page.locator.return_value.first.is_visible.return_value = False
-    assert BrowserAdapter().check_session(page) is True
+    assert _adapter.check_session(page) is True
 
     page.url = "https://chat.qwen.ai/login"
-    assert BrowserAdapter().check_session(page) is False
+    assert _adapter.check_session(page) is False
 
 
 def test_manual_login_delays_check_session_after_confirmation(tmp_path: Path) -> None:

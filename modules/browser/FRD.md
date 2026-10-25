@@ -32,7 +32,7 @@ call the aggregate and receive a page already proven usable.
 
 ### FR-BROWSER-002: Probe session liveness and authentication
 
-- **Description**: Bind one page to a session probe that reports whether the chat UI is alive and asserts the saved session is still authenticated — the check every pipeline run depends on before it dispatches a prompt.
+- **Description**: Bind one page to a session probe that reports whether the chat UI is alive and asserts the saved session is still authenticated, and drive model selection/verification policy — the checks and policies every pipeline run depends on before it dispatches a prompt.
 - **Input**: The live Playwright page to probe.
 - **Output**: A boolean liveness verdict from `is_alive`, and `check_auth` raising an authentication error when the page is a login or guest view, shows a login form, or an in-page session-expiry banner.
 - **Business Rules**:
@@ -41,6 +41,18 @@ call the aggregate and receive a page already proven usable.
   - A page that is still hydrating is tolerated by `check_auth` while it exposes the authenticated UI.
 - **Edge Cases**: A page whose DOM is mid-hydration reports False rather than a spurious authentication error; an in-page expiry notice on the chat URL raises the authentication error naming the re-login verb.
 - **Error Handling**: An authentication error names the login path so the caller can route the operator to the setup verb; browser errors during the probe surface as an authentication error naming the reason.
+
+### FR-BROWSER-003: Select and verify the target model (issue #283/#374 fallback rules)
+
+- **Description**: Resolve the configured target model for the run, drive the in-page picker to that model when it is offered, verify the active model matches the target, and fall back to the first available model when it does not — the product policy about which model a run targets, kept out of the browser adapter so the DOM mechanics stay in one place.
+- **Input**: The live Playwright page and the lifecycle emitter that records the model-verified event.
+- **Output**: `select_model` returns the chosen model label; `verify_model` returns a boolean verdict on whether the expected label is active.
+- **Business Rules**:
+  - The configured target model is resolved per run (a contextvar bound once per browser context launch), so concurrent runs keep their own override without mutating shared state.
+  - A picker that does not expose the requested model falls back to the first model it offers and records a warning rather than aborting the run (issue #283 AC-2, issue #374).
+  - A verification retry budget is bounded; a slow picker hydrating must not fail the pipeline (issue #283).
+- **Edge Cases**: A picker that never becomes ready falls back through the retry budget before reporting a model-switch error; an unreadable model label raises a model-switch error naming the trigger selector.
+- **Error Handling**: A model switch that cannot complete surfaces a model-switch error naming the requested and active model; best-effort selection failures are logged and swallowed so the prompt pipeline is never blocked.
 
 ## API Contract
 
@@ -52,6 +64,13 @@ call the aggregate and receive a page already proven usable.
 | `navigate_to_chat` | page, lifecycle emitter | page on an authenticated chat | authentication error | page loaded | Take the page to the chat. |
 | `check_auth` | page | none; raises on failure | authentication error | none | Assert the page is an authenticated chat. |
 | `check_session` | page | boolean readiness verdict | none | none | Report whether the page is ready for use. |
+| `detect_session_expired` | page | boolean verdict when the in-page expiry banner shows | none | none | Re-run the banner scan against the current page state. |
+| `health_probe_page` | runtime configuration | context manager yielding one ready page | authentication error | none | Open one ephemeral health-probe page. |
+| `renew_session` | runtime configuration | none; raises on failure | authentication error | none | Renew the master-profile session in place. |
+| `reset_page` | page, lifecycle emitter | a clean chat state | none | network reconnecting | Navigate back to the chat and emit the reset event. |
+| `select_model` | page, lifecycle emitter | the chosen model label | model-switch error | none | Select the run's target model (FR-BROWSER-003). |
+| `verify_model` | page, expected label | boolean verdict | none | none | Verify the active model (FR-BROWSER-003). |
+| `is_alive` | none (bound page) | boolean liveness verdict | none | none | Report whether the session is stable and the chat UI is responsive (FR-BROWSER-002). |
 
 ### Aggregate API
 

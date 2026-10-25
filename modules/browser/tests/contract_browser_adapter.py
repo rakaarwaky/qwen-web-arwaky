@@ -9,6 +9,7 @@ from __future__ import annotations
 import inspect
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 
@@ -27,7 +28,7 @@ _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
 
 
 def test_adapter_implements_the_browser_protocol() -> None:
-    assert isinstance(BrowserAdapter(), IBrowserProtocol)
+    assert isinstance(BrowserAdapter(model_policy=BrowserModelPolicy()), IBrowserProtocol)
 
 
 def test_aggregate_declares_only_the_open_session_door() -> None:

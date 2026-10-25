@@ -9,9 +9,10 @@ import pytest
 
 from modules.browser.src import capabilities_browser_adapter as browser_adapter
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.shared.src import AppConfig
 
-_browser = BrowserAdapter()
+_browser = BrowserAdapter(model_policy=BrowserModelPolicy())
 
 
 class TestBrowserSession:
@@ -177,7 +178,7 @@ class TestLaunchContext:
 
         p.chromium.launch_persistent_context.side_effect = launch_side_effect
 
-        ctx = BrowserAdapter()._launch_context(p, kwargs)
+        ctx = _browser._launch_context(p, kwargs)
         assert ctx == good_ctx
         assert call_count[0] == 3, "two failures then a success must cost three attempts"
 
@@ -192,6 +193,6 @@ class TestLaunchContext:
         mock_ctx = MagicMock()
         p.chromium.launch_persistent_context.return_value = mock_ctx
 
-        BrowserAdapter()._launch_context(p, kwargs)
+        _browser._launch_context(p, kwargs)
         assert not (lock_dir / "SingletonLock").exists()
         assert not (lock_dir / "SingletonSocket").exists()

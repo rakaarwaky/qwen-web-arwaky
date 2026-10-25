@@ -43,6 +43,7 @@ EventDetailsMapping: TypeAlias = Mapping[str, object]
 EventOrderMapping: TypeAlias = dict[object, int]
 RetryWaitSec = NewType("RetryWaitSec", float)
 ErrorReason = NewType("ErrorReason", str)
+ModelLabel = NewType("ModelLabel", str)
 
 
 @runtime_checkable
@@ -771,6 +772,7 @@ __all__ = [
     "EventOrderMapping",
     "RetryWaitSec",
     "ErrorReason",
+    "ModelLabel",
     "CancelToken",
     "TaskExecutor",
     "EventDetails",

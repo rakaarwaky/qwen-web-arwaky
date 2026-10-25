@@ -7,7 +7,6 @@ utility only. Logger obtained via get_logger (standard library), not via another
 from __future__ import annotations
 
 import contextlib
-import contextvars
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,8 +21,12 @@ from playwright.sync_api import (
 )
 from tenacity import RetryCallState, Retrying, stop_after_attempt, wait_fixed
 
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserModelPolicyProtocol,
+    IBrowserProtocol,
+)
 from modules.shared.src.browser.utility_browser_async_loop import isolate_thread_event_loop
+from modules.shared.src.browser.utility_browser_model_target import bind_target_model, target_model
 from modules.shared.src.browser.utility_browser_session_check import (
     _in_page_expiry_banner_visible,
     assert_on_chat_page,
@@ -31,9 +34,7 @@ from modules.shared.src.browser.utility_browser_session_check import (
 )
 from modules.shared.src.common.taxonomy_core_constant import (
     CHAT_URL,
-    DEFAULT_MODEL,
     LAUNCH_RETRY_WAIT_SEC,
-    MODEL_SELECTOR_BUTTON,
     NAVIGATION_LOAD_TIMEOUT_MS,
     NAVIGATION_TIMEOUT_MS,
     NEW_CHAT_SELECTORS,
@@ -43,7 +44,6 @@ from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import (
     AuthRequiredError,
     BrowserLaunchError,
-    ModelSwitchError,
 )
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
@@ -52,19 +52,13 @@ from modules.shared.src.common.taxonomy_core_event import (
     EVENT_SESSION_EXPIRED,
     EVENT_WEB_LOADED,
 )
+from modules.shared.src.common.taxonomy_core_vo import ModelLabel, WaitTimeoutMs
 from modules.shared.src.common.utility_dom_helper import click_first_visible_enabled
 from modules.shared.src.common.utility_logger_factory import get_logger
 from modules.shared.src.session.utility_session_cloner import clean_stale_locks, create_ephemeral_session
 from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
 
 log = get_logger("browser")
-
-# Issue #283: the targeted model is per-run configuration. A contextvars token
-# lets concurrent runs (Swarm fan-out, parallel jobs) keep their own override
-# without mutating shared state. The override is active only for runs that
-# received an AppConfig with a non-empty ``model`` field; the constant-level
-# default (QWEN_DEFAULT_MODEL / QWEN_MODEL env var) is preserved otherwise.
-_TARGET_MODEL: contextvars.ContextVar[str] = contextvars.ContextVar("qwa_target_model", default=DEFAULT_MODEL)
 
 #: Hostnames that are third-party tracking/CDN pixels — their failures and
 #: console errors are noise, not domain signals. Demoted to DEBUG so they
@@ -106,9 +100,20 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 class BrowserAdapter(IBrowserProtocol):
     """Persistent Chromium browser context adapter implementing the browser contract."""
 
-    def __init__(self) -> None:
-        """Initialize BrowserAdapter."""
-        pass
+    def __init__(self, model_policy: IBrowserModelPolicyProtocol) -> None:
+        """Initialize BrowserAdapter.
+
+        *model_policy* is the injected model-policy capability that owns the
+        issue #283/#374 model selection/verification fallback rules. The
+        composition root (`modules/root_core_container.py`) constructs
+        `BrowserModelPolicy` and injects the same instance into the adapter
+        and the container, so both views see one shared seam. The adapter
+        file itself never imports a sibling capability (AES201); the public
+        seam stays the 2-method `IBrowserModelPolicyProtocol`, and the
+        adapter reaches the DOM-mechanic internals through the concrete
+        `BrowserModelPolicy` type.
+        """
+        self._model_policy = model_policy
 
     # Block 2: Public Contract
 
@@ -170,7 +175,11 @@ class BrowserAdapter(IBrowserProtocol):
         emitter.emit(EVENT_LOGIN_VERIFIED, {"url": page.url})
 
         # Step 5: Select the configured default model so the user never picks
-        # it manually.
+        # it manually. The model-policy capability owns the fallback rules;
+        # the adapter binds the run target so the picker helpers read the
+        # right model.
+        target = target_model()
+        bind_target_model(target)
         switched = self.ensure_default_model(page)
 
         # Step 6: Verify the switch actually happened. A readable but different
@@ -183,184 +192,55 @@ class BrowserAdapter(IBrowserProtocol):
     def _verify_default_model(self, page: Page, require_switch: bool = True) -> tuple[bool, str]:
         """Confirm the active model is the configured default, degrading when it is not.
 
-        Runs after ``ensure_default_model`` so a silent picker failure cannot let
-        the pipeline dispatch the prompt to an unrecorded model. Returns
-        ``(True, target)`` when the configured default is active. When the
-        configured model is absent from the picker, the first available model is
-        selected and a WARNING is logged (issue #283 AC-2); the method then
-        returns ``(False, fallback)`` so the caller can proceed with the active
-        model instead of aborting the pipeline (issue #374). Raises
-        ``ModelSwitchError`` only when no model label can be read at all, since
-        the active model is then unknowable. When the best-effort switch reported
-        failure (``require_switch=False``), verification is retried while the
-        model picker hydrates so a slow picker cannot fail the pipeline.
+        Delegates to the model-policy capability (issue #283/#374 fallback
+        rules).
         """
-        # Model picker options can arrive after the committed page document,
-        # especially when Qwen's static assets are slow. Keep this readiness gate
-        # bounded and retry selection instead of failing the whole pipeline on the
-        # first stale model label.
-        attempts = 5
-        current = ""
-        target = _active_model()
-        for attempt in range(attempts):
-            try:
-                picker = self._get_model_trigger(page)
-                picker.wait_for(state="visible", timeout=5000)
-                current = (picker.inner_text() or "").replace("\n", " ").strip()
-            except Error as exc:
-                if attempt + 1 < attempts:
-                    log.debug("verify_default_model_read_retry %s %s %s", target, str(exc), attempt + 1)
-                    self._retry_default_model_selection(page)
-                    continue
-                fallback = self._select_first_available_model(page)
-                if fallback is not None:
-                    return False, fallback
-                raise ModelSwitchError(
-                    f"Cannot read active model from '{MODEL_SELECTOR_BUTTON}' button: {exc}"
-                ) from exc
-            if target in current.split():
-                log.debug("verify_default_model_ok %s", target)
-                return True, target
-            if attempt + 1 < attempts:
-                log.debug("verify_default_model_retry %s %s %s %s", target, current, require_switch, attempt + 1)
-                self._retry_default_model_selection(page)
-                continue
-            # FRD FR-001 fallback: the configured default is absent from the
-            # picker, so pipeline availability wins over exact matching
-            # (issue #374). Prefer actively selecting the first available model
-            # so the run continues on a known-good picker entry (issue #283).
-            fallback = self._select_first_available_model(page)
-            if fallback is not None:
-                return False, fallback
-            log.warning(
-                "default_model_unavailable_proceeding_with_active %s %s",
-                target,
-                current,
-            )
-            return False, current
-        fallback = self._select_first_available_model(page)
-        if fallback is not None:
-            return False, fallback
-        raise ModelSwitchError(f"Default model not active: expected '{target}'")
+        target = target_model()
+        verified, detected = self._model_policy.verify_default_model(page, target, require_switch)
+        return verified, str(detected)
 
     def _select_first_available_model(self, page: Page) -> str | None:
         """Select the first model the picker offers, or return None when unreadable.
 
-        The graceful-degradation path for a renamed or deprecated model
-        identifier (issue #283 AC-2): the run continues on whatever model the
-        picker exposes first, and the WARNING names both the configured and the
-        active model so the discrepancy is auditable.
+        Delegates to the model-policy capability.
         """
-        try:
-            picker = self._get_model_trigger(page)
-            picker.click(timeout=5000)
-            try:
-                first_option = page.locator(".wms-list__item").first
-                if first_option.is_visible(timeout=2000) is not True:
-                    return None
-                label = (first_option.inner_text() or "").replace("\n", " ").strip()
-                first_option.click(timeout=5000)
-            finally:
-                with contextlib.suppress(Error):
-                    page.keyboard.press("Escape")
-        except Error as exc:
-            log.warning("model_fallback_unavailable %s %s", _active_model(), str(exc))
-            return None
-        if not label:
-            return None
-        log.warning(
-            "model_fallback_activated %s %s %s",
-            _active_model(),
-            label,
-            "configured model not offered by the model picker",
-        )
-        return label
+        result = self._model_policy.select_first_available_model(page)
+        return None if result is None else str(result)
 
     def _wait_for_model_picker_ready(self, page: Page, timeout_ms: int = 15_000) -> None:
-        """Wait until the hydrated picker exposes the configured default option."""
-        target = _active_model()
-        picker = self._get_model_trigger(page)
-        picker.wait_for(state="visible", timeout=timeout_ms)
-        picker.click(timeout=5000)
-        try:
-            option: Any = page.get_by_role("option", name=target)
-            with contextlib.suppress(Error):
-                loc = page.locator(".wms-list__item", has_text=target).first
-                if loc.is_visible(timeout=1000) is True:
-                    option = loc
-            option.wait_for(state="visible", timeout=timeout_ms)
-        finally:
-            with contextlib.suppress(Error):
-                page.keyboard.press("Escape")
+        """Wait until the hydrated picker exposes the configured default option.
+
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.wait_for_picker_ready(page, WaitTimeoutMs(timeout_ms))
 
     def _retry_default_model_selection(self, page: Page) -> None:
-        """Close a stale picker, allow hydration, and retry default-model selection."""
-        with contextlib.suppress(Error):
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(2000)
-        self.ensure_default_model(page)
+        """Close a stale picker, allow hydration, and retry default-model selection.
+
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.retry_default_model_selection(page)
 
     def _get_model_trigger(self, page: Page) -> Any:
-        """Return locator for active model selector trigger button/div."""
-        with contextlib.suppress(Error):
-            trigger = page.locator(".wms-trigger, [aria-label='Select Model']").first
-            if trigger.is_visible(timeout=1000) is True:
-                return trigger
-        return page.get_by_role("button", name=MODEL_SELECTOR_BUTTON)
+        """Return locator for active model selector trigger button/div.
+
+        Delegates to the model-policy capability.
+        """
+        return self._model_policy.get_model_trigger(page)
 
     def ensure_default_model(self, page: Page) -> bool:
         """Best-effort: ensure the active Qwen model is the configured default.
 
-        Opens the model picker only long enough to click the default option. The
-        call is defensive — any failure is logged and swallowed so it can never
-        block the prompt pipeline (the verify step then drives fallback).
+        Delegates to the model-policy capability.
         """
-        target = _active_model()
-        try:
-            picker = self._get_model_trigger(page)
-            picker.wait_for(state="visible", timeout=5000)
-            picker.click(timeout=5000)
-
-            # Option item (.wms-list__item or role=option)
-            option = page.get_by_role("option", name=target)
-            with contextlib.suppress(Error):
-                loc = page.locator(".wms-list__item", has_text=target).first
-                if loc.is_visible(timeout=1000) is True:
-                    option = loc
-
-            option.wait_for(state="visible", timeout=5000)
-            option.click(timeout=5000)
-            page.wait_for_timeout(300)
-
-            self._try_set_as_default(page)
-            log.debug("ensure_default_model_applied %s", target)
-            return True
-        except Error as exc:
-            log.debug("ensure_default_model_skipped %s %s", target, str(exc))
-            return False
+        return self._model_policy.ensure_default_model(page)
 
     def _try_set_as_default(self, page: Page) -> None:
-        """Best-effort attempt to click 'Set default' or 'Set as default' in Qwen UI picker."""
-        try:
-            picker = self._get_model_trigger(page)
-            picker.click(timeout=3000)
-            page.wait_for_timeout(300)
+        """Best-effort attempt to click 'Set default' or 'Set as default' in Qwen UI picker.
 
-            with contextlib.suppress(Error):
-                item = page.locator(".wms-list__item", has_text=DEFAULT_MODEL).first
-                if item.is_visible(timeout=1500) is True:
-                    pin = item.locator(".wms-list__pin-action, :has-text('Set as default')").first
-                    if "Set as default" in (pin.inner_text() or ""):
-                        pin.evaluate("e => e.click()")
-                        log.debug("set_default_model_ui_applied %s", _active_model())
-                        page.wait_for_timeout(300)
-
-            with contextlib.suppress(Error):
-                page.keyboard.press("Escape")
-        except Error as exc:
-            log.debug("set_default_model_ui_skipped %s", str(exc))
-            with contextlib.suppress(Error):
-                page.keyboard.press("Escape")
+        Delegates to the model-policy capability.
+        """
+        self._model_policy.try_set_as_default(page)
 
     def _start_new_chat(self, page: Page, opt_in: bool = True) -> None:
         """Start a clean Qwen conversation so stale cards cannot affect monitoring."""
@@ -665,7 +545,9 @@ class BrowserAdapter(IBrowserProtocol):
                     # Bind per-run model override after the context launches so
                     # concurrent runs scope their model to this session only.
                     _model = getattr(cfg, "model", "")
-                    _TARGET_MODEL.set(_model.strip() if isinstance(_model, str) and _model.strip() else DEFAULT_MODEL)
+                    bind_target_model(
+                        ModelLabel(_model.strip()) if isinstance(_model, str) and _model.strip() else target_model()
+                    )
 
                     # Eagerly navigate the initial about:blank page to CHAT_URL
                     # so the browser starts loading while route/diagnostics setup
@@ -787,14 +669,10 @@ def _raise_if_session_expired(page: Page) -> None:
 def _active_model() -> str:
     """Return the model a running pipeline should target.
 
-    ``ContextVar.get()`` returns the raw stored value, which in tests may be a
-    ``MagicMock`` (leaked by a prior unmocked ``browser_session`` call). Only a
-    genuine string is a valid target; anything else falls back to the default.
+    Delegates to the shared utility, so the per-run target model stays in
+    one place.
     """
-    value = _TARGET_MODEL.get()
-    if isinstance(value, str) and value:
-        return value
-    return DEFAULT_MODEL
+    return str(target_model())
 
 
 def _is_third_party_noise(url: str) -> bool:

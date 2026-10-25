@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 import contextlib
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
@@ -73,7 +74,7 @@ def client(browser_ctx: BrowserContext, page) -> DirectPromptAdapter:
         headless=True,
     )
     return DirectPromptAdapter(
-        browser=BrowserAdapter(),
+        browser=BrowserAdapter(model_policy=BrowserModelPolicy()),
         injector=PromptInjector(),
         sender=SendDispatcher(),
         streamer=StreamMonitor(),

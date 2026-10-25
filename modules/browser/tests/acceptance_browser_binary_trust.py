@@ -63,6 +63,7 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
     from playwright.sync_api import Error as PlaywrightError
 
     from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+    from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
     from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
     bindir = tmp_path / "path-bin"
@@ -98,5 +99,5 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
         mock_p.chromium.launch_persistent_context.side_effect = PlaywrightError("no trusted browser binary")
 
         with pytest.raises(BrowserLaunchError):
-            with BrowserAdapter().browser_session(cfg):
+            with BrowserAdapter(model_policy=BrowserModelPolicy()).browser_session(cfg):
                 pass

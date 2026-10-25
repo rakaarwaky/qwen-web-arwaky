@@ -67,6 +67,7 @@ from modules.session.src.capabilities_session_health_checker import SessionHealt
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
+from modules.shared.src.browser.contract_browser_protocol import IBrowserModelPolicyProtocol
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -115,6 +116,13 @@ from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapabili
 from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
 
 
+def _new_browser_model_policy() -> IBrowserModelPolicyProtocol:
+    """Construct the browser model-policy capability (AES503 wiring helper)."""
+    from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+
+    return BrowserModelPolicy()
+
+
 class SharedContainer:
     """Single dependency injection container shared by CLI and MCP features."""
 
@@ -137,7 +145,13 @@ class SharedContainer:
         )
         self.rl = RateLimiter(MaxPerMinute(rate_limit_per_minute))
 
-        self.browser = BrowserAdapter()
+        # Browser model-policy capability: owns the issue #283/#374 model
+        # selection/verification fallback rules; the container owns the seam
+        # and injects the same instance into the adapter so the adapter's
+        # model steps delegate to a shared capability (the adapter file
+        # itself never imports a sibling capability, AES201).
+        self.browser_model_policy = _new_browser_model_policy()
+        self.browser = BrowserAdapter(model_policy=self.browser_model_policy)
         # Browser capability: the session probe (page liveness + auth
         # assertion) the adapter delegates to; registered here so the
         # container owns the seam.

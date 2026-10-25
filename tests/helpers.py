@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import (
@@ -128,12 +129,12 @@ def validate_file(filepath, max_size_bytes=None):
 
 def clean_stale_locks(user_data_dir: str) -> None:
     """Standalone wrapper for BrowserAdapter._clean_stale_locks."""
-    BrowserAdapter()._clean_stale_locks(user_data_dir)
+    BrowserAdapter(model_policy=BrowserModelPolicy())._clean_stale_locks(user_data_dir)
 
 
 def navigate_to_chat(page, emitter) -> None:
     """Standalone wrapper for BrowserAdapter.navigate_to_chat."""
-    BrowserAdapter().navigate_to_chat(page, emitter)
+    BrowserAdapter(model_policy=BrowserModelPolicy()).navigate_to_chat(page, emitter)
 
 
 def make_app_config(tmp_path: Path, **overrides) -> AppConfig:

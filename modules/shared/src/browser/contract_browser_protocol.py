@@ -13,11 +13,92 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
+from typing import Any
 
 from playwright.sync_api import BrowserContext, Page
 
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
-from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.common.taxonomy_core_vo import AppConfig, ModelLabel, WaitTimeoutMs
+
+
+class IBrowserModelPolicyProtocol(ABC):
+    """Model selection/verification policy (issue #283/#374 fallback rules).
+
+    Product policy about which model to run on and the fallback rules when
+    the picker is unreadable, keeping DOM mechanics in the browser adapter.
+    """
+
+    @abstractmethod
+    def select_model(self, page: Page, emitter: LifecycleEmitter) -> ModelLabel:
+        """Read/select the default model on *page*; return the chosen label.
+
+        Raises:
+            ModelSwitchError: When no model label can be read at all.
+        """
+        ...
+
+    @abstractmethod
+    def verify_model(self, page: Page, expected: ModelLabel) -> bool:
+        """Return True when *page* shows *expected* as the active model."""
+        ...
+
+    # Internal DOM-mechanic helpers the browser adapter's delegation
+    # wrappers reach through; not part of the outward-facing public seam.
+
+    @abstractmethod
+    def ensure_default_model(self, page: Page) -> bool:
+        """Best-effort: click the configured default option in the picker.
+
+        Any failure is logged and swallowed so it never blocks the prompt
+        pipeline (the verify step drives fallback).
+        """
+        ...
+
+    @abstractmethod
+    def verify_default_model(
+        self, page: Page, target: ModelLabel, require_switch: bool = True
+    ) -> tuple[bool, ModelLabel]:
+        """Confirm the active model is *target*, degrading when it is not.
+
+        Returns ``(True, target)`` when the configured default is active.
+        When the configured model is absent from the picker, the first
+        available model is selected and a WARNING is logged (issue #283
+        AC-2); the method then returns ``(False, fallback)`` so the caller
+        proceeds with the active model instead of aborting the pipeline
+        (issue #374). Raises ``ModelSwitchError`` only when no model label
+        can be read at all.
+        """
+        ...
+
+    @abstractmethod
+    def select_first_available_model(self, page: Page) -> ModelLabel | None:
+        """Select the first model the picker offers, or return None when unreadable.
+
+        The graceful-degradation path for a renamed or deprecated model
+        identifier (issue #283 AC-2): the run continues on whatever model
+        the picker exposes first.
+        """
+        ...
+
+    @abstractmethod
+    def wait_for_picker_ready(self, page: Page, timeout_ms: WaitTimeoutMs = WaitTimeoutMs(15_000)) -> None:
+        """Wait until the hydrated picker exposes the configured default option."""
+        ...
+
+    @abstractmethod
+    def retry_default_model_selection(self, page: Page) -> None:
+        """Close a stale picker, allow hydration, and retry default-model selection."""
+        ...
+
+    @abstractmethod
+    def get_model_trigger(self, page: Page) -> Any:
+        """Return the locator for the active model selector trigger button/div."""
+        ...
+
+    @abstractmethod
+    def try_set_as_default(self, page: Page) -> None:
+        """Best-effort attempt to click 'Set default' in the Qwen UI picker."""
+        ...
 
 
 class IBrowserProtocol(ABC):
@@ -171,10 +252,15 @@ class ISessionCheckProtocol(ABC):
         ...
 
 
-__all__ = ["IBrowserProtocol", "ISessionCheckProtocol"]
+__all__ = [
+    "IBrowserModelPolicyProtocol",
+    "IBrowserProtocol",
+    "ISessionCheckProtocol",
+]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
+    "IBrowserModelPolicyProtocol": IBrowserModelPolicyProtocol,
     "IBrowserProtocol": IBrowserProtocol,
     "ISessionCheckProtocol": ISessionCheckProtocol,
 }
