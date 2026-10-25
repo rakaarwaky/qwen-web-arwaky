@@ -26,15 +26,15 @@ One table: every feature row. Feature detail stays in each feature's `BACKLOG.md
 |---|---|---|---|---|---|---|
 | `modules/prompt` | Prompt execution and attachment | P0 | Done | Spec: [FRD](modules/prompt/FRD.md) · Backlog: [BACKLOG](modules/prompt/BACKLOG.md) | None | 2026-10-25 |
 | `modules/session` | Session pool and rotation | P0 | Done | Spec: [FRD](modules/session/FRD.md) · Backlog: [BACKLOG](modules/session/BACKLOG.md) | `SESSION-03` | 2026-10-25 |
+| `modules/browser` | Browser adapter | P0 | Done | Spec: [FRD](modules/browser/FRD.md) · Backlog: [BACKLOG](modules/browser/BACKLOG.md) | None | 2026-10-25 |
 | `modules/jobs` | Async job and folder compilation | P1 | Done | Spec: [FRD](modules/jobs/FRD.md) · Backlog: [BACKLOG](modules/jobs/BACKLOG.md) | `JOBS-01` | 2026-10-24 |
 | `modules/swarm` | Swarm execution | P1 | Ready | Spec: [FRD](modules/swarm/FRD.md) · Backlog: [BACKLOG](modules/swarm/BACKLOG.md) | `SWARM-01` | 2026-09-24 |
 | `modules/logging` | Observability and metrics | P1 | Done | Spec: [FRD](modules/logging/FRD.md) · Backlog: [BACKLOG](modules/logging/BACKLOG.md) | None | 2026-10-25 |
-| `modules/browser` | Browser adapter | P0 | Done | Spec: [FRD](modules/browser/FRD.md) · Backlog: [BACKLOG](modules/browser/BACKLOG.md) | None | 2026-10-25 |
 | `modules/config` | Configuration | P1 | Done | Spec: [FRD](modules/config/FRD.md) · Backlog: [BACKLOG](modules/config/BACKLOG.md) | None | 2026-10-25 |
-| `modules/update` | Product update | P2 | Done | Spec: [FRD](modules/update/FRD.md) · Backlog: [BACKLOG](modules/update/BACKLOG.md) | None | 2026-10-25 |
 | `modules/cli` | CLI and Textual TUI | P1 | Done | Spec: [DESIGN](modules/cli/DESIGN.md) · Backlog: [BACKLOG](modules/cli/BACKLOG.md) | None | 2026-10-25 |
 | `modules/tui` | Textual TUI | P1 | Done | Spec: [DESIGN](modules/tui/DESIGN.md) · Backlog: [BACKLOG](modules/tui/BACKLOG.md) | `TUI-01` | 2026-10-25 |
 | `modules/mcp` | MCP Server Surface | P1 | Done | Spec: [DESIGN](modules/mcp/DESIGN.md) · Backlog: [BACKLOG](modules/mcp/BACKLOG.md) | None | 2026-10-25 |
+| `modules/update` | Product update | P2 | Done | Spec: [FRD](modules/update/FRD.md) · Backlog: [BACKLOG](modules/update/BACKLOG.md) | None | 2026-10-25 |
 
 ## Risk Register
 
