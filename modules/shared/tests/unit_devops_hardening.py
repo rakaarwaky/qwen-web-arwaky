@@ -111,12 +111,9 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
 
     adapter = adapter_module.BrowserAdapter(model_policy=BrowserModelPolicy())
     with (
-        patch.object(adapter_module, "create_ephemeral_session") as ephemeral,
         patch.object(adapter_module, "find_chrome_binary", return_value="/usr/bin/chromium"),
         patch.object(adapter_module, "sync_playwright", return_value=_Playwright()),
     ):
-        ephemeral.return_value.__enter__ = lambda self=None: session
-        ephemeral.return_value.__exit__ = lambda *_exc: False
         for disable in (False, True):
             cfg = AppConfig(
                 input_path=session,

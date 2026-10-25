@@ -81,6 +81,17 @@ pool, health checking, rotation, renewal, deletion, and login.
 - **Edge Cases**: A headless login has no operator to confirm, so it completes as soon as the page authenticates. An `AppConfig.timeout` shorter than the login wait ceiling does not truncate the login window, and a non-integer `QWEN_LOGIN_WAIT_SEC` falls back to the default ceiling.
 - **Error Handling**: A sequence that cannot complete surfaces the reason and leaves the previous session intact.
 
+### FR-SESSION-005: Prepare a session profile for browser launch
+
+- **Description**: Compute the mode→clone decision and hand the browser a plain prepared Path.
+- **Input**: An `AppConfig` carrying the session path and mode.
+- **Output**: A context manager yielding a prepared session profile path.
+- **Business Rules**:
+  - login mode yields the master session path directly so credentials persist.
+  - any other mode clones the master into an ephemeral temp dir so multiple browser processes can run concurrently without SingletonLock conflicts.
+- **Edge Cases**: A missing master session path results in an empty (but valid) ephemeral dir.
+- **Error Handling**: A clone failure surfaces an error naming the master path.
+
 ## API Contract
 
 ### Protocol API
@@ -97,6 +108,7 @@ pool, health checking, rotation, renewal, deletion, and login.
 | `mark_limited` | session identifier, optional reason | session pool | file error | none | Mark one session rate limited. |
 | `mark_auth_required` | session identifier, optional reason | session pool | file error | none | Mark one session as requiring re-authentication. |
 | `get_next_healthy_session` | none | session info | no-healthy-session error | none | Return the next usable session. |
+| `prepare` | AppConfig | prepared session profile path context manager | file error | none | Mode→clone decision: login mode yields master path directly; otherwise yields an ephemeral clone. |
 
 ### Aggregate API
 

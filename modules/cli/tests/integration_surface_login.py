@@ -61,7 +61,7 @@ class _BrowserHarness:
         self.page.is_closed.return_value = True
 
     @contextmanager
-    def browser_session(self, cfg):
+    def browser_session(self, cfg, session_path=None, executable_path=None):
         self.context_configs.append(cfg)
         self.active = True
         context = MagicMock()

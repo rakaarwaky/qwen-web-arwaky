@@ -68,6 +68,7 @@ from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
+from modules.session.src.capabilities_session_profile_preparer import ProfilePreparer
 from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.browser.contract_browser_protocol import (
@@ -184,6 +185,7 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
+        self.profile_preparer: ProfilePreparer = ProfilePreparer()
         # Session infrastructure (health checker + renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.
         self.session_health_checker = SessionHealthChecker(browser_lifecycle=self.browser_lifecycle)
@@ -292,6 +294,7 @@ class SharedContainer:
             renewer=self.session_renewer,
             health_checker=self.session_health_checker,
             rotator=self.session_rotator,
+            profile_preparer=self.profile_preparer,
         )
         # updater_verify and the update aggregate depend on the session orchestrator
         # (smoke gate) so they are composed after it.

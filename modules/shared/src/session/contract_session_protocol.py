@@ -21,6 +21,7 @@ aggregate: the consumer that picks the next session calls
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -35,6 +36,25 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionPool,
     SessionReason,
 )
+
+
+class IProfilePreparerProtocol(ABC):
+    """Session profile preparation — mode→clone decision for browser profiles.
+
+    Owns the ephemeral profile clone decision and hands the browser layer a
+    plain prepared Path. The browser capability never clones the profile
+    itself (AES201).
+    """
+
+    @abstractmethod
+    def prepare(self, cfg: AppConfig) -> AbstractContextManager[Path]:
+        """Return a context manager that yields a prepared session profile path.
+
+        For login mode, yields the master session path directly.
+        For standard modes, clones the master into an ephemeral temp dir
+        and yields the clone path (cleaned up on exit).
+        """
+        ...
 
 
 class ISessionManagerProtocol(ABC):
@@ -243,6 +263,7 @@ __all__ = [
     "ISessionHealthCheckerProtocol",
     "ISessionRotatorProtocol",
     "ISessionRenewalProtocol",
+    "IProfilePreparerProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -251,4 +272,5 @@ _layer_symbols = {
     "ISessionHealthCheckerProtocol": ISessionHealthCheckerProtocol,
     "ISessionRotatorProtocol": ISessionRotatorProtocol,
     "ISessionRenewalProtocol": ISessionRenewalProtocol,
+    "IProfilePreparerProtocol": IProfilePreparerProtocol,
 }

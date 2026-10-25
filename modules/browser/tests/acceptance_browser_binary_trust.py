@@ -88,13 +88,7 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
         headless=True,
     )
 
-    with (
-        patch("modules.browser.src.capabilities_browser_adapter.create_ephemeral_session") as ephemeral,
-        patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw,
-    ):
-        ephemeral.return_value.__enter__ = lambda self=None: str(session_dir)
-        ephemeral.return_value.__exit__ = lambda *_exc: False
-
+    with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
         mock_p = mock_pw.return_value.__enter__.return_value
         mock_p.chromium.launch_persistent_context.side_effect = PlaywrightError("no trusted browser binary")
 

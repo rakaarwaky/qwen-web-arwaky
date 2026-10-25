@@ -74,10 +74,19 @@ def test_agent_job_orchestrator_runs_n_jobs_in_parallel() -> None:
 
 
 def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None:
+    """Job mode passes the prepared session path straight through to the browser.
+
+    ProfilePreparer (session module) owns the ephemeral-clone decision; the
+    browser capability receives a plain prepared Path and never clones itself.
+    """
     adapter = BrowserAdapter(model_policy=BrowserModelPolicy())
     master_session = tmp_path / "master_session"
     master_session.mkdir()
     (master_session / "Cookies").write_text("cookie_auth", encoding="utf-8")
+
+    from modules.session.src.capabilities_session_profile_preparer import ProfilePreparer
+
+    preparer = ProfilePreparer()
 
     cfg = MagicMock()
     cfg.session_path = master_session
@@ -94,14 +103,15 @@ def test_browser_adapter_uses_ephemeral_session_for_jobs(tmp_path: Path) -> None
         return ctx
 
     with patch.object(adapter, "_launch_context", side_effect=fake_launch):
-        with adapter.browser_session(cfg):
-            pass
+        with preparer.prepare(cfg) as prepared_path:
+            with adapter.browser_session(cfg, session_path=prepared_path):
+                pass
 
     assert len(observed_user_data_dir) == 1
     used_dir = Path(observed_user_data_dir[0])
-    # Must NOT be master session
+    # Prepared path is the ephemeral clone, NOT the master session
     assert used_dir != master_session
-    # Ephemeral dir must have been cleaned up after session exit
+    # Ephemeral dir cleaned up after session exit
     assert not used_dir.exists()
 
 

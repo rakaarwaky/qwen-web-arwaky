@@ -55,7 +55,7 @@ from modules.shared.src.common.taxonomy_core_event import (
 from modules.shared.src.common.taxonomy_core_vo import ModelLabel, WaitTimeoutMs
 from modules.shared.src.common.utility_dom_helper import click_first_visible_enabled
 from modules.shared.src.common.utility_logger_factory import get_logger
-from modules.shared.src.session.utility_session_cloner import clean_stale_locks, create_ephemeral_session
+from modules.shared.src.session.utility_session_cloner import clean_stale_locks
 from modules.shared.src.update.utility_update_browser_binary import find_chrome_binary, is_headless_shell_binary
 
 log = get_logger("browser")
@@ -382,7 +382,7 @@ class BrowserAdapter(
         del session_path, executable_path
         # Login mode: create_ephemeral_session yields the master path directly,
         # so any cookie the browser writes persists to the master profile.
-        with self._open_chat_page(cfg, mode="login", strict_auth=True):
+        with self._open_chat_page(cfg, _mode="login", strict_auth=True):
             pass
 
     @contextmanager
@@ -393,17 +393,10 @@ class BrowserAdapter(
         Used by the manual login window flow; performs no model selection.
         No auth assertion: the page is handed to the operator to log in.
         """
-        master_session = cfg.session_path
-        with create_ephemeral_session(master_session, mode="login") as session_dir:
-            kwargs = self._launch_kwargs(session_dir, cfg)
-            with sync_playwright() as p:
-                ctx = self._launch_context(p, kwargs)
-                try:
-                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    yield page
-                finally:
-                    ctx.close()
+        with self.browser_session(cfg) as ctx:
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
+            yield page
 
     def wire_diagnostics(self, ctx: BrowserContext) -> None:
         """Attach all diagnostics to *ctx*: the context-level asset-abort
@@ -496,7 +489,7 @@ class BrowserAdapter(
                 view, or shows a login form.
         """
         del session_path, executable_path
-        with self._open_chat_page(cfg, mode="", strict_auth=False) as page:
+        with self._open_chat_page(cfg, _mode="", strict_auth=False) as page:
             yield page
 
     def _goto_chat(
@@ -556,8 +549,9 @@ class BrowserAdapter(
         self,
         cfg: Any,
         *,
-        mode: str,
+        _mode: str,
         strict_auth: bool,
+        session_path: Path | None = None,
     ) -> Iterator[Page]:
         """The shared launch → navigate → auth-assert sequence for one profile.
 
@@ -571,19 +565,22 @@ class BrowserAdapter(
         ``strict_auth`` mirrors the two consumers: renewal asserts on the
         chat page (strict), the health probe tolerates a page that is still
         hydrating (non-strict).
+
+        ``session_path`` is the plain profile path prepared by the session
+        `ProfilePreparer`; when omitted the adapter resolves it from
+        *cfg.session_path*. The capability no longer clones the profile itself.
         """
-        master_session = cfg.session_path
-        with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            kwargs = self._launch_kwargs(session_dir, cfg)
-            with sync_playwright() as p:
-                ctx = self._launch_context(p, kwargs)
-                try:
-                    page = ctx.pages[0] if ctx.pages else ctx.new_page()
-                    self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
-                    assert_on_chat_page(page, strict=strict_auth)
-                    yield page
-                finally:
-                    ctx.close()
+        session_dir = session_path if session_path is not None else cfg.session_path
+        kwargs = self._launch_kwargs(session_dir, cfg)
+        with sync_playwright() as p:
+            ctx = self._launch_context(p, kwargs)
+            try:
+                page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                self._goto_chat(page, NAVIGATION_TIMEOUT_MS, NAVIGATION_LOAD_TIMEOUT_MS)
+                assert_on_chat_page(page, strict=strict_auth)
+                yield page
+            finally:
+                ctx.close()
 
     def _launch_kwargs(self, session_dir: Path, cfg: Any) -> dict[str, Any]:
         """Build the persistent-context launch arguments for *cfg*.
@@ -692,75 +689,75 @@ class BrowserAdapter(
         ``executable_path`` is the Chromium binary to launch (injected by
         the update module); when omitted, the adapter resolves it.
         """
-        master_session = session_path if session_path is not None else cfg.session_path
+        session_dir = session_path if session_path is not None else cfg.session_path
         mode = getattr(cfg, "mode", "")
         # Per-run --model override is bound exactly once, after the ephemeral
         # session launches, so concurrent Swarm legs never read each other's
         # target model (Issue #283). Non-string values (e.g. a MagicMock in
         # a test harness) are ignored so they never pollute the contextvar.
 
-        with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            # Shared launch args (flags, sandbox/headless extras, headless-shell
-            # fallback) come from _launch_kwargs; the extras below are the ones
-            # only the prompt pipeline needs (clipboard permissions).
-            kwargs = self._launch_kwargs(session_dir, cfg)
-            kwargs["permissions"] = ["clipboard-read", "clipboard-write"]
-            if executable_path is not None:
-                kwargs["executable_path"] = executable_path
+        session_dir.mkdir(parents=True, exist_ok=True)
+        with contextlib.suppress(OSError):
+            session_dir.chmod(0o700)
 
-            isolate_thread_event_loop()
+        kwargs = self._launch_kwargs(session_dir, cfg)
+        kwargs["permissions"] = ["clipboard-read", "clipboard-write"]
+        if executable_path is not None:
+            kwargs["executable_path"] = executable_path
 
-            context_started = False
-            try:
-                with sync_playwright() as p:
-                    ctx = self._launch_context(p, kwargs)
-                    context_started = True
-                    # Bind per-run model override after the context launches so
-                    # concurrent runs scope their model to this session only.
-                    _model = getattr(cfg, "model", "")
-                    bind_target_model(
-                        ModelLabel(_model.strip()) if isinstance(_model, str) and _model.strip() else target_model()
+        isolate_thread_event_loop()
+
+        context_started = False
+        try:
+            with sync_playwright() as p:
+                ctx = self._launch_context(p, kwargs)
+                context_started = True
+                # Bind per-run model override after the context launches so
+                # concurrent runs scope their model to this session only.
+                _model = getattr(cfg, "model", "")
+                bind_target_model(
+                    ModelLabel(_model.strip()) if isinstance(_model, str) and _model.strip() else target_model()
+                )
+
+                # Eagerly navigate the initial about:blank page to CHAT_URL
+                # so the browser starts loading while route/diagnostics setup
+                # and orchestrator init happen in parallel.
+                if ctx.pages:
+                    try:
+                        ctx.pages[0].goto(
+                            CHAT_URL,
+                            wait_until="commit",
+                            timeout=NAVIGATION_TIMEOUT_MS,
+                        )
+                        log.debug("browser_eager_navigate_ok %s", CHAT_URL)
+                    except Error as exc:
+                        log.warning("browser_eager_navigate_failed_retry_in_navigate %s", str(exc))
+
+                if mode != "login":
+                    ctx.route(
+                        "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
+                        lambda r: r.abort(),
                     )
 
-                    # Eagerly navigate the initial about:blank page to CHAT_URL
-                    # so the browser starts loading while route/diagnostics setup
-                    # and orchestrator init happen in parallel.
-                    if ctx.pages:
-                        try:
-                            ctx.pages[0].goto(
-                                CHAT_URL,
-                                wait_until="commit",
-                                timeout=NAVIGATION_TIMEOUT_MS,
-                            )
-                            log.debug("browser_eager_navigate_ok %s", CHAT_URL)
-                        except Error as exc:
-                            log.warning("browser_eager_navigate_failed_retry_in_navigate %s", str(exc))
+                self.wire_diagnostics(ctx)
 
-                    if mode != "login":
-                        ctx.route(
-                            "**/*.{png,jpg,jpeg,gif,webp,mp4,mp3,woff,woff2,ttf,otf}",
-                            lambda r: r.abort(),
-                        )
-
-                    self.wire_diagnostics(ctx)
-
+                try:
+                    yield ctx
+                finally:
                     try:
-                        yield ctx
-                    finally:
-                        try:
-                            ctx.close()
-                        except Exception as e:
-                            # Teardown is best-effort and must never mask the domain failure.
-                            log.warning("browser_context_cleanup_failed %s", str(e))
-            except AuthRequiredError:
+                        ctx.close()
+                    except Exception as e:
+                        # Teardown is best-effort and must never mask the domain failure.
+                        log.warning("browser_context_cleanup_failed %s", str(e))
+        except AuthRequiredError:
+            raise
+        except BrowserLaunchError:
+            raise
+        except Exception as e:
+            if context_started:
                 raise
-            except BrowserLaunchError:
-                raise
-            except Exception as e:
-                if context_started:
-                    raise
-                log.critical("browser_launch_failed %s", str(e))
-                raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
+            log.critical("browser_launch_failed %s", str(e))
+            raise BrowserLaunchError(f"Failed to launch browser: {e}") from e
 
     # Block 3: Dunder Methods, Factories & Helpers
 
