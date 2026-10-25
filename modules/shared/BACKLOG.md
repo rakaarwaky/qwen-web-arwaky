@@ -18,7 +18,7 @@ Last Updated: 2026-10-05
 |---|---:|---|---|---|---|
 | SHARED-01 | P1 | Done | None | — | 2026-10-24 |
 | SHARED-02 | P1 | Done | None | Pinned DOM query helpers in unit_transcript_selector_regression.py against captured transcript fixture (2026-10-25). Evidence: `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). | 2026-10-25 |
-| SHARED-03 | P2 | Ready | `CONFIG-02` | Specify the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settles. | 2026-10-05 |
+| SHARED-03 | P2 | Done | `CONFIG-02` | Documented the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settled. Evidence: `uv run python -m pytest modules/shared/tests/ -q` → passes (2026-10-25, commit 2355b5d). | 2026-10-25 | FR-PROMPT-006 |
 
 ## Scenario Evidence
 
