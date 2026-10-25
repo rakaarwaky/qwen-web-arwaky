@@ -35,8 +35,8 @@ snapshot while it runs, and cancel it; they never own a browser or a thread.
 - **Output**: A snapshot naming each leg's status, its session, and its response path.
 - **Business Rules**:
   - A snapshot is a read that never mutates the fan-out.
-  - A leg that has not started yet reports pending rather than absent.
-  - The fan-out progress envelope a poller (MCP `get_job_status` consumer) relies on is the snapshot: run-level `status` in `queued` / `running` / `completed` / `partial` / `failed` / `cancelled`; per-leg `agents` each carrying `agent_id`, `status` in `queued` / `running` / `retrying` / `completed` / `failed` / `cancelled`, `attempt`, `output_path`, `error`, and `duration_sec`; plus run-level `browser_concurrency`, `clamped_browser_count`, and `session_shortfall`. A poller maps the run-level `status` onto the MCP envelope `status` field, maps each `agent.status` onto the per-leg status, and reads `clamped_browser_count` / `session_shortfall` to explain any submitted leg count below the request.
+  - A leg that has not started yet reports `queued` rather than absent.
+  - The fan-out progress envelope a poller (MCP `get_job_status` consumer) relies on the snapshot. Run-level fields: `swarm_id`, `input_path`, `root_path`, `status` in `queued` / `running` / `completed` / `partial` / `failed` / `cancelled` (`completed` when every leg succeeded, `partial` when some failed, `cancelled` when stopped), `max_attempts`, `browser_concurrency`, `clamped_browser_count`, `session_shortfall`, and the `agents` tuple. Per-leg fields: `agent_id` (the role), `status` in `queued` / `running` / `retrying` / `completed` / `failed` / `cancelled`, `attempt`, `output_path`, `error`, and `duration_sec`. A poller maps the run-level `status` onto the MCP envelope `status` discriminator, maps each `agent.status` onto the per-leg status, and reads `clamped_browser_count` / `session_shortfall` to explain any submitted leg count below the request.
 - **Edge Cases**: A snapshot of a fan-out that never started reports no legs.
 - **Error Handling**: A snapshot whose handle is unknown reports no legs rather than raising.
 
