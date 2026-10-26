@@ -1,7 +1,5 @@
 """Prompt runtime layer: browser/stream capabilities (AES403)."""
 
-from __future__ import annotations
-
 from .capabilities_send_dispatcher import SendDispatcher
 from .capabilities_stream_monitor import StreamMonitor
 
