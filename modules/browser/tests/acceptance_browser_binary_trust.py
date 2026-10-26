@@ -79,7 +79,11 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
     navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
     lifecycle.navigation = navigation
     orchestrator = BrowserOrchestrator(
-        None, obs, lifecycle=lifecycle, navigation=navigation, model_policy=model_policy, diagnostics=diag
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
     )
 
     bindir = tmp_path / "path-bin"

@@ -13,7 +13,6 @@ from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
 from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
-from modules.session.src.capabilities_session_health_checker import SessionCheck
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
@@ -65,7 +64,7 @@ from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunC
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.session.src.capabilities_session_health_checker import SessionCheck, SessionHealthChecker
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_profile_preparer import ProfilePreparer
 from modules.session.src.capabilities_session_renewal import SessionRenewer
@@ -189,11 +188,11 @@ class SharedContainer:
         self.browser_lifecycle.navigation = self.browser_navigation
         self.browser_session_check = SessionCheck
         # BrowserOrchestrator is the composition point: it implements the
-        # legacy IBrowserProtocol facade by delegating every method to the
-        # owning narrow capability (AES201: the Agent layer may import all
-        # capabilities, so the facade lives here, not in a capabilities file).
+        # IBrowserAggregate door (open_session) and delegates every
+        # capability method to the owning narrow capability view
+        # (AES201: the Agent layer may import all capabilities, so the
+        # composition point lives here, not in a capabilities file).
         self.browser = BrowserOrchestrator(
-            None,
             self.observability,
             lifecycle=self.browser_lifecycle,
             navigation=self.browser_navigation,
@@ -223,7 +222,7 @@ class SharedContainer:
         )
         # Feature agents sit between capabilities and surfaces so no caller
         # repeats the sequencing each feature owns. The browser orchestrator
-        # is already the IBrowserProtocol facade (constructed above); the
+        # is the IBrowserAggregate composition point (constructed above); the
         # aggregate view (open_session) reuses the same instance.
         self.agent_browser_orchestrator: IBrowserAggregate = self.browser
         self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
@@ -312,7 +311,8 @@ class SharedContainer:
             prompt=self.prompt_aggregate,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
             observability=self.observability,
             sessions=self.session_manager,
             renewer=self.session_renewer,

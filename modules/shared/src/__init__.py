@@ -9,9 +9,6 @@ from __future__ import annotations
 # ─── Contract: aggregates ─────────────────────────────────────
 from .browser.contract_browser_aggregate import IBrowserAggregate
 
-# ─── Contract: protocols ──────────────────────────────────────
-from .browser.contract_browser_protocol import IBrowserProtocol
-
 # ─── Taxonomy: constants ──────────────────────────────────────
 from .common.taxonomy_core_constant import (
     AUTH_KEYWORDS,
@@ -427,7 +424,6 @@ __all__ = [
     "IJobStorageProtocol",
     "ISendProtocol",
     "IStreamProtocol",
-    "IBrowserProtocol",
     "ISaverProtocol",
     "ISmokeGate",
     "IObservabilityProtocol",

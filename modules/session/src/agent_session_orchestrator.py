@@ -16,8 +16,13 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserLifecycleProtocol,
+    IBrowserNavigationProtocol,
+)
+from modules.shared.src.browser.utility_browser_session_check import check_session
 from modules.shared.src.common.taxonomy_core_constant import DEFAULT_OUTPUT, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
@@ -56,14 +61,32 @@ class SessionOrchestrator(ISessionAggregate):
 
     def __init__(
         self,
-        browser: IBrowserProtocol,
         observability: IObservabilityProtocol,
         sessions: ISessionManagerProtocol | None = None,
         renewer: ISessionRenewalProtocol | None = None,
         health_checker: ISessionHealthCheckerProtocol | None = None,
         rotator: ISessionRotatorProtocol | None = None,
+        *,
+        browser: object | None = None,
+        browser_lifecycle: IBrowserLifecycleProtocol | None = None,
+        browser_navigation: IBrowserNavigationProtocol | None = None,
+        session_probe: Callable[[Any], bool] | None = None,
     ) -> None:
-        self._browser = browser
+        """Wire the session orchestrator's capability seams.
+
+        *observability* is positional for the legacy call shape; the browser
+        seam is a keyword: the narrow views (*browser_lifecycle* /
+        *browser_navigation*) are the current API, while the legacy *browser*
+        shorthand is used as both views when no narrow view is supplied.
+        *session_probe* is an injectable per-page liveness verdict that
+        defaults to the shared ``utility_browser_session_check`` probe, so
+        tests can steer the verdict without monkeypatching the module.
+        """
+        lifecycle_view: object = browser_lifecycle if browser_lifecycle is not None else browser
+        navigation_view: object = browser_navigation if browser_navigation is not None else browser
+        self._browser_lifecycle: IBrowserLifecycleProtocol = lifecycle_view  # type: ignore[assignment]
+        self._browser_navigation: IBrowserNavigationProtocol = navigation_view  # type: ignore[assignment]
+        self._session_probe: Callable[[Any], bool] = session_probe if session_probe is not None else check_session
         self._observability = observability
         self._sessions = sessions
         self._renewer = renewer
@@ -206,7 +229,7 @@ class SessionOrchestrator(ISessionAggregate):
         # Delegate the browser mechanics (prepare → browser_session → first
         # page → goto) to the open_login_page capability instead of
         # re-implementing them here.
-        with self._browser.open_login_page(cfg) as page:
+        with self._browser_navigation.open_login_page(cfg) as page:
             # The human wait ceiling is its own budget: a typed login must
             # never be cut short by the generic run timeout.
             deadline = time.monotonic() + login_wait_seconds()
@@ -426,11 +449,11 @@ class SessionOrchestrator(ISessionAggregate):
             headless=True,
         )
         try:
-            with self._browser.browser_session(validation_cfg) as bctx:
+            with self._browser_lifecycle.browser_session(validation_cfg) as bctx:
                 page = bctx.pages[0] if bctx.pages else bctx.new_page()
                 emitter = LifecycleEmitter(self._observability.get_logger())
-                self._browser.navigate_to_chat(page, emitter)
-                if self._browser.check_session(page):
+                self._browser_navigation.navigate_to_chat(page, emitter)
+                if check_session(page):
                     return True
         except Exception:
             # Validation is a best-effort fast path: when the headless
@@ -447,11 +470,11 @@ class SessionOrchestrator(ISessionAggregate):
             try:
                 self._renewer.renew_session_if_stale(validation_cfg)
                 # Re-validate after renewal succeeded
-                with self._browser.browser_session(validation_cfg) as bctx:
+                with self._browser_lifecycle.browser_session(validation_cfg) as bctx:
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
                     emitter = LifecycleEmitter(self._observability.get_logger())
-                    self._browser.navigate_to_chat(page, emitter)
-                    if self._browser.check_session(page):
+                    self._browser_navigation.navigate_to_chat(page, emitter)
+                    if check_session(page):
                         return True
             except QwenCliError:
                 # AuthRequiredError or other auth failures: renewal impossible,

@@ -13,6 +13,10 @@ from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnost
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserLifecycleProtocol,
+    IBrowserNavigationProtocol,
+)
 
 
 def _make_orchestrator() -> BrowserOrchestrator:
@@ -27,7 +31,11 @@ def _make_orchestrator() -> BrowserOrchestrator:
     navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
     lifecycle.navigation = navigation
     return BrowserOrchestrator(
-        None, obs, lifecycle=lifecycle, navigation=navigation, model_policy=model_policy, diagnostics=diag
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
     )
 
 
@@ -120,10 +128,22 @@ class _BrowserHarness:
 
 
 def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
-    """Build an orchestrator with the non-browser capabilities mocked."""
+    """Build an orchestrator with the non-browser capabilities mocked.
+
+    The harness implements the method shapes both narrow browser protocols
+    need (``browser_session`` / ``open_login_page`` / ``navigate_to_chat`` /
+    ``check_session`` / ``check_auth``), so it is passed as the injected view
+    for each protocol. The session orchestrator reaches the session verdict
+    through the shared ``check_session`` utility, which the harness satisfies
+    via its context-manager page shape.
+    """
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
-    return SessionOrchestrator(browser=browser, observability=observability)
+    return SessionOrchestrator(
+        browser_lifecycle=browser,  # type: ignore[arg-type]
+        browser_navigation=browser,  # type: ignore[arg-type]
+        observability=observability,
+    )
 
 
 def _login_verdict(orchestrator, **kwargs) -> str:

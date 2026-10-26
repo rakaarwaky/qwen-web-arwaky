@@ -5,15 +5,6 @@ page, navigate to the chat, and prove the saved session was still signed in —
 four steps repeated in six files. This orchestrator owns that sequence once
 and exposes it as a single context manager, so no caller can forget the
 authentication check that every DOM interaction depends on.
-
-The orchestrator is also the composition point for the legacy
-``IBrowserProtocol`` facade: it owns the four narrow capability views
-(``BrowserLifecycle``, ``BrowserNavigation``, ``BrowserModelPolicy``,
-``BrowserDiagnostics``) and implements ``IBrowserProtocol`` by delegating
-every facade method to the owning narrow capability. The facade stays in the
-Agent layer so no capabilities-layer file imports a sibling capability
-(AES201); the composition root constructs the narrow views and hands them
-here.
 """
 
 from __future__ import annotations
@@ -21,7 +12,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-from typing import Any, cast
 
 from playwright.sync_api import BrowserContext, Page
 
@@ -31,12 +21,8 @@ from modules.shared.src.browser.contract_browser_protocol import (
     IBrowserLifecycleProtocol,
     IBrowserModelPolicyProtocol,
     IBrowserNavigationProtocol,
-    IBrowserProtocol,
 )
-from modules.shared.src.browser.utility_browser_session_check import (
-    assert_on_chat_page,
-    session_is_alive,
-)
+from modules.shared.src.browser.utility_browser_session_check import check_session
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig, ModelLabel, WaitTimeoutMs
@@ -48,18 +34,20 @@ log = get_logger("browser")
 __all__ = ["BrowserOrchestrator"]
 
 
-class BrowserOrchestrator(IBrowserAggregate, IBrowserProtocol):
+class BrowserOrchestrator(IBrowserAggregate):
     """Open authenticated chat sessions on behalf of the other orchestrators.
 
-    Implements ``IBrowserAggregate`` (``open_session``) and the legacy
-    ``IBrowserProtocol`` facade. The facade methods delegate to the four
-    narrow capability views injected by the composition root, so the
-    orchestrator owns no DOM mechanics of its own.
+    Implements ``IBrowserAggregate`` (``open_session``). The session probe
+    (``check_session`` / ``detect_session_expired``) is routed through the
+    shared ``utility_browser_session_check`` helpers so the Agent layer
+    carries no inline DOM mechanics and no legacy ``IBrowserProtocol``
+    facade. Capability internals are reached only through the injected
+    narrow protocol views; this orchestrator is ignorant of capability
+    implementations.
     """
 
     def __init__(
         self,
-        browser: IBrowserProtocol | None,
         observability: IObservabilityProtocol,
         *,
         lifecycle: IBrowserLifecycleProtocol,
@@ -69,13 +57,9 @@ class BrowserOrchestrator(IBrowserAggregate, IBrowserProtocol):
     ) -> None:
         """Wrap the browser capability that does the Playwright work.
 
-        *browser* is the facade the orchestrator's own ``open_session``
-        drives (the composition root passes the orchestrator itself so the
-        facade and the aggregate share one view set); *observability*
-        owns the run-scoped log. The four narrow views are the single-owner
-        seams every facade method reaches through.
+        *observability* owns the run-scoped log. The four narrow views are
+        the single-owner seams every delegate reaches through.
         """
-        self._browser = browser if browser is not None else self
         self._observability = observability
         self._lifecycle = lifecycle
         self._navigation = navigation
@@ -107,7 +91,18 @@ class BrowserOrchestrator(IBrowserAggregate, IBrowserProtocol):
             return bctx.pages[0]
         return bctx.new_page()
 
-    # ── IBrowserProtocol facade (delegates to the narrow views) ───────
+    # ── Session probe (no facade, no inline DOM mechanics) ───────────────
+
+    def check_session(self, page: Page) -> bool:
+        """Return True when *page* shows the authenticated chat UI.
+
+        Routes through the shared ``utility_browser_session_check`` probe:
+        URL / login-form / in-page expiry-banner assert plus the live
+        chat-input check. The Agent layer owns no DOM logic itself.
+        """
+        return check_session(page)
+
+    # ── Delegates to narrow capability views (public surface only) ───────
 
     def browser_session(
         self, cfg: AppConfig, session_path: Path | None = None, executable_path: str | None = None
@@ -142,13 +137,7 @@ class BrowserOrchestrator(IBrowserAggregate, IBrowserProtocol):
     def open_login_page(
         self, cfg: AppConfig, lifecycle: IBrowserLifecycleProtocol | None = None
     ) -> AbstractContextManager[Page]:
-        """Open one fresh page on *cfg*'s profile and go to the chat URL.
-
-        Delegates to the navigation capability, which uses the
-        *lifecycle* view for ``browser_session`` when provided, and falls
-        back to the orchestrator's own lifecycle view when omitted so the
-        loop stays on one Chromium process group.
-        """
+        """Open one fresh page on *cfg*'s profile and go to the chat URL."""
         if lifecycle is None:
             return self._navigation.open_login_page(cfg, lifecycle=self._lifecycle)
         return self._navigation.open_login_page(cfg, lifecycle=lifecycle)
@@ -201,96 +190,8 @@ class BrowserOrchestrator(IBrowserAggregate, IBrowserProtocol):
         self._diagnostics.wire_diagnostics(ctx)
 
     def detect_session_expired(self, page: Page) -> bool:
-        """True when the live page now shows an in-page session-expiry notice.
-
-        Delegates to the diagnostics capability, which reaches the shared
-        utility's expiry-banner scan (PR 5 collapse).
-        """
+        """True when the live page now shows an in-page session-expiry notice."""
         return self._diagnostics.detect_session_expired(page)
-
-    def check_session(self, page: Page) -> bool:
-        """Return True when *page* shows the authenticated chat UI.
-
-        Routes through the shared utility (PR 5 collapse): the URL /
-        login-form / in-page expiry-banner assert plus the live chat-input
-        check live in ``utility_browser_session_check``; the facade owns
-        no DOM logic of its own.
-        """
-        try:
-            try:
-                page.wait_for_load_state("load", timeout=15_000)
-            except Exception:
-                log.debug("session_load_state_wait_failed")
-            assert_on_chat_page(page)
-            return session_is_alive(page)
-        except AuthRequiredError:
-            return False
-        except Exception as exc:
-            log.warning("session_validation_failed %s", str(exc))
-            return False
-
-    # Internal DOM-mechanic helpers the legacy monolith exposed to tests;
-    # each now reaches through the owning capability.
-
-    def _goto_chat(self, page: Page, navigation_timeout_ms: int, load_timeout_ms: int) -> None:
-        """Navigate to chat.qwen.ai without waiting on third-party page assets."""
-        cast(Any, self._navigation)._goto_chat(page, navigation_timeout_ms, load_timeout_ms)
-
-    def _start_new_chat(self, page: Page, opt_in: bool = True) -> None:
-        """Start a clean Qwen conversation so stale cards cannot affect monitoring."""
-        cast(Any, self._navigation)._start_new_chat(page, opt_in)
-
-    def _clean_stale_locks(self, user_data_dir: str) -> None:
-        """Clean up stale Chromium lock files if process crashed or before launch."""
-        cast(Any, self._lifecycle)._clean_stale_locks(user_data_dir)
-
-    def _launch_context(self, p: object, kwargs: dict[str, object]) -> BrowserContext:
-        """Launch the persistent context with tenacity retry for transient crashes."""
-        return cast(Any, self._lifecycle)._launch_context(p, kwargs)  # type: ignore[no-any-return]
-
-    def _launch_kwargs(self, session_dir: Path, cfg: AppConfig) -> dict[str, object]:
-        """Build the persistent-context launch arguments for *cfg*."""
-        return cast(Any, self._lifecycle)._launch_kwargs(session_dir, cfg)  # type: ignore[no-any-return]
-
-    def _open_chat_page(
-        self,
-        cfg: AppConfig,
-        *,
-        _mode: str,
-        strict_auth: bool,
-        session_path: Path | None = None,
-    ) -> Iterator[Page]:
-        """The shared launch → navigate → auth-assert sequence for one profile."""
-        return cast(Any, self._lifecycle)._open_chat_page(
-            cfg, _mode=_mode, strict_auth=strict_auth, session_path=session_path
-        )  # type: ignore[no-any-return]
-
-    def _verify_default_model(self, page: Page, require_switch: bool = True) -> tuple[bool, str]:
-        """Confirm the active model is the configured default, degrading when it is not."""
-        target = self._model_policy.target_model()
-        verified, detected = self._model_policy.verify_default_model(page, target, require_switch)
-        return verified, str(detected)
-
-    def _select_first_available_model(self, page: Page) -> str | None:
-        """Select the first model the picker offers, or return None when unreadable."""
-        result = self._model_policy.select_first_available_model(page)
-        return None if result is None else str(result)
-
-    def _wait_for_model_picker_ready(self, page: Page, timeout_ms: int = 15_000) -> None:
-        """Wait until the hydrated picker exposes the configured default option."""
-        self._model_policy.wait_for_picker_ready(page, WaitTimeoutMs(timeout_ms))
-
-    def _retry_default_model_selection(self, page: Page) -> None:
-        """Close a stale picker, allow hydration, and retry default-model selection."""
-        self._model_policy.retry_default_model_selection(page)
-
-    def _get_model_trigger(self, page: Page) -> object:
-        """Return locator for active model selector trigger button/div."""
-        return self._model_policy.get_model_trigger(page)
-
-    def _try_set_as_default(self, page: Page) -> None:
-        """Best-effort attempt to click 'Set default' or 'Set as default' in Qwen UI picker."""
-        self._model_policy.try_set_as_default(page)
 
     def __repr__(self) -> str:
         """Return string representation of BrowserOrchestrator."""

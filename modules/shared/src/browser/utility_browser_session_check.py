@@ -81,6 +81,25 @@ def page_is_expired(page: Page) -> bool:
     return _in_page_expiry_banner_visible(page)
 
 
+def check_session(page: Page) -> bool:
+    """Return True when *page* shows the authenticated chat UI.
+
+    Never raises: a page that is still loading or whose DOM is not readable
+    is judged by the live checks, not reported as an error. Composes the
+    shared ``assert_on_chat_page`` and ``session_is_alive`` probes so the
+    Agent layer carries no inline DOM mechanics of its own.
+    """
+    try:
+        page.wait_for_load_state("load", timeout=15_000)
+    except Exception:
+        log.debug("session_load_state_wait_failed")
+    try:
+        assert_on_chat_page(page)
+    except AuthRequiredError:
+        return False
+    return session_is_alive(page)
+
+
 def _in_page_expiry_banner_visible(page: Page) -> bool:
     """True when the live page shows an in-page session-expiry notice."""
     try:
@@ -95,4 +114,4 @@ def _in_page_expiry_banner_visible(page: Page) -> bool:
     return False
 
 
-__all__ = ["session_is_alive", "assert_on_chat_page", "page_is_expired"]
+__all__ = ["session_is_alive", "assert_on_chat_page", "page_is_expired", "check_session"]

@@ -140,7 +140,6 @@ def _make_orchestrator() -> BrowserOrchestrator:
     navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
     lifecycle.navigation = navigation
     return BrowserOrchestrator(
-        None,
         obs,
         lifecycle=lifecycle,
         navigation=navigation,
@@ -150,13 +149,13 @@ def _make_orchestrator() -> BrowserOrchestrator:
 
 
 def clean_stale_locks(user_data_dir: str) -> None:
-    """Standalone wrapper for BrowserOrchestrator._clean_stale_locks."""
-    _make_orchestrator()._clean_stale_locks(user_data_dir)
+    """Standalone wrapper for the lifecycle capability's lock cleanup."""
+    _make_orchestrator()._lifecycle._clean_stale_locks(user_data_dir)
 
 
 def navigate_to_chat(page, emitter) -> None:
-    """Standalone wrapper for BrowserOrchestrator.navigate_to_chat."""
-    _make_orchestrator().navigate_to_chat(page, emitter)
+    """Standalone wrapper for the navigation capability's goto sequence."""
+    _make_orchestrator()._navigation.navigate_to_chat(page, emitter)
 
 
 def make_app_config(tmp_path: Path, **overrides) -> AppConfig:

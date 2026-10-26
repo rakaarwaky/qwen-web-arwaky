@@ -21,7 +21,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from modules.session.src.capabilities_session_renewal import SessionRenewer
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserLifecycleProtocol,
+    IBrowserNavigationProtocol,
+)
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.session.utility_session_renewal_cookie_probe import (
@@ -123,7 +126,7 @@ def test_missing_profile_reports_expired_and_not_renewable(tmp_path: Path) -> No
 
 
 def _renewer(tmp_path: Path) -> tuple[SessionRenewer, MagicMock]:
-    browser: MagicMock = MagicMock(spec=IBrowserProtocol)
+    browser: MagicMock = MagicMock(spec=IBrowserLifecycleProtocol)
     observability: MagicMock = MagicMock()
     observability.get_logger.return_value = MagicMock()
     renewer = SessionRenewer(browser, observability)
@@ -219,7 +222,7 @@ def test_orchestrator_validation_falls_back_to_renewer(tmp_path: Path) -> None:
     from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 
     _make_cookie_db(tmp_path, auth_future=False, refresh_future=True)
-    browser = MagicMock(spec=IBrowserProtocol)
+    browser = MagicMock(spec=IBrowserLifecycleProtocol)
     # The initial probe must report the session not ready (check_session
     # returns False) so the renewal path runs; the post-renewal re-validation
     # must then pass (check_session returns True) because the renewed
@@ -229,26 +232,26 @@ def test_orchestrator_validation_falls_back_to_renewer(tmp_path: Path) -> None:
     probe_page.new_page = MagicMock()
     browser.browser_session.return_value.__enter__ = MagicMock(return_value=probe_page)
     browser.browser_session.return_value.__exit__ = MagicMock(return_value=False)
-    browser.check_session.side_effect = [False, True]
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
 
     renewer = MagicMock()
     renewer.renew_session_if_stale.return_value = True
 
-    browser.browser_session.return_value.__enter__ = MagicMock(return_value=probe_page)
-    browser.browser_session.return_value.__exit__ = MagicMock(return_value=False)
     orch = SessionOrchestrator(
-        browser=browser,
+        browser_lifecycle=browser,
+        browser_navigation=MagicMock(spec=IBrowserNavigationProtocol),
         observability=observability,
         renewer=renewer,
     )
     # The initial probe fails (check_session False, no raise), so the
     # orchestrator consults the renewer; the post-renewal re-validation
     # passes because the renewed auth-session cookie is now live.
-    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build, \
+         patch("modules.session.src.agent_session_orchestrator.check_session", side_effect=[False, True]) as check:
         build.return_value = _cfg(tmp_path)
         assert orch._validate_saved_session(_cfg(tmp_path)) is True
+    check.assert_called()
     renewer.renew_session_if_stale.assert_called_once()
 
 
@@ -257,15 +260,19 @@ def test_orchestrator_without_renewer_reports_invalid(tmp_path: Path) -> None:
     from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 
     _make_cookie_db(tmp_path, auth_future=False, refresh_future=False)
-    browser = MagicMock(spec=IBrowserProtocol)
+    browser = MagicMock(spec=IBrowserLifecycleProtocol)
     probe_page = MagicMock()
     probe_page.pages = [probe_page]
     browser.browser_session.return_value.__enter__ = MagicMock(return_value=probe_page)
     browser.browser_session.return_value.__exit__ = MagicMock(return_value=False)
-    browser.check_session.return_value = False
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
-    orch = SessionOrchestrator(browser=browser, observability=observability)
-    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
+    orch = SessionOrchestrator(
+        browser_lifecycle=browser,
+        browser_navigation=MagicMock(spec=IBrowserNavigationProtocol),
+        observability=observability,
+    )
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build, \
+         patch("modules.session.src.agent_session_orchestrator.check_session", return_value=False):
         build.return_value = _cfg(tmp_path)
         assert orch._validate_saved_session(_cfg(tmp_path)) is False

@@ -49,7 +49,6 @@ def _make_orchestrator() -> BrowserOrchestrator:
     navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
     lifecycle.navigation = navigation
     return BrowserOrchestrator(
-        None,
         obs,
         lifecycle=lifecycle,
         navigation=navigation,

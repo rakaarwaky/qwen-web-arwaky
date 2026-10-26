@@ -37,7 +37,7 @@ class SessionRenewer(ISessionRenewalProtocol):
     """Detects stale auth sessions and renews them via browser self-heal.
 
     Wire-up:
-        browser: IBrowserProtocol
+        browser_lifecycle: IBrowserLifecycleProtocol
         observability: IObservabilityProtocol
 
     Public method:
