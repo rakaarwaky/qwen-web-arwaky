@@ -1,1 +1,1 @@
-"""Prompt pipeline/orchestration layer (AES405)."""
+"""Prompt pipeline/orchestration layer: agent orchestrator and prompt-verb adapters."""
