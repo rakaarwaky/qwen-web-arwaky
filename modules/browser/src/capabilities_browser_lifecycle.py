@@ -88,7 +88,8 @@ class BrowserLifecycle(IBrowserLifecycleProtocol):
     def navigation(self) -> IBrowserNavigationProtocol:
         """The injected navigation view (set after the container breaks
         the lifecycle/navigation DI cycle)."""
-        assert self._navigation is not None, "navigation not wired"
+        if self._navigation is None:
+            raise RuntimeError("navigation not wired")
         return self._navigation
 
     @navigation.setter

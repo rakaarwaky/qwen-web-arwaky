@@ -9,15 +9,15 @@ Last Updated: 2026-10-24
 
 - Done: `uv run python -m pytest modules/jobs/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - In Progress: None.
-- Next Action: None. `JOBS-01` shipped on 2026-10-22; next open item is `JOBS-02`.
+- Next Action: None. `FR-JOBS-001` shipped on 2026-10-22; both FR-JOBS-001 and FR-JOBS-002 are Done.
 
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|
-| JOBS-01 | P0 | Done | None | Zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. Evidence: `uv run python -m pytest modules/jobs/tests/acceptance_job_zombie_reconciliation.py -v` → 7 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001 |
-| JOBS-02 | P1 | Done | `MCP-01` | The saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. Evidence: `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001, FR-JOBS-002 |
-| JOBS-03 | P2 | Done | `LOGGING-03` | Single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by LOGGING-03. Evidence: `uv run python -m pytest modules/shared/tests/contract_status_schema.py -v` → 3 passed (2026-10-25, commit 16de58b). | 2026-10-25 | FR-JOBS-002 |
+| FR-JOBS-001 | P0 | Done | None | Zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. Evidence: `uv run python -m pytest modules/jobs/tests/acceptance_job_zombie_reconciliation.py -v` → 7 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001 |
+| FR-JOBS-002 | P1 | Done | `MCP-01` | The saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. Evidence: `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001, FR-JOBS-002 |
+| FR-JOBS-002 | P2 | Done | `LOGGING-02` | Single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by the logging status-file row. Evidence: `uv run python -m pytest modules/shared/tests/contract_status_schema.py -v` → 3 passed (2026-10-25, commit 16de58b). | 2026-10-25 | FR-JOBS-002 |
 
 ## Scenario Evidence
 
