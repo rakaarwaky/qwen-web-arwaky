@@ -1,1 +1,1 @@
-"""Prompt runtime package: browser/stream capabilities for chat.qwen.ai."""
+"""Prompt runtime layer: browser/stream capabilities for chat.qwen.ai."""

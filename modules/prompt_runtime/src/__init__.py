@@ -1,4 +1,4 @@
-"""Prompt runtime layer: browser/stream capabilities (AES403)."""
+"""Prompt runtime layer: browser/stream capabilities for chat.qwen.ai."""
 
 from .capabilities_file_uploader import FileUploader
 from .capabilities_output_saver import Saver
