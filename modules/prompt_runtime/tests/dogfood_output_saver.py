@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from modules.prompt.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
 from modules.shared.src.common.taxonomy_core_vo import RunContext
 from modules.shared.src.common.utility_io_writer import sidecar_path_for
 
