@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from contextlib import nullcontext
 from pathlib import Path
 
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.common.taxonomy_core_constant import CHAT_URL, DEFAULT_OUTPUT, SESSIONS_DIR
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_OUTPUT, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -29,7 +28,6 @@ from modules.shared.src.config.utility_config_app_factory import build_app_confi
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
-    IProfilePreparerProtocol,
     ISessionHealthCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRenewalProtocol,
@@ -64,7 +62,6 @@ class SessionOrchestrator(ISessionAggregate):
         renewer: ISessionRenewalProtocol | None = None,
         health_checker: ISessionHealthCheckerProtocol | None = None,
         rotator: ISessionRotatorProtocol | None = None,
-        profile_preparer: IProfilePreparerProtocol | None = None,
     ) -> None:
         self._browser = browser
         self._observability = observability
@@ -72,7 +69,6 @@ class SessionOrchestrator(ISessionAggregate):
         self._renewer = renewer
         self._health_checker = health_checker
         self._rotator = rotator
-        self._profile_preparer = profile_preparer
 
     # Block 2: Protocol Method Implementation
 
@@ -207,13 +203,10 @@ class SessionOrchestrator(ISessionAggregate):
             headless=False,
         )
 
-        preparer = self._profile_preparer
-        prepared_cm = preparer.prepare(cfg) if preparer is not None else nullcontext(profile_path)
-
-        with prepared_cm as prepared_path, self._browser.browser_session(cfg, session_path=prepared_path) as bctx:
-            page = bctx.pages[0] if bctx.pages else bctx.new_page()
-            page.goto(CHAT_URL, wait_until="domcontentloaded")
-
+        # Delegate the browser mechanics (prepare → browser_session → first
+        # page → goto) to the open_login_page capability instead of
+        # re-implementing them here.
+        with self._browser.open_login_page(cfg) as page:
             # The human wait ceiling is its own budget: a typed login must
             # never be cut short by the generic run timeout.
             deadline = time.monotonic() + login_wait_seconds()

@@ -71,6 +71,15 @@ class _BrowserHarness:
         finally:
             self.active = False
 
+    @contextmanager
+    def open_login_page(self, cfg):
+        self.context_configs.append(cfg)
+        self.active = True
+        try:
+            yield self.page
+        finally:
+            self.active = False
+
     def navigate_to_chat(self, page, emitter) -> None:
         return None
 
@@ -130,7 +139,8 @@ def test_existing_valid_session_still_opens_headed_browser(tmp_path: Path) -> No
     )
 
     assert "completed successfully" in result
-    # Two contexts: headed login + headless post-login validation.
+    # Two contexts: headed login (open_login_page) + headless post-login
+    # validation (browser_session).
     assert len(browser.context_configs) == 2
     assert [cfg.mode for cfg in browser.context_configs] == ["login", "session-check"]
     assert browser.context_configs[0].headless is False  # login context is headed

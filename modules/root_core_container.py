@@ -294,7 +294,6 @@ class SharedContainer:
             renewer=self.session_renewer,
             health_checker=self.session_health_checker,
             rotator=self.session_rotator,
-            profile_preparer=self.profile_preparer,
         )
         # updater_verify and the update aggregate depend on the session orchestrator
         # (smoke gate) so they are composed after it.
