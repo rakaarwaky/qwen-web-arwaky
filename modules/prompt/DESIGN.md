@@ -27,6 +27,13 @@ The adapters take protocol-typed constructor arguments (`IInjectionProtocol`,
 `ISendProtocol`, `IStreamProtocol`, `ISaverProtocol`, `IUploadProtocol`,
 `IRunCancelProtocol`); the root container wires the concrete implementations.
 
+### Packaging
+
+The per-member `pyproject.toml` is additive setuptools metadata under the
+root `packages.find include = ["modules*"]`; it is not a uv workspace
+member and is not standalone-buildable (matches the pre-existing
+`modules/shared` / `modules/cli` convention).
+
 ### Dependency Notes
 
 - Depends on `modules.shared` (taxonomy, contract, utility) — no other module's

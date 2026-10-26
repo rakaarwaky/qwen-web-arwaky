@@ -24,11 +24,16 @@ lifecycle events but log only lengths and counts, never response text.
 
 ### Barrel
 
-`src/__init__.py` is the module's single import point. It re-exports the five
+`src/__init__.py` is the module's single import point; it re-exports the five
 capability classes (`FileUploader`, `PromptInjector`, `SendDispatcher`,
-`Saver`, `StreamMonitor`) under `__all__`; the `from .capabilities_* import ...`
-lines are added incrementally in PRs 2–4 as each capability moves in, and PR 5
-verifies the barrel is complete.
+`Saver`, `StreamMonitor`) under `__all__`.
+
+### Packaging
+
+The per-member `pyproject.toml` is additive setuptools metadata under the
+root `packages.find include = ["modules*"]`; it is not a uv workspace
+member and is not standalone-buildable (matches the pre-existing
+`modules/shared` / `modules/cli` convention).
 
 ### Dependency Notes
 
