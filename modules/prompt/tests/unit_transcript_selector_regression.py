@@ -33,7 +33,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.prompt.src.capabilities_stream_monitor import JS_PROBE_GENERATION_STATE, StreamMonitor
+from modules.prompt_runtime.src.capabilities_stream_monitor import JS_PROBE_GENERATION_STATE, StreamMonitor
 from modules.shared.src.common.taxonomy_core_constant import (
     STOP_BUTTON_SELECTORS,
     THINKING_CARD_TEXT_MARKERS,
@@ -585,7 +585,7 @@ def test_one_probe_round_trip_per_poll_cycle_during_thinking() -> None:
     monitor = StreamMonitor(stall_timeout_sec=300)
     emitter = MagicMock(spec=LifecycleEmitter)
 
-    with patch("modules.prompt.src.capabilities_stream_monitor.time") as mock_time:
+    with patch("modules.prompt_runtime.src.capabilities_stream_monitor.time") as mock_time:
         mock_time.time.side_effect = [0, 0, 1]  # start, first poll (probe runs), second poll (timeout)
         mock_time.sleep = MagicMock()
         with pytest.raises(ResponseDetectionTimeoutError, match="hard timeout"):

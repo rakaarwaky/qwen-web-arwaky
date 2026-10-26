@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.prompt.src import capabilities_send_dispatcher as sd
 from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src import capabilities_send_dispatcher as sd
 
 # ── Precise DOM mock ─────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ class TestWaitForSendEnabledHoldFlag:
     """When hold_on_card_parsing=False, the card spinner must not block the send."""
 
     def test_no_hold_when_document_parsed(self):
-        from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
+        from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
 
         dispatcher = SendDispatcher()
         call_log: list[bool] = []
@@ -173,7 +173,7 @@ class TestWaitForSendEnabledHoldFlag:
         assert call_log == [], f"_is_file_card_parsing called with hold=False: {call_log}"
 
     def test_hold_when_not_parsed(self):
-        from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
+        from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
 
         dispatcher = SendDispatcher()
         call_log: list[bool] = []
