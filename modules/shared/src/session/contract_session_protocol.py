@@ -10,7 +10,7 @@ Seams:
 - ``ISessionManagerProtocol``       → ``SessionManager``        (pool CRUD, status marking)
 - ``ISessionLoginCheckerProtocol``  → ``SessionLoginChecker``   (is the Qwen page authenticated?)
 - ``ISessionLimitCheckerProtocol``  → ``SessionLimitChecker``   (is the Qwen page rate-limited?)
-- ``ISessionRotatorProtocol``       → ``SessionRotationAdapter`` (round-robin selection)
+- ``ISessionRotatorProtocol``       → ``SessionRotator``         (round-robin selection)
 - ``ISessionRenewalProtocol``       → ``SessionRenewer``        (token renewal, self-heal)
 
 The outward export surface for outer layers is ``ISessionAggregate``

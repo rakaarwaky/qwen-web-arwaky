@@ -45,6 +45,7 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionHealthResult,
     SessionId,
     SessionList,
+    SessionPool,
     SessionRequest,
     SessionResponse,
     SessionStatus,
@@ -171,7 +172,10 @@ class SessionOrchestrator(ISessionAggregate):
                 return SessionResponse(error="session checker not wired")
             pool = self._sessions.load_pool()
             results = self._run_pool_checks(pool, self._sessions)
-            healthy_count = sum(1 for r in results if r.is_healthy)
+            healthy_count = 0
+            for r in results:
+                if r.is_healthy:
+                    healthy_count += 1
             total = len(results)
             health_results = [r for r in results]
             lines = [f"{healthy_count}/{total} session(s) healthy"]
@@ -201,7 +205,7 @@ class SessionOrchestrator(ISessionAggregate):
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
 
     def _run_pool_checks(
-        self, pool, session_manager
+        self, pool: SessionPool, session_manager: ISessionManagerProtocol
     ) -> list[SessionHealthResult]:
         """Run the login checker then the limit checker on every pool session.
 
@@ -211,17 +215,21 @@ class SessionOrchestrator(ISessionAggregate):
         Manager state is written sequentially after the async probes so
         pool mutation never races (BE-4-001).
         """
+        if self._login_checker is None or self._limit_checker is None:
+            return []
         import asyncio
 
+        login_checker = self._login_checker
+        limit_checker = self._limit_checker
+
         async def _check_all() -> list[SessionHealthResult]:
-            login_verdicts = await asyncio.gather(
-                *(self._login_checker.check_session(s) for s in pool.sessions)
-            )
-            limit_verdicts = await asyncio.gather(
-                *(self._limit_checker.check_session(s) for s in pool.sessions)
+            # One gather over both checkers so login and limit probes of the same
+            # session run concurrently instead of two sequential sweeps (BE-4-001).
+            pairs = await asyncio.gather(
+                *(asyncio.gather(login_checker.check_session(s), limit_checker.check_session(s)) for s in pool.sessions)
             )
             results: list[SessionHealthResult] = []
-            for s, login_v, limit_v in zip(pool.sessions, login_verdicts, limit_verdicts, strict=True):
+            for s, (login_v, limit_v) in zip(pool.sessions, pairs, strict=True):
                 if login_v.status == SessionStatus.AUTH_REQUIRED:
                     verdict = login_v
                 elif limit_v.status == SessionStatus.LIMITED:
@@ -509,7 +517,7 @@ class SessionOrchestrator(ISessionAggregate):
                 page = bctx.pages[0] if bctx.pages else bctx.new_page()
                 emitter = LifecycleEmitter(self._observability.get_logger())
                 self._browser_navigation.navigate_to_chat(page, emitter)
-                if check_session(page):
+                if self._session_probe(page):
                     return True
         except Exception:
             # Validation is a best-effort fast path: when the headless
@@ -530,7 +538,7 @@ class SessionOrchestrator(ISessionAggregate):
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
                     emitter = LifecycleEmitter(self._observability.get_logger())
                     self._browser_navigation.navigate_to_chat(page, emitter)
-                    if check_session(page):
+                    if self._session_probe(page):
                         return True
             except QwenCliError:
                 # AuthRequiredError or other auth failures: renewal impossible,

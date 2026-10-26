@@ -19,7 +19,8 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from modules.shared.src.browser.utility_browser_session_check import (
     assert_on_chat_page,
@@ -38,6 +39,9 @@ from modules.shared.src.session.taxonomy_session_vo import (
 
 if TYPE_CHECKING:
     from modules.shared.src.browser.contract_browser_protocol import IBrowserLifecycleProtocol
+
+
+# Block 1: Class Definition & Constructor
 
 
 class SessionLoginChecker(ISessionLoginCheckerProtocol):
@@ -59,8 +63,9 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
         self._browser_lifecycle = browser_lifecycle
         self._timeout = timeout_seconds
         self._session_cfg = session_cfg
+        self._new_cancel: Callable[[], threading.Event] = threading.Event
 
-    # ── Protocol Method Implementation ────────────────────────────────
+    # Block 2: Protocol Method Implementation
 
     async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         """Probe *session* and return the login verdict (ACTIVE or AUTH_REQUIRED).
@@ -80,8 +85,8 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
                 recovery_action="Configure the Playwright Chromium browser seam.",
             )
 
-        cfg = self._build_cfg(session)
-        cancel = threading.Event()
+        cfg = self.build_cfg(session)
+        cancel = self._new_cancel()
         probe_done = threading.Event()
         probe_task = asyncio.get_running_loop().run_in_executor(
             None,
@@ -114,9 +119,7 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
                 recovery_action="Verify Chromium installation and profile permissions.",
             )
 
-    # ── Internal helpers ───────────────────────────────────────────────
-
-    def _build_cfg(self, session: SessionInfo) -> AppConfig:
+    def build_cfg(self, session: SessionInfo) -> AppConfig:
         """Point the probe at *session*'s stored profile, reusing the base cfg's flags."""
         base = self._session_cfg
         if base is None:
@@ -148,6 +151,8 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
             inline_prompt_text=base.inline_prompt_text,
         )
 
+    # Block 3: Dunder Methods, Factories, Helpers
+
     def _probe_login(
         self,
         cfg: AppConfig,
@@ -166,6 +171,8 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
 
         All three pass → ``ACTIVE``. Any failure → ``AUTH_REQUIRED``.
         """
+        if self._browser_lifecycle is None:
+            return _auth_required(session_id, HealthReason.LAUNCH_FAILURE, "Browser seam not configured")
         try:
             with self._browser_lifecycle.health_probe_page(cfg) as page:
                 if cancel.is_set():
@@ -180,11 +187,18 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
                     assert_on_chat_page(page)
                 except AuthRequiredError as exc:
                     return _auth_required(session_id, HealthReason.EXPIRED, str(exc))
-                if not session_is_alive(page):
+                try:
+                    if not session_is_alive(page):
+                        return _auth_required(
+                            session_id,
+                            HealthReason.EXPIRED,
+                            "Chat input / composer not usable or login prompt displayed",
+                        )
+                except Exception as exc:
                     return _auth_required(
                         session_id,
-                        HealthReason.EXPIRED,
-                        "Chat input / composer not usable or login prompt displayed",
+                        HealthReason.LAUNCH_FAILURE,
+                        f"Login probe failed: {exc}",
                     )
                 return SessionHealthResult(
                     session_id=session_id,

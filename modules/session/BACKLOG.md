@@ -27,7 +27,7 @@ Last Updated: 2026-10-24
 | The session aggregate reports its verdict from the browser seam | Automated | `modules/session/tests/unit_agent_session_orchestrator.py` | session aggregate | 2026-10-05 |
 | Rotation skips a rate-limited session | Automated | `modules/session/tests/unit_agent_session_orchestrator.py` | rotation | 2026-10-05 |
 | A backup write failure refuses the deletion | Automated | `modules/session/tests/unit_capabilities_session_manager.py` | backup failure refuses deletion | 2026-10-18 |
-| Every pooled session rate limited reports the throttle | Automated | `modules/session/tests/unit_capabilities_session_rotation_adapter.py` | rotation exhaustion | 2026-10-18 |
+| Every pooled session rate limited reports the throttle | Automated | `modules/session/tests/unit_capabilities_session_rotator.py` | rotation exhaustion | 2026-10-18 |
 
 ## Blockers
 

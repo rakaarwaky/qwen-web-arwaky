@@ -248,7 +248,7 @@ class SessionRotator:
         )
 ```
 
-The code sample above mirrors `SessionRotationAdapter.rotate` in `modules/session/src/capabilities_session_rotation_adapter.py`, including the `empty_pool` early return and the verdict-marking branches; it omits only the metrics counters.
+The code sample above mirrors `SessionRotator.rotate` in `modules/session/src/capabilities_session_rotator.py`, including the `empty_pool` early return and the verdict-marking branches; it omits only the metrics counters.
 
 **CAPTCHA / access-control stop:** A CAPTCHA or any provider access-control stop halts immediately. No bypass is attempted. The affected session is marked `AUTH_REQUIRED` with reason `EXPIRED` or `NETWORK` as appropriate.
 

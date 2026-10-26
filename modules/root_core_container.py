@@ -304,9 +304,9 @@ class SharedContainer:
         # Session rotation: the rotator needs the prompt aggregate so that
         # execute_with_rotation can delegate real work instead of using a
         # simulated response (ARCH-2-003).
-        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+        from modules.session.src.capabilities_session_rotator import SessionRotator
 
-        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
+        self.session_rotator: ISessionRotatorProtocol = SessionRotator(
             session_manager=self.session_manager,
             limit_checker=self.session_limit_checker,
             prompt=self.prompt_aggregate,

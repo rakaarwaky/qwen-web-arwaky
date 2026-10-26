@@ -11,7 +11,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
-from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+from modules.session.src.capabilities_session_rotator import SessionRotator
 from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionPool, SessionStatus
 
 
@@ -25,7 +25,7 @@ def _session(index: int) -> SessionInfo:
     )
 
 
-def _rotation_adapter(pool: SessionPool) -> SessionRotationAdapter:
+def _rotation_adapter(pool: SessionPool) -> SessionRotator:
     """Return a rotation adapter over *pool* with a stub health probe."""
     from unittest.mock import MagicMock
 
@@ -37,7 +37,7 @@ def _rotation_adapter(pool: SessionPool) -> SessionRotationAdapter:
     manager.mark_healthy.return_value = None
     checker = MagicMock()
     checker.check_session = _healthy
-    return SessionRotationAdapter(manager, checker)
+    return SessionRotator(manager, checker)
 
 
 def test_dogfood_rotation_over_a_single_session_pool_returns_it(tmp_path: Path) -> None:

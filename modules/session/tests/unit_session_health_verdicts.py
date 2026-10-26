@@ -45,8 +45,13 @@ def _session(
 def _page_mock(*, body: str = "", usable: bool = True) -> MagicMock:
     page = MagicMock()
     page.inner_text.return_value = body
+    page.evaluate.return_value = "complete"
+    page.url = "https://chat.qwen.ai/"
     page.query_selector.return_value = MagicMock() if usable else None
     page.wait_for_timeout.return_value = None
+    loc = page.locator.return_value
+    loc.count.return_value = 0
+    loc.first.is_visible.return_value = False
     return page
 
 

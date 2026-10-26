@@ -44,7 +44,7 @@ _NO_ELIGIBLE_RECOVERY: dict[str, str] = {
 # Block 1: Class Definition & Constructor
 
 
-class SessionRotationAdapter(ISessionRotatorProtocol):
+class SessionRotator(ISessionRotatorProtocol):
     """Transparent session rotation with health checking."""
 
     def __init__(
@@ -176,7 +176,7 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
     def _ensure_checker(self) -> ISessionLimitCheckerProtocol:
         """Return the limit checker, raising if not configured."""
         if self._checker is None:
-            raise RuntimeError("Limit checker not configured — pass one to SessionRotationAdapter()")
+            raise RuntimeError("Limit checker not configured — pass one to SessionRotator()")
         return self._checker
 
     def _execute_request(
@@ -193,8 +193,7 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
         """
         if self._prompt is None:
             raise RuntimeError(
-                "SessionRotationAdapter has no IPromptAggregate wired — "
-                "pass prompt=PromptOrchestrator(...) when constructing"
+                "SessionRotator has no IPromptAggregate wired — pass prompt=PromptOrchestrator(...) when constructing"
             )
         response = self._prompt.execute(
             PromptRequest(
@@ -207,6 +206,6 @@ class SessionRotationAdapter(ISessionRotatorProtocol):
 
 
 __all__ = [
-    "SessionRotationAdapter",
+    "SessionRotator",
     "RotationMetrics",
 ]

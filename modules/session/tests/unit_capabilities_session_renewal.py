@@ -238,22 +238,27 @@ def test_orchestrator_validation_falls_back_to_renewer(tmp_path: Path) -> None:
     renewer = MagicMock()
     renewer.renew_session_if_stale.return_value = True
 
+    _probe_results = [False, True]
+
+    def _probe(page) -> bool:
+        try:
+            return _probe_results.pop(0)
+        except IndexError:
+            return True
+
     orch = SessionOrchestrator(
         browser_lifecycle=browser,
         browser_navigation=MagicMock(spec=IBrowserNavigationProtocol),
         observability=observability,
         renewer=renewer,
+        session_probe=_probe,
     )
-    # The initial probe fails (check_session False, no raise), so the
+    # The initial probe fails (session_probe returns False), so the
     # orchestrator consults the renewer; the post-renewal re-validation
     # passes because the renewed auth-session cookie is now live.
-    with (
-        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
-        patch("modules.session.src.agent_session_orchestrator.check_session", side_effect=[False, True]) as check,
-    ):
+    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build:
         build.return_value = _cfg(tmp_path)
         assert orch._validate_saved_session(_cfg(tmp_path)) is True
-    check.assert_called()
     renewer.renew_session_if_stale.assert_called_once()
 
 

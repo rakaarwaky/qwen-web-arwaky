@@ -15,12 +15,14 @@ import json
 import os
 import stat
 import time
+from collections.abc import Coroutine
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.common import taxonomy_core_constant as constants
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
@@ -389,18 +391,27 @@ class _SlowChecker:
         return SessionHealthResult(session_id=session.session_id, status=status)
 
 
+def _make_probe_stub(name: str, probe) -> object:
+    """Build a plain instance whose check_session delegates to *probe* without self."""
+
+    class _ProbeStub:
+        check_session = staticmethod(probe)
+
+    return type(name, (_ProbeStub,), {})()
+
+
 def _orchestrator_with_slow_checker(pool: SessionPool) -> tuple[SessionOrchestrator, _SlowChecker]:
     """Wire a session orchestrator with slow login+limit checkers."""
-    from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-
     checker = _SlowChecker()
 
-    async def _probe(_session: SessionInfo) -> SessionHealthResult:
-        await asyncio.sleep(_SlowChecker.probe_duration)
-        return SessionHealthResult(session_id=_session.session_id, status=SessionStatus.ACTIVE)
+    def _login_probe(session: SessionInfo) -> Coroutine[None, None, SessionHealthResult]:
+        return checker.check_session(session)
 
-    login_checker = type("_LoginStub", (), {"check_session": _probe})()
-    limit_checker = type("_LimitStub", (), {"check_session": _probe})()
+    def _limit_probe(session: SessionInfo) -> Coroutine[None, None, SessionHealthResult]:
+        return checker.check_session(session)
+
+    login_checker = _make_probe_stub("_LoginStub", _login_probe)
+    limit_checker = _make_probe_stub("_LimitStub", _limit_probe)
 
     orchestrator = SessionOrchestrator(
         observability=MagicMock(),

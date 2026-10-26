@@ -19,10 +19,10 @@ import asyncio
 import re
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
-from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.session.contract_session_protocol import ISessionLimitCheckerProtocol
 from modules.shared.src.session.taxonomy_session_vo import (
@@ -33,11 +33,16 @@ from modules.shared.src.session.taxonomy_session_vo import (
 )
 
 if TYPE_CHECKING:
+    from playwright.sync_api import Page
+
     from modules.shared.src.browser.contract_browser_protocol import IBrowserLifecycleProtocol
 
 
 # Compiled patterns for performance
 _compiled_patterns = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
+
+
+# Block 1: Class Definition & Constructor
 
 
 class SessionLimitChecker(ISessionLimitCheckerProtocol):
@@ -59,8 +64,9 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
         self._browser_lifecycle = browser_lifecycle
         self._timeout = timeout_seconds
         self._session_cfg = session_cfg
+        self._new_cancel: Callable[[], threading.Event] = threading.Event
 
-    # ── Protocol Method Implementation ────────────────────────────────
+    # Block 2: Protocol Method Implementation
 
     async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         """Probe *session* and return the limit verdict (ACTIVE or LIMITED).
@@ -74,15 +80,14 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
         if self._browser_lifecycle is None:
             return _limited(session_id, session.reason, "Browser seam not configured")
 
-        cfg = self._build_cfg(session)
-        cancel = threading.Event()
+        cfg = self.build_cfg(session)
+        cancel = self._new_cancel()
         probe_done = threading.Event()
         probe_task = asyncio.get_running_loop().run_in_executor(
             None,
             self._probe_limit,
             cfg,
             session_id,
-            session.status,
             session.reason,
             cancel,
             probe_done,
@@ -100,6 +105,7 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
                 session_id,
                 session.reason,
                 f"Limit probe timed out after {self._timeout}s",
+                reason=HealthReason.TIMEOUT.value,
             )
         except Exception as exc:
             return _limited(
@@ -108,9 +114,7 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
                 f"Limit probe failed: {exc}",
             )
 
-    # ── Internal helpers ───────────────────────────────────────────────
-
-    def _build_cfg(self, session: SessionInfo) -> AppConfig:
+    def build_cfg(self, session: SessionInfo) -> AppConfig:
         """Point the probe at *session*'s stored profile, reusing the base cfg's flags."""
         base = self._session_cfg
         if base is None:
@@ -142,11 +146,55 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
             inline_prompt_text=base.inline_prompt_text,
         )
 
+    # Block 3: Dunder Methods, Factories, Helpers
+
+    @staticmethod
+    def _extract_limit_evidence(page: Page) -> str | None:
+        """Extract matching rate-limit evidence from page body text."""
+        try:
+            body = page.inner_text("body") or ""
+            for pattern in _compiled_patterns:
+                match = pattern.search(body)
+                if match:
+                    return match.group(0)
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _page_is_usable(
+        page: Page,
+        cancel: threading.Event | None = None,
+    ) -> bool:
+        """True when the chat composer (textarea) is present on the page."""
+        try:
+            selector = "textarea"
+            deadline = 3
+            for _ in range(deadline):
+                if cancel is not None and cancel.is_set():
+                    return False
+                if page.query_selector(selector):
+                    return True
+                page.wait_for_timeout(500)
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    def _body_is_rate_limited(page: Page) -> bool:
+        """True when the page body text matches a known rate-limit notice."""
+        try:
+            body = (page.inner_text("body") or "").lower()
+        except Exception:
+            return False
+        if not body:
+            return False
+        return any(pattern.search(body) for pattern in _compiled_patterns)
+
     def _probe_limit(
         self,
         cfg: AppConfig,
         session_id: str,
-        prior_status: SessionStatus,
         prior_reason: str | None,
         cancel: threading.Event,
         probe_done: threading.Event,
@@ -162,6 +210,8 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
         ``ACTIVE`` for the limit checker; expiry is the login checker's
         concern.
         """
+        if self._browser_lifecycle is None:
+            return _limited(session_id, prior_reason, "Browser seam not configured")
         try:
             with self._browser_lifecycle.health_probe_page(cfg) as page:
                 if cancel.is_set():
@@ -196,56 +246,22 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
         finally:
             probe_done.set()
 
-    @staticmethod
-    def _extract_limit_evidence(page: Any) -> str | None:
-        """Extract matching rate-limit evidence from page body text."""
-        try:
-            body = page.inner_text("body") or ""
-            for pattern in _compiled_patterns:
-                match = pattern.search(body)
-                if match:
-                    return match.group(0)
-        except Exception:
-            pass
-        return None
-
-    @staticmethod
-    def _page_is_usable(page: Any, cancel: threading.Event | None = None) -> bool:
-        """True when the chat composer (textarea) is present on the page."""
-        try:
-            selector = "textarea"
-            deadline = 3
-            for _ in range(deadline):
-                if cancel is not None and cancel.is_set():
-                    return False
-                if page.query_selector(selector):
-                    return True
-                page.wait_for_timeout(500)
-            return False
-        except Exception:
-            return False
-
-    @staticmethod
-    def _body_is_rate_limited(page: Any) -> bool:
-        """True when the page body text matches a known rate-limit notice."""
-        try:
-            body = (page.inner_text("body") or "").lower()
-        except Exception:
-            return False
-        if not body:
-            return False
-        return any(pattern.search(body) for pattern in _compiled_patterns)
-
     def __repr__(self) -> str:
         return f"SessionLimitChecker(browser_lifecycle={self._browser_lifecycle!r}, timeout_seconds={self._timeout})"
 
 
-def _limited(session_id: str, prior_reason: str | None, evidence: str) -> SessionHealthResult:
+def _limited(
+    session_id: str,
+    prior_reason: str | None,
+    evidence: str,
+    *,
+    reason: str | None = None,
+) -> SessionHealthResult:
     """Build a LIMITED verdict with a recovery action."""
     return SessionHealthResult(
         session_id=session_id,
         status=SessionStatus.LIMITED,
-        reason=prior_reason or HealthReason.QUOTA.value,
+        reason=reason or prior_reason or HealthReason.QUOTA.value,
         evidence=evidence,
         recovery_action="Wait for quota reset or switch accounts.",
     )

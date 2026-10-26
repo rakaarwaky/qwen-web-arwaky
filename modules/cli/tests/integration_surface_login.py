@@ -130,9 +130,9 @@ def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
     The harness implements the method shapes both narrow browser protocols
     need (``browser_session`` / ``open_login_page`` / ``navigate_to_chat`` /
     ``check_session`` / ``check_auth``), so it is passed as the injected view
-    for each protocol. The session orchestrator reaches the session verdict
-    through the shared ``check_session`` utility, which the harness satisfies
-    via its context-manager page shape.
+    for each protocol. The orchestrator reaches the saved-session verdict via
+    its injectable ``session_probe`` hook, which here is the harness's
+    ``check_session``.
     """
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()

@@ -1,4 +1,4 @@
-"""Unit tests for SessionRotationAdapter: rotation outcomes and exhaustion.
+"""Unit tests for SessionRotator: rotation outcomes and exhaustion.
 
 Covers the locked decisions (SESSION-02, BA-2-002):
 - ``rotate`` returns an explicit ``no_eligible_session`` outcome (with
@@ -16,7 +16,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+from modules.session.src.capabilities_session_rotator import SessionRotator
 from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
     SessionHealthResult,
@@ -67,12 +67,12 @@ class _StubChecker:
         return self._verdict(session)
 
 
-def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter:
+def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotator:
     manager = MagicMock()
     manager.load_pool.return_value = pool
     prompt = MagicMock()
     prompt.execute.return_value = MagicMock(response_text="ok")
-    return SessionRotationAdapter(manager, limit_checker=checker, prompt=prompt)
+    return SessionRotator(manager, limit_checker=checker, prompt=prompt)
 
 
 def test_rotation_all_sessions_limited_reports_throttle(tmp_path: Path) -> None:
@@ -191,7 +191,7 @@ def test_execute_with_rotation_requires_prompt_aggregate(tmp_path: Path) -> None
     checker = _StubChecker(healthy_ids={"session_1"})
     manager = MagicMock()
     manager.load_pool.return_value = pool
-    adapter = SessionRotationAdapter(manager, checker)  # no prompt
+    adapter = SessionRotator(manager, checker)  # no prompt
 
     with __import__("pytest").raises(RuntimeError, match="no IPromptAggregate"):
         asyncio.run(adapter.execute_with_rotation("prompt"))
