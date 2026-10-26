@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
 from modules.shared.src import FileValidationError
 from modules.shared.src.common.utility_core_validation import (
     MAX_ATTACHMENT_SIZE_BYTES,
@@ -85,7 +85,7 @@ class TestAttachmentBoundaryMatrix:
         """Publish the supported format allowlist for BA-3-001.
 
         The allowlist is derived from the actual uploader enforcement path
-        (modules/prompt/src/capabilities_file_uploader.py via shared utility).
+        (modules/prompt_runtime/src/capabilities_file_uploader.py via shared utility).
         """
         assert ".txt" in SUPPORTED_ATTACHMENT_EXTENSIONS
         assert ".md" in SUPPORTED_ATTACHMENT_EXTENSIONS
