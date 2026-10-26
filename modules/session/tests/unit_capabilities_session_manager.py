@@ -382,41 +382,10 @@ class _SlowChecker:
     def set_status(self, session_id: str, status: SessionStatus) -> None:
         self._next_status[session_id] = status
 
-    async def check_session(self, session: SessionInfo) -> bool:
-        await asyncio.sleep(self.probe_duration)
-        return self._next_status.get(session.session_id, SessionStatus.ACTIVE) == SessionStatus.ACTIVE
-
-    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         await asyncio.sleep(self.probe_duration)
         status = self._next_status.get(session.session_id, SessionStatus.ACTIVE)
         return SessionHealthResult(session_id=session.session_id, status=status)
-
-    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
-
-        updated = []
-        for s in pool.sessions:
-            verdict = await self.diagnose_session(s)
-            updated.append(s.with_status(verdict.status, reason=verdict.reason))
-        return SessionPool(sessions=updated, current_index=pool.current_index)
-
-    def check_pool_sync(self, pool: SessionPool, session_manager) -> list[tuple[SessionInfo, SessionHealthResult]]:
-        async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
-            tasks = [self.diagnose_session(s) for s in pool.sessions]
-            verdicts = await asyncio.gather(*tasks)
-            results = list(zip(pool.sessions, verdicts, strict=True))
-            for s, verdict in results:
-                if verdict.is_healthy:
-                    session_manager.mark_healthy(s.session_id)
-                elif verdict.status == SessionStatus.LIMITED:
-                    session_manager.mark_limited(s.session_id, reason=verdict.reason)
-                else:
-                    session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
-            return results
-
-        return asyncio.run(_run())
-
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
-        return (sum(1 for _, v in results if v.is_healthy), len(results))
 
 
 def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:

@@ -1,4 +1,4 @@
-"""Unit tests for the real, browser-backed SessionHealthChecker.
+"""Unit tests for the real, browser-backed SessionLimitChecker.
 
 These pin the contract that ``check_session`` drives the injected browser
 seam (``health_probe_page``), that an authenticated, non-rate-limited page
@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
-from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionStatus
+from modules.shared.src.session.taxonomy_session_vo import SessionHealthResult, SessionInfo, SessionStatus
 
 
 def _session(index: int = 0) -> SessionInfo:
@@ -54,32 +54,37 @@ class _FakeBrowser:
         yield self._page
 
 
-def _checker(page: Any, *, raise_auth: bool = False, timeout_seconds: float = 5.0) -> SessionHealthChecker:
-    return SessionHealthChecker(
+def _checker(page: Any, *, raise_auth: bool = False, timeout_seconds: float = 5.0) -> SessionLimitChecker:
+    return SessionLimitChecker(
         browser_lifecycle=_FakeBrowser(page, raise_auth=raise_auth), timeout_seconds=timeout_seconds
     )
 
 
+def _healthy(checker: SessionLimitChecker, session: SessionInfo) -> bool:
+    verdict: SessionHealthResult = asyncio.run(checker.check_session(session))
+    return verdict.is_healthy
+
+
 def test_check_session_is_healthy_on_a_clean_authenticated_chat_page() -> None:
     page = _page_mock(body="Qwen chat", usable=True)
-    assert asyncio.run(_checker(page).check_session(_session())) is True
+    assert _healthy(_checker(page), _session()) is True
 
 
 def test_check_session_is_unhealthy_when_body_shows_a_rate_limit_notice() -> None:
     page = _page_mock(body="You have reached the daily limit. Please try again tomorrow.", usable=True)
-    assert asyncio.run(_checker(page).check_session(_session())) is False
+    assert _healthy(_checker(page), _session()) is False
 
 
 def test_check_session_is_unhealthy_when_the_chat_composer_is_missing() -> None:
     page = _page_mock(body="Qwen chat", usable=False)
-    assert asyncio.run(_checker(page).check_session(_session())) is False
+    assert _healthy(_checker(page), _session()) is False
 
 
 def test_check_session_is_unhealthy_when_the_profile_no_longer_authenticates() -> None:
     page = _page_mock(body="Qwen chat", usable=True)
-    assert asyncio.run(_checker(page, raise_auth=True).check_session(_session())) is False
+    assert _healthy(_checker(page, raise_auth=True), _session()) is False
 
 
 def test_check_session_without_a_browser_seam_is_unhealthy() -> None:
     """An inert checker (no browser injected) must report unhealthy, not crash."""
-    assert asyncio.run(SessionHealthChecker().check_session(_session())) is False
+    assert _healthy(SessionLimitChecker(), _session()) is False

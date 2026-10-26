@@ -64,7 +64,8 @@ from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunC
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.session.src.capabilities_session_health_checker import SessionCheck, SessionHealthChecker
+from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
+from modules.session.src.capabilities_session_login_checker import SessionLoginChecker
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.session.src.capabilities_session_profile_preparer import ProfilePreparer
 from modules.session.src.capabilities_session_renewal import SessionRenewer
@@ -186,7 +187,6 @@ class SharedContainer:
             lifecycle=self.browser_lifecycle,
         )
         self.browser_lifecycle.navigation = self.browser_navigation
-        self.browser_session_check = SessionCheck
         # BrowserOrchestrator is the composition point: it implements the
         # IBrowserAggregate door (open_session) and delegates every
         # capability method to the owning narrow capability view
@@ -207,9 +207,10 @@ class SharedContainer:
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
         self.profile_preparer: ProfilePreparer = ProfilePreparer()
-        # Session infrastructure (health checker + renewer) is composed here;
+        # Session infrastructure (login + limit checkers, renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.
-        self.session_health_checker = SessionHealthChecker(browser_lifecycle=self.browser_lifecycle)
+        self.session_login_checker = SessionLoginChecker(browser_lifecycle=self.browser_lifecycle)
+        self.session_limit_checker = SessionLimitChecker(browser_lifecycle=self.browser_lifecycle)
         self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
             browser_lifecycle=self.browser_lifecycle,
             observability=self.observability,
@@ -307,7 +308,7 @@ class SharedContainer:
 
         self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
             session_manager=self.session_manager,
-            health_checker=self.session_health_checker,
+            limit_checker=self.session_limit_checker,
             prompt=self.prompt_aggregate,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
@@ -316,7 +317,8 @@ class SharedContainer:
             observability=self.observability,
             sessions=self.session_manager,
             renewer=self.session_renewer,
-            health_checker=self.session_health_checker,
+            login_checker=self.session_login_checker,
+            limit_checker=self.session_limit_checker,
             rotator=self.session_rotator,
         )
         # updater_verify and the update aggregate depend on the session orchestrator

@@ -268,47 +268,11 @@ class IBrowserDiagnosticsProtocol(ABC):
         ...
 
 
-
-class ISessionCheckProtocol(ABC):
-    """Session liveness and auth-probe capability contract.
-
-    One named method per probe: a page-readiness check and an
-    authentication assertion. The capability binds both to the Playwright
-    page it wraps, so a caller gets a stateless probe object instead of
-    repeating the sequence.
-    """
-
-    @abstractmethod
-    def is_alive(self) -> bool:
-        """Return True when the session is stable and the chat UI is responsive.
-
-        Never raises: a page that is still loading or whose DOM is not
-        readable is judged False by the live checks, not reported as an
-        error.
-        """
-        ...
-
-    @abstractmethod
-    def check_auth(self) -> None:
-        """Raise AuthRequiredError when the session is no longer authenticated.
-
-        Combines the URL check with the login-form and in-page expiry
-        banner checks, so a caller proves the session without inspecting
-        the DOM itself.
-
-        Raises:
-            AuthRequiredError: When the page is on a login or guest view,
-                shows a login form, or the saved session has expired.
-        """
-        ...
-
-
 __all__ = [
     "IBrowserDiagnosticsProtocol",
     "IBrowserLifecycleProtocol",
     "IBrowserModelPolicyProtocol",
     "IBrowserNavigationProtocol",
-    "ISessionCheckProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -317,5 +281,4 @@ _layer_symbols = {
     "IBrowserLifecycleProtocol": IBrowserLifecycleProtocol,
     "IBrowserModelPolicyProtocol": IBrowserModelPolicyProtocol,
     "IBrowserNavigationProtocol": IBrowserNavigationProtocol,
-    "ISessionCheckProtocol": ISessionCheckProtocol,
 }

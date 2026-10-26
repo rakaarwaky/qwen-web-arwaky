@@ -247,8 +247,10 @@ def test_orchestrator_validation_falls_back_to_renewer(tmp_path: Path) -> None:
     # The initial probe fails (check_session False, no raise), so the
     # orchestrator consults the renewer; the post-renewal re-validation
     # passes because the renewed auth-session cookie is now live.
-    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build, \
-         patch("modules.session.src.agent_session_orchestrator.check_session", side_effect=[False, True]) as check:
+    with (
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.check_session", side_effect=[False, True]) as check,
+    ):
         build.return_value = _cfg(tmp_path)
         assert orch._validate_saved_session(_cfg(tmp_path)) is True
     check.assert_called()
@@ -272,7 +274,9 @@ def test_orchestrator_without_renewer_reports_invalid(tmp_path: Path) -> None:
         browser_navigation=MagicMock(spec=IBrowserNavigationProtocol),
         observability=observability,
     )
-    with patch("modules.session.src.agent_session_orchestrator.build_app_config") as build, \
-         patch("modules.session.src.agent_session_orchestrator.check_session", return_value=False):
+    with (
+        patch("modules.session.src.agent_session_orchestrator.build_app_config") as build,
+        patch("modules.session.src.agent_session_orchestrator.check_session", return_value=False),
+    ):
         build.return_value = _cfg(tmp_path)
         assert orch._validate_saved_session(_cfg(tmp_path)) is False

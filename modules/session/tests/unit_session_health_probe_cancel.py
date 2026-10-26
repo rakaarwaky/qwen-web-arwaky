@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
 from modules.shared.src.session.taxonomy_session_vo import HealthReason, SessionInfo, SessionStatus
 
 
@@ -76,8 +76,8 @@ class _NeverCancels(_StalledBrowser):
             self.state["closed"] = True
 
 
-def _checker(browser: _StalledBrowser) -> SessionHealthChecker:
-    checker = SessionHealthChecker(browser_lifecycle=browser, timeout_seconds=0.2)
+def _checker(browser: _StalledBrowser) -> SessionLimitChecker:
+    checker = SessionLimitChecker(browser_lifecycle=browser, timeout_seconds=0.2)
     real_new = checker._new_cancel
 
     def _capturing_new() -> threading.Event:
@@ -95,11 +95,11 @@ def test_a_timed_out_probe_closes_its_browser_context() -> None:
     checker = _checker(browser)
 
     async def _run() -> object:
-        return await checker.diagnose_session(_session())
+        return await checker.check_session(_session())
 
     verdict = asyncio.run(_run())
 
-    assert verdict.status == SessionStatus.AUTH_REQUIRED
+    assert verdict.status == SessionStatus.LIMITED
     assert verdict.reason == HealthReason.TIMEOUT.value
     assert browser.state["closed"] is True
 
@@ -110,11 +110,11 @@ def test_a_probe_that_ignores_the_cancel_does_not_hold_the_caller() -> None:
     checker = _checker(browser)
 
     async def _run() -> object:
-        return await asyncio.wait_for(checker.diagnose_session(_session()), timeout=15)
+        return await asyncio.wait_for(checker.check_session(_session()), timeout=15)
 
     verdict = asyncio.run(_run())
 
-    assert verdict.status == SessionStatus.AUTH_REQUIRED
+    assert verdict.status == SessionStatus.LIMITED
     assert verdict.reason == HealthReason.TIMEOUT.value
 
 
@@ -134,7 +134,7 @@ def test_the_probe_thread_tears_its_own_context_down() -> None:
     browser.health_probe_page = _recording
 
     async def _run() -> object:
-        return await checker.diagnose_session(_session())
+        return await checker.check_session(_session())
 
     asyncio.run(_run())
 
@@ -167,12 +167,12 @@ def test_a_probe_that_succeeds_never_sees_the_cancel_handle() -> None:
     checker._new_cancel = _recording_new
 
     async def _run() -> object:
-        return await checker.diagnose_session(_session())
+        return await checker.check_session(_session())
 
     verdict = asyncio.run(_run())
 
     assert verdict.status == SessionStatus.ACTIVE
-    assert seen, "diagnose_session must create a per-probe cancel handle"
+    assert seen, "check_session must create a per-probe cancel handle"
     assert seen[0].is_set() is False
 
 
@@ -194,7 +194,7 @@ def test_concurrent_probes_do_not_share_one_cancel_handle() -> None:
             yield page
 
     browser = _SlowHealthy()
-    checker = SessionHealthChecker(browser_lifecycle=browser, timeout_seconds=5.0)
+    checker = SessionLimitChecker(browser_lifecycle=browser, timeout_seconds=5.0)
     real_new = checker._new_cancel
 
     def _recording_new() -> threading.Event:
@@ -206,7 +206,7 @@ def test_concurrent_probes_do_not_share_one_cancel_handle() -> None:
 
     async def _run() -> None:
         async def _one() -> object:
-            return await checker.diagnose_session(_session())
+            return await checker.check_session(_session())
 
         task_a = asyncio.create_task(_one())
         task_b = asyncio.create_task(_one())

@@ -92,6 +92,17 @@ pool, health checking, rotation, renewal, deletion, and login.
 - **Edge Cases**: A missing master session path results in an empty (but valid) ephemeral dir.
 - **Error Handling**: A clone failure surfaces an error naming the master path.
 
+### FR-SESSION-006: Probe page-level session liveness and authentication
+
+- **Description**: Bind one page to a stateless probe that reports whether the chat UI is alive and asserts the saved session is still authenticated.
+- **Input**: The live Playwright page to probe.
+- **Output**: A boolean liveness verdict from `is_alive`, and `check_auth` raising an authentication error when the page is a login or guest view, shows a login form, or an in-page session-expiry banner.
+- **Business Rules**:
+  - Liveness never raises: an unreadable or still-loading page reports False instead of an error.
+  - Authentication combines the URL check, the login-form check, and the in-page expiry banner check.
+- **Edge Cases**: A page whose DOM is mid-hydration reports False rather than a spurious authentication error.
+- **Error Handling**: An authentication error names the login path so the caller can route the operator to the setup verb; browser errors during the probe surface as an authentication error naming the reason.
+
 ## API Contract
 
 ### Protocol API
@@ -109,6 +120,8 @@ pool, health checking, rotation, renewal, deletion, and login.
 | `mark_auth_required` | session identifier, optional reason | session pool | file error | none | Mark one session as requiring re-authentication. |
 | `get_next_healthy_session` | none | session info | no-healthy-session error | none | Return the next usable session. |
 | `prepare` | AppConfig | prepared session profile path context manager | file error | none | Mode→clone decision: login mode yields master path directly; otherwise yields an ephemeral clone. |
+| `is_alive` | none (bound page) | boolean liveness verdict | none | none | Report whether the session is stable and the chat UI is responsive (FR-SESSION-006). |
+| `check_auth` | none (bound page) | none; raises on failure | authentication error | none | Assert the bound page is an authenticated chat (FR-SESSION-006). |
 
 ### Aggregate API
 

@@ -62,22 +62,9 @@ class _StubChecker:
             evidence="Session expired",
         )
 
-    async def check_session(self, session: SessionInfo) -> bool:
-        self.probed.append(session.session_id)
-        return session.session_id in self.healthy_ids
-
-    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         self.probed.append(session.session_id)
         return self._verdict(session)
-
-    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
-        return pool
-
-    def check_pool_sync(self, pool: SessionPool, session_manager) -> list[tuple[SessionInfo, SessionHealthResult]]:
-        return [(s, self._verdict(s)) for s in pool.sessions]
-
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
-        return (sum(1 for _, v in results if v.is_healthy), len(results))
 
 
 def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter:
@@ -85,7 +72,7 @@ def _adapter(pool: SessionPool, checker: _StubChecker) -> SessionRotationAdapter
     manager.load_pool.return_value = pool
     prompt = MagicMock()
     prompt.execute.return_value = MagicMock(response_text="ok")
-    return SessionRotationAdapter(manager, checker, prompt=prompt)
+    return SessionRotationAdapter(manager, limit_checker=checker, prompt=prompt)
 
 
 def test_rotation_all_sessions_limited_reports_throttle(tmp_path: Path) -> None:

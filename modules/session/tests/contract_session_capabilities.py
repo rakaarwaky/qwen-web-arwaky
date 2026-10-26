@@ -11,14 +11,16 @@ import inspect
 from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
-    ISessionHealthCheckerProtocol,
+    ISessionLimitCheckerProtocol,
+    ISessionLoginCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     ISessionManagerProtocol,
-    ISessionHealthCheckerProtocol,
+    ISessionLoginCheckerProtocol,
+    ISessionLimitCheckerProtocol,
     ISessionRotatorProtocol,
 )
 

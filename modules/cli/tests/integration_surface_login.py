@@ -13,10 +13,7 @@ from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnost
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
-from modules.shared.src.browser.contract_browser_protocol import (
-    IBrowserLifecycleProtocol,
-    IBrowserNavigationProtocol,
-)
+from modules.shared.src.browser.utility_browser_session_check import check_session
 
 
 def _make_orchestrator() -> BrowserOrchestrator:
@@ -140,9 +137,10 @@ def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
     return SessionOrchestrator(
-        browser_lifecycle=browser,  # type: ignore[arg-type]
-        browser_navigation=browser,  # type: ignore[arg-type]
+        browser_lifecycle=browser,
+        browser_navigation=browser,
         observability=observability,
+        session_probe=browser.check_session,
     )
 
 
@@ -260,10 +258,10 @@ def test_browser_check_session_requires_authenticated_chat_ui() -> None:
     page.query_selector.return_value = MagicMock()
     page.locator.return_value.count.return_value = 0
     page.locator.return_value.first.is_visible.return_value = False
-    assert _adapter.check_session(page) is True
+    assert check_session(page) is True
 
     page.url = "https://chat.qwen.ai/login"
-    assert _adapter.check_session(page) is False
+    assert check_session(page) is False
 
 
 def test_manual_login_delays_check_session_after_confirmation(tmp_path: Path) -> None:

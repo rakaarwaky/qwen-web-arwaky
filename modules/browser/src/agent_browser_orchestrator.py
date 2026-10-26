@@ -22,7 +22,7 @@ from modules.shared.src.browser.contract_browser_protocol import (
     IBrowserModelPolicyProtocol,
     IBrowserNavigationProtocol,
 )
-from modules.shared.src.browser.utility_browser_session_check import check_session
+from modules.shared.src.browser.utility_browser_session_check import _in_page_expiry_banner_visible
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig, ModelLabel, WaitTimeoutMs
@@ -37,13 +37,12 @@ __all__ = ["BrowserOrchestrator"]
 class BrowserOrchestrator(IBrowserAggregate):
     """Open authenticated chat sessions on behalf of the other orchestrators.
 
-    Implements ``IBrowserAggregate`` (``open_session``). The session probe
-    (``check_session`` / ``detect_session_expired``) is routed through the
-    shared ``utility_browser_session_check`` helpers so the Agent layer
-    carries no inline DOM mechanics and no legacy ``IBrowserProtocol``
-    facade. Capability internals are reached only through the injected
-    narrow protocol views; this orchestrator is ignorant of capability
-    implementations.
+    Implements ``IBrowserAggregate`` (``open_session``). The diagnostics
+    probe (``detect_session_expired``) is routed through the injected
+    narrow protocol views so the Agent layer carries no inline DOM
+    mechanics and no legacy ``IBrowserProtocol`` facade. Capability
+    internals are reached only through the injected narrow protocol
+    views; this orchestrator is ignorant of capability implementations.
     """
 
     def __init__(
@@ -91,17 +90,6 @@ class BrowserOrchestrator(IBrowserAggregate):
             return bctx.pages[0]
         return bctx.new_page()
 
-    # ── Session probe (no facade, no inline DOM mechanics) ───────────────
-
-    def check_session(self, page: Page) -> bool:
-        """Return True when *page* shows the authenticated chat UI.
-
-        Routes through the shared ``utility_browser_session_check`` probe:
-        URL / login-form / in-page expiry-banner assert plus the live
-        chat-input check. The Agent layer owns no DOM logic itself.
-        """
-        return check_session(page)
-
     # ── Delegates to narrow capability views (public surface only) ───────
 
     def browser_session(
@@ -141,10 +129,6 @@ class BrowserOrchestrator(IBrowserAggregate):
         if lifecycle is None:
             return self._navigation.open_login_page(cfg, lifecycle=self._lifecycle)
         return self._navigation.open_login_page(cfg, lifecycle=lifecycle)
-
-    def open_chat_page(self, page: Page, *, strict: bool = True) -> None:
-        """Navigate *page* to the chat URL and assert authentication."""
-        self._navigation.open_chat_page(page, strict=strict)
 
     def select_model(self, page: Page, emitter: LifecycleEmitter) -> ModelLabel:
         """Read/select the default model on *page*; return the chosen label."""
@@ -200,10 +184,6 @@ class BrowserOrchestrator(IBrowserAggregate):
 
 def _raise_if_session_expired(page: Page) -> None:
     """Raise AuthRequiredError when the in-page expiry banner is detected."""
-    from modules.shared.src.browser.utility_browser_session_check import (
-        _in_page_expiry_banner_visible,
-    )
-
     if _in_page_expiry_banner_visible(page):
         raise AuthRequiredError(
             "Session expired — the saved Qwen login session is no longer valid "

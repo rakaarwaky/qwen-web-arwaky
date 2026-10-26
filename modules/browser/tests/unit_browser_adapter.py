@@ -25,7 +25,6 @@ from modules.browser.src.capabilities_browser_diagnostics import (
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
 from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
-from modules.session.src.capabilities_session_health_checker import SessionCheck
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.browser import utility_browser_session_check as session_check_util
 from modules.shared.src.browser.utility_browser_session_check import _in_page_expiry_banner_visible
@@ -99,16 +98,14 @@ def test_session_check_is_alive_success():
     mock_page.evaluate.return_value = "complete"
     mock_page.query_selector.return_value = MagicMock()
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is True
+    assert session_check_util.session_is_alive(mock_page) is True
 
 
 def test_session_check_not_ready():
     mock_page = MagicMock()
     mock_page.evaluate.return_value = "loading"
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is False
+    assert session_check_util.session_is_alive(mock_page) is False
 
 
 def test_session_check_textarea_missing():
@@ -116,17 +113,15 @@ def test_session_check_textarea_missing():
     mock_page.evaluate.return_value = "complete"
     mock_page.query_selector.return_value = None
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is False
+    assert session_check_util.session_is_alive(mock_page) is False
 
 
 def test_session_check_auth_redirect():
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/login"
 
-    checker = SessionCheck(mock_page)
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
-        checker.check_auth()
+        session_check_util.assert_on_chat_page(mock_page)
 
 
 def test_check_auth_valid():
@@ -449,7 +444,7 @@ def test_verify_default_model_retries_transient_picker_read_failure():
     # picker DOM interaction.
     adapter._model_policy.ensure_default_model = MagicMock(return_value=False)
 
-    adapter._verify_default_model(mock_page)
+    adapter.verify_default_model(mock_page, adapter._model_policy.target_model())
 
     assert picker.inner_text.call_count == 2
     adapter._model_policy.ensure_default_model.assert_called_once_with(mock_page)
@@ -516,7 +511,7 @@ def test_verify_default_model_ok():
     mock_page.get_by_role.return_value.inner_text.return_value = f"Select Model {DEFAULT_MODEL}"
 
     # Must not raise when the picker reports the hardcoded default.
-    verified, detected = _adapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is True
     assert detected == DEFAULT_MODEL
@@ -525,15 +520,16 @@ def test_verify_default_model_ok():
 def test_verify_default_model_falls_back_on_mismatch():
     """A readable non-default model degrades gracefully instead of aborting (issue #374).
 
-    The active model is not in the picker's offer list, so ``_select_first_available_model``
-    (issue #283 AC-2) is tried first; when the picker reports it is not visible the
-    readable-but-different label is returned with ``verified=False`` instead of raising.
+    The active model is not in the picker's offer list, so the first
+    available model is tried; when the picker reports it is not visible the
+    readable-but-different label is returned with ``verified=False`` instead
+    of raising.
     """
     mock_page = MagicMock()
     mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.7-Plus"
 
-    verified, detected = _adapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is False
     assert detected == "Select Model Qwen3.7-Plus"
@@ -545,10 +541,10 @@ def test_verify_default_model_rejects_superstring_model():
     mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max-Plus"
 
-    verified, detected = _adapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is False
-    assert "Qwen3.8-Max-Plus" in detected
+    assert "Qwen3.8-Max-Plus" in str(detected)
 
 
 def test_verify_default_model_retries_when_switch_reported_failure():
@@ -565,7 +561,9 @@ def test_verify_default_model_retries_when_switch_reported_failure():
     mock_page.get_by_role.return_value.inner_text.side_effect = _fake_inner_text
 
     # Must not raise: the retry path fixes the mismatch.
-    verified, detected = _adapter()._verify_default_model(mock_page, require_switch=False)
+    verified, detected = _adapter().verify_default_model(
+        mock_page, _adapter()._model_policy.target_model(), require_switch=False
+    )
 
     assert verified is True
     assert detected == DEFAULT_MODEL
@@ -583,7 +581,7 @@ def test_verify_default_model_raises_when_unreadable():
     mock_page.locator.return_value.first.is_visible.return_value = False
 
     with pytest.raises(ModelSwitchError, match="Cannot read active model"):
-        _adapter()._verify_default_model(mock_page)
+        _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
 
 MODEL_SELECTOR_BUTTON_NAME = "Select Model"

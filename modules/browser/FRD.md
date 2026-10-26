@@ -15,34 +15,7 @@ call the aggregate and receive a page already proven usable.
 
 ## Functional Requirements
 
-### FR-BROWSER-001: Open an authenticated, model-pinned chat session
-
-- **Description**: Open the persistent Chromium context over the saved session profile, take its page to the chat, prove the saved session is still signed in, and pin the model the run requested — the one capability that turns a runtime configuration into a page a caller can drive.
-- **Input**: A validated runtime configuration carrying the session path, headless flag, sandbox verdict, browser binary preference, and target model, plus the lifecycle emitter that records progress events.
-- **Output**: A context manager yielding the live browser context whose page is already positioned on an authenticated chat running the requested model, or the error that stopped it.
-- **Business Rules**:
-  - The session directory is created with owner-only permissions; a pre-existing directory with wider permissions is repaired before launch.
-  - Stale Chromium lock files left by a killed run are removed before launch so a clean run is not blocked by a dead process.
-  - Authentication is proven before the page is handed to a caller; no caller may receive an unauthenticated page.
-  - A page still loading is tolerated while it exposes the authenticated UI.
-  - The configured model is resolved before the first page is handed over, without mutating shared state, so concurrent runs keep their own override.
-  - A picker that does not expose the requested model falls back to the first model it offers and records a warning rather than aborting the run.
-- **Edge Cases**: A launch that fails after retries surfaces a browser-launch error naming the reason; a sandbox the host cannot provide falls back to the sandbox-disabled launch only when the configuration allows it; a page redirected to a login URL or showing a login form raises an authentication error rather than yielding an unusable page; a picker that never becomes ready falls back through the configured retry budget before reporting failure.
-- **Error Handling**: Browser-launch errors carry the host capability that failed; session-directory permission failures surface as a file error naming the path; an authentication error names the login path so the caller can route the operator to the setup verb; a model switch that cannot complete surfaces a model-switch error naming the requested and active model.
-
-### FR-BROWSER-002: Probe session liveness and authentication
-
-- **Description**: Bind one page to a session probe that reports whether the chat UI is alive and asserts the saved session is still authenticated, and drive model selection/verification policy — the checks and policies every pipeline run depends on before it dispatches a prompt.
-- **Input**: The live Playwright page to probe.
-- **Output**: A boolean liveness verdict from `is_alive`, and `check_auth` raising an authentication error when the page is a login or guest view, shows a login form, or an in-page session-expiry banner.
-- **Business Rules**:
-  - Liveness never raises: an unreadable or still-loading page reports False instead of an error.
-  - Authentication combines the URL check, the login-form check, and the in-page expiry banner check.
-  - A page that is still hydrating is tolerated by `check_auth` while it exposes the authenticated UI.
-- **Edge Cases**: A page whose DOM is mid-hydration reports False rather than a spurious authentication error; an in-page expiry notice on the chat URL raises the authentication error naming the re-login verb.
-- **Error Handling**: An authentication error names the login path so the caller can route the operator to the setup verb; browser errors during the probe surface as an authentication error naming the reason.
-
-### FR-BROWSER-003: Select and verify the target model (issue #283/#374 fallback rules)
+### FR-BROWSER-003: Select, verify, and probe the target model
 
 - **Description**: Resolve the configured target model for the run, drive the in-page picker to that model when it is offered, verify the active model matches the target, and fall back to the first available model when it does not — the product policy about which model a run targets, kept out of the browser adapter so the DOM mechanics stay in one place.
 - **Input**: The live Playwright page and the lifecycle emitter that records the model-verified event.
@@ -51,8 +24,10 @@ call the aggregate and receive a page already proven usable.
   - The configured target model is resolved per run (a contextvar bound once per browser context launch), so concurrent runs keep their own override without mutating shared state.
   - A picker that does not expose the requested model falls back to the first model it offers and records a warning rather than aborting the run (issue #283 AC-2, issue #374).
   - A verification retry budget is bounded; a slow picker hydrating must not fail the pipeline (issue #283).
-- **Edge Cases**: A picker that never becomes ready falls back through the retry budget before reporting a model-switch error; an unreadable model label raises a model-switch error naming the trigger selector.
-- **Error Handling**: A model switch that cannot complete surfaces a model-switch error naming the requested and active model; best-effort selection failures are logged and swallowed so the prompt pipeline is never blocked.
+  - Liveness probes never raise: an unreadable or still-loading page reports False instead of an error.
+  - Authentication combines the URL check, the login-form check, and the in-page expiry banner check.
+- **Edge Cases**: A picker that never becomes ready falls back through the retry budget before reporting a model-switch error; an unreadable model label raises a model-switch error naming the trigger selector; a page whose DOM is mid-hydration reports False rather than a spurious authentication error.
+- **Error Handling**: A model switch that cannot complete surfaces a model-switch error naming the requested and active model; best-effort selection failures are logged and swallowed so the prompt pipeline is never blocked; browser errors during the probe surface as an authentication error naming the reason.
 
 ### FR-BROWSER-004: Launch and tear down the persistent Chromium context
 
@@ -100,16 +75,14 @@ call the aggregate and receive a page already proven usable.
 | `browser_session` | runtime configuration, optional prepared session path and executable path | context manager over the live context | browser-launch error | launch progress | Open the persistent authenticated context. |
 | `navigate_to_chat` | page, lifecycle emitter | page on an authenticated chat | authentication error | page loaded | Take the page to the chat. |
 | `check_auth` | page | none; raises on failure | authentication error | none | Assert the page is an authenticated chat. |
-| `check_session` | page | boolean readiness verdict | none | none | Report whether the page is ready for use. |
 | `detect_session_expired` | page | boolean verdict when the in-page expiry banner shows | none | none | Re-run the banner scan against the current page state. |
 | `health_probe_page` | runtime configuration, optional prepared session path and executable path | context manager yielding one ready page | authentication error | none | Open one ephemeral health-probe page. |
 | `renew_session` | runtime configuration, optional prepared session path and executable path | none; raises on failure | authentication error | none | Renew the master-profile session in place. |
 | `reset_page` | page, lifecycle emitter | a clean chat state | none | network reconnecting | Navigate back to the chat and emit the reset event. |
-| `open_login_page` | runtime configuration | context manager yielding one fresh page on the chat URL | browser-launch error | none | Open the manual-login window (FR-BROWSER-005). |
+| `open_login_page` | runtime configuration | context manager yielding one fresh page on the chat URL | browser-launch error | none | Open the manual-login window (FR-BROWSER-004). |
 | `wire_diagnostics` | live browser context | none | none | none | Attach asset-abort route, page-creation hook, and per-page listeners (FR-BROWSER-006). |
 | `select_model` | page, lifecycle emitter | the chosen model label | model-switch error | model verified | Select the run's target model (FR-BROWSER-003). |
 | `verify_model` | page, expected label | boolean verdict | none | none | Verify the active model (FR-BROWSER-003). |
-| `is_alive` | none (bound page) | boolean liveness verdict | none | none | Report whether the session is stable and the chat UI is responsive (FR-BROWSER-002). |
 
 ### Aggregate API
 
