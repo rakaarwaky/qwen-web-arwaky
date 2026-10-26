@@ -3,7 +3,7 @@
 > Browser/stream capability contract for the prompt feature
 > (`modules/prompt_runtime`).
 > Audience: capability engineers, agent integrators.
-> Condition: [ROADMAP.md](../../ROADMAP.md) (workspace) + [FRD.md](../prompt/FRD.md) (prompt).
+> Condition: [ROADMAP.md](../../ROADMAP.md) (workspace) + [FRD.md](FRD.md) (this layer).
 
 ## Brand & Style
 

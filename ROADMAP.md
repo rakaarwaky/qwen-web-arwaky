@@ -1,6 +1,6 @@
 # ROADMAP — qwen-web-arwaky
 
-State: vocabulary below. Last Updated: 2026-10-24.
+State: vocabulary below. Last Updated: 2026-10-26.
 
 ## Current Condition
 
@@ -25,6 +25,7 @@ One table: every feature row. Feature detail stays in each feature's `BACKLOG.md
 | ID | Feature | Priority | State | Dependencies | Next Action | Updated |
 |---|---|---|---|---|---|---|
 | `modules/prompt` | Prompt execution and attachment | P0 | Done | Spec: [FRD](modules/prompt/FRD.md) · Backlog: [BACKLOG](modules/prompt/BACKLOG.md) | None | 2026-10-25 |
+| `modules/prompt_runtime` | Prompt browser/stream runtime | P0 | Done | Spec: [FRD](modules/prompt_runtime/FRD.md) · Backlog: [BACKLOG](modules/prompt_runtime/BACKLOG.md) | None | 2026-10-26 |
 | `modules/session` | Session pool and rotation | P0 | Done | Spec: [FRD](modules/session/FRD.md) · Backlog: [BACKLOG](modules/session/BACKLOG.md) | `SESSION-03` | 2026-10-25 |
 | `modules/browser` | Browser adapter | P0 | Done | Spec: [FRD](modules/browser/FRD.md) · Backlog: [BACKLOG](modules/browser/BACKLOG.md) | None | 2026-10-25 |
 | `modules/jobs` | Async job and folder compilation | P1 | Done | Spec: [FRD](modules/jobs/FRD.md) · Backlog: [BACKLOG](modules/jobs/BACKLOG.md) | `JOBS-01` | 2026-10-24 |

@@ -55,7 +55,8 @@ modules/browser/src/  agent_browser_orchestrator, capabilities_browser_adapter
 modules/config/src/   agent_config_orchestrator, capabilities_config_*
 modules/jobs/src/     agent_job_orchestrator, capabilities_folder_compiler, capabilities_job_storage
 modules/logging/src/  agent_logging_orchestrator, capabilities_metrics_counter
-modules/prompt/src/   agent_prompt_orchestrator, agent_shared_flow_orchestrator, capabilities_*
+modules/prompt/src/   agent_prompt_orchestrator, capabilities_prompt_flow_dispatcher, capabilities_direct_prompt_adapter, capabilities_prompt_file_adapter, capabilities_attachment_prompt_adapter, capabilities_run_cancel_registry
+modules/prompt_runtime/src/ capabilities_stream_monitor, capabilities_send_dispatcher, capabilities_prompt_injector, capabilities_file_uploader, capabilities_output_saver
 modules/session/src/  agent_session_orchestrator, capabilities_session_*
 modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
 modules/update/src/   agent_update_orchestrator, capabilities_update_manager
@@ -81,9 +82,10 @@ Every command must match the exact CI gate.
 ```bash
 # Tests
 uv run python -m pytest modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ \
-  modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ \
-  modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ \
+  modules/mcp/tests/ modules/prompt/tests/ modules/prompt_runtime/tests/ \
+  modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ \
   modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ \
+  modules/shared/benches/ modules/prompt/benches/ modules/prompt_runtime/benches/ \
   -m "not benchmark" -v   # what it covers
 uv run python -m pytest modules/{name}/tests/ -v              # one unit
 uv run python -m pytest modules/{name}/tests/{file}.py -v     # one file
