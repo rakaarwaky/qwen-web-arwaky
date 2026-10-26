@@ -120,7 +120,9 @@ def _adapter(calls: list[str]) -> DirectPromptAdapter:
     sender.click_send = MagicMock(side_effect=_click_send)
 
     return DirectPromptAdapter(
-        browser=browser,
+        browser_lifecycle=MagicMock(),
+        browser_navigation=browser,
+        browser_diagnostics=MagicMock(),
         injector=PromptInjector(),
         sender=sender,
         streamer=_completed_monitor(),

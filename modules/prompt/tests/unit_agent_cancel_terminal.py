@@ -22,11 +22,11 @@ from modules.shared.src.prompt.taxonomy_prompt_vo import PromptRequest, PromptRe
 
 
 def _make_file_adapter(cancel: CapabilitiesRunCancelRegistry) -> PromptFileAdapter:
-    return PromptFileAdapter(*(MagicMock() for _ in range(7)), cancel=cancel)
+    return PromptFileAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
 
 
 def _make_attachment_adapter(cancel: CapabilitiesRunCancelRegistry) -> AttachmentPromptAdapter:
-    return AttachmentPromptAdapter(*(MagicMock() for _ in range(9)), cancel=cancel)
+    return AttachmentPromptAdapter(*(MagicMock() for _ in range(11)), cancel=cancel)
 
 
 def _orchestrator(
@@ -149,7 +149,17 @@ def test_a_direct_prompt_reports_zero_stopped_pipelines() -> None:
     """FR-PROMPT-004 business rule: a direct prompt has no cancel registry."""
     from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
 
-    direct = DirectPromptAdapter(*(MagicMock() for _ in range(7)))
+    direct = DirectPromptAdapter(
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
+        injector=MagicMock(),
+        sender=MagicMock(),
+        streamer=MagicMock(),
+        saver=MagicMock(),
+        observability=MagicMock(),
+        flow=MagicMock(),
+    )
 
     response = direct.execute(PromptRequest(verb="request_cancel", cancel_event=threading.Event()))
 

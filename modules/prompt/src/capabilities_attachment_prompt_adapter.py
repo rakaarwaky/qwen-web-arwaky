@@ -12,7 +12,11 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserDiagnosticsProtocol,
+    IBrowserLifecycleProtocol,
+    IBrowserNavigationProtocol,
+)
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter, LifecycleState
 from modules.shared.src.common.taxonomy_core_error import (
     ResponseDetectionTimeoutError,
@@ -81,7 +85,9 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
 
     def __init__(
         self,
-        browser: IBrowserProtocol,
+        browser_lifecycle: IBrowserLifecycleProtocol,
+        browser_navigation: IBrowserNavigationProtocol,
+        browser_diagnostics: IBrowserDiagnosticsProtocol,
         injector: IInjectionProtocol,
         sender: ISendProtocol,
         streamer: IStreamProtocol,
@@ -92,7 +98,9 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         folder_adapter: IFolderToAttachmentProtocol,
         cancel: IRunCancelProtocol,
     ) -> None:
-        self._browser = browser
+        self._browser_lifecycle = browser_lifecycle
+        self._browser_navigation = browser_navigation
+        self._browser_diagnostics = browser_diagnostics
         self._injector = injector
         self._sender = sender
         self._streamer = streamer
@@ -191,7 +199,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                 emitter.observe(event_observer)
 
             t0 = time.time()
-            with self._browser.browser_session(cfg) as bctx:
+            with self._browser_lifecycle.browser_session(cfg) as bctx:
                 self._cancel.set_active_bctx(run_state.run_id, bctx)
                 try:
                     if run_state.cancel_event.is_set():
@@ -257,8 +265,8 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
     ) -> StreamVerdict:
         logger = self._observability.get_logger()
 
-        self._browser.navigate_to_chat(page, emitter)
-        self._browser.check_auth(page)
+        self._browser_navigation.navigate_to_chat(page, emitter)
+        self._browser_navigation.check_auth(page)
         msg_count_before = self._sender.count_messages(page)
 
         self._injector.find_input(page)
@@ -298,7 +306,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
                 cancel_event=cancel_event,
             )
         except Exception:
-            if self._browser.detect_session_expired(page):
+            if self._browser_diagnostics.detect_session_expired(page):
                 emitter.emit(EVENT_SESSION_EXPIRED, {"url": page.url, "reason": "post_send_banner"})
             raise
 

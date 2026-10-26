@@ -348,10 +348,18 @@ def test_login_loop_runs_past_run_timeout_up_to_login_ceiling(tmp_path: Path) ->
 
     page = MagicMock()
     page.is_closed.return_value = False
-    ctx = MagicMock()
-    ctx.pages = [page]
     browser = MagicMock()
-    browser.browser_session.return_value.__enter__.return_value = ctx
+
+    def _open_login_page(cfg):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _cm():
+            yield page
+
+        return _cm()
+
+    browser.open_login_page.side_effect = _open_login_page
 
     orch = SessionOrchestrator(browser=browser, observability=MagicMock(), sessions=SessionManager())
 

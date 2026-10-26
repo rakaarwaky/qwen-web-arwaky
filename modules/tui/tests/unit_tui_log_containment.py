@@ -162,7 +162,7 @@ def test_default_is_stderr_enabled(tmp_path: Path, isolated_root_logger, monkeyp
 
 # ── Part 2: every browser event that fires at startup must not leak ───────────
 #
-# These are the exact records capabilities_browser_adapter emits during the
+# These are the exact records the browser capabilities emit during the
 # startup session check (page.on handlers + navigate_to_chat).
 
 
@@ -185,7 +185,7 @@ def test_browser_event_never_leaks_to_stderr(
     fake = _FakeStderr()
     monkeypatch.setattr(sys, "stderr", fake)
     cap = _tui_observability(tmp_path)
-    log = cap.get_logger("capabilities_browser_adapter")
+    log = cap.get_logger("browser")
 
     # structlog-style kwargs and stdlib-style args both must be safe.
     getattr(log, logging.getLevelName(level).lower())(event, **extra)
@@ -199,7 +199,7 @@ def test_all_browser_events_fired_together_do_not_leak(tmp_path: Path, isolated_
     fake = _FakeStderr()
     monkeypatch.setattr(sys, "stderr", fake)
     cap = _tui_observability(tmp_path)
-    log = cap.get_logger("capabilities_browser_adapter")
+    log = cap.get_logger("browser")
 
     for event, level, extra in _BROWSER_EVENTS:
         getattr(log, logging.getLevelName(level).lower())(event, **extra)
@@ -214,7 +214,7 @@ def test_browser_events_from_worker_threads_do_not_leak(tmp_path: Path, isolated
     fake = _FakeStderr()
     monkeypatch.setattr(sys, "stderr", fake)
     cap = _tui_observability(tmp_path)
-    log = cap.get_logger("capabilities_browser_adapter")
+    log = cap.get_logger("browser")
 
     barrier = threading.Barrier(4)
     errors: list[BaseException] = []
@@ -257,7 +257,7 @@ def test_app_jsonl_still_written_in_tui_mode(tmp_path: Path, isolated_root_logge
     """app.jsonl must still receive every record when stderr is disabled."""
     monkeypatch.setattr(sys, "stderr", _FakeStderr())
     cap = _tui_observability(tmp_path)
-    cap.get_logger("capabilities_browser_adapter").info("browser_mutation_response", status=200)
+    cap.get_logger("browser").info("browser_mutation_response", status=200)
 
     for h in isolated_root_logger.handlers:
         h.flush()
@@ -269,7 +269,7 @@ def test_all_levels_persist_to_file_in_tui_mode(tmp_path: Path, isolated_root_lo
     """INFO+ must reach the JSONL file (DEBUG only when verbose)."""
     monkeypatch.setattr(sys, "stderr", _FakeStderr())
     cap = _tui_observability(tmp_path)
-    log = cap.get_logger("capabilities_browser_adapter")
+    log = cap.get_logger("browser")
     log.info("browser_mutation_response", status=200)
     log.warning("browser_request_failed", error="x")
     log.error("browser_http_error", status=500)
@@ -293,9 +293,9 @@ def test_tui_log_handler_routes_browser_record_to_overview() -> None:
     handler = QwenTuiLogHandler(app)
 
     rec = logging.LogRecord(
-        "capabilities_browser_adapter",
+        "browser",
         logging.INFO,
-        "capabilities_browser_adapter.py",
+        "browser.py",
         560,
         "browser_mutation_response",
         (),
@@ -319,7 +319,7 @@ def test_tui_log_handler_truncates_long_records() -> None:
     handler = QwenTuiLogHandler(app)
 
     long_msg = "x" * 500
-    rec = logging.LogRecord("capabilities_browser_adapter", logging.INFO, "p.py", 1, long_msg, (), None)
+    rec = logging.LogRecord("browser", logging.INFO, "p.py", 1, long_msg, (), None)
     handler.emit(rec)
 
     text = app.call_from_thread.call_args[0][1]
@@ -337,7 +337,7 @@ def test_tui_log_handler_ignores_third_party_records() -> None:
         rec = logging.LogRecord(noisy, logging.INFO, "p.py", 1, "noise", (), None)
         assert handler.filter(rec) is False, f"{noisy} must be filtered out"
 
-    for allowed in ("", "qwen-web-arwaky", "modules.browser.src.capabilities_browser_adapter", "browser"):
+    for allowed in ("", "qwen-web-arwaky", "modules.browser.src.capabilities_browser_lifecycle", "browser"):
         rec = logging.LogRecord(allowed, logging.INFO, "p.py", 1, "keep", (), None)
         assert handler.filter(rec) is True, f"{allowed!r} must be allowed"
 
@@ -367,10 +367,10 @@ def test_tui_app_contains_browser_logs_in_panels() -> None:
                 # Emit from a worker thread, exactly like Playwright callbacks.
                 def _fire() -> None:
                     for name, level, msg in [
-                        ("capabilities_browser_adapter", logging.INFO, "browser_mutation_response"),
-                        ("capabilities_browser_adapter", logging.WARNING, "browser_request_failed"),
+                        ("browser", logging.INFO, "browser_mutation_response"),
+                        ("browser", logging.WARNING, "browser_request_failed"),
                     ]:
-                        rec = logging.LogRecord(name, level, "capabilities_browser_adapter.py", 560, msg, (), None)
+                        rec = logging.LogRecord(name, level, "browser.py", 560, msg, (), None)
                         logging.getLogger().handle(rec)
 
                 t = threading.Thread(target=_fire)

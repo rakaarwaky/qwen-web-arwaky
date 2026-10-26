@@ -9,15 +9,16 @@ Last Updated: 2026-10-24
 
 - Done: `uv run python -m pytest modules/swarm/tests/ -v` at commit `00124e4`, on 2026-10-25.
 - In Progress: None.
-- Next Action: None; `SWARM-01`, `SWARM-02`, and `SWARM-03` are Done.
+- Next Action: None; `FR-SWARM-001`, `FR-SWARM-002`, `FR-SWARM-003`, and `FR-SWARM-004` are all Done.
 
 ## Backlog
 
 | ID | Priority | State | Dependencies | Next Action | Evidence | Updated | FRD Ref |
 |---|---:|---|---|---|---|---|---|
-| SWARM-01 | P1 | Done | None | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/acceptance_swarm_concurrency_clamp.py -v` — 2 passed. | 2026-10-25 | FR-SWARM-001 |
-| SWARM-02 | P1 | Done | `MCP-01` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_progress_envelope.py -v` — 11 passed. | 2026-10-25 | FR-SWARM-002, FR-SWARM-003 |
-| SWARM-03 | P2 | Done | `BROWSER-03` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_session_shortfall.py -v` — 9 passed. | 2026-10-25 | FR-SWARM-001, FR-SWARM-004 |
+| FR-SWARM-001 | P1 | Done | None | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/acceptance_swarm_concurrency_clamp.py -v` — 2 passed. | 2026-10-25 | FR-SWARM-001 |
+| FR-SWARM-002 | P1 | Done | `MCP-01` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_progress_envelope.py -v` — 11 passed. | 2026-10-25 | FR-SWARM-002, FR-SWARM-003 |
+| FR-SWARM-003 | P2 | Done | `BROWSER-03` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_session_shortfall.py -v` — 9 passed. | 2026-10-25 | FR-SWARM-001, FR-SWARM-004 |
+| FR-SWARM-004 | P2 | Done | `BROWSER-03` | — | `00124e4`: cancel stops the running legs and the shortfall report is pinned in `unit_agent_swarm_orchestrator.py`. | 2026-10-25 | FR-SWARM-004 |
 
 ## Scenario Evidence
 
@@ -36,7 +37,7 @@ None.
 
 - `MCP-01` owns the progress envelope a fan-out poller consumes.
 - `BROWSER-03` owns the per-leg session availability this feature clamps against.
-- `JOBS-02` owns the backpressure a clamped fan-out can still hit.
+- `FR-JOBS-002` owns the backpressure a clamped fan-out can still hit.
 
 ## Release Readiness
 

@@ -281,8 +281,8 @@ def _is_parse_toast_visible(page: Page) -> bool:
                     text = item.inner_text(timeout=100).casefold()
                     if any(kw in text for kw in parse_keywords):
                         return True
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("parse toast probe failed for selector %s: %s", selector, exc)
     return False
 
 
@@ -324,6 +324,6 @@ def _is_file_card_parsing(page: Page) -> bool:
                 for spin_idx in range(spinners.count()):
                     if spinners.nth(spin_idx).is_visible(timeout=100):
                         return True
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("file-card parsing probe failed for selector %s: %s", sel, exc)
     return False

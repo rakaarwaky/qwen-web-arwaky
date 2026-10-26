@@ -7,11 +7,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.browser.src import capabilities_browser_adapter as browser_adapter
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src import capabilities_browser_lifecycle as browser_lifecycle
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.shared.src import AppConfig
 
-_browser = BrowserAdapter()
+
+def _make_lifecycle() -> BrowserLifecycle:
+    """Build a BrowserLifecycle with a real diagnostics view."""
+    return BrowserLifecycle(navigation=None, diagnostics=BrowserDiagnostics())
 
 
 class TestBrowserSession:
@@ -26,13 +30,13 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg):
+            with _make_lifecycle().browser_session(cfg):
                 mode = cfg.session_path.stat().st_mode
                 assert stat.S_ISDIR(mode)
                 assert stat.S_IMODE(mode) == 0o700
@@ -58,13 +62,13 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg):
+            with _make_lifecycle().browser_session(cfg):
                 mode = cfg.session_path.stat().st_mode
                 assert stat.S_ISDIR(mode)
                 assert stat.S_IMODE(mode) == 0o700
@@ -80,13 +84,13 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg) as ctx:
+            with _make_lifecycle().browser_session(cfg) as ctx:
                 assert ctx == mock_ctx
             mock_ctx.close.assert_called()
 
@@ -101,13 +105,13 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg):
+            with _make_lifecycle().browser_session(cfg):
                 mock_ctx.route.assert_called_once()
 
     def test_browser_session_login_mode_no_route(self, tmp_path):
@@ -121,13 +125,13 @@ class TestBrowserSession:
         mock_ctx = MagicMock()
         mock_ctx.pages = [MagicMock()]
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg):
+            with _make_lifecycle().browser_session(cfg):
                 mock_ctx.route.assert_not_called()
 
     def test_browser_session_close_error_handled(self, tmp_path):
@@ -144,13 +148,13 @@ class TestBrowserSession:
         mock_ctx.pages = [MagicMock()]
         mock_ctx.close.side_effect = Error("already closed")
 
-        with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+        with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
             mock_p = MagicMock()
             mock_pw.return_value.__enter__ = MagicMock(return_value=mock_p)
             mock_pw.return_value.__exit__ = MagicMock(return_value=False)
             mock_p.chromium.launch_persistent_context.return_value = mock_ctx
 
-            with _browser.browser_session(cfg):
+            with _make_lifecycle().browser_session(cfg):
                 pass
 
 
@@ -159,7 +163,7 @@ class TestLaunchContext:
         from playwright.sync_api import Error
 
         # The retry must still happen; only the real 2s backoff is dropped.
-        monkeypatch.setattr(browser_adapter, "LAUNCH_RETRY_WAIT_SEC", 0.0)
+        monkeypatch.setattr(browser_lifecycle, "LAUNCH_RETRY_WAIT_SEC", 0.0)
 
         p = MagicMock()
         kwargs = {"user_data_dir": "", "headless": True}
@@ -177,7 +181,7 @@ class TestLaunchContext:
 
         p.chromium.launch_persistent_context.side_effect = launch_side_effect
 
-        ctx = BrowserAdapter()._launch_context(p, kwargs)
+        ctx = _make_lifecycle()._launch_context(p, kwargs)
         assert ctx == good_ctx
         assert call_count[0] == 3, "two failures then a success must cost three attempts"
 
@@ -192,6 +196,6 @@ class TestLaunchContext:
         mock_ctx = MagicMock()
         p.chromium.launch_persistent_context.return_value = mock_ctx
 
-        BrowserAdapter()._launch_context(p, kwargs)
+        _make_lifecycle()._launch_context(p, kwargs)
         assert not (lock_dir / "SingletonLock").exists()
         assert not (lock_dir / "SingletonSocket").exists()

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
+from modules.shared.src.browser.contract_browser_protocol import IBrowserLifecycleProtocol
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError, QwenCliError
 from modules.shared.src.common.taxonomy_core_event import EVENT_SESSION_EXPIRED, EVENT_SESSION_RENEWED
@@ -37,7 +37,7 @@ class SessionRenewer(ISessionRenewalProtocol):
     """Detects stale auth sessions and renews them via browser self-heal.
 
     Wire-up:
-        browser: IBrowserProtocol
+        browser_lifecycle: IBrowserLifecycleProtocol
         observability: IObservabilityProtocol
 
     Public method:
@@ -46,10 +46,10 @@ class SessionRenewer(ISessionRenewalProtocol):
 
     def __init__(
         self,
-        browser: IBrowserProtocol,
+        browser_lifecycle: IBrowserLifecycleProtocol,
         observability: IObservabilityProtocol,
     ) -> None:
-        self._browser = browser
+        self._browser_lifecycle = browser_lifecycle
         self._observability = observability
 
     # Block 2: Protocol Method Implementation
@@ -111,7 +111,7 @@ class SessionRenewer(ISessionRenewalProtocol):
         # Step 3: attempt the browser warm-up on the master profile.
         logger.info("session_renewal_attempting_browser_warmup", profile=str(profile_dir))
         try:
-            self._browser.renew_session(cfg)
+            self._browser_lifecycle.renew_session(cfg)
         except AuthRequiredError:
             raise
         except Exception as exc:
@@ -131,7 +131,7 @@ class SessionRenewer(ISessionRenewalProtocol):
 
     # Block 3: Dunder Methods, Factories & Helpers
     def __repr__(self) -> str:
-        return f"SessionRenewer(browser={self._browser!r}, observability={self._observability!r})"
+        return f"SessionRenewer(browser_lifecycle={self._browser_lifecycle!r}, observability={self._observability!r})"
 
 
 __all__ = ["SessionRenewalError", "SessionRenewer"]

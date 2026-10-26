@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+from modules.session.src.capabilities_session_rotator import SessionRotator
 from modules.shared.src.session.taxonomy_session_vo import SessionInfo, SessionStatus
 
 pytestmark = pytest.mark.benchmark
@@ -27,7 +27,7 @@ async def _healthy(_session: SessionInfo) -> bool:
     return True
 
 
-def _adapter() -> SessionRotationAdapter:
+def _adapter() -> SessionRotator:
     """Return a rotation adapter over a stub pool holding one session."""
     session = SessionInfo(
         session_id="bench-00",
@@ -41,7 +41,7 @@ def _adapter() -> SessionRotationAdapter:
     manager.mark_healthy.return_value = None
     checker = MagicMock()
     checker.check_session = _healthy
-    return SessionRotationAdapter(manager, checker)
+    return SessionRotator(manager, checker)
 
 
 def bench_get_next_session(iterations: int = 1000) -> float:

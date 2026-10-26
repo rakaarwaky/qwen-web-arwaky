@@ -43,7 +43,9 @@ def _make_attachment_orchestrator() -> AttachmentPromptAdapter:
     # bind it so stall tests exercise the production save+verdict path.
     flow.mid_stream_cut_outcome.side_effect = PromptFlowDispatcher().mid_stream_cut_outcome
     return AttachmentPromptAdapter(
-        browser=MagicMock(),
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
@@ -78,9 +80,9 @@ def _configure_lifecycle_mocks(orch) -> None:
 
     bctx = MagicMock()
     bctx.pages = [MagicMock()]
-    orch._browser.browser_session.return_value.__enter__.return_value = bctx
+    orch._browser_lifecycle.browser_session.return_value.__enter__.return_value = bctx
 
-    orch._browser.navigate_to_chat.side_effect = navigate
+    orch._browser_navigation.navigate_to_chat.side_effect = navigate
     orch._uploader.upload_attachment.side_effect = lambda page, filepath, **kw: upload(
         kw.get("page"), kw.get("filepath"), emitter=kw.get("emitter")
     )
@@ -245,7 +247,7 @@ class TestSendFile:
         _configure_lifecycle_mocks(orch)
 
         orch._flow.dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
-        orch._browser.detect_session_expired.return_value = True
+        orch._browser_diagnostics.detect_session_expired.return_value = True
 
         f = tmp_path / "task.md"
         f.write_text("hello")
@@ -266,7 +268,7 @@ class TestSendFile:
                 prompt="hello",
             )
 
-        orch._browser.detect_session_expired.assert_called_once()
+        orch._browser_diagnostics.detect_session_expired.assert_called_once()
         # Check that the emitter was called with EVENT_SESSION_EXPIRED
         # The emitter used in the internal call is a MagicMock
         emitter = orch._flow.dispatch_and_wait_for_response.call_args.kwargs.get("emitter")
@@ -281,7 +283,7 @@ class TestSendFile:
         _configure_lifecycle_mocks(orch)
 
         orch._flow.dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
-        orch._browser.detect_session_expired.return_value = False
+        orch._browser_diagnostics.detect_session_expired.return_value = False
 
         f = tmp_path / "task.md"
         f.write_text("hello")
@@ -302,7 +304,7 @@ class TestSendFile:
                 prompt="hello",
             )
 
-        orch._browser.detect_session_expired.assert_called_once()
+        orch._browser_diagnostics.detect_session_expired.assert_called_once()
         emitter = orch._flow.dispatch_and_wait_for_response.call_args.kwargs.get("emitter")
         if emitter:
             emit_calls = [c for c in emitter.emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
@@ -333,7 +335,7 @@ class TestSendFile:
         """
         orch = _make_attachment_orchestrator()
         _configure_lifecycle_mocks(orch)
-        orch._browser.detect_session_expired.return_value = False
+        orch._browser_diagnostics.detect_session_expired.return_value = False
         orch._folder_adapter.resolve_to_attachment.side_effect = lambda p: p
 
         partial = "Operating margin improved by 3 points, driven by lower cloud spend."
@@ -342,7 +344,7 @@ class TestSendFile:
         # confirmed no forward text of its own before the stall fired).
         page = MagicMock()
         page.evaluate.return_value = partial
-        bctx = orch._browser.browser_session.return_value.__enter__.return_value
+        bctx = orch._browser_lifecycle.browser_session.return_value.__enter__.return_value
         bctx.pages = [page]
 
         def write_output(path, text, *_args, **_kwargs):

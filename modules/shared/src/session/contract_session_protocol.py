@@ -8,8 +8,9 @@ and never carries stubs.
 Seams:
 
 - ``ISessionManagerProtocol``       → ``SessionManager``        (pool CRUD, status marking)
-- ``ISessionHealthCheckerProtocol`` → ``SessionHealthChecker``  (async ping, bulk health)
-- ``ISessionRotatorProtocol``       → ``SessionRotationAdapter`` (round-robin selection)
+- ``ISessionLoginCheckerProtocol``  → ``SessionLoginChecker``   (is the Qwen page authenticated?)
+- ``ISessionLimitCheckerProtocol``  → ``SessionLimitChecker``   (is the Qwen page rate-limited?)
+- ``ISessionRotatorProtocol``       → ``SessionRotator``         (round-robin selection)
 - ``ISessionRenewalProtocol``       → ``SessionRenewer``        (token renewal, self-heal)
 
 The outward export surface for outer layers is ``ISessionAggregate``
@@ -21,6 +22,7 @@ aggregate: the consumer that picks the next session calls
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -35,6 +37,25 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionPool,
     SessionReason,
 )
+
+
+class IProfilePreparerProtocol(ABC):
+    """Session profile preparation — mode→clone decision for browser profiles.
+
+    Owns the ephemeral profile clone decision and hands the browser layer a
+    plain prepared Path. The browser capability never clones the profile
+    itself (AES201).
+    """
+
+    @abstractmethod
+    def prepare(self, cfg: AppConfig) -> AbstractContextManager[Path]:
+        """Return a context manager that yields a prepared session profile path.
+
+        For login mode, yields the master session path directly.
+        For standard modes, clones the master into an ephemeral temp dir
+        and yields the clone path (cleaned up on exit).
+        """
+        ...
 
 
 class ISessionManagerProtocol(ABC):
@@ -139,36 +160,45 @@ class ISessionManagerProtocol(ABC):
         ...
 
 
-class ISessionHealthCheckerProtocol(ABC):
-    """Async session health-check contract (ping test per session)."""
+class ISessionLoginCheckerProtocol(ABC):
+    """Login-session check contract.
+
+    Answers one question: does the Qwen chat page behind *session* still
+    carry an authenticated account?
+
+    - ``ACTIVE``       — the page shows the authenticated chat UI and a live composer.
+    - ``AUTH_REQUIRED`` — the page is a login/guest/expired view or the probe could not
+      open an authenticated page.
+
+    A rate-limited page that is still signed in is not a login failure, so the
+    checker never reports ``LIMITED``: limit detection is the
+    :class:`ISessionLimitCheckerProtocol` concern.
+    """
 
     @abstractmethod
-    async def check_session(self, session: SessionInfo) -> bool:
-        """Return True when *session* is healthy, False when not."""
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Probe *session* and return the login verdict (ACTIVE or AUTH_REQUIRED)."""
         ...
 
-    @abstractmethod
-    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
-        """Probe *session* and return the reasoned SessionHealthResult."""
-        ...
+
+class ISessionLimitCheckerProtocol(ABC):
+    """Rate-limit check contract.
+
+    Answers one question: does the Qwen chat page behind *session* still
+    reply, or is it rate-limited?
+
+    - ``ACTIVE``  — the page is healthy and not rate-limited.
+    - ``LIMITED`` — the page shows a provider limit banner, or the probe
+      timed out / could not get a reply (treated as a limit signal).
+
+    An expired session is not a limit, so the checker never reports
+    ``AUTH_REQUIRED``: login detection is the
+    :class:`ISessionLoginCheckerProtocol` concern.
+    """
 
     @abstractmethod
-    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
-        """Health-check every session and return the updated pool."""
-        ...
-
-    @abstractmethod
-    def check_pool_sync(
-        self,
-        pool: SessionPool,
-        session_manager: ISessionManagerProtocol,
-    ) -> list[tuple[SessionInfo, SessionHealthResult]]:
-        """Synchronously probe every session and mark manager state; returns ``(session, result)`` pairs."""
-        ...
-
-    @abstractmethod
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
-        """Return ``(healthy_count, total)`` for a pool-check result list."""
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Probe *session* and return the limit verdict (ACTIVE or LIMITED)."""
         ...
 
 
@@ -240,15 +270,19 @@ class ISessionRenewalProtocol(ABC):
 
 __all__ = [
     "ISessionManagerProtocol",
-    "ISessionHealthCheckerProtocol",
+    "ISessionLoginCheckerProtocol",
+    "ISessionLimitCheckerProtocol",
     "ISessionRotatorProtocol",
     "ISessionRenewalProtocol",
+    "IProfilePreparerProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
 _layer_symbols = {
     "ISessionManagerProtocol": ISessionManagerProtocol,
-    "ISessionHealthCheckerProtocol": ISessionHealthCheckerProtocol,
+    "ISessionLoginCheckerProtocol": ISessionLoginCheckerProtocol,
+    "ISessionLimitCheckerProtocol": ISessionLimitCheckerProtocol,
     "ISessionRotatorProtocol": ISessionRotatorProtocol,
     "ISessionRenewalProtocol": ISessionRenewalProtocol,
+    "IProfilePreparerProtocol": IProfilePreparerProtocol,
 }

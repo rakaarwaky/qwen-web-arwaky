@@ -1,4 +1,10 @@
-"""Unit tests for browser session management and lifecycle helpers."""
+"""Unit tests for browser session management and lifecycle helpers.
+
+The monolith `capabilities_browser_adapter` was dissolved into narrow
+capability views (lifecycle, navigation, model policy, diagnostics) plus
+the `BrowserOrchestrator` facade in the Agent layer. These tests drive
+that new seam.
+"""
 
 from __future__ import annotations
 
@@ -7,11 +13,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.browser.src import capabilities_browser_adapter as adapter_mod
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.browser.src.agent_browser_orchestrator import (
+    BrowserOrchestrator,
+    _raise_if_session_expired,
+)
+from modules.browser.src.capabilities_browser_diagnostics import (
+    _NOISE_CONSOLE_PATTERNS,
+    BrowserDiagnostics,
+    _is_third_party_noise,
+)
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.shared.src import AuthRequiredError, LifecycleEmitter
 from modules.shared.src.browser import utility_browser_session_check as session_check_util
+from modules.shared.src.browser.utility_browser_session_check import _in_page_expiry_banner_visible
 from modules.shared.src.common import utility_dom_helper as dom_helper
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_LOGIN_VERIFIED,
@@ -20,6 +36,29 @@ from modules.shared.src.common.taxonomy_core_event import (
     EVENT_WEB_LOADED,
 )
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
+
+
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a BrowserOrchestrator with all narrow capability views wired."""
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
+    )
+
+
+def _adapter() -> BrowserOrchestrator:
+    """Build a BrowserOrchestrator (replaces the deleted BrowserAdapter)."""
+    return _make_orchestrator()
 
 
 def _make_cfg(tmp_path: Path, mode: str, headless: bool, **extra: object) -> AppConfig:
@@ -59,16 +98,14 @@ def test_session_check_is_alive_success():
     mock_page.evaluate.return_value = "complete"
     mock_page.query_selector.return_value = MagicMock()
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is True
+    assert session_check_util.session_is_alive(mock_page) is True
 
 
 def test_session_check_not_ready():
     mock_page = MagicMock()
     mock_page.evaluate.return_value = "loading"
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is False
+    assert session_check_util.session_is_alive(mock_page) is False
 
 
 def test_session_check_textarea_missing():
@@ -76,23 +113,21 @@ def test_session_check_textarea_missing():
     mock_page.evaluate.return_value = "complete"
     mock_page.query_selector.return_value = None
 
-    checker = SessionCheck(mock_page)
-    assert checker.is_alive() is False
+    assert session_check_util.session_is_alive(mock_page) is False
 
 
 def test_session_check_auth_redirect():
     mock_page = MagicMock()
     mock_page.url = "https://chat.qwen.ai/login"
 
-    checker = SessionCheck(mock_page)
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
-        checker.check_auth()
+        session_check_util.assert_on_chat_page(mock_page)
 
 
 def test_check_auth_valid():
     mock_page, adapter_mod, orig = _make_page_mock(body_text="")
     try:
-        BrowserAdapter().check_auth(mock_page)
+        _adapter().check_auth(mock_page)
     finally:
         dom_helper.is_any_visible = orig
 
@@ -106,12 +141,11 @@ def test_check_auth_login_url():
     mock_page.inner_text.return_value = ""
 
     with pytest.raises(AuthRequiredError, match="Not authenticated"):
-        BrowserAdapter().check_auth(mock_page)
+        _adapter().check_auth(mock_page)
 
 
 def test_assert_on_chat_page_strict_logs_warning_when_textarea_missing():
     """Steady-state default (strict=True) keeps the warning log level."""
-
     mock_page, _, _ = _make_page_mock(body_text="")
     mock_page.query_selector.return_value = None  # textarea missing, no login form
 
@@ -153,7 +187,7 @@ def test_reset_page_emits_reconnecting():
     mock_page = MagicMock()
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
-    BrowserAdapter().reset_page(mock_page, mock_emitter)
+    _adapter().reset_page(mock_page, mock_emitter)
     mock_emitter.emit.assert_called_once()
     mock_page.goto.assert_called_once()
 
@@ -164,7 +198,7 @@ def test_raise_if_session_expired_banner_keyword():
     mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
     try:
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._raise_if_session_expired(mock_page)
+            _raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
         dom_helper.is_any_visible = orig
@@ -187,7 +221,7 @@ def test_raise_if_session_expired_banner_selector():
     dom_helper.is_any_visible = _split_probe
     try:
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._raise_if_session_expired(mock_page)
+            _raise_if_session_expired(mock_page)
         assert exc_info.value.session_expired is True
     finally:
         dom_helper.is_any_visible = original_is_any_visible
@@ -209,7 +243,7 @@ def test_goto_chat_uses_commit_when_domcontentloaded_is_slow():
     mock_page = MagicMock()
     mock_page.wait_for_load_state.side_effect = PwError("third-party asset stalled")
 
-    BrowserAdapter()._goto_chat(mock_page, navigation_timeout_ms=1000, load_timeout_ms=100)
+    _adapter()._navigation._goto_chat(mock_page, navigation_timeout_ms=1000, load_timeout_ms=100)
 
     assert mock_page.goto.call_args.kwargs["wait_until"] == "commit"
     assert mock_page.goto.call_args.kwargs["timeout"] == 1000
@@ -229,7 +263,7 @@ def test_navigate_to_chat_emits_web_loaded():
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
     try:
-        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+        _adapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
         dom_helper.is_any_visible = orig
 
@@ -241,17 +275,15 @@ def test_navigate_to_chat_emits_web_loaded():
 def test_navigate_to_chat_emits_session_expired_on_in_page_banner():
     """When the chat page shows an in-page expiry banner, navigate_to_chat
     emits EVENT_SESSION_EXPIRED before propagating the AuthRequiredError."""
-
     mock_page, _, orig = _make_page_mock(body_text="Your session has expired. Please login again.")
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
     try:
         with pytest.raises(AuthRequiredError) as exc_info:
-            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+            _adapter().navigate_to_chat(mock_page, mock_emitter)
         assert exc_info.value.session_expired is True
     finally:
         dom_helper.is_any_visible = orig
-
     emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]
     assert EVENT_SESSION_EXPIRED in emitted, f"expected EVENT_SESSION_EXPIRED in {emitted}"
     expired_calls = [c for c in mock_emitter.emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
@@ -266,7 +298,7 @@ def test_navigate_to_chat_no_session_expired_event_on_clean_page():
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
     try:
-        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+        _adapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
         dom_helper.is_any_visible = orig
 
@@ -304,7 +336,7 @@ def test_navigate_to_chat_reports_fallback_model_on_event():
     mock_emitter = MagicMock(spec=LifecycleEmitter)
 
     try:
-        BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+        _adapter().navigate_to_chat(mock_page, mock_emitter)
     finally:
         dom_helper.is_any_visible = orig_vis
 
@@ -316,12 +348,10 @@ def test_navigate_to_chat_reports_fallback_model_on_event():
 
 
 def test_select_first_available_model_returns_none_when_picker_closed():
-    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter as Adapter
-
     mock_page = MagicMock()
     mock_page.locator.return_value.first.is_visible.return_value = False
 
-    assert Adapter()._select_first_available_model(mock_page) is None
+    assert _adapter()._model_policy.select_first_available_model(mock_page) is None
 
 
 def test_clean_stale_locks(tmp_path: Path):
@@ -330,7 +360,7 @@ def test_clean_stale_locks(tmp_path: Path):
     lock_file = session_dir / "SingletonLock"
     lock_file.write_text("lock")
 
-    BrowserAdapter()._clean_stale_locks(str(session_dir))
+    _adapter()._lifecycle._clean_stale_locks(str(session_dir))
     assert not lock_file.exists()
 
 
@@ -342,14 +372,14 @@ def test_ensure_default_model_clicks_default_option():
     option = MagicMock()
     set_btn = MagicMock()
     set_btn.is_visible.return_value = False
-    locators = {MODEL_SELECTOR_BUTTON_NAME: picker, DEFAULT_MODEL: option, "Set default": set_btn}
+    locators = {"Select Model": picker, DEFAULT_MODEL: option, "Set default": set_btn}
 
     def _fake_get_by_role(role, name=None, exact=False):
         return locators.get(name or "", MagicMock())
 
     mock_page.get_by_role.side_effect = _fake_get_by_role
 
-    switched = BrowserAdapter().ensure_default_model(mock_page)
+    switched = _adapter()._model_policy.ensure_default_model(mock_page)
 
     assert switched is True
     picker.wait_for.assert_called_once()
@@ -380,7 +410,7 @@ def test_try_set_as_default_clicks_button():
 
     mock_page.locator.side_effect = _fake_locator
 
-    BrowserAdapter()._try_set_as_default(mock_page)
+    _adapter()._model_policy.try_set_as_default(mock_page)
 
     trigger.click.assert_called_once_with(timeout=3000)
     pin.evaluate.assert_called_once_with("e => e.click()")
@@ -395,7 +425,7 @@ def test_ensure_default_model_swallows_error():
 
     # Best-effort: must never raise and must report failure, so the prompt
     # pipeline can fall back to a single verification pass.
-    assert BrowserAdapter().ensure_default_model(mock_page) is False
+    assert _adapter()._model_policy.ensure_default_model(mock_page) is False
 
 
 def test_verify_default_model_retries_transient_picker_read_failure():
@@ -406,14 +436,18 @@ def test_verify_default_model_retries_transient_picker_read_failure():
     mock_page = MagicMock()
     picker = mock_page.get_by_role.return_value
     picker.inner_text.side_effect = [PwError("picker not hydrated"), f"Select Model {DEFAULT_MODEL}"]
-    adapter = BrowserAdapter()
-    adapter.ensure_default_model = MagicMock(return_value=False)
+    adapter = _adapter()
+    # The retry path now lives in the model-policy capability:
+    # verify_default_model -> retry_default_model_selection ->
+    # ensure_default_model. Mock the policy-level helpers so the test
+    # isolates the retry-and-verify loop without running the real
+    # picker DOM interaction.
+    adapter._model_policy.ensure_default_model = MagicMock(return_value=False)
 
-    adapter._verify_default_model(mock_page)
+    adapter.verify_default_model(mock_page, adapter._model_policy.target_model())
 
     assert picker.inner_text.call_count == 2
-    mock_page.keyboard.press.assert_called_once_with("Escape")
-    adapter.ensure_default_model.assert_called_once_with(mock_page)
+    adapter._model_policy.ensure_default_model.assert_called_once_with(mock_page)
 
 
 def _navigate_fixture(mock_page: MagicMock, model_text: str) -> MagicMock:
@@ -438,11 +472,11 @@ def test_verify_default_model_fallback_event_payload() -> None:
     different model is readable, instead of aborting the pipeline."""
     mock_page = MagicMock()
     emitter = _navigate_fixture(mock_page, "Select Model Qwen3.7-Plus")
-    adapter = BrowserAdapter()
-    adapter._goto_chat = MagicMock()
-    adapter._start_new_chat = MagicMock()
-    adapter._wait_for_model_picker_ready = MagicMock()
-    adapter.ensure_default_model = MagicMock(return_value=False)
+    adapter = _adapter()
+    adapter._navigation._goto_chat = MagicMock()
+    adapter._navigation._start_new_chat = MagicMock()
+    adapter._model_policy.wait_for_picker_ready = MagicMock()
+    adapter._model_policy.ensure_default_model = MagicMock(return_value=False)
 
     adapter.navigate_to_chat(mock_page, emitter)
 
@@ -457,11 +491,11 @@ def test_verify_default_model_ok_event_payload() -> None:
 
     mock_page = MagicMock()
     emitter = _navigate_fixture(mock_page, f"Select Model {DEFAULT_MODEL}")
-    adapter = BrowserAdapter()
-    adapter._goto_chat = MagicMock()
-    adapter._start_new_chat = MagicMock()
-    adapter._wait_for_model_picker_ready = MagicMock()
-    adapter.ensure_default_model = MagicMock(return_value=True)
+    adapter = _adapter()
+    adapter._navigation._goto_chat = MagicMock()
+    adapter._navigation._start_new_chat = MagicMock()
+    adapter._model_policy.wait_for_picker_ready = MagicMock()
+    adapter._model_policy.ensure_default_model = MagicMock(return_value=True)
 
     adapter.navigate_to_chat(mock_page, emitter)
 
@@ -477,7 +511,7 @@ def test_verify_default_model_ok():
     mock_page.get_by_role.return_value.inner_text.return_value = f"Select Model {DEFAULT_MODEL}"
 
     # Must not raise when the picker reports the hardcoded default.
-    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is True
     assert detected == DEFAULT_MODEL
@@ -486,15 +520,16 @@ def test_verify_default_model_ok():
 def test_verify_default_model_falls_back_on_mismatch():
     """A readable non-default model degrades gracefully instead of aborting (issue #374).
 
-    The active model is not in the picker's offer list, so ``_select_first_available_model``
-    (issue #283 AC-2) is tried first; when the picker reports it is not visible the
-    readable-but-different label is returned with ``verified=False`` instead of raising.
+    The active model is not in the picker's offer list, so the first
+    available model is tried; when the picker reports it is not visible the
+    readable-but-different label is returned with ``verified=False`` instead
+    of raising.
     """
     mock_page = MagicMock()
     mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.7-Plus"
 
-    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is False
     assert detected == "Select Model Qwen3.7-Plus"
@@ -506,10 +541,10 @@ def test_verify_default_model_rejects_superstring_model():
     mock_page.locator.return_value.first.is_visible.return_value = False
     mock_page.get_by_role.return_value.inner_text.return_value = "Select Model Qwen3.8-Max-Plus"
 
-    verified, detected = BrowserAdapter()._verify_default_model(mock_page)
+    verified, detected = _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
     assert verified is False
-    assert "Qwen3.8-Max-Plus" in detected
+    assert "Qwen3.8-Max-Plus" in str(detected)
 
 
 def test_verify_default_model_retries_when_switch_reported_failure():
@@ -526,7 +561,9 @@ def test_verify_default_model_retries_when_switch_reported_failure():
     mock_page.get_by_role.return_value.inner_text.side_effect = _fake_inner_text
 
     # Must not raise: the retry path fixes the mismatch.
-    verified, detected = BrowserAdapter()._verify_default_model(mock_page, require_switch=False)
+    verified, detected = _adapter().verify_default_model(
+        mock_page, _adapter()._model_policy.target_model(), require_switch=False
+    )
 
     assert verified is True
     assert detected == DEFAULT_MODEL
@@ -544,15 +581,13 @@ def test_verify_default_model_raises_when_unreadable():
     mock_page.locator.return_value.first.is_visible.return_value = False
 
     with pytest.raises(ModelSwitchError, match="Cannot read active model"):
-        BrowserAdapter()._verify_default_model(mock_page)
+        _adapter().verify_default_model(mock_page, _adapter()._model_policy.target_model())
 
 
 MODEL_SELECTOR_BUTTON_NAME = "Select Model"
 
 
 def test_is_third_party_noise_returns_true_for_known_domains():
-    from modules.browser.src.capabilities_browser_adapter import _is_third_party_noise
-
     assert _is_third_party_noise("https://www.google.com/measurement/conversion")
     assert _is_third_party_noise("https://analytics.google.com/g/collect")
     assert _is_third_party_noise("https://img.alicdn.com/imgextra/x.png")
@@ -560,8 +595,6 @@ def test_is_third_party_noise_returns_true_for_known_domains():
 
 
 def test_is_third_party_noise_returns_false_for_qwen_domains():
-    from modules.browser.src.capabilities_browser_adapter import _is_third_party_noise
-
     assert not _is_third_party_noise("https://chat.qwen.ai/")
     assert not _is_third_party_noise("https://api.qwen.ai/completion")
 
@@ -648,7 +681,6 @@ def test_err_failed_in_noise_patterns_is_lowercase():
     """_NOISE_CONSOLE_PATTERNS must use lowercase 'err_failed' so the
     .lower()-normalised console text actually matches.  Uppercase patterns
     in a frozenset compared against lower-cased text will never match."""
-    from modules.browser.src.capabilities_browser_adapter import _NOISE_CONSOLE_PATTERNS
 
     assert "err_failed" in _NOISE_CONSOLE_PATTERNS
     assert "ERR_FAILED" not in _NOISE_CONSOLE_PATTERNS, (
@@ -671,7 +703,7 @@ def test_raise_if_session_expired_raises_on_in_page_expiration_banner():
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._raise_if_session_expired(mock_page)
+            _raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
@@ -686,7 +718,7 @@ def test_detect_session_expired_banner_no_false_positive_on_normal_chat_body():
     mock_page.inner_text.return_value = "Ask Qwen anything"
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
-        assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
+        assert _in_page_expiry_banner_visible(mock_page) is False
 
 
 def test_raise_if_session_expired_raises_on_live_token_expired_banner():
@@ -703,7 +735,7 @@ def test_raise_if_session_expired_raises_on_live_token_expired_banner():
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._raise_if_session_expired(mock_page)
+            _raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
@@ -720,7 +752,7 @@ def test_raise_if_session_expired_raises_on_token_has_expired_alone():
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            adapter_mod._raise_if_session_expired(mock_page)
+            _raise_if_session_expired(mock_page)
 
     assert exc_info.value.session_expired is True
 
@@ -737,7 +769,7 @@ def test_detect_session_expired_banner_skips_when_body_unreadable():
     mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
-        assert adapter_mod._in_page_expiry_banner_visible(mock_page) is False
+        assert _in_page_expiry_banner_visible(mock_page) is False
 
 
 # ── detect_session_expired protocol method tests ─────────────────────────────
@@ -751,7 +783,7 @@ def test_detect_session_expired_returns_true_on_token_expired_banner():
     mock_page.inner_text.return_value = "Token has expired, please log in again"
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
-        assert BrowserAdapter().detect_session_expired(mock_page) is True
+        assert _adapter().detect_session_expired(mock_page) is True
 
 
 def test_detect_session_expired_returns_false_on_clean_page():
@@ -762,7 +794,7 @@ def test_detect_session_expired_returns_false_on_clean_page():
     mock_page.inner_text.return_value = "Hello, here is a response."
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
-        assert BrowserAdapter().detect_session_expired(mock_page) is False
+        assert _adapter().detect_session_expired(mock_page) is False
 
 
 def test_detect_session_expired_returns_false_when_body_unreadable():
@@ -774,7 +806,7 @@ def test_detect_session_expired_returns_false_when_body_unreadable():
     mock_page.inner_text.side_effect = PwError("DOM not hydrated yet")
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
-        assert BrowserAdapter().detect_session_expired(mock_page) is False
+        assert _adapter().detect_session_expired(mock_page) is False
 
 
 def test_detect_session_expired_fires_on_banner_shell_selector():
@@ -790,7 +822,7 @@ def test_detect_session_expired_fires_on_banner_shell_selector():
         return selectors == ", ".join(const.SESSION_EXPIRED_BANNER_SELECTORS)
 
     with patch.object(dom_helper, "is_any_visible", side_effect=_banner_probe):
-        assert BrowserAdapter().detect_session_expired(mock_page) is True
+        assert _adapter().detect_session_expired(mock_page) is True
 
 
 def test_navigate_to_chat_emits_session_expired_before_propagation():
@@ -805,7 +837,7 @@ def test_navigate_to_chat_emits_session_expired_before_propagation():
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Session expired") as exc_info:
-            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+            _adapter().navigate_to_chat(mock_page, mock_emitter)
 
     assert exc_info.value.session_expired is True
     emitted = [call.args for call in mock_emitter.emit.call_args_list]
@@ -824,7 +856,7 @@ def test_navigate_to_chat_no_session_expired_emit_on_redirect_case():
 
     with patch.object(dom_helper, "is_any_visible", return_value=False):
         with pytest.raises(AuthRequiredError, match="Not authenticated") as exc_info:
-            BrowserAdapter().navigate_to_chat(mock_page, mock_emitter)
+            _adapter().navigate_to_chat(mock_page, mock_emitter)
 
     assert exc_info.value.session_expired is False
     emitted = [call.args[0] for call in mock_emitter.emit.call_args_list]

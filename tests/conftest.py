@@ -19,11 +19,16 @@ sys.path.insert(0, str(ROOT))
 
 import contextlib
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
+from modules.prompt.src.capabilities_output_saver import Saver
+from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
@@ -63,6 +68,16 @@ def page(browser_ctx: BrowserContext):
         pg.close()
 
 
+def _make_browser_views():
+    """Build the narrow browser views the DirectPromptAdapter fixture needs."""
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return lifecycle, navigation, diag
+
+
 @pytest.fixture
 def client(browser_ctx: BrowserContext, page) -> DirectPromptAdapter:
     cfg = AppConfig(
@@ -72,16 +87,21 @@ def client(browser_ctx: BrowserContext, page) -> DirectPromptAdapter:
         session_path=ROOT / "qwen_session",
         headless=True,
     )
+    lifecycle, navigation, diag = _make_browser_views()
     return DirectPromptAdapter(
-        browser=BrowserAdapter(),
+        browser_lifecycle=lifecycle,
+        browser_navigation=navigation,
+        browser_diagnostics=diag,
         injector=PromptInjector(),
         sender=SendDispatcher(),
         streamer=StreamMonitor(),
+        saver=Saver(),
         observability=ObservabilitySetup(
             cfg.log_path,
             StatusFileWriter(status_path_for(cfg.log_path)),
             MetricsCounter(metrics_path=cfg.log_path / "metrics.json"),
         ),
+        flow=PromptFlowDispatcher(),
     )
 
 

@@ -7,7 +7,7 @@ The card foot carries three icon-only buttons — the shipped glyph set is
 - ↻ (refresh, ``account-refresh-<n>``): reloads the pool from disk and
   repaints the row.
 - ☐ (health, ``account-health-<n>``): runs the pool health check — the
-  same probe as ``qwa session health`` (``SessionHealthChecker``).
+  same probe as ``qwa session health`` (``SessionLimitChecker``).
 - × (delete, ``account-delete-<n>``): removes the pool entry and deletes
   the Chromium profile — the same logic as ``qwa session remove``
   (``SessionManager.remove_session`` + ``delete_session_profile``),

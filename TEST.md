@@ -27,8 +27,8 @@ that mirrors the exact DOM structure verified live on `chat.qwen.ai`.
 | `shared/src/utility_core_validation.py` | `validate_response_content` | Detects CAPTCHA challenges, server error pages, empty responses | Live probe 2026-08-09 |
 | `prompt/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
 | `prompt/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
-| `browser/src/capabilities_browser_adapter.py` | `SessionCheck.is_alive` | Verifies page readiness and textarea presence | Live probe 2026-08-09 |
-| `browser/src/capabilities_browser_adapter.py` | `SessionCheck.check_auth` | Detects login redirects and missing textarea | Live probe 2026-08-09 |
+| `session/src/capabilities_session_login_checker.py` | `SessionLoginChecker.check_session` | Verifies the Qwen chat page carries an authenticated account | Live probe 2026-08-09 |
+| `session/src/capabilities_session_limit_checker.py` | `SessionLimitChecker.check_session` | Detects rate-limit banners and probe timeouts on the Qwen chat page | Live probe 2026-08-09 |
 | `prompt/src/capabilities_attachment_prompt_adapter.py` | `process_prompt_with_attachment` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
 | `prompt/src/capabilities_prompt_file_adapter.py` | `process_prompt_file_only` | Same pipeline without attachment | Live probe 2026-08-09 |
 

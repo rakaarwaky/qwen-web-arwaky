@@ -8,23 +8,25 @@ from __future__ import annotations
 
 import inspect
 
-from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+from modules.session.src.capabilities_session_rotator import SessionRotator
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
-    ISessionHealthCheckerProtocol,
+    ISessionLimitCheckerProtocol,
+    ISessionLoginCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRotatorProtocol,
 )
 
 _REQUIRED_PROTOCOLS: tuple[type, ...] = (
     ISessionManagerProtocol,
-    ISessionHealthCheckerProtocol,
+    ISessionLoginCheckerProtocol,
+    ISessionLimitCheckerProtocol,
     ISessionRotatorProtocol,
 )
 
 
 def test_rotation_adapter_implements_the_rotator_protocol() -> None:
-    assert ISessionRotatorProtocol in inspect.getmro(SessionRotationAdapter)
+    assert ISessionRotatorProtocol in inspect.getmro(SessionRotator)
 
 
 def test_aggregate_declares_only_the_execute_door() -> None:
@@ -42,4 +44,4 @@ def test_every_protocol_method_is_abstract_with_a_return_annotation() -> None:
 
 
 def test_the_rotator_is_async_so_a_health_probe_can_run_per_rotation() -> None:
-    assert inspect.iscoroutinefunction(SessionRotationAdapter.get_next_session)
+    assert inspect.iscoroutinefunction(SessionRotator.get_next_session)

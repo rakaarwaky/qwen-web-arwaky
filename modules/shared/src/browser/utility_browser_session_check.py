@@ -1,6 +1,7 @@
 """Utility: browser session liveness and auth probe.
 
-Module-level helpers only (utility layer). Used by BrowserAdapter and tests.
+Module-level helpers only (utility layer). Used by the browser
+capabilities, the session health checker, and tests.
 """
 
 from __future__ import annotations
@@ -69,6 +70,36 @@ def assert_on_chat_page(page: Page, strict: bool = True) -> None:
         )
 
 
+def page_is_expired(page: Page) -> bool:
+    """True when the live page shows an in-page session-expiry notice.
+
+    Re-runs the banner text/selector scan against the CURRENT page state.
+    Best-effort: a DOM that is unreadable (mid-hydration) is not a signal,
+    so this returns False rather than raising. Used by prompt pipelines
+    after a failed dispatch to surface ``EVENT_SESSION_EXPIRED``.
+    """
+    return _in_page_expiry_banner_visible(page)
+
+
+def check_session(page: Page) -> bool:
+    """Return True when *page* shows the authenticated chat UI.
+
+    Never raises: a page that is still loading or whose DOM is not readable
+    is judged by the live checks, not reported as an error. Composes the
+    shared ``assert_on_chat_page`` and ``session_is_alive`` probes so the
+    Agent layer carries no inline DOM mechanics of its own.
+    """
+    try:
+        page.wait_for_load_state("load", timeout=15_000)
+    except Exception:
+        log.debug("session_load_state_wait_failed")
+    try:
+        assert_on_chat_page(page)
+    except AuthRequiredError:
+        return False
+    return session_is_alive(page)
+
+
 def _in_page_expiry_banner_visible(page: Page) -> bool:
     """True when the live page shows an in-page session-expiry notice."""
     try:
@@ -83,4 +114,4 @@ def _in_page_expiry_banner_visible(page: Page) -> bool:
     return False
 
 
-__all__ = ["session_is_alive", "assert_on_chat_page"]
+__all__ = ["session_is_alive", "assert_on_chat_page", "page_is_expired", "check_session"]

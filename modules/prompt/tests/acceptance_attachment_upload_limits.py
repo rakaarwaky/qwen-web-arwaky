@@ -57,7 +57,20 @@ def test_acceptance_a_missing_prompt_file_is_reported_before_the_send(tmp_path: 
     Note: the adapter returns the failure as an error string rather than
     raising, so this asserts the response text rather than an exception.
     """
-    adapter = AttachmentPromptAdapter(*(MagicMock() for _ in range(10)))
+    adapter = AttachmentPromptAdapter(
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
+        injector=MagicMock(),
+        sender=MagicMock(),
+        streamer=MagicMock(),
+        uploader=MagicMock(),
+        saver=MagicMock(),
+        observability=MagicMock(),
+        flow=MagicMock(),
+        folder_adapter=MagicMock(),
+        cancel=MagicMock(),
+    )
 
     result = adapter.process_prompt_with_attachment(
         prompt_file=tmp_path / "absent-prompt.md",
@@ -87,14 +100,20 @@ def test_acceptance_invalid_attachment_surfaces_stable_reason_without_browser_la
     folder_adapter = MagicMock()
     folder_adapter.resolve_to_attachment.side_effect = lambda p: p
 
-    # Build adapter: mock dependencies, real uploader, mock browser
-    # Signature order: browser, injector, sender, streamer, uploader,
-    # saver, observability, flow, folder_adapter, cancel
-    deps: list[object] = [MagicMock() for _ in range(10)]
-    deps[0] = browser_mock  # IBrowserProtocol
-    deps[4] = uploader  # IUploadProtocol
-    deps[8] = folder_adapter  # IFolderCompileProtocol
-    adapter = AttachmentPromptAdapter(*deps)
+    adapter = AttachmentPromptAdapter(
+        browser_lifecycle=browser_mock,
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
+        injector=MagicMock(),
+        sender=MagicMock(),
+        streamer=MagicMock(),
+        uploader=uploader,
+        saver=MagicMock(),
+        observability=MagicMock(),
+        flow=MagicMock(),
+        folder_adapter=folder_adapter,
+        cancel=MagicMock(),
+    )
 
     result = adapter.process_prompt_with_attachment(
         prompt_file=prompt,

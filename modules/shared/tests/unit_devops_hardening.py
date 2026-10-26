@@ -71,7 +71,7 @@ def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
 
 def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     """The launch kwargs carry ``--no-sandbox`` iff the config dropped the sandbox."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_module
+    from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 
     captured: list[dict] = []
 
@@ -107,14 +107,15 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     session.mkdir()
     (session / "Cookies").write_text("x", encoding="utf-8")
 
-    adapter = adapter_module.BrowserAdapter()
+    from modules.browser.src import capabilities_browser_lifecycle as lifecycle_module
+    from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+
+    diag = BrowserDiagnostics()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
     with (
-        patch.object(adapter_module, "create_ephemeral_session") as ephemeral,
-        patch.object(adapter_module, "find_chrome_binary", return_value="/usr/bin/chromium"),
-        patch.object(adapter_module, "sync_playwright", return_value=_Playwright()),
+        patch.object(lifecycle_module, "find_chrome_binary", return_value="/usr/bin/chromium"),
+        patch.object(lifecycle_module, "sync_playwright", return_value=_Playwright()),
     ):
-        ephemeral.return_value.__enter__ = lambda self=None: session
-        ephemeral.return_value.__exit__ = lambda *_exc: False
         for disable in (False, True):
             cfg = AppConfig(
                 input_path=session,
@@ -124,7 +125,7 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
                 headless=True,
             )
             try:
-                with adapter.browser_session(cfg):
+                with lifecycle.browser_session(cfg):
                     pass
             except Exception:
                 pass

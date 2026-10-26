@@ -138,21 +138,37 @@ qwen-web-arwaky session status
 ### Ping Test Implementation
 
 ```python
-class SessionHealthChecker:
-    """Quick health check using minimal ping message."""
+class SessionLoginChecker:
+    """Quick health check using minimal ping message (login verdict: ACTIVE or AUTH_REQUIRED)."""
     
     PING_MESSAGE = "Reply with just: pong"
     EXPECTED_RESPONSE = "pong"
     TIMEOUT_SECONDS = 5
     
-    async def check_session(self, session: SessionInfo) -> bool:
-        """Returns True if session is healthy, False if limited."""
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Returns a verdict: ACTIVE when the session is authenticated, AUTH_REQUIRED otherwise."""
+        try:
+            result = await self._send_ping(session)
+            return self._is_authenticated(result)
+        except Exception:
+            return AUTH_REQUIRED
+
+
+class SessionLimitChecker:
+    """Rate-limit verdict (ACTIVE or LIMITED) using minimal ping message."""
+
+    PING_MESSAGE = "Reply with just: pong"
+    EXPECTED_RESPONSE = "pong"
+    TIMEOUT_SECONDS = 5
+
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
+        """Returns a verdict: ACTIVE when the page is healthy, LIMITED when rate-limited."""
         try:
             result = await self._send_ping(session)
             return self._is_healthy(result)
         except Exception:
-            return False
-    
+            return LIMITED
+
     async def _send_ping(self, session: SessionInfo) -> str:
         """Send minimal ping and capture response."""
         # Use lightweight browser context
@@ -210,7 +226,7 @@ class SessionRotator:
         for candidate in pool.sessions:
             if candidate.session_id in excluded:
                 continue
-            verdict = await self.health_checker.diagnose_session(candidate)
+            verdict = await self.limit_checker.check_session(candidate)
             if verdict.is_healthy:
                 return RotatorResponse(session=candidate, outcome="success")
             if verdict.status == SessionStatus.LIMITED:
@@ -232,7 +248,7 @@ class SessionRotator:
         )
 ```
 
-The code sample above mirrors `SessionRotationAdapter.rotate` in `modules/session/src/capabilities_session_rotation_adapter.py`, including the `empty_pool` early return and the verdict-marking branches; it omits only the metrics counters.
+The code sample above mirrors `SessionRotator.rotate` in `modules/session/src/capabilities_session_rotator.py`, including the `empty_pool` early return and the verdict-marking branches; it omits only the metrics counters.
 
 **CAPTCHA / access-control stop:** A CAPTCHA or any provider access-control stop halts immediately. No bypass is attempted. The affected session is marked `AUTH_REQUIRED` with reason `EXPIRED` or `NETWORK` as appropriate.
 
@@ -301,7 +317,7 @@ for role in roles:
 - [ ] Store Chromium profiles per session
 
 #### Phase 2: Health Checker (1 day)
-- [ ] Implement ping test (`SessionHealthChecker`)
+- [ ] Implement ping test (`SessionLimitChecker`)
 - [ ] Add rate limit detection logic
 - [ ] Test with real Qwen responses
 - [ ] Add `session health` command
@@ -328,7 +344,7 @@ for role in roles:
 - `modules/shared/src/taxonomy_session_vo.py` — Session VOs
 - `modules/shared/src/contract_session_aggregate.py` — Session protocol
 - `modules/core/src/capabilities_session_manager.py` — Session storage
-- `modules/core/src/capabilities_session_health_checker.py` — Ping test
+- `modules/session/src/capabilities_session_limit_checker.py` — Ping test
 - `modules/core/src/agent_session_rotator.py` — Rotation logic
 - `modules/cli/src/surface_cli_sessions_command.py` — CLI handler
 
@@ -346,13 +362,13 @@ for role in roles:
 # Test ping detection
 def test_ping_detects_rate_limit():
     session = create_fake_session(limited=True)
-    checker = SessionHealthChecker()
+    checker = SessionLimitChecker()
     assert checker.check_session(session) == False
 
 
 def test_ping_detects_healthy():
     session = create_fake_session(limited=False)
-    checker = SessionHealthChecker()
+    checker = SessionLimitChecker()
     assert checker.check_session(session) == True
 
 

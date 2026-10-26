@@ -41,6 +41,8 @@ def _browser_stub(emitter_events: tuple = ()) -> MagicMock:
 
 
 def _make_file_orchestrator() -> tuple[PromptFileAdapter, dict[str, MagicMock]]:
+    browser_lifecycle = MagicMock()
+    browser_diagnostics = MagicMock()
     browser = _browser_stub()
     injector = MagicMock()
     sender = MagicMock()
@@ -67,7 +69,9 @@ def _make_file_orchestrator() -> tuple[PromptFileAdapter, dict[str, MagicMock]]:
     cancel.cancel_by_event = MagicMock()
 
     orchestrator = PromptFileAdapter(
-        browser=browser,
+        browser_lifecycle=browser_lifecycle,
+        browser_navigation=browser,
+        browser_diagnostics=browser_diagnostics,
         injector=injector,
         sender=sender,
         streamer=streamer,
@@ -77,7 +81,9 @@ def _make_file_orchestrator() -> tuple[PromptFileAdapter, dict[str, MagicMock]]:
         cancel=cancel,
     )
     mocks = {
-        "browser": browser,
+        "browser_lifecycle": browser_lifecycle,
+        "browser_navigation": browser,
+        "browser_diagnostics": browser_diagnostics,
         "injector": injector,
         "sender": sender,
         "streamer": streamer,
@@ -118,7 +124,7 @@ def test_process_prompt_file_only_emits_session_expired_when_banner_appears_afte
     mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
 
     # Mock the browser to return True for detect_session_expired
-    mocks["browser"].detect_session_expired.return_value = True
+    mocks["browser_diagnostics"].detect_session_expired.return_value = True
 
     with pytest.raises(SendDispatchError, match="Send failed"):
         orch._execute_file_on_page(
@@ -131,7 +137,7 @@ def test_process_prompt_file_only_emits_session_expired_when_banner_appears_afte
             prompt="hello",
         )
 
-    mocks["browser"].detect_session_expired.assert_called_once()
+    mocks["browser_diagnostics"].detect_session_expired.assert_called_once()
     emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
     assert len(emit_calls) == 1
     assert emit_calls[0].args[1] == {"url": "https://chat.qwen.ai/", "reason": "post_send_banner"}
@@ -149,7 +155,9 @@ def test_process_prompt_file_only_reads_the_prompt_file_before_browser_launch(tm
         pass
 
     adapter = PromptFileAdapter(
-        browser=browser,
+        browser_lifecycle=MagicMock(),
+        browser_navigation=browser,
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
@@ -187,7 +195,9 @@ def test_process_prompt_file_only_reports_an_unreadable_prompt_file_before_brows
     browser = MagicMock()
 
     adapter = PromptFileAdapter(
-        browser=browser,
+        browser_lifecycle=MagicMock(),
+        browser_navigation=browser,
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
@@ -214,7 +224,9 @@ def test_process_prompt_file_only_pre_flight_matches_the_attachment_adapter(tmp_
     attachment.write_text("attachment")
 
     file_adapter = PromptFileAdapter(
-        browser=MagicMock(),
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
@@ -224,7 +236,9 @@ def test_process_prompt_file_only_pre_flight_matches_the_attachment_adapter(tmp_
         cancel=CapabilitiesRunCancelRegistry(),
     )
     attachment_adapter = AttachmentPromptAdapter(
-        browser=MagicMock(),
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
@@ -246,8 +260,8 @@ def test_process_prompt_file_only_pre_flight_matches_the_attachment_adapter(tmp_
 
     assert "not found" in str(file_result.response_text).lower()
     assert "not found" in str(attachment_result.response_text).lower()
-    file_adapter._browser.browser_session.assert_not_called()
-    attachment_adapter._browser.browser_session.assert_not_called()
+    file_adapter._browser_lifecycle.browser_session.assert_not_called()
+    attachment_adapter._browser_lifecycle.browser_session.assert_not_called()
 
 
 def test_process_prompt_file_only_no_session_expired_emit_when_clean() -> None:
@@ -257,7 +271,7 @@ def test_process_prompt_file_only_no_session_expired_emit_when_clean() -> None:
     mocks["flow"].dispatch_and_wait_for_response.side_effect = SendDispatchError("Send failed")
 
     # Mock the browser to return False for detect_session_expired
-    mocks["browser"].detect_session_expired.return_value = False
+    mocks["browser_diagnostics"].detect_session_expired.return_value = False
 
     with pytest.raises(SendDispatchError, match="Send failed"):
         orch._execute_file_on_page(
@@ -270,7 +284,7 @@ def test_process_prompt_file_only_no_session_expired_emit_when_clean() -> None:
             prompt="hello",
         )
 
-    mocks["browser"].detect_session_expired.assert_called_once()
+    mocks["browser_diagnostics"].detect_session_expired.assert_called_once()
     emit_calls = [c for c in mocks["emitter"].emit.call_args_list if c.args[0] == EVENT_SESSION_EXPIRED]
     assert len(emit_calls) == 0
 
@@ -297,7 +311,7 @@ def test_stalled_stream_saves_the_partial_artifact_with_a_stalled_verdict(tmp_pa
     """
     orch, mocks = _make_file_orchestrator()
     _real_content_saver(mocks)
-    mocks["browser"].detect_session_expired.return_value = False
+    mocks["browser_diagnostics"].detect_session_expired.return_value = False
 
     partial = "Revenue grew 12% quarter over quarter, driven by"
 
@@ -339,7 +353,7 @@ def test_timed_out_stream_saves_the_partial_artifact_with_an_incomplete_verdict(
     never reached a terminal event — and its partial text is still saved."""
     orch, mocks = _make_file_orchestrator()
     _real_content_saver(mocks)
-    mocks["browser"].detect_session_expired.return_value = False
+    mocks["browser_diagnostics"].detect_session_expired.return_value = False
 
     partial = "Operating margin improved by 3 points,"
 
@@ -379,7 +393,7 @@ def test_a_cancel_still_reports_no_extraction_verdict(tmp_path) -> None:
     from modules.shared.src.common.taxonomy_core_error import RunCancelledError
 
     orch, mocks = _make_file_orchestrator()
-    mocks["browser"].detect_session_expired.return_value = False
+    mocks["browser_diagnostics"].detect_session_expired.return_value = False
 
     def raise_cancelled(*_args, **_kwargs):
         raise RunCancelledError("Cancelled by user while waiting for response")

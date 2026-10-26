@@ -8,7 +8,35 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
+from modules.shared.src.browser.utility_browser_session_check import check_session
+
+
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a standalone BrowserOrchestrator for the login-surface harness."""
+    from unittest.mock import MagicMock
+
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
+    )
+
+
+_adapter = _make_orchestrator()
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 
@@ -58,13 +86,22 @@ class _BrowserHarness:
         self.page.is_closed.return_value = True
 
     @contextmanager
-    def browser_session(self, cfg):
+    def browser_session(self, cfg, session_path=None, executable_path=None):
         self.context_configs.append(cfg)
         self.active = True
         context = MagicMock()
         context.pages = [self.page]
         try:
             yield context
+        finally:
+            self.active = False
+
+    @contextmanager
+    def open_login_page(self, cfg):
+        self.context_configs.append(cfg)
+        self.active = True
+        try:
+            yield self.page
         finally:
             self.active = False
 
@@ -88,10 +125,23 @@ class _BrowserHarness:
 
 
 def _orchestrator(browser: _BrowserHarness) -> SessionOrchestrator:
-    """Build an orchestrator with the non-browser capabilities mocked."""
+    """Build an orchestrator with the non-browser capabilities mocked.
+
+    The harness implements the method shapes both narrow browser protocols
+    need (``browser_session`` / ``open_login_page`` / ``navigate_to_chat`` /
+    ``check_session`` / ``check_auth``), so it is passed as the injected view
+    for each protocol. The orchestrator reaches the saved-session verdict via
+    its injectable ``session_probe`` hook, which here is the harness's
+    ``check_session``.
+    """
     observability = MagicMock()
     observability.get_logger.return_value = MagicMock()
-    return SessionOrchestrator(browser=browser, observability=observability)
+    return SessionOrchestrator(
+        browser_lifecycle=browser,
+        browser_navigation=browser,
+        observability=observability,
+        session_probe=browser.check_session,
+    )
 
 
 def _login_verdict(orchestrator, **kwargs) -> str:
@@ -127,7 +177,8 @@ def test_existing_valid_session_still_opens_headed_browser(tmp_path: Path) -> No
     )
 
     assert "completed successfully" in result
-    # Two contexts: headed login + headless post-login validation.
+    # Two contexts: headed login (open_login_page) + headless post-login
+    # validation (browser_session).
     assert len(browser.context_configs) == 2
     assert [cfg.mode for cfg in browser.context_configs] == ["login", "session-check"]
     assert browser.context_configs[0].headless is False  # login context is headed
@@ -207,10 +258,10 @@ def test_browser_check_session_requires_authenticated_chat_ui() -> None:
     page.query_selector.return_value = MagicMock()
     page.locator.return_value.count.return_value = 0
     page.locator.return_value.first.is_visible.return_value = False
-    assert BrowserAdapter().check_session(page) is True
+    assert check_session(page) is True
 
     page.url = "https://chat.qwen.ai/login"
-    assert BrowserAdapter().check_session(page) is False
+    assert check_session(page) is False
 
 
 def test_manual_login_delays_check_session_after_confirmation(tmp_path: Path) -> None:

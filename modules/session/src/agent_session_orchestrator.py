@@ -16,9 +16,14 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
-from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
-from modules.shared.src.common.taxonomy_core_constant import CHAT_URL, DEFAULT_OUTPUT, SESSIONS_DIR
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserLifecycleProtocol,
+    IBrowserNavigationProtocol,
+)
+from modules.shared.src.browser.utility_browser_session_check import check_session
+from modules.shared.src.common.taxonomy_core_constant import DEFAULT_OUTPUT, SESSIONS_DIR
 from modules.shared.src.common.taxonomy_core_entity import LifecycleEmitter
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -28,7 +33,8 @@ from modules.shared.src.config.utility_config_app_factory import build_app_confi
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
-    ISessionHealthCheckerProtocol,
+    ISessionLimitCheckerProtocol,
+    ISessionLoginCheckerProtocol,
     ISessionManagerProtocol,
     ISessionRenewalProtocol,
     ISessionRotatorProtocol,
@@ -36,8 +42,10 @@ from modules.shared.src.session.contract_session_protocol import (
 from modules.shared.src.session.taxonomy_session_vo import (
     HealthReason,
     RotatorRequest,
+    SessionHealthResult,
     SessionId,
     SessionList,
+    SessionPool,
     SessionRequest,
     SessionResponse,
     SessionStatus,
@@ -56,18 +64,45 @@ class SessionOrchestrator(ISessionAggregate):
 
     def __init__(
         self,
-        browser: IBrowserProtocol,
         observability: IObservabilityProtocol,
         sessions: ISessionManagerProtocol | None = None,
         renewer: ISessionRenewalProtocol | None = None,
-        health_checker: ISessionHealthCheckerProtocol | None = None,
+        login_checker: ISessionLoginCheckerProtocol | None = None,
+        limit_checker: ISessionLimitCheckerProtocol | None = None,
         rotator: ISessionRotatorProtocol | None = None,
+        *,
+        browser: IBrowserLifecycleProtocol | IBrowserNavigationProtocol | None = None,
+        browser_lifecycle: IBrowserLifecycleProtocol | None = None,
+        browser_navigation: IBrowserNavigationProtocol | None = None,
+        session_probe: Callable[[Any], bool] | None = None,
     ) -> None:
-        self._browser = browser
+        """Wire the session orchestrator's capability seams.
+
+        *observability* is positional for the legacy call shape; the browser
+        seam is a keyword: the narrow views (*browser_lifecycle* /
+        *browser_navigation*) are the current API, while the legacy *browser*
+        shorthand is used as both views when no narrow view is supplied.
+        *session_probe* is an injectable per-page liveness verdict that
+        defaults to the shared ``utility_browser_session_check`` probe, so
+        tests can steer the verdict without monkeypatching the module.
+
+        The ``check_health`` verb consults two checkers in sequence:
+        *login_checker* (AUTH_REQUIRED on failure) then *limit_checker*
+        (LIMITED on failure). Both are optional; ``check_health`` reports
+        an error when either is not wired.
+        """
+        self._browser_lifecycle: IBrowserLifecycleProtocol = cast(
+            IBrowserLifecycleProtocol, browser_lifecycle if browser_lifecycle is not None else browser
+        )
+        self._browser_navigation: IBrowserNavigationProtocol = cast(
+            IBrowserNavigationProtocol, browser_navigation if browser_navigation is not None else browser
+        )
+        self._session_probe: Callable[[Any], bool] = session_probe if session_probe is not None else check_session
         self._observability = observability
         self._sessions = sessions
         self._renewer = renewer
-        self._health_checker = health_checker
+        self._login_checker = login_checker
+        self._limit_checker = limit_checker
         self._rotator = rotator
 
     # Block 2: Protocol Method Implementation
@@ -133,14 +168,18 @@ class SessionOrchestrator(ISessionAggregate):
                 profile_path=found.path,
             )
         if request.verb == "check_health":
-            if self._sessions is None or self._health_checker is None:
-                return SessionResponse(error="session health checker not wired")
+            if self._sessions is None or self._login_checker is None or self._limit_checker is None:
+                return SessionResponse(error="session checker not wired")
             pool = self._sessions.load_pool()
-            results = self._health_checker.check_pool_sync(pool, self._sessions)
-            healthy_count, total = self._health_checker.summarize_pool_results(results)
-            health_results = [r for _, r in results]
+            results = self._run_pool_checks(pool, self._sessions)
+            healthy_count = 0
+            for r in results:
+                if r.is_healthy:
+                    healthy_count += 1
+            total = len(results)
+            health_results = [r for r in results]
             lines = [f"{healthy_count}/{total} session(s) healthy"]
-            for s, r in results:
+            for s, r in zip(pool.sessions, results, strict=True):
                 line = f"  - {s.name} ({s.session_id}): {r.status.value}"
                 if r.reason:
                     line += f" [{r.reason}]"
@@ -164,6 +203,54 @@ class SessionOrchestrator(ISessionAggregate):
         if request.verb == "rotate":
             return self._rotate(request.exclude_ids)
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
+
+    def _run_pool_checks(
+        self, pool: SessionPool, session_manager: ISessionManagerProtocol
+    ) -> list[SessionHealthResult]:
+        """Run the login checker then the limit checker on every pool session.
+
+        A session that fails the login check is marked ``AUTH_REQUIRED``.
+        A session that passes the login check but fails the limit check is
+        marked ``LIMITED``. A session that passes both is ``ACTIVE``.
+        Manager state is written sequentially after the async probes so
+        pool mutation never races (BE-4-001).
+        """
+        if self._login_checker is None or self._limit_checker is None:
+            return []
+        import asyncio
+
+        login_checker = self._login_checker
+        limit_checker = self._limit_checker
+
+        async def _check_all() -> list[SessionHealthResult]:
+            # One gather over both checkers so login and limit probes of the same
+            # session run concurrently instead of two sequential sweeps (BE-4-001).
+            pairs = await asyncio.gather(
+                *(asyncio.gather(login_checker.check_session(s), limit_checker.check_session(s)) for s in pool.sessions)
+            )
+            results: list[SessionHealthResult] = []
+            for s, (login_v, limit_v) in zip(pool.sessions, pairs, strict=True):
+                if login_v.status == SessionStatus.AUTH_REQUIRED:
+                    verdict = login_v
+                elif limit_v.status == SessionStatus.LIMITED:
+                    verdict = limit_v
+                else:
+                    verdict = SessionHealthResult(
+                        session_id=s.session_id,
+                        status=SessionStatus.ACTIVE,
+                    )
+                results.append(verdict)
+            return results
+
+        results = asyncio.run(_check_all())
+        for s, verdict in zip(pool.sessions, results, strict=True):
+            if verdict.status == SessionStatus.ACTIVE:
+                session_manager.mark_healthy(s.session_id)
+            elif verdict.status == SessionStatus.LIMITED:
+                session_manager.mark_limited(s.session_id, reason=verdict.reason)
+            else:
+                session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
+        return results
 
     # Block 3: Dunder Methods, Factories, Helpers
 
@@ -203,10 +290,10 @@ class SessionOrchestrator(ISessionAggregate):
             headless=False,
         )
 
-        with self._browser.browser_session(cfg) as bctx:
-            page = bctx.pages[0] if bctx.pages else bctx.new_page()
-            page.goto(CHAT_URL, wait_until="domcontentloaded")
-
+        # Delegate the browser mechanics (prepare → browser_session → first
+        # page → goto) to the open_login_page capability instead of
+        # re-implementing them here.
+        with self._browser_navigation.open_login_page(cfg) as page:
             # The human wait ceiling is its own budget: a typed login must
             # never be cut short by the generic run timeout.
             deadline = time.monotonic() + login_wait_seconds()
@@ -426,11 +513,11 @@ class SessionOrchestrator(ISessionAggregate):
             headless=True,
         )
         try:
-            with self._browser.browser_session(validation_cfg) as bctx:
+            with self._browser_lifecycle.browser_session(validation_cfg) as bctx:
                 page = bctx.pages[0] if bctx.pages else bctx.new_page()
                 emitter = LifecycleEmitter(self._observability.get_logger())
-                self._browser.navigate_to_chat(page, emitter)
-                if self._browser.check_session(page):
+                self._browser_navigation.navigate_to_chat(page, emitter)
+                if self._session_probe(page):
                     return True
         except Exception:
             # Validation is a best-effort fast path: when the headless
@@ -447,11 +534,11 @@ class SessionOrchestrator(ISessionAggregate):
             try:
                 self._renewer.renew_session_if_stale(validation_cfg)
                 # Re-validate after renewal succeeded
-                with self._browser.browser_session(validation_cfg) as bctx:
+                with self._browser_lifecycle.browser_session(validation_cfg) as bctx:
                     page = bctx.pages[0] if bctx.pages else bctx.new_page()
                     emitter = LifecycleEmitter(self._observability.get_logger())
-                    self._browser.navigate_to_chat(page, emitter)
-                    if self._browser.check_session(page):
+                    self._browser_navigation.navigate_to_chat(page, emitter)
+                    if self._session_probe(page):
                         return True
             except QwenCliError:
                 # AuthRequiredError or other auth failures: renewal impossible,

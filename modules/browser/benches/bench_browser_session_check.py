@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.shared.src.browser import utility_browser_session_check as session_check_util
 from modules.shared.src.common.taxonomy_core_constant import TEXTAREA_SELECTOR
 
 pytestmark = pytest.mark.benchmark
@@ -28,14 +28,13 @@ def _ready_page() -> MagicMock:
 
 def bench_session_check_is_alive(iterations: int = 2000) -> float:
     """Benchmark one readiness probe against a ready page."""
-    checker = SessionCheck(_ready_page())
-    page = checker.page
+    page = _ready_page()
 
     start = time.perf_counter()
     for _ in range(iterations):
         page.evaluate.return_value = "complete"
         page.query_selector.return_value = MagicMock()
-        checker.is_alive()
+        session_check_util.session_is_alive(page)
     elapsed = time.perf_counter() - start
     return elapsed / iterations * 1_000_000
 

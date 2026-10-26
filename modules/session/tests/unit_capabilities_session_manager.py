@@ -15,12 +15,14 @@ import json
 import os
 import stat
 import time
+from collections.abc import Coroutine
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_manager import SessionManager
 from modules.shared.src.common import taxonomy_core_constant as constants
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
@@ -370,8 +372,9 @@ def test_running_init_twice_keeps_a_populated_default_profile(pool_home: Path, m
 class _SlowChecker:
     """A checker whose probes each sleep, so concurrency is measurable.
 
-    Implements the full health-checker seam so the manager can mark pool
-    state synchronously via :meth:`check_pool_sync` without a real browser.
+    Implements the limit-checker seam so the orchestrator's
+    :meth:`_run_pool_checks` can mark pool state synchronously without a
+    real browser.
     """
 
     probe_duration: float = 0.15
@@ -382,41 +385,41 @@ class _SlowChecker:
     def set_status(self, session_id: str, status: SessionStatus) -> None:
         self._next_status[session_id] = status
 
-    async def check_session(self, session: SessionInfo) -> bool:
-        await asyncio.sleep(self.probe_duration)
-        return self._next_status.get(session.session_id, SessionStatus.ACTIVE) == SessionStatus.ACTIVE
-
-    async def diagnose_session(self, session: SessionInfo) -> SessionHealthResult:
+    async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         await asyncio.sleep(self.probe_duration)
         status = self._next_status.get(session.session_id, SessionStatus.ACTIVE)
         return SessionHealthResult(session_id=session.session_id, status=status)
 
-    async def check_all_sessions(self, pool: SessionPool) -> SessionPool:
 
-        updated = []
-        for s in pool.sessions:
-            verdict = await self.diagnose_session(s)
-            updated.append(s.with_status(verdict.status, reason=verdict.reason))
-        return SessionPool(sessions=updated, current_index=pool.current_index)
+def _make_probe_stub(name: str, probe) -> object:
+    """Build a plain instance whose check_session delegates to *probe* without self."""
 
-    def check_pool_sync(self, pool: SessionPool, session_manager) -> list[tuple[SessionInfo, SessionHealthResult]]:
-        async def _run() -> list[tuple[SessionInfo, SessionHealthResult]]:
-            tasks = [self.diagnose_session(s) for s in pool.sessions]
-            verdicts = await asyncio.gather(*tasks)
-            results = list(zip(pool.sessions, verdicts, strict=True))
-            for s, verdict in results:
-                if verdict.is_healthy:
-                    session_manager.mark_healthy(s.session_id)
-                elif verdict.status == SessionStatus.LIMITED:
-                    session_manager.mark_limited(s.session_id, reason=verdict.reason)
-                else:
-                    session_manager.mark_auth_required(s.session_id, reason=verdict.reason)
-            return results
+    class _ProbeStub:
+        check_session = staticmethod(probe)
 
-        return asyncio.run(_run())
+    return type(name, (_ProbeStub,), {})()
 
-    def summarize_pool_results(self, results: list[tuple[SessionInfo, SessionHealthResult]]) -> tuple[int, int]:
-        return (sum(1 for _, v in results if v.is_healthy), len(results))
+
+def _orchestrator_with_slow_checker(pool: SessionPool) -> tuple[SessionOrchestrator, _SlowChecker]:
+    """Wire a session orchestrator with slow login+limit checkers."""
+    checker = _SlowChecker()
+
+    def _login_probe(session: SessionInfo) -> Coroutine[None, None, SessionHealthResult]:
+        return checker.check_session(session)
+
+    def _limit_probe(session: SessionInfo) -> Coroutine[None, None, SessionHealthResult]:
+        return checker.check_session(session)
+
+    login_checker = _make_probe_stub("_LoginStub", _login_probe)
+    limit_checker = _make_probe_stub("_LimitStub", _limit_probe)
+
+    orchestrator = SessionOrchestrator(
+        observability=MagicMock(),
+        sessions=MagicMock(),
+        login_checker=login_checker,
+        limit_checker=limit_checker,
+    )
+    return orchestrator, checker
 
 
 def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
@@ -433,14 +436,14 @@ def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
     ]
     pool = SessionPool(sessions=sessions)
     manager = MagicMock()
-    checker = _SlowChecker()
+    orchestrator, checker = _orchestrator_with_slow_checker(pool)
 
     started = time.monotonic()
-    results = checker.check_pool_sync(pool, manager)
+    results = orchestrator._run_pool_checks(pool, manager)
     elapsed = time.monotonic() - started
 
-    assert [s.session_id for s, _ in results] == [s.session_id for s in sessions]
-    assert all(verdict.is_healthy for _, verdict in results)
+    assert [r.session_id for r in results] == [s.session_id for s in sessions]
+    assert all(r.is_healthy for r in results)
     # 4 sequential probes would take >= 0.6s; concurrent must stay near one probe.
     assert elapsed < _SlowChecker.probe_duration * 2, f"probes ran sequentially: {elapsed:.2f}s"
     assert manager.mark_healthy.call_count == 4
@@ -460,14 +463,14 @@ def test_check_pool_sync_marks_limited_sessions_in_pool_order(pool_home: Path) -
     ]
     pool = SessionPool(sessions=sessions)
     manager = MagicMock()
-    checker = _SlowChecker()
+    orchestrator, checker = _orchestrator_with_slow_checker(pool)
     # All probes report LIMITED except session_0 and session_2 (ACTIVE by index parity)
     for i in range(3):
         checker.set_status(f"session_{i}", SessionStatus.ACTIVE if i % 2 == 0 else SessionStatus.LIMITED)
 
-    results = checker.check_pool_sync(pool, manager)
+    results = orchestrator._run_pool_checks(pool, manager)
 
-    assert [verdict.is_healthy for _, verdict in results] == [True, False, True]
+    assert [r.is_healthy for r in results] == [True, False, True]
     marked = [call.args[0] for call in manager.mark_healthy.call_args_list]
     limited = [call.args[0] for call in manager.mark_limited.call_args_list]
     assert marked == ["session_0", "session_2"]

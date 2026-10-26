@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 from playwright.sync_api import Error as PlaywrightError
 
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.shared.src.browser import utility_browser_session_check as session_check_util
 from modules.shared.src.common.taxonomy_core_constant import TEXTAREA_SELECTOR
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 
@@ -45,10 +45,9 @@ def test_dogfood_blank_page_is_not_ready() -> None:
     url = Path("tests/fixtures/qwen_fixture.html").resolve().as_uri()
     playwright, browser, page = _launch_page(url)
     try:
-        checker = SessionCheck(page)
         # The fixture carries no chat textarea, so the probe must report
         # the page unusable rather than handing it to a pipeline.
-        assert checker.is_alive() is False
+        assert session_check_util.session_is_alive(page) is False
         assert page.query_selector(TEXTAREA_SELECTOR) is None
     finally:
         _close(playwright, browser, page)
@@ -65,8 +64,7 @@ def test_dogfood_about_blank_reports_a_playwright_error_rather_than_raising() ->
         page.goto("about:blank")
         # A real navigation error must be swallowed into a False verdict,
         # not escape as a Playwright Error into the caller.
-        checker = SessionCheck(page)
-        assert checker.is_alive() in (True, False)
+        assert session_check_util.session_is_alive(page) in (True, False)
     except PlaywrightError:
         # The launch itself is the failure; the probe contract is that it
         # never raises PlaywrightError out of is_alive().
@@ -82,7 +80,7 @@ def test_dogfood_login_url_raises_auth_required() -> None:
     try:
         page.url = "https://chat.qwen.ai/login"
         with pytest.raises(AuthRequiredError):
-            SessionCheck(page).check_auth()
+            session_check_util.assert_on_chat_page(page)
     finally:
         _close(playwright, browser, page)
 
@@ -96,4 +94,4 @@ def test_dogfood_stub_page_with_a_textarea_reads_alive() -> None:
     page.url = "https://chat.qwen.ai/"
     page.locator.return_value.count.return_value = 0
 
-    assert SessionCheck(page).is_alive() is True
+    assert session_check_util.session_is_alive(page) is True

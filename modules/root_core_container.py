@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import cast
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
@@ -63,10 +64,18 @@ from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunC
 from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
-from modules.session.src.capabilities_session_health_checker import SessionHealthChecker
+from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
+from modules.session.src.capabilities_session_login_checker import SessionLoginChecker
 from modules.session.src.capabilities_session_manager import SessionManager
+from modules.session.src.capabilities_session_profile_preparer import ProfilePreparer
 from modules.session.src.capabilities_session_renewal import SessionRenewer
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
+from modules.shared.src.browser.contract_browser_protocol import (
+    IBrowserDiagnosticsProtocol,
+    IBrowserLifecycleProtocol,
+    IBrowserModelPolicyProtocol,
+    IBrowserNavigationProtocol,
+)
 from modules.shared.src.common.taxonomy_core_constant import (
     DEFAULT_JOBS_DIR,
     DEFAULT_LOG,
@@ -115,6 +124,13 @@ from modules.update.src.capabilities_update_upgrade import UpdateUpgradeCapabili
 from modules.update.src.capabilities_update_verify import UpdateVerifyCapability
 
 
+def _new_browser_model_policy() -> IBrowserModelPolicyProtocol:
+    """Construct the browser model-policy capability (AES503 wiring helper)."""
+    from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+
+    return BrowserModelPolicy()
+
+
 class SharedContainer:
     """Single dependency injection container shared by CLI and MCP features."""
 
@@ -137,29 +153,66 @@ class SharedContainer:
         )
         self.rl = RateLimiter(MaxPerMinute(rate_limit_per_minute))
 
-        self.browser = BrowserAdapter()
-        # Browser capability: the session probe (page liveness + auth
-        # assertion) the adapter delegates to; registered here so the
-        # container owns the seam.
-        self.session_check = SessionCheck
-        self.injector = PromptInjector()
-        self.sender = SendDispatcher()
-        self.streamer = StreamMonitor()
-        self.uploader = FileUploader()
-        self.saver = Saver()
+        # Browser model-policy capability: owns the issue #283/#374 model
+        # selection/verification fallback rules; the container owns the seam
+        # and injects the same instance into the orchestrator facade so the
+        # orchestrator's model steps delegate to a shared capability
+        # (AES201: a capability file never imports a sibling capability).
+        self.browser_model_policy = _new_browser_model_policy()
+
+        # Observability (constructed before the browser orchestrator so the
+        # facade's run-scoped log is available).
         self.metrics = MetricsCounter(metrics_path=log / "metrics.json")
         self.observability = ObservabilitySetup(
             log,
             status_writer=StatusFileWriter(status_path_for(log)),
             metrics=self.metrics,
         )
+
+        # Narrow browser views: each capability implements exactly one split
+        # protocol. Cross-capability needs are reached through injected
+        # contracts (AES201); the container wires the views so every view
+        # drives one Chromium process group.
+        self.browser_diagnostics: IBrowserDiagnosticsProtocol = BrowserDiagnostics()
+        # Lifecycle and navigation share a circular DI: lifecycle needs
+        # navigation (goto + auth-assert) and navigation needs lifecycle
+        # (browser_session for open_login_page). The container breaks the
+        # cycle by constructing lifecycle with navigation last via a
+        # two-step wire.
+        self.browser_lifecycle: IBrowserLifecycleProtocol = BrowserLifecycle(
+            navigation=None, diagnostics=self.browser_diagnostics
+        )
+        self.browser_navigation: IBrowserNavigationProtocol = BrowserNavigation(
+            model_policy=self.browser_model_policy,
+            lifecycle=self.browser_lifecycle,
+        )
+        self.browser_lifecycle.navigation = self.browser_navigation
+        # BrowserOrchestrator is the composition point: it implements the
+        # IBrowserAggregate door (open_session) and delegates every
+        # capability method to the owning narrow capability view
+        # (AES201: the Agent layer may import all capabilities, so the
+        # composition point lives here, not in a capabilities file).
+        self.browser = BrowserOrchestrator(
+            self.observability,
+            lifecycle=self.browser_lifecycle,
+            navigation=self.browser_navigation,
+            model_policy=self.browser_model_policy,
+            diagnostics=self.browser_diagnostics,
+        )
+        self.injector = PromptInjector()
+        self.sender = SendDispatcher()
+        self.streamer = StreamMonitor()
+        self.uploader = FileUploader()
+        self.saver = Saver()
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
-        # Session infrastructure (health checker + renewer) is composed here;
+        self.profile_preparer: ProfilePreparer = ProfilePreparer()
+        # Session infrastructure (login + limit checkers, renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.
-        self.session_health_checker = SessionHealthChecker(browser=self.browser)
+        self.session_login_checker = SessionLoginChecker(browser_lifecycle=self.browser_lifecycle)
+        self.session_limit_checker = SessionLimitChecker(browser_lifecycle=self.browser_lifecycle)
         self.session_renewer: ISessionRenewalProtocol = SessionRenewer(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
             observability=self.observability,
         )
         self.updater_check: IUpdateCheckProtocol = UpdateCheckCapability(DEFAULT_PACKAGE_NAME)
@@ -169,8 +222,10 @@ class SharedContainer:
             package_name=DEFAULT_PACKAGE_NAME,
         )
         # Feature agents sit between capabilities and surfaces so no caller
-        # repeats the sequencing each feature owns.
-        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser, self.observability)
+        # repeats the sequencing each feature owns. The browser orchestrator
+        # is the IBrowserAggregate composition point (constructed above); the
+        # aggregate view (open_session) reuses the same instance.
+        self.agent_browser_orchestrator: IBrowserAggregate = self.browser
         self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)
@@ -201,7 +256,9 @@ class SharedContainer:
 
         # The 5 specialized agent orchestrators
         self.agent_direct_prompt_orchestrator: IDirectPromptProtocol = DirectPromptAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
@@ -210,7 +267,9 @@ class SharedContainer:
             flow=self.prompt_flow_dispatcher,
         )
         self.agent_prompt_file_orchestrator: IPromptFileProtocol = PromptFileAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
@@ -220,7 +279,9 @@ class SharedContainer:
             cancel=self.run_cancel_registry,
         )
         self.agent_attachment_prompt_orchestrator: IAttachmentPromptProtocol = AttachmentPromptAdapter(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
+            browser_diagnostics=self.browser_diagnostics,
             injector=self.injector,
             sender=self.sender,
             streamer=self.streamer,
@@ -243,19 +304,21 @@ class SharedContainer:
         # Session rotation: the rotator needs the prompt aggregate so that
         # execute_with_rotation can delegate real work instead of using a
         # simulated response (ARCH-2-003).
-        from modules.session.src.capabilities_session_rotation_adapter import SessionRotationAdapter
+        from modules.session.src.capabilities_session_rotator import SessionRotator
 
-        self.session_rotator: ISessionRotatorProtocol = SessionRotationAdapter(
+        self.session_rotator: ISessionRotatorProtocol = SessionRotator(
             session_manager=self.session_manager,
-            health_checker=self.session_health_checker,
+            limit_checker=self.session_limit_checker,
             prompt=self.prompt_aggregate,
         )
         self.agent_session_orchestrator: ISessionAggregate = SessionOrchestrator(
-            browser=self.browser,
+            browser_lifecycle=self.browser_lifecycle,
+            browser_navigation=self.browser_navigation,
             observability=self.observability,
             sessions=self.session_manager,
             renewer=self.session_renewer,
-            health_checker=self.session_health_checker,
+            login_checker=self.session_login_checker,
+            limit_checker=self.session_limit_checker,
             rotator=self.session_rotator,
         )
         # updater_verify and the update aggregate depend on the session orchestrator
