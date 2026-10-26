@@ -9,8 +9,8 @@ from __future__ import annotations
 import inspect
 
 from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
+from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.shared.src.prompt.contract_prompt_protocol import (
     IAttachmentPromptProtocol,
     IDirectPromptProtocol,
