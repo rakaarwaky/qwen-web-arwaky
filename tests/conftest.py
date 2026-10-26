@@ -24,7 +24,7 @@ from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.shared.src import AppConfig, RunContext

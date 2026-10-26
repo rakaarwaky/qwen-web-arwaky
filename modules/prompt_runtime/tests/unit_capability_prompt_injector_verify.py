@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from playwright.sync_api import Error
 
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
 from modules.shared.src import PromptInjectionError
 
 

@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.prompt.src.capabilities_file_uploader import FileUploader
 from modules.prompt_runtime.src import capabilities_send_dispatcher as sd
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
 
 # ── Precise DOM mock ─────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ class TestWaitForDomParseReadySpinnerVisibility:
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=False, spinner_count=2)
         page.evaluate.return_value = {"found": True, "ready": True}
 
-        with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
+        with patch("modules.prompt_runtime.src.capabilities_file_uploader.time") as mod_time:
             # Call 1 (deadline base) → 0.0; call 2 (while check) → 0.0 (< 0.001, body
             # runs); subsequent calls → 99999.0 (past deadline, loop exits if the
             # body did not return).
@@ -227,7 +227,7 @@ class TestWaitForDomParseReadySpinnerVisibility:
         page = _build_page(card_text="test\n.md\n5.0 B", spinner_visible=True, spinner_count=2)
         page.evaluate.return_value = {"found": True, "ready": False}
 
-        with patch("modules.prompt.src.capabilities_file_uploader.time") as mod_time:
+        with patch("modules.prompt_runtime.src.capabilities_file_uploader.time") as mod_time:
             # The loop runs one iteration: deadline = 0.0 + 0.001, while check at 0.0
             # enters the body. The JS probe reports not-ready, so the body falls
             # through to wait_for_timeout(300) and loops back; the third
