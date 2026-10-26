@@ -107,8 +107,8 @@ rate-limited.
   LIMITED; it does not overwrite the quota evidence with invented data.
   - An expired session that still shows the composer is still `ACTIVE` for
   the limit checker; expiry is the login checker's concern.
-  - Banner detection uses the `RATE_LIMIT_PATTERNS` constant from
-  `modules/shared/src/common/taxonomy_core_constant.py`.
+  - Banner detection uses the rate-limit pattern constant from the shared
+  taxonomy constants.
 - **Edge Cases**: A page that is expired but still signed in is `ACTIVE`
 for the limit checker.
 - **Error Handling**: A probe that times out or cannot get a reply returns
@@ -151,10 +151,8 @@ own refresh-token flow, without forcing the user back to
 - **Output**: `True` when the session is healthy (either already, or after
 a successful renewal).
 - **Business Rules**:
-  - The renewal cookie probe utilities in
-  `modules/shared/src/session/utility_session_renewal_cookie_probe.py`
-  (`is_refresh_token_valid`, `is_auth_session_expired`,
-  `renewal_is_possible`) back this capability.
+  - The renewal cookie probe utilities (`is_refresh_token_valid`,
+  `is_auth_session_expired`, `renewal_is_possible`) back this capability.
   - A session whose profile no longer authenticates is first offered a
   transparent token renewal; only when renewal is impossible is it
   reported invalid (FR-SESSION-001).
@@ -182,21 +180,34 @@ layer a plain prepared Path.
 - **Edge Cases**: A missing master session path yields an empty dir.
 - **Error Handling**: A filesystem error surfaces an error naming the path.
 
-## Aggregate API
+## API Contract
 
-The session aggregate is the single entry point the surface layer calls. It
-delegates each verb to the owning capability.
+### Protocol API
 
+| Method | Input | Output | Error | Event | Description |
+|---|---|---|---|---|---|
+| `load_pool` | none | SessionPool | file error | none | Read the tracked session pool, quarantining a corrupt file and rebuilding from disk. |
+| `save_pool` | SessionPool | None | file error | none | Persist the pool atomically (temp file + `os.replace` swap). |
+| `add_session` | name, profile path | SessionInfo | file error | none | Add one session with a unique ID. |
+| `remove_session` | session ID | bool | file error | none | Remove one session from the pool. |
+| `get_session_by_name` | name | SessionInfo or None | none | none | Read the pool entry registered under a name. |
+| `delete_session_profile` | profile path, force | bool | QwenCliError | none | Remove a saved Chromium profile; refused without a backup unless forced (FR-SESSION-001). |
+| `mark_healthy` / `mark_limited` / `mark_auth_required` | session ID, optional reason | None | file error | none | Mark pool entry status (FR-SESSION-001). |
+| `check_session` | SessionInfo | SessionHealthResult (ACTIVE or AUTH_REQUIRED) | none | none | Probe whether the session is still authenticated (FR-SESSION-002). |
+| `check_session` | SessionInfo | SessionHealthResult (ACTIVE or LIMITED) | none | none | Probe whether the session is rate-limited (FR-SESSION-003). |
+| `rotate` | RotatorRequest | RotatorResponse | none | none | Select the next healthy session, skipping already-tried and rate-limited (FR-SESSION-004). |
+| `rotate_sync` | RotatorRequest | RotatorResponse | none | none | Synchronous wrapper that owns the event loop. |
+| `get_next_session` | none | SessionInfo or None | none | none | Pick the next healthy session by round-robin order. |
+| `renew_session_if_stale` | AppConfig, optional session path | bool | AuthRequiredError | none | Transparent refresh-token renewal when the auth session is stale (FR-SESSION-005). |
+| `prepare` | AppConfig | context manager yielding Path | file error | none | Mode→clone decision: login yields master path; otherwise yields an ephemeral clone (FR-SESSION-006). |
 
-| Verb           | Delegates to                                     | Behavior                                                                                     |
-| -------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `check_health` | `SessionLoginChecker` then `SessionLimitChecker` | Runs both probes over the pool and synthesizes the verdict (FR-SESSION-002, FR-SESSION-003). |
-| `rotate`       | `SessionRotator`                                 | Selects the next healthy session (FR-SESSION-004).                                           |
-| `delete`       | `SessionManager`                                 | Removes a session and its profile with the backup guard (FR-SESSION-001).                    |
-| `login`        | `SessionManager`                                 | Registers the authenticated profile into the pool (FR-SESSION-001).                          |
+### Aggregate API
 
+| Method | Input | Output | Error | Event | Description |
+|---|---|---|---|---|---|
+| `execute` | SessionRequest | SessionResponse | none | none | Single entry point over the session feature; routes on `request.verb`. |
 
-### Verb Contracts
+#### Verb Contracts
 
 - **check_health** — runs the login checker and the limit checker over every
 pooled session, then writes the synthesized verdict back to the pool
@@ -210,40 +221,22 @@ already-tried and rate-limited ones, and returns it or a reasoned
 backup unless forced.
 - **login** — registers the authenticated profile into the pool.
 
-## Protocol API
-
-
-| Method                                                 | Protocol                     | Input                            | Output                                         | Error             | Description                                                                                          |
-| ------------------------------------------------------ | ---------------------------- | -------------------------------- | ---------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `load_pool`                                            | ISessionManagerProtocol      | none                             | SessionPool                                    | file error        | Read the tracked session pool, quarantining a corrupt file and rebuilding from disk.                 |
-| `save_pool`                                            | ISessionManagerProtocol      | SessionPool                      | None                                           | file error        | Persist the pool atomically (temp file + `os.replace` swap).                                         |
-| `add_session`                                          | ISessionManagerProtocol      | name, profile path               | SessionInfo                                    | file error        | Add one session with a unique ID.                                                                    |
-| `remove_session`                                       | ISessionManagerProtocol      | session ID                       | bool                                           | file error        | Remove one session from the pool.                                                                    |
-| `get_session_by_name`                                  | ISessionManagerProtocol      | name                             | SessionInfo or None                            | none              | Read the pool entry registered under a name.                                                         |
-| `delete_session_profile`                               | ISessionManagerProtocol      | profile path, force              | bool                                           | QwenCliError      | Remove a saved Chromium profile; refused without a backup unless forced (FR-SESSION-001).            |
-| `mark_healthy` / `mark_limited` / `mark_auth_required` | ISessionManagerProtocol      | session ID, optional reason      | None                                           | file error        | Mark pool entry status (FR-SESSION-001).                                                             |
-| `check_session`                                        | ISessionLoginCheckerProtocol | SessionInfo                      | SessionHealthResult (ACTIVE or AUTH\_REQUIRED) | none              | Probe whether the session is still authenticated (FR-SESSION-002).                                   |
-| `check_session`                                        | ISessionLimitCheckerProtocol | SessionInfo                      | SessionHealthResult (ACTIVE or LIMITED)        | none              | Probe whether the session is rate-limited (FR-SESSION-003).                                          |
-| `rotate`                                               | ISessionRotatorProtocol      | RotatorRequest                   | RotatorResponse                                | none              | Select the next healthy session, skipping already-tried and rate-limited (FR-SESSION-004).           |
-| `rotate_sync`                                          | ISessionRotatorProtocol      | RotatorRequest                   | RotatorResponse                                | none              | Synchronous wrapper that owns the event loop.                                                        |
-| `get_next_session`                                     | ISessionRotatorProtocol      | none                             | SessionInfo or None                            | none              | Pick the next healthy session by round-robin order.                                                  |
-| `renew_session_if_stale`                               | ISessionRenewalProtocol      | AppConfig, optional session path | bool                                           | AuthRequiredError | Transparent refresh-token renewal when the auth session is stale (FR-SESSION-005).                   |
-| `prepare`                                              | IProfilePreparerProtocol     | AppConfig                        | context manager yielding Path                  | file error        | Mode→clone decision: login yields master path; otherwise yields an ephemeral clone (FR-SESSION-006). |
-
-
 ## Integration Points
 
-- **Browser capability** — the login and limit checkers drive the browser
-through the `IBrowserLifecycleProtocol` seam (`health_probe_page`); the
-profile preparer hands the browser a prepared Path.
-- **Prompt capability** — the session orchestrator passes the resolved
-session to the prompt feature for prompt assembly.
-- **Config capability** — the session orchestrator reads `AppConfig` for
-session directory, output path, and profile mode.
-- **Shared utilities** — the checkers rely on the shared DOM predicates in
-`modules/shared/src/browser/utility_browser_session_check.py`; the renewal
-capability relies on the cookie probe utilities in
-`modules/shared/src/session/utility_session_renewal_cookie_probe.py`.
+| System | Direction | Purpose | Failure mode |
+|---|---|---|---|
+| Browser capability | out | The login and limit checkers drive the browser through the lifecycle seam (`health_probe_page`); the profile preparer hands the browser a prepared Path. | authentication error -> session reported invalid |
+| Prompt capability | out | The session orchestrator passes the resolved session to the prompt feature for prompt assembly. | none -> prompt assembly blocked |
+| Config capability | out | The session orchestrator reads `AppConfig` for session directory, output path, and profile mode. | file error -> session path unresolvable |
+| Shared utilities | out | The checkers rely on the shared browser-session liveness utilities; the renewal capability relies on the renewal cookie probe utilities. | probe failure -> session reported invalid |
+
+## Non-functional Requirements
+
+| Metric | Target | Measurement method |
+|---|---|---|
+| Pool operation cost | O(n) over registered session count | session count bound check |
+| Pool file concurrency | advisory lock during read-modify-write | lock presence check |
+| Profile deletion safety | never deleted without backup unless `force=True` | backup guard check |
 
 ## Test Scenarios
 
@@ -274,16 +267,7 @@ invalid (FR-SESSION-001).
 - A login mode profile preparation yields the master path; a standard mode
 preparation yields an ephemeral clone (FR-SESSION-006).
 
-## Non-functional Requirements
-
-- **Performance**: Pool operations are O(n) over the registered session
-count, which is bounded by the number of saved browser profiles.
-- **Concurrency**: The pool file is locked with an advisory lock during
-read-modify-write.
-- **Security**: A saved Chromium profile is never deleted without a backup,
-unless the caller passes `force=True`.
-
-## Assumptions &amp; Constraints
+## Assumptions & Constraints
 
 - The session directory is under the user's control; the session manager
 must not assume it exists.
