@@ -1,4 +1,4 @@
-"""Contract tests for the browser capability's public seam.
+"""Contract tests for the browser orchestrator's public seam.
 
 Pins the aggregate and protocol surface a caller may depend on, so a
 signature change fails here rather than in a caller that has to be reworked.
@@ -7,9 +7,13 @@ signature change fails here rather than in a caller that has to be reworked.
 from __future__ import annotations
 
 import inspect
+from unittest.mock import MagicMock
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.shared.src.browser.contract_browser_aggregate import IBrowserAggregate
 from modules.shared.src.browser.contract_browser_protocol import IBrowserProtocol
 
@@ -21,6 +25,7 @@ _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
         "detect_session_expired",
         "health_probe_page",
         "navigate_to_chat",
+        "open_chat_page",
         "open_login_page",
         "renew_session",
         "reset_page",
@@ -31,8 +36,26 @@ _REQUIRED_PROTOCOL_METHODS: frozenset[str] = frozenset(
 )
 
 
-def test_adapter_implements_the_browser_protocol() -> None:
-    assert isinstance(BrowserAdapter(model_policy=BrowserModelPolicy()), IBrowserProtocol)
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a BrowserOrchestrator with all narrow capability views wired."""
+    obs = MagicMock()
+    diag = BrowserDiagnostics()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    model_policy = BrowserModelPolicy()
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        None,
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
+    )
+
+
+def test_orchestrator_implements_the_browser_protocol() -> None:
+    assert isinstance(_make_orchestrator(), IBrowserProtocol)
 
 
 def test_aggregate_declares_only_the_open_session_door() -> None:

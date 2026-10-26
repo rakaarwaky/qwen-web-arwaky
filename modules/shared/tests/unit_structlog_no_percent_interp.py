@@ -102,25 +102,25 @@ def test_old_percent_style_leaks_positional_args() -> None:
 
 
 def test_browser_adapter_has_no_kwarg_style_log_calls() -> None:
-    """Static guard: capabilities_browser_adapter.py has no keyword-arg log calls.
+    """Static guard: capabilities_browser_lifecycle.py has no keyword-arg log calls.
 
     Locks the source so a future edit cannot reintroduce the TypeError from
     passing ``key=value`` to a stdlib logger.
     """
-    src = Path(__file__).resolve().parents[2] / "browser" / "src" / "capabilities_browser_adapter.py"
+    src = Path(__file__).resolve().parents[2] / "browser" / "src" / "capabilities_browser_lifecycle.py"
     text = src.read_text(encoding="utf-8")
     kwarg_re = re.compile(r"""log\.(?:debug|info|warning|error|critical|exception)\([^)]*?\w+=[\w.]""")
     offenders = [m.group(0) for m in kwarg_re.finditer(text)]
-    assert not offenders, "keyword-arg log calls reintroduced in browser_adapter:\n" + "\n".join(offenders)
+    assert not offenders, "keyword-arg log calls reintroduced in browser_lifecycle:\n" + "\n".join(offenders)
 
 
 def test_browser_adapter_module_logger_is_stdlib() -> None:
-    """End-to-end: the real browser-adapter module logger is a stdlib logger, not structlog."""
+    """End-to-end: the real browser-lifecycle module logger is a stdlib logger, not structlog."""
     import logging as _logging
 
-    from modules.browser.src import capabilities_browser_adapter as adapter
+    from modules.browser.src import capabilities_browser_lifecycle as lifecycle
 
-    assert isinstance(adapter.log, _logging.Logger), (
-        f"browser adapter logger must be a stdlib logging.Logger, got {type(adapter.log).__name__}"
+    assert isinstance(lifecycle.log, _logging.Logger), (
+        f"browser lifecycle logger must be a stdlib logging.Logger, got {type(lifecycle.log).__name__}"
     )
-    assert adapter.log.name == "browser"
+    assert lifecycle.log.name == "browser"

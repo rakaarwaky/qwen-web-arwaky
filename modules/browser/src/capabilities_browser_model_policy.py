@@ -64,6 +64,10 @@ class BrowserModelPolicy(IBrowserModelPolicyProtocol):
         except Error:
             return False
 
+    def target_model(self) -> ModelLabel:
+        """Return the per-run target model the picker helpers should read."""
+        return target_model()
+
     # Block 3: Dunder Methods, Factories & Helpers
 
     def __repr__(self) -> str:

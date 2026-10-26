@@ -9,7 +9,30 @@ import pytest
 from playwright.sync_api import Page
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
+from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
+
+
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a BrowserOrchestrator with all narrow capability views wired."""
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        None,
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
+    )
 
 
 def _cfg() -> AppConfig:
@@ -37,12 +60,14 @@ def _cfg() -> AppConfig:
 
 def test_open_session_yields_first_page() -> None:
     page = MagicMock(spec=Page)
-    bctx = MagicMock()
-    bctx.pages = [page, MagicMock()]
-    stub = MagicMock()
-    stub.browser_session.return_value.__enter__.return_value = bctx
 
-    with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()) as got:
+    orch = _make_orchestrator()
+    bctx = MagicMock()
+    bctx.pages.__getitem__.return_value = page
+    bctx.__enter__.return_value = bctx
+    orch._lifecycle.browser_session = MagicMock(return_value=bctx)
+
+    with orch.open_session(_cfg()) as got:
         assert got is page
 
 
@@ -50,10 +75,14 @@ def test_open_session_creates_page_when_context_is_empty() -> None:
     bctx = MagicMock()
     bctx.pages = []
     bctx.new_page.return_value = MagicMock(spec=Page)
-    stub = MagicMock()
-    stub.browser_session.return_value.__enter__.return_value = bctx
+    bctx.__enter__.return_value = bctx
+    manager = MagicMock()
+    manager.__enter__.return_value = bctx
 
-    with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()) as got:
+    orch = _make_orchestrator()
+    orch._lifecycle.browser_session = MagicMock(return_value=manager)
+
+    with orch.open_session(_cfg()) as got:
         assert got is bctx.new_page.return_value
     bctx.new_page.assert_called_once()
 
@@ -63,11 +92,13 @@ def test_open_session_closes_browser_on_exception() -> None:
     bctx.pages = [MagicMock(spec=Page)]
     manager = MagicMock()
     manager.__enter__.return_value = bctx
-    stub = MagicMock()
-    stub.browser_session.return_value = manager
+    manager.__exit__.return_value = None
+
+    orch = _make_orchestrator()
+    orch._lifecycle.browser_session = MagicMock(return_value=manager)
 
     with pytest.raises(ValueError, match="boom"):
-        with BrowserOrchestrator(stub, MagicMock()).open_session(_cfg()):
+        with orch.open_session(_cfg()):
             raise ValueError("boom")
 
     manager.__exit__.assert_called_once()

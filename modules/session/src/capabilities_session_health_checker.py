@@ -1,4 +1,9 @@
-"""Session health checker — real browser ping to detect rate limits and expired sessions."""
+"""Session health checker — real browser ping to detect rate limits and expired sessions.
+
+Also owns the page-level session liveness/auth probe (FR-BROWSER-002):
+``SessionCheck`` binds the shared ``utility_browser_session_check`` DOM
+probes to a Playwright page and implements ``ISessionCheckProtocol``.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,14 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
+from playwright.sync_api import Error as PlaywrightError, Page
+
+from modules.shared.src.browser.contract_browser_protocol import ISessionCheckProtocol
+from modules.shared.src.browser.utility_browser_session_check import (
+    assert_on_chat_page,
+    page_is_expired,
+    session_is_alive,
+)
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
@@ -306,6 +319,15 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
                         recovery_action="Session is rate-limited. Switch accounts or reduce request throughput.",
                     )
 
+                if page_is_expired(page):
+                    return SessionHealthResult(
+                        session_id=session_id,
+                        status=SessionStatus.AUTH_REQUIRED,
+                        reason=HealthReason.EXPIRED.value,
+                        evidence="In-page session-expiry notice detected on the chat page",
+                        recovery_action="Run 'qwen-web-arwaky session login' to authenticate.",
+                    )
+
                 if not self._page_is_usable(page, cancel=cancel):
                     return SessionHealthResult(
                         session_id=session_id,
@@ -408,4 +430,35 @@ class SessionHealthChecker(ISessionHealthCheckerProtocol):
         return f"SessionHealthChecker(browser_lifecycle={self._browser_lifecycle!r}, timeout_seconds={self._timeout})"
 
 
-__all__ = ["SessionHealthChecker"]
+# ─── Page-level session liveness/auth probe (FR-BROWSER-002) ────────────────
+
+
+class SessionCheck(ISessionCheckProtocol):
+    """Validates that the browser session and Qwen chat UI are alive.
+
+    Binds the shared ``utility_browser_session_check`` DOM probes
+    (``session_is_alive`` / ``assert_on_chat_page``) to a Playwright
+    page. No DOM mechanics of its own.
+    """
+
+    def __init__(self, page: Page) -> None:
+        """Initialize with a Playwright Page instance."""
+        self.page = page
+
+    def is_alive(self) -> bool:
+        """Return True if the session is stable and the chat UI is responsive."""
+        return session_is_alive(self.page)
+
+    def check_auth(self) -> None:
+        """Raise AuthRequiredError if the session is no longer authenticated or UI is missing."""
+        try:
+            assert_on_chat_page(self.page)
+        except PlaywrightError as exc:
+            raise AuthRequiredError(f"Session invalid (browser error): {exc}") from exc
+
+    def __repr__(self) -> str:
+        """Return string representation of SessionCheck."""
+        return f"SessionCheck(page={self.page!r})"
+
+
+__all__ = ["SessionHealthChecker", "SessionCheck"]

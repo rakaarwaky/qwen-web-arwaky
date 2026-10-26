@@ -10,11 +10,10 @@ from pathlib import Path
 from typing import cast
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
 from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.session.src.capabilities_session_health_checker import SessionCheck
 
 # agent_config_orchestrator
 from modules.config.src.agent_config_orchestrator import ConfigOrchestrator
@@ -156,33 +155,56 @@ class SharedContainer:
 
         # Browser model-policy capability: owns the issue #283/#374 model
         # selection/verification fallback rules; the container owns the seam
-        # and injects the same instance into the adapter so the adapter's
-        # model steps delegate to a shared capability (the adapter file
-        # itself never imports a sibling capability, AES201).
+        # and injects the same instance into the orchestrator facade so the
+        # orchestrator's model steps delegate to a shared capability
+        # (AES201: a capability file never imports a sibling capability).
         self.browser_model_policy = _new_browser_model_policy()
-        self.browser = BrowserAdapter(model_policy=self.browser_model_policy)
-        # Narrow browser views: each capability implements exactly one split
-        # protocol and delegates to the facade (AES201: a capability never
-        # imports a sibling capability; the container wires the adapter into
-        # both views so every view drives one Chromium process group).
-        self.browser_lifecycle: IBrowserLifecycleProtocol = BrowserLifecycle(self.browser)
-        self.browser_navigation: IBrowserNavigationProtocol = BrowserNavigation(self.browser)
-        self.browser_diagnostics: IBrowserDiagnosticsProtocol = BrowserDiagnostics(self.browser)
-        # Browser capability: the session probe (page liveness + auth
-        # assertion) the adapter delegates to; registered here so the
-        # container owns the seam.
-        self.session_check = SessionCheck
-        self.injector = PromptInjector()
-        self.sender = SendDispatcher()
-        self.streamer = StreamMonitor()
-        self.uploader = FileUploader()
-        self.saver = Saver()
+
+        # Observability (constructed before the browser orchestrator so the
+        # facade's run-scoped log is available).
         self.metrics = MetricsCounter(metrics_path=log / "metrics.json")
         self.observability = ObservabilitySetup(
             log,
             status_writer=StatusFileWriter(status_path_for(log)),
             metrics=self.metrics,
         )
+
+        # Narrow browser views: each capability implements exactly one split
+        # protocol. Cross-capability needs are reached through injected
+        # contracts (AES201); the container wires the views so every view
+        # drives one Chromium process group.
+        self.browser_diagnostics: IBrowserDiagnosticsProtocol = BrowserDiagnostics()
+        # Lifecycle and navigation share a circular DI: lifecycle needs
+        # navigation (goto + auth-assert) and navigation needs lifecycle
+        # (browser_session for open_login_page). The container breaks the
+        # cycle by constructing lifecycle with navigation last via a
+        # two-step wire.
+        self.browser_lifecycle: IBrowserLifecycleProtocol = BrowserLifecycle(
+            navigation=None, diagnostics=self.browser_diagnostics
+        )
+        self.browser_navigation: IBrowserNavigationProtocol = BrowserNavigation(
+            model_policy=self.browser_model_policy,
+            lifecycle=self.browser_lifecycle,
+        )
+        self.browser_lifecycle.navigation = self.browser_navigation
+        self.browser_session_check = SessionCheck
+        # BrowserOrchestrator is the composition point: it implements the
+        # legacy IBrowserProtocol facade by delegating every method to the
+        # owning narrow capability (AES201: the Agent layer may import all
+        # capabilities, so the facade lives here, not in a capabilities file).
+        self.browser = BrowserOrchestrator(
+            None,
+            self.observability,
+            lifecycle=self.browser_lifecycle,
+            navigation=self.browser_navigation,
+            model_policy=self.browser_model_policy,
+            diagnostics=self.browser_diagnostics,
+        )
+        self.injector = PromptInjector()
+        self.sender = SendDispatcher()
+        self.streamer = StreamMonitor()
+        self.uploader = FileUploader()
+        self.saver = Saver()
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
         self.profile_preparer: ProfilePreparer = ProfilePreparer()
@@ -200,8 +222,10 @@ class SharedContainer:
             package_name=DEFAULT_PACKAGE_NAME,
         )
         # Feature agents sit between capabilities and surfaces so no caller
-        # repeats the sequencing each feature owns.
-        self.agent_browser_orchestrator: IBrowserAggregate = BrowserOrchestrator(self.browser, self.observability)
+        # repeats the sequencing each feature owns. The browser orchestrator
+        # is already the IBrowserProtocol facade (constructed above); the
+        # aggregate view (open_session) reuses the same instance.
+        self.agent_browser_orchestrator: IBrowserAggregate = self.browser
         self.agent_logging_orchestrator: IObservabilityAggregate = LoggingOrchestrator(self.observability, self.metrics)
         self.folder_compiler = FolderCompiler()
         self.folder_adapter = FolderToAttachmentAdapter(folder_compiler=self.folder_compiler)

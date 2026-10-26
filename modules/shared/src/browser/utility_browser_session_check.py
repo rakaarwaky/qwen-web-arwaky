@@ -1,6 +1,7 @@
 """Utility: browser session liveness and auth probe.
 
-Module-level helpers only (utility layer). Used by BrowserAdapter and tests.
+Module-level helpers only (utility layer). Used by the browser
+capabilities, the session health checker, and tests.
 """
 
 from __future__ import annotations
@@ -69,6 +70,17 @@ def assert_on_chat_page(page: Page, strict: bool = True) -> None:
         )
 
 
+def page_is_expired(page: Page) -> bool:
+    """True when the live page shows an in-page session-expiry notice.
+
+    Re-runs the banner text/selector scan against the CURRENT page state.
+    Best-effort: a DOM that is unreadable (mid-hydration) is not a signal,
+    so this returns False rather than raising. Used by prompt pipelines
+    after a failed dispatch to surface ``EVENT_SESSION_EXPIRED``.
+    """
+    return _in_page_expiry_banner_visible(page)
+
+
 def _in_page_expiry_banner_visible(page: Page) -> bool:
     """True when the live page shows an in-page session-expiry notice."""
     try:
@@ -83,4 +95,4 @@ def _in_page_expiry_banner_visible(page: Page) -> bool:
     return False
 
 
-__all__ = ["session_is_alive", "assert_on_chat_page"]
+__all__ = ["session_is_alive", "assert_on_chat_page", "page_is_expired"]

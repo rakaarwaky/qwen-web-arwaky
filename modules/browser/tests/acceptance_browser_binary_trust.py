@@ -60,11 +60,27 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
 ) -> None:
     """With no trusted binary discoverable and no managed build, launching the
     browser raises BrowserLaunchError naming the failure."""
+    from unittest.mock import MagicMock
+
     from playwright.sync_api import Error as PlaywrightError
 
-    from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+    from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+    from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+    from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
     from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+    from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
     from modules.shared.src.common.taxonomy_core_vo import AppConfig
+
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    orchestrator = BrowserOrchestrator(
+        None, obs, lifecycle=lifecycle, navigation=navigation, model_policy=model_policy, diagnostics=diag
+    )
 
     bindir = tmp_path / "path-bin"
     _seed_binary(bindir, mode=0o755)
@@ -88,10 +104,10 @@ def test_acceptance_no_trusted_binary_raises_browser_launch_error(
         headless=True,
     )
 
-    with patch("modules.browser.src.capabilities_browser_adapter.sync_playwright") as mock_pw:
+    with patch("modules.browser.src.capabilities_browser_lifecycle.sync_playwright") as mock_pw:
         mock_p = mock_pw.return_value.__enter__.return_value
         mock_p.chromium.launch_persistent_context.side_effect = PlaywrightError("no trusted browser binary")
 
         with pytest.raises(BrowserLaunchError):
-            with BrowserAdapter(model_policy=BrowserModelPolicy()).browser_session(cfg):
+            with orchestrator.browser_session(cfg):
                 pass

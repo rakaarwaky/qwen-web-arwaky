@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.browser.src.capabilities_browser_session_check import SessionCheck
+from modules.session.src.capabilities_session_health_checker import SessionCheck
 from modules.shared.src.common.taxonomy_core_constant import TEXTAREA_SELECTOR
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 

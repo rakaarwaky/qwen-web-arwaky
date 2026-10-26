@@ -9,8 +9,11 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import (
@@ -127,14 +130,33 @@ def validate_file(filepath, max_size_bytes=None):
     return _util_validate_file(filepath, max_size_bytes=max_size_bytes)
 
 
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a standalone BrowserOrchestrator for test-harness wrappers."""
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        None,
+        obs,
+        lifecycle=lifecycle,
+        navigation=navigation,
+        model_policy=model_policy,
+        diagnostics=diag,
+    )
+
+
 def clean_stale_locks(user_data_dir: str) -> None:
-    """Standalone wrapper for BrowserAdapter._clean_stale_locks."""
-    BrowserAdapter(model_policy=BrowserModelPolicy())._clean_stale_locks(user_data_dir)
+    """Standalone wrapper for BrowserOrchestrator._clean_stale_locks."""
+    _make_orchestrator()._clean_stale_locks(user_data_dir)
 
 
 def navigate_to_chat(page, emitter) -> None:
-    """Standalone wrapper for BrowserAdapter.navigate_to_chat."""
-    BrowserAdapter(model_policy=BrowserModelPolicy()).navigate_to_chat(page, emitter)
+    """Standalone wrapper for BrowserOrchestrator.navigate_to_chat."""
+    _make_orchestrator().navigate_to_chat(page, emitter)
 
 
 def make_app_config(tmp_path: Path, **overrides) -> AppConfig:
@@ -155,12 +177,15 @@ from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAd
 def make_test_orchestrator(**overrides) -> DirectPromptAdapter:
     """Build a DirectPromptAdapter with all dependencies mocked."""
     defaults = dict(
-        browser=MagicMock(),
+        browser_lifecycle=MagicMock(),
+        browser_navigation=MagicMock(),
+        browser_diagnostics=MagicMock(),
         injector=MagicMock(),
         sender=MagicMock(),
         streamer=MagicMock(),
         saver=MagicMock(),
         observability=MagicMock(get_logger=MagicMock(return_value=MagicMock())),
+        flow=MagicMock(),
     )
     defaults.update(overrides)
     return DirectPromptAdapter(**defaults)  # type: ignore[arg-type]

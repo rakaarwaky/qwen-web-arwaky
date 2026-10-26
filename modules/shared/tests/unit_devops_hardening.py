@@ -71,7 +71,7 @@ def test_qwen_enable_sandbox_forces_the_sandbox_on_in_a_container() -> None:
 
 def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     """The launch kwargs carry ``--no-sandbox`` iff the config dropped the sandbox."""
-    from modules.browser.src import capabilities_browser_adapter as adapter_module
+    from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 
     captured: list[dict] = []
 
@@ -107,12 +107,14 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
     session.mkdir()
     (session / "Cookies").write_text("x", encoding="utf-8")
 
-    from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+    from modules.browser.src import capabilities_browser_lifecycle as lifecycle_module
+    from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
 
-    adapter = adapter_module.BrowserAdapter(model_policy=BrowserModelPolicy())
+    diag = BrowserDiagnostics()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
     with (
-        patch.object(adapter_module, "find_chrome_binary", return_value="/usr/bin/chromium"),
-        patch.object(adapter_module, "sync_playwright", return_value=_Playwright()),
+        patch.object(lifecycle_module, "find_chrome_binary", return_value="/usr/bin/chromium"),
+        patch.object(lifecycle_module, "sync_playwright", return_value=_Playwright()),
     ):
         for disable in (False, True):
             cfg = AppConfig(
@@ -123,7 +125,7 @@ def test_sandbox_flag_reaches_playwright_only_when_dropped(tmp_path) -> None:
                 headless=True,
             )
             try:
-                with adapter.browser_session(cfg):
+                with lifecycle.browser_session(cfg):
                     pass
             except Exception:
                 pass

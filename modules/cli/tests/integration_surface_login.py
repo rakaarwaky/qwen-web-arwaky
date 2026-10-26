@@ -8,10 +8,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 
-_adapter = BrowserAdapter(model_policy=BrowserModelPolicy())
+
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a standalone BrowserOrchestrator for the login-surface harness."""
+    from unittest.mock import MagicMock
+
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        None, obs, lifecycle=lifecycle, navigation=navigation, model_policy=model_policy, diagnostics=diag
+    )
+
+
+_adapter = _make_orchestrator()
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.shared.src.session.taxonomy_session_vo import SessionRequest
 

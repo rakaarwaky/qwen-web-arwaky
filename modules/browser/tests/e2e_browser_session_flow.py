@@ -12,12 +12,30 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.browser.src.capabilities_browser_adapter import BrowserAdapter
+from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
+from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
+from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
+from modules.browser.src.capabilities_browser_navigation import BrowserNavigation
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
 
-_browser = BrowserAdapter(model_policy=BrowserModelPolicy())
+
+def _make_orchestrator() -> BrowserOrchestrator:
+    """Build a standalone BrowserOrchestrator for the e2e suite."""
+    obs = MagicMock()
+    obs.get_logger.return_value = MagicMock()
+    diag = BrowserDiagnostics()
+    model_policy = BrowserModelPolicy()
+    lifecycle = BrowserLifecycle(navigation=None, diagnostics=diag)
+    navigation = BrowserNavigation(model_policy=model_policy, lifecycle=lifecycle)
+    lifecycle.navigation = navigation
+    return BrowserOrchestrator(
+        None, obs, lifecycle=lifecycle, navigation=navigation, model_policy=model_policy, diagnostics=diag
+    )
+
+
+_browser = _make_orchestrator()
 
 
 @pytest.fixture

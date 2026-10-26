@@ -117,8 +117,8 @@ def test_browser_logs_do_not_reach_stderr_in_tui_mode(tmp_path: Path, isolated_r
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
 
     # Replay what Playwright's page.on("response") callback emits during the
-    # startup session check (capabilities_browser_adapter).
-    log = cap.get_logger("capabilities_browser_adapter")
+    # startup session check (capabilities_browser_lifecycle).
+    log = cap.get_logger("browser")
     log.info("browser_mutation_response", status=200, url="https://chat.qwen.ai/api/chat")
     log.warning("browser_request_failed", url="https://chat.qwen.ai/x", error="net::ERR_NAME_NOT_RESOLVED")
 
@@ -138,7 +138,7 @@ def test_browser_logs_still_persist_to_file_in_tui_mode(tmp_path: Path, isolated
     )
     cap.setup_observability(log_path=tmp_path, attach_stderr=False)
 
-    log = cap.get_logger("capabilities_browser_adapter")
+    log = cap.get_logger("browser")
     log.info("browser_mutation_response", status=200, url="https://chat.qwen.ai/api/chat")
 
     for h in isolated_root_logger.handlers:

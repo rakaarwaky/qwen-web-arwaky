@@ -106,6 +106,15 @@ class IBrowserModelPolicyProtocol(ABC):
         """Best-effort attempt to click 'Set default' in the Qwen UI picker."""
         ...
 
+    @abstractmethod
+    def target_model(self) -> ModelLabel:
+        """Return the per-run target model the picker helpers should read.
+
+        Reads the shared ``utility_browser_model_target`` contextvar so
+        concurrent runs scope their model to their own session (issue #283).
+        """
+        ...
+
 
 class IBrowserLifecycleProtocol(ABC):
     """Launch/teardown, ephemeral-context probes, and master-profile renewal.
@@ -172,6 +181,23 @@ class IBrowserNavigationProtocol(ABC):
     """
 
     @abstractmethod
+    def open_chat_page(self, page: Page, *, strict: bool = True) -> None:
+        """Navigate *page* to the chat URL and assert authentication.
+
+        The shared launch → navigate → auth-assert sequence's navigation
+        half: up to 4 goto attempts with exponential backoff (transient
+        network failures), a committed-document load, then one
+        authentication assertion. *strict* mirrors the two consumers:
+        renewal asserts on the chat page (strict), the health probe
+        tolerates a page that is still hydrating (non-strict).
+
+        Raises:
+            AuthRequiredError: When the page lands on a login/guest view
+                or shows a login form.
+        """
+        ...
+
+    @abstractmethod
     def navigate_to_chat(self, page: Page, emitter: LifecycleEmitter) -> None:
         """Navigate *page* to the chat, assert auth, reset to a clean conversation.
 
@@ -191,11 +217,17 @@ class IBrowserNavigationProtocol(ABC):
         ...
 
     @abstractmethod
-    def open_login_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+    def open_login_page(
+        self, cfg: AppConfig, lifecycle: IBrowserLifecycleProtocol | None = None
+    ) -> AbstractContextManager[Page]:
         """Open one fresh page on *cfg*'s profile and go to the chat URL.
 
-        Thin wrapper over ``browser_session`` + first page + ``goto``. Used
-        by the manual login window flow; performs no model selection.
+        Thin wrapper over ``browser_session`` + first page + ``goto``.
+        Used by the manual login window flow; performs no model
+        selection. When *lifecycle* is provided it supplies
+        ``browser_session`` (the composition root injects the shared
+        view); otherwise the navigation capability falls back to its
+        own launch path.
         """
         ...
 
@@ -204,9 +236,10 @@ class IBrowserDiagnosticsProtocol(ABC):
     """Page and context diagnostics: asset-abort route, page-creation hook,
     network/console listeners, URL scrubbing, noise demotion.
 
-    Today the adapter wires diagnostics at TWO levels inside
-    `browser_session` (`modules/browser/src/capabilities_browser_adapter.py`
-    L686–749): a **context-level** asset-abort route
+    Today the diagnostics capability wires diagnostics at TWO levels inside
+    `browser_session` (`modules/browser/src/capabilities_browser_diagnostics.py`
+    and `modules/browser/src/capabilities_browser_lifecycle.py`): a
+    **context-level** asset-abort route
     (`ctx.route("**/*.{png,…}", abort)`) and a page-creation hook
     (`ctx.on("page", attach_page_diagnostics)`), plus **per-page** listeners
     (`page.on("request"/"requestfailed"/"console"/"response")`). The protocol
@@ -372,11 +405,24 @@ class IBrowserProtocol(ABC):
         ...
 
     @abstractmethod
-    def open_login_page(self, cfg: AppConfig) -> AbstractContextManager[Page]:
+    def open_login_page(
+        self, cfg: AppConfig, lifecycle: IBrowserLifecycleProtocol | None = None
+    ) -> AbstractContextManager[Page]:
         """Open one fresh page on *cfg*'s profile and go to the chat URL.
 
-        Thin wrapper over ``browser_session`` + first page + ``goto``. Used
-        by the manual login window flow; performs no model selection.
+        Thin wrapper over ``browser_session`` + first page + ``goto``.
+        Used by the manual login window flow; performs no model selection.
+        When *lifecycle* is provided it supplies ``browser_session``;
+        otherwise the implementation falls back to its own launch path.
+        """
+        ...
+
+    @abstractmethod
+    def open_chat_page(self, page: Page, *, strict: bool = True) -> None:
+        """Navigate *page* to the chat URL and assert authentication.
+
+        The shared launch → navigate → auth-assert sequence's navigation
+        half. Called by the lifecycle capability's ``_open_chat_page``.
         """
         ...
 
