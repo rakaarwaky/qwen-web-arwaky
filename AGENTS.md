@@ -55,8 +55,8 @@ modules/browser/src/  agent_browser_orchestrator, capabilities_browser_adapter
 modules/config/src/   agent_config_orchestrator, capabilities_config_*
 modules/jobs/src/     agent_job_orchestrator, capabilities_folder_compiler, capabilities_job_storage
 modules/logging/src/  agent_logging_orchestrator, capabilities_metrics_counter
-modules/prompt/src/   agent_prompt_orchestrator, capabilities_prompt_flow_dispatcher, capabilities_direct_prompt_adapter, capabilities_prompt_file_adapter, capabilities_attachment_prompt_adapter, capabilities_run_cancel_registry
-modules/prompt_runtime/src/ capabilities_stream_monitor, capabilities_send_dispatcher, capabilities_prompt_injector, capabilities_file_uploader, capabilities_output_saver
+modules/prompt/src/   agent_prompt_orchestrator, capabilities_*
+modules/prompt_runtime/src/ capabilities_*
 modules/session/src/  agent_session_orchestrator, capabilities_session_*
 modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
 modules/update/src/   agent_update_orchestrator, capabilities_update_manager

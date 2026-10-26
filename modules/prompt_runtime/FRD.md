@@ -27,8 +27,8 @@ requirements stay there. Each entry below references that FR by ID.
 - **Description**: Follow the response stream until a terminal state is reached or the stall detector fires.
 - **Input**: The live page, the stream's selectors, and the configured ceilings.
 - **Output**: The extraction verdict: complete, stalled, or incomplete.
-- **Business Rules**: The event-driven stall detector fires before the wall-clock response ceiling; stalled and incomplete verdicts are distinguished so a caller can decide whether to retry.
-- **Edge Cases**: A stream that emits no forward event for the full ceiling reports `stalled`, not `complete`.
+- **Business Rules**: A stalled stream is distinguished from a complete one so a caller can decide whether to retry; the event-driven stall detector may fire before the wall-clock response ceiling, which is absolute and terminal for the attempt.
+- **Edge Cases**: A stream that emits no forward event for the full ceiling reports `stalled`, not `complete`; a slow-but-emitting stream outlives the stall threshold and is bounded only by the response ceiling.
 - **Error Handling**: A monitor that cannot read the stream reports the extraction `incomplete` rather than raising into the caller.
 - **Authoritative text**: [FR-PROMPT-006](../prompt/FRD.md#fr-prompt-006-monitor-the-response-stream).
 
@@ -67,7 +67,7 @@ requirements stay there. Each entry below references that FR by ID.
 - **Description**: Attach a file to the chat as an attachment, with pre-flight validation.
 - **Input**: A page, the file path, the optional upload configuration, and the optional lifecycle emitter.
 - **Output**: A boolean indicating whether the attachment was accepted.
-- **Business Rules**: A file exceeding the upload limit is rejected with the limit named; the byte ceiling is exactly `104857600` bytes (`100 * 1024 * 1024`).
+- **Business Rules**: A file exceeding the upload limit is rejected with the limit named.
 - **Edge Cases**: A file that cannot be read surfaces a file error naming the path.
 - **Error Handling**: An upload failure surfaces an upload-failure error carrying the reason.
 - **Authoritative text**: [FR-PROMPT-010](../prompt/FRD.md#fr-prompt-010-upload-an-attachment).
@@ -79,22 +79,17 @@ contracts of the shared kernel.
 
 ### Protocol API
 
-The browser/stream layer owns `IStreamProtocol`, `IInjectionProtocol`,
-`ISendProtocol`, `IUploadProtocol`, and `ISaverProtocol`. The full method
-table lives in the authoritative FRD.
+This module owns the `IStreamProtocol`, `IInjectionProtocol`, `ISendProtocol`,
+`IUploadProtocol`, and `ISaverProtocol` protocol rows; see the full method
+table in the authoritative [Protocol API](../prompt/FRD.md#protocol-api)
+in `modules/prompt/FRD.md`. Representative rows per protocol:
 
 | Method | Input | Output | Error | Event | Description |
 |---|---|---|---|---|---|
 | `wait_for_response` | page, timeout, msg_count_before, emitter, config, cancel_event | response text + `extraction_verdict` | stream error, run cancelled | generation finished | Wait for a stable assistant response. (IStreamProtocol) |
-| `is_generation_complete` | page | generation flag | none | none | True when Qwen has finished generating. (IStreamProtocol) |
-| `is_thinking_active` | page | thinking flag | none | none | True when Qwen is currently thinking/streaming. (IStreamProtocol) |
 | `find_input` | page, config | input element | element not found | none | Locate the chat input element. (IInjectionProtocol) |
-| `inject_text` | page, text, config | none | element not found | prompt injected | Inject prompt text via multi-strategy DOM injection. (IInjectionProtocol) |
 | `click_send` | page, emitter, config, document_parsed | none | send dispatch error | send clicked | Trigger the send action. (ISendProtocol) |
-| `count_messages` | page | chat turn count | none | none | Count chat turns. (ISendProtocol) |
-| `latest_message_text` | page | response text | none | none | Return the latest assistant response text. (ISendProtocol) |
 | `upload_attachment` | page, filepath, emitter, web_loaded | accepted flag | upload error | file uploaded | Attach a file as an attachment. (IUploadProtocol) |
-| `validate_file` | filepath, max_size_bytes | file size in bytes | file error | none | Pre-flight validation of an attachment. (IUploadProtocol) |
 | `write_output` | path, content, ctx, src, dur, input_chars, output_chars, config | none | output write error | output copied | Write processed output with metadata header + sidecar. (ISaverProtocol) |
 
 ### Aggregate API

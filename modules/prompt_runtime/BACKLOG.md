@@ -7,7 +7,7 @@ Last Updated: 2026-10-26
 
 ## Current Condition
 
-- Done: `uv run python -m pytest modules/prompt_runtime/tests/ -m "not benchmark and not e2e" -q` green on 2026-10-26 (FR-PROMPT-006..010 tracked by this module).
+- Done: `uv run python -m pytest modules/prompt_runtime/tests/ -m "not benchmark and not e2e" -q` green on 2026-10-26 (FR-PROMPT-006, 007, 008, 009, and 010 tracked by this module).
 - In Progress: None.
 - Next Action: None — every backlog row is Done.
 - The authoritative prompt backlog lives in [modules/prompt/BACKLOG.md](../prompt/BACKLOG.md) (PROMPT-01/02/03, covering all 12 prompt FRs); this view tracks the runtime layer's share of that work.
@@ -18,9 +18,11 @@ Last Updated: 2026-10-26
 |---|---:|---|---|---|---|---|
 | FR-PROMPT-006 | P1 | Done | `CONFIG-02` | Stream-monitor stall detection and the send-dispatcher parse-toast hold coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_capability_stream_monitor.py`, `unit_capability_stream_resilience.py`, and `unit_capability_send_dispatcher.py`. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_stream_monitor.py modules/prompt_runtime/tests/unit_capability_stream_resilience.py modules/prompt_runtime/tests/unit_capability_send_dispatcher.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-006, FR-PROMPT-008 |
 | FR-PROMPT-007 | P1 | Done | `SHARED-02` | The prompt-injector DOM probes and the file-uploader pre-flight validation rely on the shared pinned DOM and validation helpers. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_prompt_injector.py modules/prompt_runtime/tests/unit_capability_prompt_injector_verify.py modules/prompt_runtime/tests/unit_capability_file_uploader.py modules/prompt_runtime/tests/unit_attachment_contract.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-007, FR-PROMPT-010 |
-| FR-PROMPT-008 | P1 | Done | `SHARED-02` | The send dispatcher clicks the send control and counts the resulting chat turns; the parse-toast hold is pinned by the dispatcher and spinner-regression tests. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_send_dispatcher.py modules/prompt_runtime/tests/unit_parse_spinner_regressions.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-008 |
+| FR-PROMPT-008 | P1 | Done | `CONFIG-02` | The send dispatcher clicks the send control and counts the resulting chat turns; the parse-toast hold is pinned by the dispatcher and spinner-regression tests. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_send_dispatcher.py modules/prompt_runtime/tests/unit_parse_spinner_regressions.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-008 |
 | FR-PROMPT-010 | P1 | Done | `SHARED-02` | The file uploader attaches files with pre-flight validation (100 MiB ceiling); the upload-limit acceptance test pins the ceiling. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_file_uploader.py modules/prompt_runtime/tests/unit_attachment_contract.py modules/prompt/tests/acceptance_attachment_upload_limits.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-010 |
-| FR-PROMPT-009 | P2 | Done | `SHARED-02` | The output saver writes the response and its XDG-state `.meta.json` sidecar; `dogfood_output_saver.py` pins the sidecar schema. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_output_saver.py modules/prompt_runtime/tests/dogfood_output_saver.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-009 |
+| FR-PROMPT-009 | P2 | Done | None | The output saver writes the response and its XDG-state `.meta.json` sidecar; `dogfood_output_saver.py` pins the sidecar schema. Evidence: `uv run python -m pytest modules/prompt_runtime/tests/unit_capability_output_saver.py modules/prompt_runtime/tests/dogfood_output_saver.py -v` → passed (2026-10-26, commit 7af7b47). | 2026-10-26 | FR-PROMPT-009 |
+
+The three row keys above (FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009) cover FR-PROMPT-008 and FR-PROMPT-010 via the FRD Ref column, so all five runtime FRs are tracked.
 
 ## Scenario Evidence
 

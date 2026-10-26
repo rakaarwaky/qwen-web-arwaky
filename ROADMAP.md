@@ -5,7 +5,7 @@ State: vocabulary below. Last Updated: 2026-10-26.
 ## Current Condition
 
 - In Progress: `modules/tui` TUI-01 release-evidence recording (tracked in #721).
-- Done: `modules/prompt`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
+- Done: `modules/prompt`, `modules/prompt_runtime`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
 - Blocked: None
 - Next: None
 
