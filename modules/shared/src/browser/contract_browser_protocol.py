@@ -152,8 +152,8 @@ class IBrowserLifecycleProtocol(ABC):
 
         Launches an ephemeral persistent context, navigates to the chat URL,
         asserts authentication, and yields one ready page. Performs no model
-        selection and no prompt dispatch. Used by `SessionHealthChecker`
-        (`modules/session/src/capabilities_session_health_checker.py` L289).
+        selection and no prompt dispatch. Used by `SessionLimitChecker`
+        (`modules/session/src/capabilities_session_limit_checker.py` L65).
         """
         ...
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 from modules.shared.src.browser.utility_browser_session_check import (
@@ -94,13 +95,9 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
             return await asyncio.wait_for(probe_task, timeout=self._timeout)
         except asyncio.TimeoutError:
             cancel.set()
-            deadline = 5.0
-            import time as _time
-
-            while not probe_done.is_set():
+            deadline = time.monotonic() + self.CANCEL_JOIN_TIMEOUT_SECONDS
+            while not probe_done.is_set() and time.monotonic() < deadline:
                 await asyncio.sleep(0.05)
-                if _time.monotonic() - deadline <= 0:
-                    break
             return SessionHealthResult(
                 session_id=session_id,
                 status=SessionStatus.AUTH_REQUIRED,

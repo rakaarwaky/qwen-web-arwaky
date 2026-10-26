@@ -21,7 +21,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from modules.shared.src.browser.utility_browser_session_check import page_is_expired
 from modules.shared.src.common.taxonomy_core_constant import RATE_LIMIT_PATTERNS
 from modules.shared.src.common.taxonomy_core_error import AuthRequiredError
 from modules.shared.src.common.taxonomy_core_vo import AppConfig

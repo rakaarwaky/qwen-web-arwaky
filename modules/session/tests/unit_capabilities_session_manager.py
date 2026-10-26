@@ -370,8 +370,9 @@ def test_running_init_twice_keeps_a_populated_default_profile(pool_home: Path, m
 class _SlowChecker:
     """A checker whose probes each sleep, so concurrency is measurable.
 
-    Implements the full health-checker seam so the manager can mark pool
-    state synchronously via :meth:`check_pool_sync` without a real browser.
+    Implements the limit-checker seam so the orchestrator's
+    :meth:`_run_pool_checks` can mark pool state synchronously without a
+    real browser.
     """
 
     probe_duration: float = 0.15
@@ -388,6 +389,28 @@ class _SlowChecker:
         return SessionHealthResult(session_id=session.session_id, status=status)
 
 
+def _orchestrator_with_slow_checker(pool: SessionPool) -> tuple[SessionOrchestrator, _SlowChecker]:
+    """Wire a session orchestrator with slow login+limit checkers."""
+    from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+
+    checker = _SlowChecker()
+
+    async def _probe(_session: SessionInfo) -> SessionHealthResult:
+        await asyncio.sleep(_SlowChecker.probe_duration)
+        return SessionHealthResult(session_id=_session.session_id, status=SessionStatus.ACTIVE)
+
+    login_checker = type("_LoginStub", (), {"check_session": _probe})()
+    limit_checker = type("_LimitStub", (), {"check_session": _probe})()
+
+    orchestrator = SessionOrchestrator(
+        observability=MagicMock(),
+        sessions=MagicMock(),
+        login_checker=login_checker,
+        limit_checker=limit_checker,
+    )
+    return orchestrator, checker
+
+
 def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
     """N slow probes finish in about one probe duration, not N×."""
     sessions = [
@@ -402,14 +425,14 @@ def test_check_pool_sync_probes_run_concurrently(pool_home: Path) -> None:
     ]
     pool = SessionPool(sessions=sessions)
     manager = MagicMock()
-    checker = _SlowChecker()
+    orchestrator, checker = _orchestrator_with_slow_checker(pool)
 
     started = time.monotonic()
-    results = checker.check_pool_sync(pool, manager)
+    results = orchestrator._run_pool_checks(pool, manager)
     elapsed = time.monotonic() - started
 
-    assert [s.session_id for s, _ in results] == [s.session_id for s in sessions]
-    assert all(verdict.is_healthy for _, verdict in results)
+    assert [r.session_id for r in results] == [s.session_id for s in sessions]
+    assert all(r.is_healthy for r in results)
     # 4 sequential probes would take >= 0.6s; concurrent must stay near one probe.
     assert elapsed < _SlowChecker.probe_duration * 2, f"probes ran sequentially: {elapsed:.2f}s"
     assert manager.mark_healthy.call_count == 4
@@ -429,14 +452,14 @@ def test_check_pool_sync_marks_limited_sessions_in_pool_order(pool_home: Path) -
     ]
     pool = SessionPool(sessions=sessions)
     manager = MagicMock()
-    checker = _SlowChecker()
+    orchestrator, checker = _orchestrator_with_slow_checker(pool)
     # All probes report LIMITED except session_0 and session_2 (ACTIVE by index parity)
     for i in range(3):
         checker.set_status(f"session_{i}", SessionStatus.ACTIVE if i % 2 == 0 else SessionStatus.LIMITED)
 
-    results = checker.check_pool_sync(pool, manager)
+    results = orchestrator._run_pool_checks(pool, manager)
 
-    assert [verdict.is_healthy for _, verdict in results] == [True, False, True]
+    assert [r.is_healthy for r in results] == [True, False, True]
     marked = [call.args[0] for call in manager.mark_healthy.call_args_list]
     limited = [call.args[0] for call in manager.mark_limited.call_args_list]
     assert marked == ["session_0", "session_2"]
