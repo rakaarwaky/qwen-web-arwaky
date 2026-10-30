@@ -15,11 +15,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_output_saver import Saver
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.shared.src.common.taxonomy_core_event import (
     EVENT_DISPATCH_ACKNOWLEDGED,
     EVENT_GENERATION_FINISHED,

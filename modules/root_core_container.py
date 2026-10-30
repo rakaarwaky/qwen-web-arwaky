@@ -53,16 +53,16 @@ from modules.prompt.src.capabilities_attachment_prompt_adapter import Attachment
 
 # capabilities_direct_prompt_adapter
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_file_uploader import FileUploader
-from modules.prompt.src.capabilities_output_saver import Saver
 
 # capabilities_prompt_file_adapter
 from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
 from modules.session.src.capabilities_session_login_checker import SessionLoginChecker

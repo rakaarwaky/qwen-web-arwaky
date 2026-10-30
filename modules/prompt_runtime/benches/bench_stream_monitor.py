@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
+from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 
 
 def bench_is_generation_complete(iterations: int = 1000) -> float:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.prompt.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
 from modules.shared.src import RunContext, SaverConfig
 from modules.shared.src.common.taxonomy_core_error import OutputWriteError
 from modules.shared.src.common.utility_core_text import strip_ui_noise
@@ -301,7 +301,7 @@ class TestWriteOutputExtended:
         ctx = RunContext()
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.write_json_file",
+            "modules.prompt_runtime.src.capabilities_output_saver.write_json_file",
             side_effect=OSError("disk full"),
         ):
             with pytest.raises(OutputWriteError, match=r"Failed to write output file .*meta\.json"):
@@ -328,7 +328,7 @@ class TestWriteOutputExtended:
         sidecar = out_file.with_suffix(".meta.json")
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.write_json_file",
+            "modules.prompt_runtime.src.capabilities_output_saver.write_json_file",
             side_effect=OSError("quota exceeded"),
         ):
             with pytest.raises(OutputWriteError) as excinfo:
@@ -354,7 +354,7 @@ class TestWriteOutputExtended:
         sidecar = out_file.with_suffix(".meta.json")
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.write_json_file",
+            "modules.prompt_runtime.src.capabilities_output_saver.write_json_file",
             side_effect=OutputWriteError(f"Atomic write failed for {sidecar}: disk full"),
         ):
             with pytest.raises(OutputWriteError) as excinfo:
@@ -386,7 +386,7 @@ class TestWriteOutputExtended:
             return ensure_dir(path)
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.ensure_dir",
+            "modules.prompt_runtime.src.capabilities_output_saver.ensure_dir",
             side_effect=_fail_sidecar_only,
         ):
             with pytest.raises(OutputWriteError) as excinfo:
@@ -410,7 +410,7 @@ class TestWriteOutputExtended:
         from unittest.mock import patch
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.utc_now_iso",
+            "modules.prompt_runtime.src.capabilities_output_saver.utc_now_iso",
             return_value="2026-01-01T00:00:00",
         ):
             first = Saver._unique_directory_path(tmp_path, "run1")
@@ -426,7 +426,7 @@ class TestWriteOutputExtended:
         from unittest.mock import patch
 
         with patch(
-            "modules.prompt.src.capabilities_output_saver.utc_now_iso",
+            "modules.prompt_runtime.src.capabilities_output_saver.utc_now_iso",
             return_value="2026-01-01T00:00:00",
         ):
             reserved = tmp_path / "qwen_output_20260101T000000_run1.md"
