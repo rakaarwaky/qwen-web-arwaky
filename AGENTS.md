@@ -56,6 +56,7 @@ modules/config/src/   agent_config_orchestrator, capabilities_config_*
 modules/jobs/src/     agent_job_orchestrator, capabilities_folder_compiler, capabilities_job_storage
 modules/logging/src/  agent_logging_orchestrator, capabilities_metrics_counter
 modules/prompt/src/   agent_prompt_orchestrator, agent_shared_flow_orchestrator, capabilities_*
+modules/prompt_runtime/src/  agent_prompt_runtime_orchestrator, capabilities_* (browser/stream/persist layer)
 modules/session/src/  agent_session_orchestrator, capabilities_session_*
 modules/swarm/src/    agent_swarm_orchestrator, capabilities_swarm_runner
 modules/update/src/   agent_update_orchestrator, capabilities_update_manager
@@ -81,7 +82,8 @@ Every command must match the exact CI gate.
 ```bash
 # Tests
 uv run python -m pytest modules/shared/tests/ modules/cli/tests/ modules/tui/tests/ \
-  modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ \
+  modules/mcp/tests/ modules/prompt/tests/ modules/prompt_runtime/tests/ \
+  modules/session/tests/ \
   modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ \
   modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ \
   -m "not benchmark" -v   # what it covers

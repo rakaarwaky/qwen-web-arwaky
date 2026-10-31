@@ -33,10 +33,10 @@ Last Updated: 2026-10-24
 | Scenario | Kind | Test file | Test name | Last verified |
 |---|---|---|---|---|
 | A direct prompt produces a response file at the named destination | Automated | `modules/prompt/tests/unit_agent_direct_prompt.py` | direct prompt save | 2026-10-22 |
-| A saved response carries its run metadata outside the output directory | Automated | `modules/prompt/tests/dogfood_output_saver.py` | a saved response carries its run metadata | 2026-10-22 |
-| A stalled stream reports `stalled` (and saves the partial) | Automated | `modules/prompt/tests/unit_capability_stream_monitor.py` | stall detection | 2026-10-22 |
-| A hard response timeout reports `incomplete` | Automated | `modules/prompt/tests/unit_capability_stream_monitor.py` | hard cutoff | 2026-10-22 |
-| An attachment over the upload limit is rejected | Automated | `modules/prompt/tests/unit_capability_file_uploader.py` | upload limit | 2026-10-05 |
+| A saved response carries its run metadata outside the output directory | Automated | `modules/prompt_runtime/tests/dogfood_output_saver.py` | a saved response carries its run metadata | 2026-10-22 |
+| A stalled stream reports `stalled` (and saves the partial) | Automated | `modules/prompt_runtime/tests/unit_capability_stream_monitor.py` | stall detection | 2026-10-22 |
+| A hard response timeout reports `incomplete` | Automated | `modules/prompt_runtime/tests/unit_capability_stream_monitor.py` | hard cutoff | 2026-10-22 |
+| An attachment over the upload limit is rejected | Automated | `modules/prompt_runtime/tests/unit_capability_file_uploader.py` | upload limit | 2026-10-05 |
 | A cancel on a terminal pipeline reports zero | Automated | `modules/prompt/tests/unit_agent_cancel_terminal.py` | `test_cancel_on_a_terminal_pipeline_reports_zero` | 2026-10-22 |
 | A cancel on a file pipeline reports one stopped pipeline | Automated | `modules/prompt/tests/unit_agent_cancel_terminal.py` | `test_cancel_on_an_in_flight_file_pipeline_reports_one_stopped_pipeline` | 2026-10-22 |
 | A response file survives a mid-stream extraction failure | Automated | `modules/prompt/tests/unit_agent_prompt_file.py` | `test_stalled_stream_saves_the_partial_artifact_with_a_stalled_verdict` | 2026-10-22 |

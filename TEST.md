@@ -17,16 +17,16 @@ that mirrors the exact DOM structure verified live on `chat.qwen.ai`.
 
 | Module | Method | Verified behavior | Source of truth |
 |--------|--------|-------------------|-----------------|
-| `prompt/src/capabilities_prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
-| `prompt/src/capabilities_prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
-| `prompt/src/capabilities_file_uploader.py` | `upload_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
-| `prompt/src/capabilities_file_uploader.py` | `validate_file` | Rejects oversized files before the chooser opens | Live probe 2026-08-09 |
-| `prompt/src/capabilities_send_dispatcher.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
-| `prompt/src/capabilities_send_dispatcher.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
-| `prompt/src/capabilities_send_dispatcher.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_prompt_injector.py` | `find_input` | Matches `textarea.message-input-textarea` | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_prompt_injector.py` | `inject_text` | Tier 1: React `HTMLTextAreaElement.prototype` setter; Tier 2: clipboard paste; Tier 3: `fill()`/`type()` | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_file_uploader.py` | `upload_attachment` | `.mode-select-open` → `Upload attachment` → file chooser → `.message-input-column-file` card | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_file_uploader.py` | `validate_file` | Rejects oversized files before the chooser opens | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_send_dispatcher.py` | `click_send` | Clicks `button[aria-label*='Send']`; Enter fallback | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_send_dispatcher.py` | `count_messages` | Counts `.markdown-body` nodes under `#chatLog` | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_send_dispatcher.py` | `latest_message_text` | Returns `.markdown-body` text of last assistant node | Live probe 2026-08-09 |
 | `shared/src/utility_core_validation.py` | `validate_response_content` | Detects CAPTCHA challenges, server error pages, empty responses | Live probe 2026-08-09 |
-| `prompt/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
-| `prompt/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_stream_monitor.py` | `wait_for_response` | Stability loop with output validation | Live probe 2026-08-09 |
+| `prompt_runtime/src/capabilities_stream_monitor.py` | `is_thinking_active` | Visible thinking card without a completed marker counts as active | Live probe 2026-08-09 |
 | `session/src/capabilities_session_login_checker.py` | `SessionLoginChecker.check_session` | Verifies the Qwen chat page carries an authenticated account | Live probe 2026-08-09 |
 | `session/src/capabilities_session_limit_checker.py` | `SessionLimitChecker.check_session` | Detects rate-limit banners and probe timeouts on the Qwen chat page | Live probe 2026-08-09 |
 | `prompt/src/capabilities_attachment_prompt_adapter.py` | `process_prompt_with_attachment` | Full pipeline: new chat → attach → inject → parse wait → send → response | Live probe 2026-08-09 |
@@ -83,6 +83,7 @@ Role fixtures (real source-review prompts, **not** injection payloads):
 # Full suite (behavior + pipeline) — mirrors the CI selection
 uv run python -m pytest tests/ modules/shared/tests/ modules/cli/tests/ \
   modules/tui/tests/ modules/mcp/tests/ modules/prompt/tests/ \
+  modules/prompt_runtime/tests/ \
   modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ \
   modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ \
   modules/update/tests/ -m "not benchmark" -v
@@ -214,9 +215,9 @@ scripts/
 
 modules/
 ├── shared/src/taxonomy_core_constant.py  # Selectors & constants
-├── prompt/src/capabilities_prompt_injector.py
-├── prompt/src/capabilities_send_dispatcher.py
-├── prompt/src/capabilities_stream_monitor.py
+├── prompt_runtime/src/capabilities_prompt_injector.py
+├── prompt_runtime/src/capabilities_send_dispatcher.py
+├── prompt_runtime/src/capabilities_stream_monitor.py
 └── prompt/src/agent_shared_flow_orchestrator.py
 ```
 

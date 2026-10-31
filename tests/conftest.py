@@ -19,6 +19,8 @@ sys.path.insert(0, str(ROOT))
 
 import contextlib
 
+from modules.prompt.src.capabilities_output_saver import Saver
+
 from modules.browser.src.capabilities_browser_diagnostics import BrowserDiagnostics
 from modules.browser.src.capabilities_browser_lifecycle import BrowserLifecycle
 from modules.browser.src.capabilities_browser_model_policy import BrowserModelPolicy
@@ -27,7 +29,6 @@ from modules.jobs.src.capabilities_status_writer import StatusFileWriter
 from modules.logging.src.capabilities_metrics_counter import MetricsCounter
 from modules.logging.src.capabilities_observability_setup import ObservabilitySetup
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_output_saver import Saver
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
 from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
