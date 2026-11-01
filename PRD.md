@@ -62,35 +62,299 @@ qwen-web-arwaky is a Python CLI and MCP server that automates `chat.qwen.ai` thr
 
 - Automation of other model providers; official model API clients; hosted multi-tenant service operation.
 - Bypassing CAPTCHAs, access controls, subscriptions, or provider limits; account creation or credential management.
-- Evaluating the factual quality of model answers; editing a user's source files from model output.
-- Guaranteeing availability when `chat.qwen.ai` is unavailable.
+- Evaluating the factual quality of model answers; editing a user's source files from model output; guaranteeing availability when `chat.qwen.ai` is unavailable.
+
+---
 
 ## Project Requirements
 
-### P0 — Must Have
+### PR-QWA-001: Direct prompt execution
 
-- **F-001 — Direct prompt execution**: A user can submit non-empty text and receive one terminal success or explicit failure outcome. Acceptance: a direct-text acceptance run returns a complete result location on success and a reason plus recovery action on failure.
-- **F-002 — Prompt-file execution**: A user can submit a readable local prompt file without manually copying its contents into the website. Acceptance: the accepted file's full prompt is represented in the completed run, while a missing or unreadable file is rejected before submission.
-- **F-003 — Prompt with document execution**: A user can submit one prompt together with one supported local document. Acceptance: the run does not send the prompt until the document is reported ready, and an unusable document produces an explicit failure. The attachment must satisfy the Product-approved format and exact-byte size matrix linked to F-003: the byte ceiling is `104857600` bytes (`100 * 1024 * 1024`) and the supported extension allowlist is enforced by the shared pre-flight validation utility; each rejected boundary case (zero bytes, exact maximum, maximum + 1 byte, unreadable file, unsupported format, type/content mismatch) has a specified pre-flight validation stage and a stable failure reason, and no unsupported input ever reaches the provider.
-- **F-004 — Authenticated session handling**: A user can establish, check, and reuse a local authenticated session without exposing its contents in normal output. Acceptance: a valid saved session permits a headless acceptance run, while an invalid session returns an authentication-required outcome with a login action.
-- **F-005 — Isolated conversation context**: Every new run starts without prior conversation content affecting its request. Acceptance: two sequential acceptance runs with contradictory context produce run records showing that each began in a new conversation.
-- **F-006 — Complete response detection**: A run waits for a terminal response rather than treating partial streaming text as complete. Acceptance: a fixture that pauses mid-response yields no success until generation ends, and a run exceeding its time budget yields an explicit timeout.
-- **F-007 — Durable local results**: A successful run stores the complete response and a traceable run record without leaving a partial destination after interrupted persistence. Acceptance: forced interruption during saving leaves either the prior complete destination or the new complete destination, never a truncated success artifact.
-- **F-008 — Safe local path boundaries**: Agent-initiated file work remains within the operator-approved workspace. Acceptance: an input or output path resolving outside that workspace is rejected before any external submission or local write.
+#### User Stories
 
-### P1 — Should Have
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | submit non-empty text and get one terminal success or explicit failure outcome | I know where the result was saved or what to do next | P0 |
 
-- **F-009 — Asynchronous job control**: An agent can queue a long-running prompt, receive a tracking identifier, and later retrieve a terminal state. Acceptance: a queued acceptance run returns its identifier within the Goal 4 target and polling eventually returns completed or failed.
-- **F-010 — Concurrent-run isolation**: Multiple accepted runs progress independently within configured resource limits. Acceptance: the Goal 5 isolation exercise completes every unaffected run despite one forced failure.
-- **F-011 — Folder prompt preparation**: A user can turn a supported local folder into one ordered prompt document while preserving resolvable local references. Acceptance: a fixture folder compiles deterministically and reports every unresolved or out-of-bound reference.
-- **F-012 — Workspace readiness diagnostics**: A user can check whether local prerequisites, authentication, workspace access, and output access are ready before starting work. Acceptance: each deliberately missing prerequisite is reported separately with one corrective action and a non-success outcome.
-- **F-013 — Interactive terminal operation**: A person at a terminal can configure and monitor multiple prompt runs without memorizing command syntax. Acceptance: the operator can start, distinguish, and review the terminal state of at least two runs using only the interactive interface.
+#### Proposed Solution
 
-### P2 — Nice to Have
+A direct-text acceptance run returns a complete result location on success and a reason plus recovery action on failure.
 
-- **F-014 — Optional external observability**: An operator can forward run health and failure information to a configured monitoring destination without making that destination mandatory. Acceptance: a configured acceptance run emits monitoring data, while an unavailable destination does not prevent the run from reaching its own terminal outcome.
-- **F-015 — Guided product updates**: An operator can check for an available release and preview the proposed change before approving it. Acceptance: a preview reports the current and proposed versions without changing installed files.
-- **F-016 — Machine-readable diagnostics**: Automated clients can consume readiness and failure reports without parsing human prose. Acceptance: every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action.
+#### Main User Flow
+
+1. Submit a non-empty prompt.
+2. Receive one terminal success or explicit failure outcome.
+3. On success, the result location is reported; on failure, a reason plus recovery action is reported.
+
+### PR-QWA-002: Prompt-file execution
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | submit a readable local prompt file without copying its contents into the website | the accepted file's full prompt is represented in the completed run | P0 |
+
+#### Proposed Solution
+
+The accepted file's full prompt is represented in the completed run; a missing or unreadable file is rejected before submission.
+
+#### Main User Flow
+
+1. Reference a readable local prompt file.
+2. The file's full prompt is represented in the completed run.
+3. A missing or unreadable file is rejected before submission.
+
+### PR-QWA-003: Prompt with document execution
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | submit one prompt together with one supported local document | the run does not send the prompt until the document is reported ready, and an unusable document produces an explicit failure | P0 |
+
+#### Proposed Solution
+
+The run does not send the prompt until the document is reported ready; an unusable document produces an explicit failure. The attachment must satisfy the Product-approved format and exact-byte size matrix linked to F-003: the byte ceiling is `104857600` bytes (`100 * 1024 * 1024`) and the supported extension allowlist is enforced by the shared pre-flight validation utility; each rejected boundary case (zero bytes, exact maximum, maximum + 1 byte, unreadable file, unsupported format, type/content mismatch) has a specified pre-flight validation stage and a stable failure reason, and no unsupported input ever reaches the provider.
+
+#### Main User Flow
+
+1. Submit a prompt with one supported local document.
+2. The document is reported ready before the prompt is sent.
+3. An unusable document produces an explicit failure at the pre-flight validation stage.
+
+### PR-QWA-004: Authenticated session handling
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | establish, check, and reuse a local authenticated session without exposing its contents in normal output | a valid saved session permits a headless acceptance run, while an invalid session returns an authentication-required outcome with a login action | P0 |
+
+#### Proposed Solution
+
+A valid saved session permits a headless acceptance run; an invalid session returns an authentication-required outcome with a login action.
+
+#### Main User Flow
+
+1. Establish a local authenticated session.
+2. Reuse the saved session for a headless run.
+3. An invalid session returns an authentication-required outcome with a login action.
+
+### PR-QWA-005: Isolated conversation context
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | every new run to start without prior conversation content affecting its request | two sequential acceptance runs with contradictory context produce run records showing that each began in a new conversation | P0 |
+
+#### Proposed Solution
+
+Every new run starts without prior conversation content affecting its request; two sequential acceptance runs with contradictory context produce run records showing that each began in a new conversation.
+
+#### Main User Flow
+
+1. Start a new run.
+2. The run record shows it began in a new conversation.
+3. A second run with contradictory context also shows a new conversation.
+
+### PR-QWA-006: Complete response detection
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | a run to wait for a terminal response rather than treating partial streaming text as complete | a fixture that pauses mid-response yields no success until generation ends, and a run exceeding its time budget yields an explicit timeout | P0 |
+
+#### Proposed Solution
+
+A run waits for a terminal response; a fixture that pauses mid-response yields no success until generation ends, and a run exceeding its time budget yields an explicit timeout.
+
+#### Main User Flow
+
+1. Submit a prompt and wait for the response.
+2. A paused stream yields no success until generation ends.
+3. A run exceeding its time budget yields an explicit timeout.
+
+### PR-QWA-007: Durable local results
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | a successful run to store the complete response and a traceable run record without leaving a partial destination after interrupted persistence | forced interruption during saving leaves either the prior complete destination or the new complete destination, never a truncated success artifact | P0 |
+
+#### Proposed Solution
+
+A successful run stores the complete response and a traceable run record; forced interruption during saving leaves either the prior complete destination or the new complete destination, never a truncated success artifact.
+
+#### Main User Flow
+
+1. Run to completion.
+2. The complete response and a traceable run record are stored.
+3. Forced interruption leaves either the prior or the new complete destination, never a truncated artifact.
+
+### PR-QWA-008: Safe local path boundaries
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | agent-initiated file work to remain within the operator-approved workspace | an input or output path resolving outside that workspace is rejected before any external submission or local write | P0 |
+
+#### Proposed Solution
+
+Agent-initiated file work remains within the operator-approved workspace; an input or output path resolving outside that workspace is rejected before any external submission or local write.
+
+#### Main User Flow
+
+1. Reference an input or output path.
+2. A path inside the workspace is accepted.
+3. A path resolving outside the workspace is rejected before submission or write.
+
+### PR-QWA-009: Asynchronous job control
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| AI coding agent | queue a long-running prompt, receive a tracking identifier, and later retrieve a terminal state | a queued acceptance run returns its identifier within the Goal 4 target and polling eventually returns completed or failed | P1 |
+
+#### Proposed Solution
+
+An agent can queue a long-running prompt, receive a tracking identifier, and later retrieve a terminal state; polling eventually returns completed or failed.
+
+#### Main User Flow
+
+1. Queue a long-running prompt.
+2. Receive a tracking identifier within the Goal 4 target.
+3. Poll for the terminal state (completed or failed).
+
+### PR-QWA-010: Concurrent-run isolation
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | multiple accepted runs to progress independently within configured resource limits | the Goal 5 isolation exercise completes every unaffected run despite one forced failure | P1 |
+
+#### Proposed Solution
+
+Multiple accepted runs progress independently within configured resource limits; the Goal 5 isolation exercise completes every unaffected run despite one forced failure.
+
+#### Main User Flow
+
+1. Submit multiple accepted runs.
+2. Force one failure.
+3. Every unaffected run completes its own terminal outcome.
+
+### PR-QWA-011: Folder prompt preparation
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Developer without an API budget | turn a supported local folder into one ordered prompt document while preserving resolvable local references | a fixture folder compiles deterministically and reports every unresolved or out-of-bound reference | P1 |
+
+#### Proposed Solution
+
+A supported local folder compiles into one ordered prompt document while preserving resolvable local references; every unresolved or out-of-bound reference is reported.
+
+#### Main User Flow
+
+1. Provide a supported local folder.
+2. The folder compiles into one ordered prompt document.
+3. Every unresolved or out-of-bound reference is reported.
+
+### PR-QWA-012: Workspace readiness diagnostics
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | check whether local prerequisites, authentication, workspace access, and output access are ready before starting work | each deliberately missing prerequisite is reported separately with one corrective action and a non-success outcome | P1 |
+
+#### Proposed Solution
+
+Each deliberately missing prerequisite is reported separately with one corrective action and a non-success outcome.
+
+#### Main User Flow
+
+1. Run the workspace readiness check.
+2. Each missing prerequisite is reported separately.
+3. Each report carries one corrective action and a non-success outcome.
+
+### PR-QWA-013: Interactive terminal operation
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator at a terminal | configure and monitor multiple prompt runs without memorizing command syntax | start, distinguish, and review the terminal state of at least two runs using only the interactive interface | P1 |
+
+#### Proposed Solution
+
+The operator can start, distinguish, and review the terminal state of at least two runs using only the interactive interface.
+
+#### Main User Flow
+
+1. Open the interactive terminal.
+2. Start at least two prompt runs.
+3. Distinguish and review the terminal state of each.
+
+### PR-QWA-014: Optional external observability
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | forward run health and failure information to a configured monitoring destination without making that destination mandatory | a configured acceptance run emits monitoring data, while an unavailable destination does not prevent the run from reaching its own terminal outcome | P2 |
+
+#### Proposed Solution
+
+A configured acceptance run emits monitoring data; an unavailable destination does not prevent the run from reaching its own terminal outcome.
+
+#### Main User Flow
+
+1. Configure a monitoring destination.
+2. A run emits monitoring data.
+3. An unavailable destination does not block the terminal outcome.
+
+### PR-QWA-015: Guided product updates
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Automation operator | check for an available release and preview the proposed change before approving it | a preview reports the current and proposed versions without changing installed files | P2 |
+
+#### Proposed Solution
+
+A preview reports the current and proposed versions without changing installed files.
+
+#### Main User Flow
+
+1. Check for an available release.
+2. Preview the proposed change.
+3. Approve or decline without changing installed files.
+
+### PR-QWA-016: Machine-readable diagnostics
+
+#### User Stories
+
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| AI coding agent | consume readiness and failure reports without parsing human prose | every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action | P2 |
+
+#### Proposed Solution
+
+Every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action.
+
+#### Main User Flow
+
+1. Trigger a diagnostic outcome.
+2. The outcome is emitted as a stable status, issue, and suggested action.
+3. The agent decodes it without parsing human prose.
 
 ### Non-functional Requirements (High-level)
 
