@@ -34,9 +34,9 @@ from modules.logging.src.capabilities_observability_setup import (
 from modules.logging.src.capabilities_observability_setup import (
     _start_span as _obs_start_span,
 )
-from modules.prompt.src.capabilities_file_uploader import FileUploader
-from modules.prompt.src.capabilities_output_saver import Saver
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
 from modules.shared.src import AppConfig
 from modules.shared.src.common.utility_core_status import status_path_for
 from modules.shared.src.common.utility_core_validation import validate_file as _util_validate_file

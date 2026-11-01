@@ -1,44 +1,207 @@
 # ROADMAP — qwen-web-arwaky
 
-State: vocabulary below. Last Updated: 2026-10-24.
+Last Updated: 2026-10-25
 
-## Current Condition
+## Progress Overview
 
-- In Progress: `modules/tui` TUI-01 release-evidence recording (tracked in #721).
-- Done: `modules/prompt`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
-- Blocked: None
-- Next: None
+The core prompt, session, jobs, browser, config, logging, CLI, MCP, and update modules are all at Done. Swarm execution and the TUI release-evidence trail remain open; both are tracked in the Roadmap Status below. State vocabulary: **Ready** (specified, not started; blockers named), **In Progress** (active now), **In Review** (PR open, awaiting verification), **Done** (command + commit evidence; shipped releases carry release evidence).
 
-## State Definitions
+## Roadmap Status
 
-| State | Meaning |
-|---|---|
-| Ready | Specified; not started. Blockers, if any, are named in Actual Condition. |
-| In Progress | Active now. |
-| In Review | PR open; awaiting verification pass. |
-| Done | Command + commit evidence; shipped releases carry release evidence. |
+Feature detail stays in each feature's `BACKLOG.md`; per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and its `modules/shared/templates` role-template package data, so neither is a feature directory. Entries are priority-ordered: all P0 first, then P1, then P2; the NNN counter is global and sequential.
 
-## Feature Roll-up
+### PR-QWA-001: Direct prompt execution
 
-One table: every feature row. Feature detail stays in each feature's `BACKLOG.md`; per [`ARCHITECTURE.md`](ARCHITECTURE.md), `modules/shared` is the cross-feature contract/taxonomy member and its `modules/shared/templates` role-template package data, so neither is a feature directory.
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
 
-| ID | Feature | Priority | State | Dependencies | Next Action | Updated |
-|---|---|---|---|---|---|---|
-| `modules/prompt` | Prompt execution and attachment | P0 | Done | Spec: [FRD](modules/prompt/FRD.md) · Backlog: [BACKLOG](modules/prompt/BACKLOG.md) | None | 2026-10-25 |
-| `modules/session` | Session pool and rotation | P0 | Done | Spec: [FRD](modules/session/FRD.md) · Backlog: [BACKLOG](modules/session/BACKLOG.md) | `SESSION-03` | 2026-10-25 |
-| `modules/browser` | Browser adapter | P0 | Done | Spec: [FRD](modules/browser/FRD.md) · Backlog: [BACKLOG](modules/browser/BACKLOG.md) | None | 2026-10-25 |
-| `modules/jobs` | Async job and folder compilation | P1 | Done | Spec: [FRD](modules/jobs/FRD.md) · Backlog: [BACKLOG](modules/jobs/BACKLOG.md) | `JOBS-01` | 2026-10-24 |
-| `modules/swarm` | Swarm execution | P1 | Ready | Spec: [FRD](modules/swarm/FRD.md) · Backlog: [BACKLOG](modules/swarm/BACKLOG.md) | `SWARM-01` | 2026-09-24 |
-| `modules/logging` | Observability and metrics | P1 | Done | Spec: [FRD](modules/logging/FRD.md) · Backlog: [BACKLOG](modules/logging/BACKLOG.md) | None | 2026-10-25 |
-| `modules/config` | Configuration | P1 | Done | Spec: [FRD](modules/config/FRD.md) · Backlog: [BACKLOG](modules/config/BACKLOG.md) | None | 2026-10-25 |
-| `modules/cli` | CLI and Textual TUI | P1 | Done | Spec: [DESIGN](modules/cli/DESIGN.md) · Backlog: [BACKLOG](modules/cli/BACKLOG.md) | None | 2026-10-25 |
-| `modules/tui` | Textual TUI | P1 | Done | Spec: [DESIGN](modules/tui/DESIGN.md) · Backlog: [BACKLOG](modules/tui/BACKLOG.md) | `TUI-01` | 2026-10-25 |
-| `modules/mcp` | MCP Server Surface | P1 | Done | Spec: [DESIGN](modules/mcp/DESIGN.md) · Backlog: [BACKLOG](modules/mcp/BACKLOG.md) | None | 2026-10-25 |
-| `modules/update` | Product update | P2 | Done | Spec: [FRD](modules/update/FRD.md) · Backlog: [BACKLOG](modules/update/BACKLOG.md) | None | 2026-10-25 |
+### PR-QWA-002: Prompt-file execution
 
-## Risk Register
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
+
+### PR-QWA-003: Prompt with document execution
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
+
+### PR-QWA-004: Authenticated session handling
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | `SESSION-03`                                                                                             |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/session/FRD.md)                                                                            |
+| Backlog      | [BACKLOG](modules/session/BACKLOG.md)                                                                    |
+
+### PR-QWA-005: Isolated conversation context
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
+
+### PR-QWA-006: Complete response detection
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
+
+### PR-QWA-007: Durable local results
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/prompt/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/prompt/BACKLOG.md)                                                                     |
+
+### PR-QWA-008: Safe local path boundaries
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P0                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/session/FRD.md)                                                                            |
+| Backlog      | [BACKLOG](modules/session/BACKLOG.md)                                                                    |
+
+### PR-QWA-009: Asynchronous job control
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P1                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | `JOBS-01`                                                                                                 |
+| Updated      | 2026-10-24                                                                                                |
+| Spec         | [FRD](modules/jobs/FRD.md)                                                                                |
+| Backlog      | [BACKLOG](modules/jobs/BACKLOG.md)                                                                        |
+
+### PR-QWA-010: Concurrent-run isolation
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P1                                                                                                        |
+| State        | Ready                                                                                                     |
+| Next Action  | `SWARM-01`                                                                                              |
+| Updated      | 2026-09-24                                                                                                |
+| Spec         | [FRD](modules/swarm/FRD.md)                                                                               |
+| Backlog      | [BACKLOG](modules/swarm/BACKLOG.md)                                                                      |
+
+### PR-QWA-011: Folder prompt preparation
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P1                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/jobs/FRD.md)                                                                                |
+| Backlog      | [BACKLOG](modules/jobs/BACKLOG.md)                                                                        |
+
+### PR-QWA-012: Workspace readiness diagnostics
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P1                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [DESIGN](modules/cli/DESIGN.md)                                                                           |
+| Backlog      | [BACKLOG](modules/cli/BACKLOG.md)                                                                        |
+
+### PR-QWA-013: Interactive terminal operation
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P1                                                                                                        |
+| State        | In Progress                                                                                               |
+| Next Action  | `TUI-01` release-evidence recording (tracked in #721)                                                    |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [DESIGN](modules/tui/DESIGN.md)                                                                          |
+| Backlog      | [BACKLOG](modules/tui/BACKLOG.md)                                                                        |
+
+### PR-QWA-014: Optional external observability
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P2                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/logging/FRD.md)                                                                             |
+| Backlog      | [BACKLOG](modules/logging/BACKLOG.md)                                                                    |
+
+### PR-QWA-015: Guided product updates
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P2                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [FRD](modules/update/FRD.md)                                                                              |
+| Backlog      | [BACKLOG](modules/update/BACKLOG.md)                                                                     |
+
+### PR-QWA-016: Machine-readable diagnostics
+
+| Aspect       | Detail                                                                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| Priority     | P2                                                                                                        |
+| State        | Done                                                                                                      |
+| Next Action  | None                                                                                                      |
+| Updated      | 2026-10-25                                                                                                |
+| Spec         | [DESIGN](modules/mcp/DESIGN.md)                                                                          |
+| Backlog      | [BACKLOG](modules/mcp/BACKLOG.md)                                                                        |
+
+### Workspace Condition and Risks
+
+- **In Progress**: `modules/tui` TUI-01 release-evidence recording (tracked in #721).
+- **Done**: `modules/prompt`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
+- **Blocked**: None. **Next**: None.
+
+Cross-cutting risks:
 
 - Risk: attachment parsing or resend behavior triggers `SendDispatchError` or anti-bot verification in a release. Mitigation: `PROMPT-01`.
 - Risk: unresolved security and quality reports ship without current reproduction or explicit acceptance. Mitigation: `PROMPT-05`, `PROMPT-06`, `MCP-02`.
 - Risk: Qwen UI or model changes invalidate selectors, completion detection, or hardcoded model verification. Mitigation: `PROMPT-01`, `PROMPT-03`.
 - Risk: async job and swarm concurrency leak resources or stall callers. Mitigation: `PROMPT-02`, `MCP-01`.
+
+## Reference
+
+| Artifact | Purpose | Link |
+|----------|---------|------|
+| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
+| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |

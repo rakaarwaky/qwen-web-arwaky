@@ -1,216 +1,73 @@
----
-name: Obsidian Terminal
-colors:
-  bg: '#171A1F'
-  surface: '#22262C'
-  border: '#2E343C'
-  text: '#E5E7EB'
-  text-muted: '#9AA4B2'
-  accent: '#38BDF8'
-  success: '#4ADE80'
-  warning: '#FACC15'
-  danger: '#E5484D'
-  focus-ring: '#38BDF8'
-  bg-surface: '#12151A'
-  bg-overlay: '#1C2026'
-  bg-raised: '#22262C'
-  bg-hover: '#2A2F36'
-  bg-active: '#31373F'
-  fg-primary: '#E5E7EB'
-  fg-muted: '#9AA4B2'
-  fg-accent: '#7DD3FC'
-  fg-on-accent: '#0B1220'
-  primary-fixed: '#BAE6FD'
-  danger-soft-bg: '#3A1214'
-  danger-soft-fg: '#FCA5A5'
-  danger-bg: '#E5484D'
-  danger-fg: '#FFF1F2'
-typography:
-  headline-lg:
-    fontFamily: Inter
-    fontSize: 32px
-    fontWeight: '600'
-    lineHeight: 40px
-    letterSpacing: -0.02em
-  headline-lg-mobile:
-    fontFamily: Inter
-    fontSize: 24px
-    fontWeight: '600'
-    lineHeight: 32px
-    letterSpacing: -0.015em
-  headline-md:
-    fontFamily: Inter
-    fontSize: 20px
-    fontWeight: '600'
-    lineHeight: 28px
-    letterSpacing: -0.01em
-  headline-sm:
-    fontFamily: Inter
-    fontSize: 16px
-    fontWeight: '600'
-    lineHeight: 24px
-    letterSpacing: 0em
-  body-lg:
-    fontFamily: Inter
-    fontSize: 15px
-    fontWeight: '400'
-    lineHeight: 22px
-    letterSpacing: 0em
-  body-md:
-    fontFamily: Inter
-    fontSize: 13px
-    fontWeight: '400'
-    lineHeight: 18px
-    letterSpacing: 0em
-  body-sm:
-    fontFamily: Inter
-    fontSize: 12px
-    fontWeight: '400'
-    lineHeight: 16px
-    letterSpacing: 0.01em
-  label-lg:
-    fontFamily: JetBrains Mono
-    fontSize: 13px
-    fontWeight: '500'
-    lineHeight: 18px
-    letterSpacing: 0.02em
-  label-md:
-    fontFamily: JetBrains Mono
-    fontSize: 11px
-    fontWeight: '500'
-    lineHeight: 14px
-    letterSpacing: 0.03em
-  label-sm:
-    fontFamily: JetBrains Mono
-    fontSize: 10px
-    fontWeight: '400'
-    lineHeight: 12px
-    letterSpacing: 0.04em
-rounded:
-  sm: 0.125rem
-  DEFAULT: 0.25rem
-  md: 0.375rem
-  lg: 0.5rem
-  xl: 0.75rem
-  full: 9999px
-spacing:
-  gutter: 0.75rem
-  margin: 1rem
-  space-xs: 0.25rem
-  space-sm: 0.5rem
-  space-md: 0.75rem
-  space-lg: 1rem
-  space-xl: 1.5rem
----
+# DESIGN — qwen-web-arwaky
 
-## Brand & Style
+## Design Overview
 
-This design system translates the density, high precision, and technical immediacy of modern command-line terminal interfaces into an ergonomic, mobile-first touch architecture. Designed for engineers orchestrating parallel LLM agents, background workers, and automated pipelines on the move, it prioritizes real-time status readability, telemetry density, and tactile execution control.
+qwen-web-arwaky's TUI and CLI share a single design-token contract: a dark, high-density terminal surface that reads as a calm operational dashboard. The visual style couples Inter for conversational narratives and UI labels with JetBrains Mono for data readouts (token counts, model names, latencies, state flags), so human-facing prose and machine-facing telemetry stay visually distinct in the same pane.
 
-The visual style blends **cyber-technical minimalism** with refined **tactile telemetry**. It abandons skeletal desktop terminal emulation in favor of deep obsidian layers, hairline luminous separators, calibrated neon indicators, and monospace data readouts. The atmosphere is quiet, surgical, and responsive—engineered for deep-focus monitoring in dark environments without visual fatigue.
+## Design Requirements
 
-## Colors
+### DS-QWEN-WEB-ARWAKY-001: Color Palette
 
-The palette operates in strict dark mode, anchored by deep carbon and obsidian planes. The TUI reads from `modules/tui/src/surface_tui_css_view.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) — the single source of truth for every hex below. This table mirrors that dict; a value that changes in code must change here in the same commit.
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Base surface | Screen / canvas background | `bg` | `#171A1F` |
+| Card surface | Cards, table rows, recessed strips | `surface` | `#22262C` |
+| Hairline separator | Card borders, row dividers | `border` | `#2E343C` |
+| Primary text | Headlines, body copy | `text` | `#E5E7EB` |
+| Secondary text | Captions, placeholders | `text-muted` | `#9AA4B2` |
+| Primary accent | Active selection, focus ring, active marker | `accent` | `#38BDF8` |
+| Success state | ACTIVE / READY / DONE indicators | `success` | `#4ADE80` |
+| Warning state | LIMITED / WARN / EXPIRED indicators | `warning` | `#FACC15` |
+| Danger state | DELETE, error, FAILED indicators | `danger` | `#E5484D` |
 
-| Token | Hex | Approx ANSI | Usage |
-|-------|-----|-------------|-------|
-| `bg` | `#171A1F` | 0 (black) | Screen / canvas background |
-| `surface` | `#22262C` | 237 | Cards, table rows |
-| `border` | `#2E343C` | 238 | Hairline separators, card borders |
-| `text` | `#E5E7EB` | 253 | Primary text |
-| `text-muted` | `#9AA4B2` | 247 | Secondary text, captions, placeholders |
-| `accent` | `#38BDF8` | 81 | Primary action, focus ring, active marker |
-| `success` | `#4ADE80` | 84 | ACTIVE / READY / DONE states |
-| `warning` | `#FACC15` | 220 | LIMITED / WARN / EXPIRED states |
-| `danger` | `#E5484D` | 203 | DELETE, error, FAILED |
+### DS-QWEN-WEB-ARWAKY-002: Typography
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `focus-ring` | `#38BDF8` | 1px focus outline on interactive widgets |
-| `bg-surface` | `#12151A` | Recessed strip (tab bar) |
-| `bg-overlay` | `#1C2026` | Card fill |
-| `bg-raised` | `#22262C` | Raised tile / row hover target |
-| `bg-hover` | `#2A2F36` | Surface hover |
-| `bg-active` | `#31373F` | Surface pressed / selected row |
-| `fg-primary` | `#E5E7EB` | Primary text (alias) |
-| `fg-muted` | `#9AA4B2` | Secondary text (alias) |
-| `fg-accent` | `#7DD3FC` | Accent-tinted text |
-| `fg-on-accent` | `#0B1220` | Text on accent fill |
-| `primary-fixed` | `#BAE6FD` | Tinted monospace value |
-| `danger-soft-bg` | `#3A1214` | Delete button default (subtle) |
-| `danger-soft-fg` | `#FCA5A5` | Delete button text (subtle) |
-| `danger-bg` | `#E5484D` | Delete button focus / confirm modal fill |
-| `danger-fg` | `#FFF1F2` | Text on the strong danger fill |
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Headline | Pane title, primary section | `headline-lg` | Inter 32 / 40 / 600 |
+| Headline (mobile) | Pane title on mobile frame | `headline-lg-mobile` | Inter 24 / 32 / 600 |
+| Headline (mid) | Sub-headline | `headline-md` | Inter 20 / 28 / 600 |
+| Headline (sm) | Small pane title | `headline-sm` | Inter 16 / 24 / 600 |
+| Body (lg) | Conversational narrative | `body-lg` | Inter 15 / 22 / 400 |
+| Body (md) | Card body copy | `body-md` | Inter 13 / 18 / 400 |
+| Body (sm) | Compact card / chip copy | `body-sm` | Inter 12 / 16 / 400 |
+| Label (lg) | Token-count / model-name readout | `label-lg` | JetBrains Mono 13 / 18 / 500 |
+| Label (md) | Latency / status flag readout | `label-md` | JetBrains Mono 11 / 14 / 500 |
+| Label (sm) | Compact chip / beacon text | `label-sm` | JetBrains Mono 10 / 12 / 400 |
 
-Legacy aliases — kept in `_COLORS` so existing CSS `$tokens` and `THEME` keys keep resolving:
+### DS-QWEN-WEB-ARWAKY-003: Layout & Spacing
 
-- `status_ok` → `success` (`#4ADE80`)
-- `status_err` → `danger` (`#E5484D`)
-- `status_warn` → `warning` (`#FACC15`)
-- `status_muted` → `text-muted` (`#9AA4B2`)
-- `status_info` → `accent` (`#38BDF8`)
-- `bright` → `success` (`#4ADE80`)
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Canvas margin | Uniform outer horizontal margin (mobile frame) | `margin` | `1rem` |
+| Column gutter | Dual-column split telemetry blocks | `gutter` | `0.75rem` |
+| Micro spacing | Badge clusters, inline terminal chips | `space-xs` | `0.25rem` |
+| Component interior | Default card / component padding | `space-md` | `0.75rem` |
+| Block rhythm | Between cards and major sections | `space-lg` | `1rem` |
+| Section spacing | Between major layout zones | `space-xl` | `1.5rem` |
 
-All text colours clear WCAG AA (4.5:1) against their background.
+### DS-QWEN-WEB-ARWAKY-004: Elevation & Depth
 
-## Typography
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Layer 0 (canvas) | Base background | `bg` | `#171A1F` |
+| Layer 1 (card / container) | Card / container surface with 1px hairline | `surface` + `border` | `#22262C` |
+| Layer 2 (floating modal / bottom sheet) | Recessed strip with 1px focus-ring-tinted border | `bg-overlay` + `focus-ring` | `#1C2026` |
+| Active agent focus | Subtle pulsating rim on active inference element | `focus-ring` | `#38BDF8` at reduced opacity |
 
-The typography couples the fluid legibility of **Inter** for conversational narratives, system prompts, and UI controls with the structural rigor of **JetBrains Mono** for execution logs, token counts, model names, latency readings, and state flags.
+### DS-QWEN-WEB-ARWAKY-005: Shapes
 
-All numbers, timestamps, system parameters, and model identifiers must be rendered in `label-*` tiers using `JetBrains Mono` with tabular figures enabled. Headers remain taut and slightly tracking-compressed to mirror modern developer tool consoles while maintaining clear readability on high-density mobile viewports.
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Standard controls / text fields | Soft 4px radius | `rounded` | `0.25rem` |
+| Structural containers / sheets | Soft 8px radius | `rounded-lg` | `0.5rem` |
+| Status pills / operational pips | Crisp circular beacons | `rounded-full` | `9999px` |
 
-## Layout & Spacing
+## Reference
 
-The layout is built on a tight 4px baseline sub-grid that maximizes real estate for multi-agent streaming and status feeds without inducing visual clutter. 
-
-- **Canvas Metrics**: Mobile frames enforce a uniform `1rem` outer horizontal margin (`margin`), tapering into `0.75rem` column gutters (`gutter`) for dual-column split telemetry blocks.
-- **Rhythm & Density**: Micro-element spacing (`space-xs` and `space-sm`) handles badge clusters, inline terminal chips, and tabular telemetry metadata. Component interior padding defaults to `space-md` (`0.75rem`) to maintain mobile touch accessibility while maximizing information density.
-- **Adaptive Breakpoints**:
-  - `Mobile (<640px)`: Single-column stacked stream view; dock-anchored action bar; tabbed worker switcher.
-  - `Tablet / Foldable (640px - 1024px)`: Two-column split layout with parallel terminal stream on the left (60%) and live metrics, thread inspectors, and system parameters on the right (40%).
-
-## Elevation & Depth
-
-This design system avoids heavy drop shadows, relying instead on **chromatic
-surface layering**: each step is a solid `$token` from the `_COLORS` palette
-in `modules/tui/src/surface_tui_css_view.py` (the shipped TUI is pixel-flat,
-so no step carries a box-shadow — depth is carried by the surface step and a
-hairline border).
-
-- **Layer 0 (Canvas)**: `$bg` (`#171A1F`) base background.
-- **Layer 1 (Card/Container)**: `$surface` (`#22262C`) with a 1px `$border` (`#2E343C`) hairline.
-- **Layer 2 (Floating Modals / Bottom Sheets)**: `$bg_overlay` (`#1C2026`) with a 1px `$focus_ring`-tinted border (`$accent` at reduced opacity).
-- **Active Agent Focus**: elements running active inference processes display a subtle pulsing rim illumination tinted from `$focus_ring` (`$accent`) without hard edge dropouts.
-
-## Shapes
-
-The design system enforces a **Soft (`1`)** shape language to preserve the precision and discipline of terminal environments. Curvatures are kept compact:
-
-- Standard controls, text fields, cards, and list rows use `0.25rem` (4px).
-- Structural containers, persistent bottom sheets, and modal frames use `0.5rem` (8px).
-- Status pills, operational pips, and cursor anchors remain crisp badges or circular beacons (`rounded-full`), balancing structural rectangular layouts with distinct data indicators.
-
-## Components
-
-### Buttons & Triggers
-- **Primary Action (Run / Execute)**: solid `$accent` (`#38BDF8`) fill with `$fg_on_accent` (`#0B1220`) bold typography, `0.25rem` radius. Active state triggers a subtle scale down (`0.98`) with an accent halo.
-- **Secondary Action (Abort / Fork)**: `$bg_raised` (`#22262C`) surface with a 1px `$border` (`#2E343C`) hairline and `$fg_accent` (`#7DD3FC`) text.
-- **Ghost / TUI Command Buttons**: monospaced labels wrapped in square brackets (`[kill -9]`, `[tail -f]`) rendered in `$fg_muted` (`#9AA4B2`) on a transparent background.
-
-### Status Indicators & Chips
-- **Worker / Agent Badges**: compact pill structures containing a 6px status beacon. Running states use pulsating `$success` (`#4ADE80`) beacons on a `$success`-tinted fill.
-- **Token & Model Chips**: micro-chips with a `$bg_raised` (`#22262C`) background, displaying model routing (`qwen-max`, `qwen-turbo`) and context consumption (`4.2k/8k tokens`) in `label-sm` font.
-
-### Parallel Stream Cards
-- Encapsulated cards featuring a monospaced terminal header bar: displays thread ID, live latency (`124ms`), and an execution state tag.
-- Stream content area uses monospaced text with a blinking `$accent` (`#38BDF8`) cursor for streaming responses, styled with an inner hairline left border to denote output nesting.
-
-### Input Fields & Command Bar
-- Fixed bottom dock featuring a prompt-symbol indicator (`> `) in `$accent` (`#38BDF8`).
-- Dark field fill (`$bg_surface` / `$bg_overlay` per the palette) bounded by a 1px `$border` that shifts to glowing `$focus_ring` on focus.
-- Monospace placeholder text with auto-suggest completions rendered in `$fg_muted` (`#9AA4B2`).
-
-### Navigation & Tab Bar
-- Bottom tab dock backed by `$bg_surface` (`#12151A`).
-- Tabs feature high-contrast minimal glyphs paired with `label-sm` text. Active tab highlighted via an upper horizontal neon hairline accent in `$accent` (`#38BDF8`).
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals, user stories, and scope | [PRD.md](PRD.md) |
+| Backlog | Task tracking, epics, and implementation status | [BACKLOG.md](BACKLOG.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](ARCHITECTURE.md) |

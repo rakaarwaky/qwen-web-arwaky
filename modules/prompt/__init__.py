@@ -1,1 +1,1 @@
-"""Core package: agent orchestrators and capabilities for browser automation."""
+"""Prompt pipeline/orchestration layer: agent orchestrator, verb adapters, and flow dispatcher."""

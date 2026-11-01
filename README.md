@@ -2,6 +2,10 @@
 
 > A Python CLI and MCP server for developers and AI agents that automate `chat.qwen.ai` through a persistent Playwright browser session, without an API key.
 
+## Project Overview
+
+qwen-web-arwaky is a production-grade Python CLI and MCP server that automates `chat.qwen.ai` with no API key: it sends prompts, waits for the response, extracts it, and saves the result locally as a Markdown file with a traceable `.meta.json` sidecar. It serves three personas: a developer working without an API budget who wants a reproducible, auditable run; an AI coding agent that needs machine-readable acceptance and progress responses over a local tool connection; and an automation operator who queues unattended jobs and needs isolated, bounded, actionable outcomes.
+
 ## Prerequisites
 
 - Git 2.39 or newer.
@@ -13,15 +17,15 @@ No Node.js installation or Qwen API key is required.
 
 ## Quick Start
 
-### Recommended: Production XDG Installation
-
-Install immutably to user XDG directories (`~/.local/share/qwen-web-arwaky/venv/` and `~/.local/bin/`):
-
-```bash
-git clone https://github.com/rakaarwaky/qwen-web-arwaky.git && cd qwen-web-arwaky
-./scripts/install.sh
-qwa --help
-```
+| Step | Action | Command |
+|------|--------|---------|
+| 1 | Clone the repository | `git clone https://github.com/rakaarwaky/qwen-web-arwaky.git && cd qwen-web-arwaky` |
+| 2 | Install immutably to XDG directories | `./scripts/install.sh` |
+| 3 | Confirm the entry point prints | `qwa --help` |
+| 4 | Provision the working directory | `qwen-web-arwaky init` |
+| 5 | Authenticate once (interactive) | `qwen-web-arwaky session login --name personal` |
+| 6 | Verify session and environment health | `qwen-web-arwaky doctor` |
+| 7 | Send an inline prompt and save the response | `qwen-web-arwaky prompt direct -t "Explain this repository" -o output.md` |
 
 ### Standalone Virtual Environment Installation
 
@@ -41,8 +45,7 @@ Success looks like this:
 
 - `pip` ends with `Successfully installed ... qwen-web-arwaky`.
 - Playwright reports that Chromium was downloaded or is already installed.
-- The final command prints `Automate chat.qwen.ai without an API key.` and lists
-actions such as `doctor`, `init`, and `session login`.
+- The final command prints `Automate chat.qwen.ai without an API key.` and lists actions such as `doctor`, `init`, and `session login`.
 
 On Windows PowerShell, create and activate the environment with:
 
@@ -53,49 +56,7 @@ py -3.12 -m venv .venv
 
 Then run the remaining `python ...` and `qwen-web-arwaky --help` commands from the Quick Start.
 
-Provision a working directory and authenticate once before sending prompts:
-
-```bash
-qwen-web-arwaky init
-qwen-web-arwaky session login --name personal
-```
-
-`init` succeeds when it reports the workspace paths it created. `session login`
-succeeds after the browser opens, authentication completes, and the CLI confirms
-that the persistent session was saved.
-
-To verify the saved session and local environment:
-
-```bash
-qwen-web-arwaky doctor
-```
-
-The command prints the diagnostic checks and exits successfully when required components are healthy.
-
-## Architecture
-
-See [`ARCHITECTURE.md`](ARCHITECTURE.md).
-
-At a high level, both the CLI and MCP surfaces call agent orchestrators. Agents coordinate capability implementations through shared contracts; capabilities adapt Playwright, filesystem, and observability I/O. Shared taxonomy and utility modules contain stable types and reusable pure logic. Root entry points compose these layers.
-
-```text
-CLI / MCP surfaces
-        |
-        v
-Agent orchestrators
-        |
-        v
-Capabilities -----> Playwright / filesystem / telemetry
-        |
-        v
-Shared contracts, taxonomy, and utilities
-```
-
-The workspace layout and module map live in [AGENTS.md](AGENTS.md) Project Structure; feature requirements live in `modules/*/FRD.md`; repository-level product requirements live in `PRD.md`. Start in `modules/root_cli_main_entry.py` for CLI composition or `modules/root_mcp_main_entry.py` for MCP composition.
-
-## Available Scripts/Commands
-
-Run application commands inside the activated virtual environment.
+### Frequently Used Commands
 
 | Command | Purpose | How to confirm success |
 | --- | --- | --- |
@@ -124,77 +85,81 @@ Run application commands inside the activated virtual environment.
 
 Use `qwa` as the short alias for `qwen-web-arwaky`. Use `--no-headless` on prompt commands to watch browser automation, and `--json` where supported for machine-readable output.
 
-## Configuration
+### Configuration
 
-[`.env.example`](.env.example) is the committed environment variable contract: every
-recognized variable with its purpose, default, and sensitivity. Copy it to `.env` and
-review each value. `qwen-web-arwaky doctor --json` echoes the effective configuration with
-secret values masked, and reports any `QWEN_*` / `QWA_*` variable set but not in the
-registry — a typo otherwise changes runtime behaviour silently.
+[`.env.example`](.env.example) is the committed environment variable contract: every recognized variable with its purpose, default, and sensitivity. Copy it to `.env` and review each value. `qwen-web-arwaky doctor --json` echoes the effective configuration with secret values masked, and reports any `QWEN_*` / `QWA_*` variable set but not in the registry — a typo otherwise changes runtime behaviour silently.
 
-Zero configuration is the supported default: with no `.env`, no exports, and no
-settings file, every value below falls back to the registry default. The TUI
-Settings screen's **Runtime Overrides** tab is the place to change one — it
-lists the same registry `doctor` prints, shows the value actually in force, and
-writes the change to `~/.config/qwen-web-arwaky/settings.env`. That file is
-loaded before the container is built, so an override survives a restart. A
-shell export still outranks it, and clearing a field returns the value to its
-default rather than blanking it.
+Zero configuration is the supported default: with no `.env`, no exports, and no settings file, every value below falls back to the registry default. The TUI Settings screen's **Runtime Overrides** tab is the place to change one — it lists the same registry `doctor` prints, shows the value actually in force, and writes the change to `~/.config/qwen-web-arwaky/settings.env`. That file is loaded before the container is built, so an override survives a restart. A shell export still outranks it, and clearing a field returns the value to its default rather than blanking it.
 
 Behaviour switches worth knowing:
 
-- `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` — target model (default `Qwen3.8-Max`); the `--model`
-  flag overrides both. A name the picker does not offer degrades to the first available
-  model with a WARNING instead of failing the run.
-- `QWEN_ENABLE_SANDBOX` / `QWEN_DISABLE_SANDBOX` — Chromium runs with its OS sandbox by
-  default; `QWEN_DISABLE_SANDBOX` is the explicit opt-out for hosts that cannot provide
-  seccomp or user namespaces.
-- `QWEN_WEB_MAX_WORKERS` / `QWEN_SWARM_CONCURRENCY` — browser fan-out. Unset derives the
-  worker count from available host memory (~700 MiB per Chromium); set explicitly to
-  override, clamped to the derived capacity.
-- `QWEN_REQUEST_TIMEOUT_SEC` — ceiling on how long a single response may take (default
-  `600`). A non-numeric value is refused by the registry and never stored.
-- `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` — error tracking and tracing. With
-  `ENVIRONMENT=production` and neither set, `doctor` reports a warning.
+- `QWEN_MODEL` / `QWEN_DEFAULT_MODEL` — target model (default `Qwen3.8-Max`); the `--model` flag overrides both. A name the picker does not offer degrades to the first available model with a WARNING instead of failing the run.
+- `QWEN_ENABLE_SANDBOX` / `QWEN_DISABLE_SANDBOX` — Chromium runs with its OS sandbox by default; `QWEN_DISABLE_SANDBOX` is the explicit opt-out for hosts that cannot provide seccomp or user namespaces.
+- `QWEN_WEB_MAX_WORKERS` / `QWEN_SWARM_CONCURRENCY` — browser fan-out. Unset derives the worker count from available host memory (~700 MiB per Chromium); set explicitly to override, clamped to the derived capacity.
+- `QWEN_REQUEST_TIMEOUT_SEC` — ceiling on how long a single response may take (default `600`). A non-numeric value is refused by the registry and never stored.
+- `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT` — error tracking and tracing. With `ENVIRONMENT=production` and neither set, `doctor` reports a warning.
 - `QWEN_WORKSPACE_ROOT` — override the workspace root directory.
 - `QWEN_STREAM_SAFETY_TIMEOUT_SEC` — global ceiling for the response-detection loop.
 - `QWEN_WEB_GITHUB_REPO` — GitHub repo the self-update checks against.
 - `QWEN_DOCTOR_DEEP` — enable the slow Playwright cold-start probe in `doctor`.
 
-Operator runbooks for each `ErrorCategory` live in [`docs/`](docs/);
-`doctor` failure messages link to them.
+Operator runbooks for each `ErrorCategory` live in [`docs/`](docs/); `doctor` failure messages link to them.
 
-A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker count is in
-[`deploy/qwen-web-arwaky.service`](deploy/qwen-web-arwaky.service).
+A reference systemd unit with `MemoryMax`, `TasksMax`, and a bounded worker count is in [`deploy/qwen-web-arwaky.service`](deploy/qwen-web-arwaky.service).
 
-Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials.
+Runtime data, state, cache, and configuration follow the platform's XDG directories rather than being committed to the repository. Do not commit session data or credentials. Generated responses land in `~/.local/share/qwen-web-arwaky/output/`; the `.meta.json` run-traceability sidecar for each response lives separately, under `~/.local/state/qwen-web-arwaky/meta/`, mirroring the artifact's relative path.
 
-Generated responses land in `~/.local/share/qwen-web-arwaky/output/`; the `.meta.json` run-traceability sidecar for each response lives separately, under `~/.local/state/qwen-web-arwaky/meta/`, mirroring the artifact's relative path.
+### Architecture
 
-## Testing
+See [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-See [`TEST.md`](TEST.md) for test tiers, browser fixtures, regression locks, and the TDD workflow.
+At a high level, both the CLI and MCP surfaces call agent orchestrators. Agents coordinate capability implementations through shared contracts; capabilities adapt Playwright, filesystem, and observability I/O. Shared taxonomy and utility modules contain stable types and reusable pure logic. Root entry points compose these layers.
 
-A quick smoke test is:
+```text
+CLI / MCP surfaces
+        |
+        v
+Agent orchestrators
+        |
+        v
+Capabilities -----> Playwright / filesystem / telemetry
+        |
+        v
+Shared contracts, taxonomy, and utilities
+```
+
+The workspace layout and module map live in [AGENTS.md](AGENTS.md) Project Structure; feature requirements live in `modules/*/FRD.md`; repository-level product requirements live in `PRD.md`. Start in `modules/root_cli_main_entry.py` for CLI composition or `modules/root_mcp_main_entry.py` for MCP composition.
+
+### Testing
+
+See [`TEST.md`](TEST.md) for test tiers, browser fixtures, regression locks, and the TDD workflow. A quick smoke test is:
 
 ```bash
 python -m pytest modules/swarm/tests/unit_swarm_to_issues.py -q
 ```
 
-Success is a progress line ending in `[100%]` and a zero exit status.
-
-Real-session pipeline checks (need a logged-in `chat.qwen.ai` session) run
-outside pytest:
+Success is a progress line ending in `[100%]` and a zero exit status. Real-session pipeline checks (need a logged-in `chat.qwen.ai` session) run outside pytest:
 
 ```bash
 python3 scripts/real_tests.py            # direct + file + attach, headful by default
 python3 scripts/real_tests.py --headless -2   # prompt-file pipeline only, headless
 ```
 
-## Contributing
+### Contributing and License
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to ship a change. License: MIT, see [`LICENSE`](LICENSE).
 
-## License
+## Reference
 
-MIT. See [`LICENSE`](LICENSE).
+| Artifact | Purpose | Link |
+|----------|---------|------|
+| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
+| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| ROADMAP | What ships next, in order | [ROADMAP.md](ROADMAP.md) |
+| TEST | Test strategy, markers, and fixture conventions | [TEST.md](TEST.md) |
+| UAT | Acceptance scenarios for a release | [UAT.md](UAT.md) |
+| DEMO | Walkthrough of the shipped behaviour | [DEMO.md](DEMO.md) |
+| CHANGELOG | What shipped in each version | [CHANGELOG.md](CHANGELOG.md) |
+| CONTRIBUTING | Branch, commit, and PR conventions | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| ISSUE | Known issues and triage notes | [ISSUE.md](ISSUE.md) |
+| AGENTS | Agent operating guide, command gates | [AGENTS.md](AGENTS.md) |

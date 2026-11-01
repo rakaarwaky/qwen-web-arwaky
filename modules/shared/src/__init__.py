@@ -230,6 +230,7 @@ from .prompt.contract_prompt_protocol import (
     IStreamProtocol,
     IUploadProtocol,
 )
+from .prompt_runtime.contract_prompt_runtime_aggregate import IPromptRuntimeAggregate
 from .session.contract_session_aggregate import ISessionAggregate
 from .session.contract_session_protocol import (
     ISessionRenewalProtocol,
@@ -437,6 +438,7 @@ __all__ = [
     "IJobManagerAggregate",
     "IObservabilityAggregate",
     "IPromptAggregate",
+    "IPromptRuntimeAggregate",
     "IUpdateAggregate",
     "ISessionAggregate",
     "ISwarmAggregate",
@@ -530,6 +532,8 @@ __all__ = [
     "contract_prompt_aggregate",
     "contract_prompt_protocol",
     "taxonomy_prompt_vo",
+    "contract_prompt_runtime_aggregate",
+    "taxonomy_prompt_runtime_vo",
 ]
 
 # ─── Sub-package imports (AES702 feature subfolders) ───────────────
@@ -577,6 +581,7 @@ from modules.shared.src.config import (
 from modules.shared.src.jobs import contract_jobs_aggregate, contract_jobs_protocol, taxonomy_jobs_vo
 from modules.shared.src.logging import contract_logging_aggregate, contract_logging_protocol, taxonomy_logging_vo
 from modules.shared.src.prompt import contract_prompt_aggregate, contract_prompt_protocol, taxonomy_prompt_vo
+from modules.shared.src.prompt_runtime import contract_prompt_runtime_aggregate, taxonomy_prompt_runtime_vo
 from modules.shared.src.session import (
     contract_session_aggregate,
     contract_session_protocol,

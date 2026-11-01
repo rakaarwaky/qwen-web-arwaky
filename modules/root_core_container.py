@@ -53,16 +53,17 @@ from modules.prompt.src.capabilities_attachment_prompt_adapter import Attachment
 
 # capabilities_direct_prompt_adapter
 from modules.prompt.src.capabilities_direct_prompt_adapter import DirectPromptAdapter
-from modules.prompt.src.capabilities_file_uploader import FileUploader
-from modules.prompt.src.capabilities_output_saver import Saver
 
 # capabilities_prompt_file_adapter
 from modules.prompt.src.capabilities_prompt_file_adapter import PromptFileAdapter
 from modules.prompt.src.capabilities_prompt_flow_dispatcher import PromptFlowDispatcher
-from modules.prompt.src.capabilities_prompt_injector import PromptInjector
 from modules.prompt.src.capabilities_run_cancel_registry import CapabilitiesRunCancelRegistry
-from modules.prompt.src.capabilities_send_dispatcher import SendDispatcher
-from modules.prompt.src.capabilities_stream_monitor import StreamMonitor
+from modules.prompt_runtime.src.agent_prompt_runtime_orchestrator import PromptRuntimeOrchestrator
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_output_saver import Saver
+from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInjector
+from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
+from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
 from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
 from modules.session.src.capabilities_session_login_checker import SessionLoginChecker
@@ -98,6 +99,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
     IPromptFileProtocol,
     IPromptFlowProtocol,
 )
+from modules.shared.src.prompt_runtime.contract_prompt_runtime_aggregate import IPromptRuntimeAggregate
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
     ISessionManagerProtocol,
@@ -204,6 +206,16 @@ class SharedContainer:
         self.streamer = StreamMonitor()
         self.uploader = FileUploader()
         self.saver = Saver()
+        # The runtime aggregate is the inject/send/watch/upload/persist door
+        # over those same five instances, typed to the shared contract so no
+        # surface reaches for a capability directly.
+        self.prompt_runtime: IPromptRuntimeAggregate = PromptRuntimeOrchestrator(
+            injector=self.injector,
+            sender=self.sender,
+            streamer=self.streamer,
+            uploader=self.uploader,
+            saver=self.saver,
+        )
         self.workspace = WorkspaceProvisioner()
         self.session_manager: ISessionManagerProtocol = SessionManager()
         self.profile_preparer: ProfilePreparer = ProfilePreparer()

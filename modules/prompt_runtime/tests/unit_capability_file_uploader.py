@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
 from modules.shared.src import (
     EVENT_DOCUMENT_PARSED,
     EVENT_FILE_UPLOADED,
@@ -158,7 +158,7 @@ class TestUploadAttachment:
 
         with (
             patch.object(FileUploader, "_try_upload_attempt", side_effect=[False, False, True]),
-            patch("modules.prompt.src.capabilities_file_uploader.time"),
+            patch("modules.prompt_runtime.src.capabilities_file_uploader.time"),
             patch.object(FileUploader, "_wait_for_parse_ready"),
         ):
             result = FileUploader().upload_attachment(page, f)

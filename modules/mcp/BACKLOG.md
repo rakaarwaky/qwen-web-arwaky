@@ -1,61 +1,82 @@
 # BACKLOG — MCP Server Surface
 
-Feature prefix: `MCP-`. Last Updated: **2026-10-18**.
+Feature prefix: `MCP-`. Last Updated: 2026-10-25.
 
-State vocabulary, verification requirements, ownership rules, and ID policy are defined only in the root [ROADMAP](../../ROADMAP.md#state-definitions) and [Status Policy](../../ROADMAP.md#status-policy).
-Surface specification: [DESIGN.md](DESIGN.md).
+DESIGN: [DESIGN.md](DESIGN.md)
+Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 
-## Current Condition
+## Progress Overview
 
-- Done: `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` passes 75 tests. `MCP-03` is complete: async-tool documentation reconciled with `surface_mcp_tool_command.py` (envelope shapes, `output_path`/`message` fields, `limit >= 1`, `SERVICE_UNAVAILABLE` on missing job manager), `DESIGN.md` updated, consumer UAT sweep recorded (live `list_jobs` and `process_prompt_file_only` validated against an authenticated session; async job polled to terminal `FAILED` state — Qwen-side `SendDispatchError`, not an MCP contract failure). Shipped MCP surface exports 9 tools in `surface_mcp_tool_command.py` with structured JSON-RPC response envelopes.
-- In Progress: None.
-- Next: None.
+The MCP surface is Done. `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` → 75 passed (2026-10-25, commit `9685d84`); the shipped server exports 9 tools with structured JSON-RPC response envelopes. No row is in progress or blocked; every entry is Done.
 
-## Scenario Evidence
+## Backlog Status
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| Prompt role template integration | Automated | `modules/mcp/tests/integration_prompt_template.py` | `test_mcp_file_only_with_role` | `73aee43` (2 tests pass) |
-| MCP tool hardening & parameter validation | Automated | `modules/mcp/tests/unit_mcp_hardening.py` | `test_prompt_path_rejects_files_outside_workspace` | `73aee43` (7 tests pass) |
-| Structured response envelope & discriminator contracts | Automated | `modules/mcp/tests/unit_mcp_response_envelope.py` | `test_async_submission_carries_accepted_status` | `73aee43` (11 tests pass) |
-| AI agent consumer UAT sign-off criteria | Automated | `modules/mcp/tests/unit_mcp_uat_signoff.py` | `test_uat_mcp_006_async_job_full_lifecycle` | `73aee43` (6 tests pass) |
-| Saturated pool keeps its backpressure envelope | Automated | `modules/mcp/tests/unit_mcp_response_envelope.py` | `test_queue_full_submission_keeps_backpressure_fields` | 2026-10-22 |
-| Live consumer validation sweep (MCP-03) | Live | `qwen-web-arwaky__list_jobs` / `qwen-web-arwaky__process_prompt_file_only` / `qwen-web-arwaky__get_job_status` | `list_jobs` + submit → poll → terminal `FAILED` | 2026-10-24 (authenticated session valid; Qwen-side `SendDispatchError` on response send) |
+### DS-MCP-001
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/mcp/tests/unit_mcp_hardening.py -v` covers stdio JSON-RPC framing and concurrency modes (`async_run=true` → `ACCEPTED`, `false` → `SUCCESS`). Verified 2026-10-22; trust marker discipline documented. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+### DS-MCP-002
 
-## Release Readiness
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` → 75 passed (2026-10-25, commit `9685d84`). Nine tools registered via `TOOLS` list in `surface_mcp_tool_command.py`, each delegating to its Core aggregate (`IPromptAggregate`, `IJobManagerAggregate`, `ISessionAggregate`, `IConfigAggregate`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` passes 26 tests on commit `73aee43`. |
-| Scenario evidence | Done | 4 test suites mapped with 26 passing automated tests. |
-| Docs | Done | [DESIGN.md](DESIGN.md) specifies tool schemas, response envelopes, session flow, and UAT matrix. |
+### DS-MCP-003
 
-## Deferred
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | When `jobs is None`, `get_job_status`/`list_jobs` return `SERVICE_UNAVAILABLE`; prompt tools fall through to `IPromptAggregate`; `shutdown()` calls `JobRequest(verb="shutdown")` on server exit. Documented in DESIGN.md §Job Manager dependency (issue #315). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+### DS-MCP-004
 
-## Change Log
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Status discriminators `SUCCESS`/`ACCEPTED`/`RUNNING`/`COMPLETED`/`FAILED` shipped in every envelope; pinned by `unit_mcp_response_envelope.py` trust-marker tests and UAT-MCP-010. Verified `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` → 75 passed (commit `9685d84`); `uv run ruff check modules/mcp/` clean. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Date | Change | By |
-|---|---|---|
-| 2026-10-18 | Rework BACKLOG.md and DESIGN.md per aes-docs templates; record command, counts, and commit evidence | @rakaarwaky |
-| 2026-10-05 | Added required BACKLOG template sections | @rakaarwaky |
+### DS-MCP-005
 
-## Backlog
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Error codes pinned: `VALIDATION_ERROR`, `ROLE_NOT_FOUND`, `CONFIRMATION_REQUIRED`, `SETUP_SESSION_FAILED`, `INIT_WORKSPACE_FAILED`, `RATE_LIMITED`, `QUEUE_FULL`, `INTERNAL_ERROR`. Documented in DESIGN.md §Error Codes (issue #343, #383). Verified 2026-10-22. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---|---|---|---|---|
-| MCP-00 | P0 | Done | Standardize MCP server surface tool handlers and JSON-RPC envelopes. Verified: `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` passes 75 tests on commit `9685d84`. Exports 9 MCP tools registered via `TOOLS` list in `modules/root_mcp_main_entry.py` (line 111) with typed request schemas and structured JSON response envelopes. Evidence: `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e" -q` → 75 passed (2026-10-25, commit 9685d84). | Maintain tool contracts and schema parity with Core aggregates. | 2026-10-25 |
-| MCP-01 | P0 | Done | Guarantee bounded, non-blocking MCP submissions. Finding [#383](https://github.com/rakaarwaky/qwen-web-arwaky/issues/383) reports that rate-limit acquisition can block a tool call for about 60 seconds. Core queue and worker constraints are owned by `JOBS-02` in `modules/jobs/BACKLOG.md`; this row owns the MCP request/response boundary. Shipped: `RATE_LIMITED` (retryable, `retry_after_sec`) and `QUEUE_FULL` (retryable, `retry_after_sec` + `queue_depth`) envelopes on both async tools, pinned by `unit_mcp_response_envelope.py::test_queue_full_submission_keeps_backpressure_fields`. Verified 2026-10-22. | Maintain the envelope contract; no open action. | 2026-10-22 |
-| MCP-02 | P0 | Done | Mark model output as untrusted at the agent boundary. Finding [#343](https://github.com/rakaarwaky/qwen-web-arwaky/issues/343) reports that model output is returned to MCP clients without an explicit trust marker. Shipped: every envelope exposing model output carries `result_trust: "untrusted_model_output"` + `security_notice` (sync success always; `get_job_status` when `result_preview` is present; `list_jobs` carries `security_notice`), and result-bearing `TOOLS` descriptions name the field. Pinned by `unit_mcp_response_envelope.py` trust-marker tests and UAT-MCP-010; documented in DESIGN.md §Untrusted data boundary. Verified 2026-10-22. Residual: `output_file` file-content trust stays policy prose — file bytes never cross the MCP boundary. | Close issue #343 citing the shipped envelope fields; no code change pending. | 2026-10-22 |
-| MCP-03 | P1 | Done | Reconcile async-tool documentation and complete consumer UAT. Findings [#315](https://github.com/rakaarwaky/qwen-web-arwaky/issues/315) and [#286](https://github.com/rakaarwaky/qwen-web-arwaky/issues/286) report missing Job Manager dependency documentation and MCP consumer sign-off. `DESIGN.md` now documents `IJobManagerAggregate` dependency (`SERVICE_UNAVAILABLE` when `jobs` is `None`, `shutdown()` on server exit), corrects envelope shapes (`output_path`/`message` instead of `output_file`/`hint`, `limit >= 1`, no `session_path` on `check_session`), adds `SESSION_NAME_REQUIRED` (UAT-MCP-004b), and records the live consumer sweep: `list_jobs` returns `session_valid: true`, `process_prompt_file_only` accepted + polled to terminal state. Live sweep ran against an authenticated Qwen session; the job hit Qwen-side `SendDispatchError` (anti-bot), not an MCP contract failure. Verified: `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"` passes 75 tests; `uv run ruff check modules/mcp/` clean. | Close stale reports #315 and #286 after consumer validation sweep against live browser session. | 2026-10-24 |
+### DS-MCP-006
 
-## Dependencies and Exit Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Every envelope exposing model output carries `result_trust: "untrusted_model_output"` + `security_notice`; `list_jobs` payload and each item carry `security_notice`; result-bearing `TOOLS` descriptions name `result_trust`. Documented in DESIGN.md §Untrusted data boundary. Verified 2026-10-22. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-- MCP surface depends on Root containers (`modules/root_core_container.py`, `modules/root_mcp_main_entry.py`) for orchestrator wiring.
-- A row can become Done only with the exact verification command, its result, and the implementing commit recorded in `Actual Condition`.
-- Verification command: `uv run python -m pytest modules/mcp/tests/ -m "not benchmark and not e2e"`.
+## Reference
+
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals and scope | [PRD.md](../../PRD.md) |
+| DESIGN | Surface specification | [DESIGN.md](DESIGN.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |

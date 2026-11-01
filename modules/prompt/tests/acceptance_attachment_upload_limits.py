@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from modules.prompt.src.capabilities_attachment_prompt_adapter import AttachmentPromptAdapter
-from modules.prompt.src.capabilities_file_uploader import FileUploader
+from modules.prompt_runtime.src.capabilities_file_uploader import FileUploader
 
 
 def _attachment(tmp_path: Path, size_bytes: int) -> Path:
