@@ -1,39 +1,71 @@
 # PRD — qwen-web-arwaky
 
-> Product Requirements Document. Describes WHAT this project does and WHY.
-> Audience: Stakeholders, PM, Design, Engineering leads.
-> Condition: [Prompt FRD](modules/prompt/FRD.md), [Session FRD](modules/session/FRD.md), [CLI DESIGN](modules/cli/DESIGN.md) + [CLI BACKLOG](modules/cli/BACKLOG.md), [MCP DESIGN](modules/mcp/DESIGN.md) + [MCP BACKLOG](modules/mcp/BACKLOG.md).
-> This file is specification only.
+## Project Overview
 
-## Problem Statement
+qwen-web-arwaky is a Python CLI and MCP server that automates `chat.qwen.ai` through a persistent authenticated browser session, without a paid model API key. Developers, local automation operators, and AI agents submit substantial prompts and documents to `chat.qwen.ai`; the product sends the prompt, waits for the terminal response, extracts it, and saves the result locally with a traceable run record.
 
-Developers, local automation operators, and AI agents need to submit substantial prompts and documents to `chat.qwen.ai` without repeatedly operating the website by hand or depending on a paid API. Manual runs are slow to reproduce, difficult to audit, and vulnerable to lost output when authentication expires, the site changes, or a long response is interrupted. Without a reliable local product boundary, unattended workflows cannot determine whether work completed, where the result was saved, or what action is required after failure.
+| As a | I want | So that | Priority |
+|------|--------|---------|----------|
+| Independent developer without an API budget | submit large local prompts and documents at no API cost | I get a complete, auditable response stored at a known location without a paid key | P0 |
+| AI coding agent over a local tool connection | receive machine-readable acceptance, progress, success, and failure responses | I can drive unattended runs and resolve interactive state by action, not by observing a browser | P0 |
+| Automation operator running unattended jobs | get isolated runs with bounded waiting and actionable diagnostics | I can trust that every submitted job reaches an auditable terminal state without inspecting each open session | P1 |
+| Developer maintaining automation after an upstream change | get explicit, reproducible failures instead of partial content | I can demonstrate a regression and pin the repair without risking user data | P1 |
 
-## Goals & Success Metrics
+## Goals
+
+- **Reliable prompt workflows**: at least 99 of 100 acceptance runs across direct text, prompt file, and prompt-plus-document workflows reach a successful terminal outcome, with every failure reported explicitly.
+- **Complete audit trail**: 100% of successful runs carry both a readable result file and a corresponding run record.
+- **Cross-surface equivalence**: all 3 primary prompt workflows produce the same success, failure, and result-location information on both the command-line and agent-tool surfaces.
+- **Responsive async submission**: p95 elapsed time from accepted submission to receipt of a tracking identifier is at or below 2 seconds across 30 queued-run trials.
+- **Concurrent-run isolation**: in a ten-run exercise with one forced failure, all 9 unaffected runs reach their own terminal outcome.
+
+### Goals & Success Metrics
 
 | # | Goal | Measurement | Target |
 |---|------|-------------|--------|
 | 1 | Complete prompt workflows reliably under controlled service availability | A 100-run acceptance exercise covering direct text, prompt files, and prompt-plus-document runs | At least 99 successful terminal outcomes out of 100 runs, with every failure reported explicitly |
-
-**Goal 1 acceptance protocol:** Before a reliability claim is made for Goal 1, a QA-approved versioned sampling protocol must be on record that states: the supported account tier and region, service-health preconditions that must hold before sampling, the workflow allocation across the 100 runs, how many initial attempts are made, how retries are counted, which exclusions are valid and why, what makes a sample valid, and the QA approval signature. An unapproved protocol blocks the reliability claim. The existing 100-run / 99-success target remains in force.
 | 2 | Preserve every accepted result and its audit trail | Compare terminally successful runs with readable result files and corresponding run records | 100% of successful runs have both artifacts |
 | 3 | Give command-line and agent clients equivalent access to the primary prompt workflows | Cross-surface acceptance matrix for direct text, prompt files, and prompt-plus-document runs | 3 of 3 workflows produce the same success, failure, and result-location information on both surfaces |
 | 4 | Keep asynchronous agent calls responsive during long generations | Measure elapsed time from accepted submission to receipt of a tracking identifier in 30 queued-run trials | p95 at or below 2 seconds |
 | 5 | Prevent one failed parallel run from terminating unrelated work | Ten-run isolation exercise with one forced authentication or generation failure | All 9 unaffected runs reach their own terminal outcome |
 
-## User Personas
+**Goal 1 acceptance protocol:** Before a reliability claim is made for Goal 1, a QA-approved versioned sampling protocol must be on record that states: the supported account tier and region, service-health preconditions that must hold before sampling, the workflow allocation across the 100 runs, how many initial attempts are made, how retries are counted, which exclusions are valid and why, what makes a sample valid, and the QA approval signature. An unapproved protocol blocks the reliability claim. The existing 100-run / 99-success target remains in force.
 
-- **Independent developer working without an API budget**: needs to send large local prompts and documents at no API cost, cannot supervise every browser interaction, and considers the job done when a complete response is stored at a known location with a traceable run record.
-- **AI coding agent operating through a local tool connection**: needs predictable machine-readable acceptance, progress, success, and failure responses; it cannot solve interactive challenges or infer state from a visible browser.
-- **Automation operator running unattended jobs overnight**: needs isolated runs, bounded waiting, and actionable diagnostics; they cannot inspect each open session and consider the system successful when every submitted job reaches an auditable terminal state.
-- **Developer maintaining automation after an upstream website change**: needs failures to be explicit and reproducible rather than silently producing partial content; done means a regression can be demonstrated without risking user data.
+## Non-Goals
+
+- Automation of other model providers, and official model API clients.
+- Hosted multi-tenant service operation.
+- Bypassing CAPTCHAs, access controls, subscriptions, or provider limits.
+- Account creation or credential management.
+- Evaluating the factual quality of model answers.
+- Editing a user's source files from model output.
+- Guaranteeing availability when `chat.qwen.ai` is unavailable.
+
+## Target Users
+
+| Persona | Need | Current Pain | Desired Outcome |
+|---------|------|--------------|-----------------|
+| Independent developer working without an API budget | Send large local prompts and documents at no API cost | Cannot supervise every browser interaction; job not "done" until a complete response is stored at a known location with a traceable run record | A complete response stored at a known location with a traceable run record, at no API cost |
+| AI coding agent operating through a local tool connection | Predictable machine-readable acceptance, progress, success, and failure responses | Cannot solve interactive challenges or infer state from a visible browser | Predictable machine-readable responses it can act on without observing a browser |
+| Automation operator running unattended jobs overnight | Isolated runs, bounded waiting, and actionable diagnostics | Cannot inspect each open session; success is uncertain when any job fails | Every submitted job reaches an auditable terminal state, with isolation and recovery guidance |
+| Developer maintaining automation after an upstream website change | Failures that are explicit and reproducible | Upstream changes silently produce partial content | A regression can be demonstrated and pinned without risking user data |
 
 ## Scope
 
-- **In scope**: local automation of authenticated `chat.qwen.ai` prompt workflows; direct-text, prompt-file, and prompt-with-document inputs; local result persistence; command-line, interactive terminal, and local agent-tool access; synchronous and asynchronous execution; workspace preparation; folder-to-document preparation; session health and recovery guidance; concurrent-run isolation; diagnostics and run observability.
-- **Out of scope**: automation of other model providers; official model API clients; hosted multi-tenant service operation; bypassing CAPTCHAs, access controls, subscriptions, or provider limits; account creation or credential management; evaluating the factual quality of model answers; editing a user's source files from model output; guaranteeing availability when `chat.qwen.ai` is unavailable.
+### In Scope
 
-## Feature Requirements
+- Local automation of authenticated `chat.qwen.ai` prompt workflows; direct-text, prompt-file, and prompt-with-document inputs; local result persistence.
+- Command-line, interactive terminal, and local agent-tool access; synchronous and asynchronous execution.
+- Workspace preparation; folder-to-document preparation; session health and recovery guidance; concurrent-run isolation; diagnostics and run observability.
+
+### Out of Scope
+
+- Automation of other model providers; official model API clients; hosted multi-tenant service operation.
+- Bypassing CAPTCHAs, access controls, subscriptions, or provider limits; account creation or credential management.
+- Evaluating the factual quality of model answers; editing a user's source files from model output.
+- Guaranteeing availability when `chat.qwen.ai` is unavailable.
+
+## Project Requirements
 
 ### P0 — Must Have
 
@@ -60,7 +92,7 @@ Developers, local automation operators, and AI agents need to submit substantial
 - **F-015 — Guided product updates**: An operator can check for an available release and preview the proposed change before approving it. Acceptance: a preview reports the current and proposed versions without changing installed files.
 - **F-016 — Machine-readable diagnostics**: Automated clients can consume readiness and failure reports without parsing human prose. Acceptance: every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action.
 
-## Non-functional Requirements (High-level)
+### Non-functional Requirements (High-level)
 
 | Category | Commitment | Detail lives in |
 |----------|------------|-----------------|
@@ -94,15 +126,11 @@ Every F-00x requirement maps to a current owning document. Shared ownership is a
 | F-015 Guided product updates | [Update module](modules/update/BACKLOG.md) | — |
 | F-016 Machine-readable diagnostics | [MCP DESIGN](modules/mcp/DESIGN.md) + [CLI DESIGN](modules/cli/DESIGN.md) | Stable status/issue/action payloads |
 
-## Open Questions / Risks
+## Reference
 
-| # | Question / Risk | Owner | Deadline | Status |
-|---|-----------------|-------|----------|--------|
-| 1 | Which `chat.qwen.ai` account tiers and regional variants are part of the supported acceptance environment? | Product | Before the next release scope is approved | open |
-| 2 | Which document types and maximum document sizes form the supported F-003 contract? | Product | Before the next F-003 acceptance review | resolved — see [Prompt FRD](modules/prompt/FRD.md) FR-PROMPT-003 and the shared pre-flight validation allowlist |
-| 3 | Goal 1 acceptance protocol: record supported tier/region, service-health preflight, workflow allocation, initial attempts, retries, exclusions with reasons, sample validity, and QA approval. Unapproved protocol blocks a reliability claim. | QA | Before the next reliability report | open |
-| 4 | What is the minimum supported machine profile and safe default concurrency for F-010? | Engineering | Before concurrent-run defaults are approved | open |
-| 5 | How long must run records and generated results be retained by default? | Product / Security | Before retention behavior is changed | open |
-| 6 | Upstream UI, authentication, or policy changes may interrupt all automation without notice. | Product / Engineering | Review before every release | open |
-| 7 | Provider terms may restrict some automated usage patterns even when the product is technically able to perform them. | Legal / Product | Before public distribution decisions | resolved — see docs/MULTI_ACCOUNT_ROTATION.md policy gate (2026-10-18, Raka) |
-| 8 | Which accessibility standard and terminal environments define acceptance for F-013? | Design | Before the next interactive-interface review | open |
+| Artifact | Purpose | Link |
+|----------|---------|------|
+| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
+| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| ROADMAP | What ships next, in order | [ROADMAP.md](ROADMAP.md) |
+| BACKLOG | What is true now, with evidence | [modules/prompt/BACKLOG.md](modules/prompt/BACKLOG.md) |

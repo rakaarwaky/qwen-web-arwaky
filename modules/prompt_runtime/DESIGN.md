@@ -1,50 +1,41 @@
 # DESIGN — Prompt Runtime
 
-> Browser/stream capability contract for the prompt feature
-> (`modules/prompt_runtime`).
-> Audience: capability engineers, agent integrators.
-> Condition: [ROADMAP.md](../../ROADMAP.md) (workspace) + [FRD.md](FRD.md) (prompt-runtime).
+## Design Overview
 
-## Brand & Style
+A browser/stream capability contract for the prompt feature (`modules/prompt_runtime`): five runtime capabilities drive the live Playwright page and the output filesystem, one aggregate fronts them as a single verb door, and the design carries no verb routing or cancellation logic of its own — those live in `modules/prompt`.
 
-Smart capability layer (AES403). The five runtime capabilities drive the live
-Playwright page and the output filesystem; they carry no verb-routing or
-cancellation logic (that lives in `modules/prompt`). They emit pipeline
-lifecycle events but log only lengths and counts, never response text.
+## Design Requirements
 
-## Components
+### DS-PROMPT-RUNTIME-001: Capability Boundaries
 
-| Capability | Class | Role |
-|---|---|---|
-| `capabilities_stream_monitor` | `StreamMonitor` | Watches the page until a response completes; stall/timeout verdicts. |
-| `capabilities_send_dispatcher` | `SendDispatcher` | Clicks send; parse-toast hold loop. |
-| `capabilities_prompt_injector` | `PromptInjector` | DOM-injects prompt text into the chat input. |
-| `capabilities_file_uploader` | `FileUploader` | Attachment validation and upload. |
-| `capabilities_output_saver` | `Saver` | Markdown persistence + `.meta.json` sidecar. |
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Stream monitor | Watches the page until a response completes; stall/timeout verdicts | `StreamMonitor` | watch |
+| Send dispatcher | Clicks send; parse-toast hold loop | `SendDispatcher` | send |
+| Prompt injector | DOM-injects prompt text into the chat input | `PromptInjector` | inject |
+| File uploader | Attachment validation and upload | `FileUploader` | upload |
+| Output saver | Markdown persistence + `.meta.json` sidecar | `Saver` | persist |
 
-### Barrel
+### DS-PROMPT-RUNTIME-002: Barrel and Packaging
 
-`src/__init__.py` is the module's single import point; it re-exports the five
-capability classes (`FileUploader`, `PromptInjector`, `SendDispatcher`,
-`Saver`, `StreamMonitor`) under `__all__`.
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Import point | `src/__init__.py` re-exports the five capability classes | `__all__` | single import point |
+| Packaging | Per-member `pyproject.toml` is additive setuptools metadata under the root | `packages.find` | additive, not standalone-buildable |
 
-### Packaging
+### DS-PROMPT-RUNTIME-003: Dependency Isolation
 
-The per-member `pyproject.toml` is additive setuptools metadata under the
-root `packages.find include = ["modules*"]`; it is not a uv workspace
-member and is not standalone-buildable (matches the pre-existing
-`modules/shared` / `modules/cli` convention).
-
-### Dependency Notes
-
-- Depends only on `modules.shared` (taxonomy, contract, utility) plus
-  `playwright` — no cross-module capability imports.
-- `Saver.write_output` enforces `0o600` on written artifacts; the `.meta.json`
-  sidecar lands under XDG state, never the output directory.
-- `FileUploader.validate_file` enforces the `100 * 1024 * 1024` byte ceiling
-  pre-flight; the limit is a shared taxonomy constant.
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Allowed imports | Depends only on `modules.shared` (taxonomy, contract, utility) plus `playwright` | `modules.shared` | no cross-module capability imports |
+| Artifact perms | `Saver.write_output` enforces `0o600` on written artifacts | `0o600` | owner read/write only |
+| Upload ceiling | `FileUploader.validate_file` enforces the `100 * 1024 * 1024` byte ceiling pre-flight | `104857600` | shared taxonomy constant |
 
 ## Reference
 
-- Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- Orchestration layer: [modules/prompt/DESIGN.md](../prompt/DESIGN.md)
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals, user stories, and scope | [PRD.md](../../PRD.md) |
+| Backlog | Task tracking, epics, and implementation status | [BACKLOG.md](BACKLOG.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |

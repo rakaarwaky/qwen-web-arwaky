@@ -5,55 +5,160 @@ Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-05
 
-## Current Condition
+## Progress Overview
 
 - Done: `uv run python -m pytest modules/shared/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
 - Done: SHARED-01 acceptance scenario (session restore byte-identity) added to `unit_utility_session_backup.py`, 2026-10-24.
 - In Progress: None.
 - Next Action: `SHARED-02`, pin DOM query helpers against one captured chat transcript.
 
-## Backlog
+## Backlog Status
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---:|---|---|---|---|
-| SHARED-01 | P1 | Done | None | — | 2026-10-24 |
-| SHARED-02 | P1 | Done | None | Pinned DOM query helpers in unit_transcript_selector_regression.py against captured transcript fixture (2026-10-25). Evidence: `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). | 2026-10-25 |
-| SHARED-03 | P2 | Done | `CONFIG-02` | Documented the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settled. Evidence: `uv run python -m pytest modules/shared/tests/ -q` → passes (2026-10-25, commit 2355b5d). | 2026-10-25 |
+### DT-SHARED-001
 
-## Scenario Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | — |
+| Updated | 2026-10-24 |
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| A restored session backup reproduces the target tree | Automated | `modules/shared/tests/unit_utility_session_backup.py` | test_restore_is_byte_identical_after_a_full_corruption_cycle | 2026-10-24 |
-| Event names are the closed vocabulary the kernel publishes | Automated | `modules/shared/tests/contract_taxonomy_core_event.py` | event contract | 2026-10-05 |
-| Capacity guards reject over-subscribed worker counts | Automated | `modules/shared/tests/unit_utility_capacity.py` | capacity bounds | 2026-10-05 |
-| Path helpers resolve XDG roots on every platform | Automated | `modules/shared/tests/unit_utility_env.py` | path resolution | 2026-10-05 |
+### DT-SHARED-002
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
 
-None.
+### DT-SHARED-003
 
-## Dependencies
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
 
-- `CONFIG-02` owns the request-timeout ceiling that the flow kernel reads.
-- `PROMPT-01` owns the retry budget that the shared rate limiter enforces.
+### DT-SHARED-004
 
-## Release Readiness
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
 
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | `uv run python -m pytest modules/shared/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 4 of 4 scenarios mapped to an automated test. |
-| Docs | Done | [DATA.md](DATA.md) is specification-only. |
+### DT-SHARED-005
 
-## Deferred
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
 
-None.
+### DT-SHARED-006
 
-## Change Log
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
 
-| Date | Change | By |
-|---|---|---|
-| 2026-10-24 | SHARED-01 advanced to Done: acceptance test `test_restore_is_byte_identical_after_a_full_corruption_cycle` added to `unit_utility_session_backup.py`. | @qwen-web-arwaky |
-| 2026-10-25 | Evidence cells completed (three-proof rule). | @qwen-web-arwaky |
-| 2026-10-05 | Initial kernel backlog created with the AES701 doc pair. | @qwen-web-arwaky |
+### DT-SHARED-007
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-008
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-009
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-010
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-011
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | Pinned DOM query helpers in `unit_transcript_selector_regression.py` against captured transcript fixture (2026-10-25). `uv run python -m pytest modules/shared/tests/unit_transcript_selector_regression.py -v` → 19 passed (commit `4d7e5f3`). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-012
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `CONFIG-02` |
+| Evidence | Documented the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settled. `uv run python -m pytest modules/shared/tests/ -q` → passes (2026-10-25, commit 2355b5d). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-013
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `CONFIG-02` |
+| Evidence | Documented the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settled. `uv run python -m pytest modules/shared/tests/ -q` → passes (2026-10-25, commit 2355b5d). |
+| Updated | 2026-10-25 |
+
+### DT-SHARED-014
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `CONFIG-02` |
+| Evidence | Documented the rate-limiter window semantics in `DATA.md` once the shared-flow retry budget settled. `uv run python -m pytest modules/shared/tests/ -q` → passes (2026-10-25, commit 2355b5d). |
+| Updated | 2026-10-25 |
+
+## Reference
+
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD.md | Product requirements | [PRD.md](../../PRD.md) |
+| DATA.md | Data contract | [DATA.md](DATA.md) |
+| ROADMAP.md | Roadmap status | [ROADMAP.md](../../ROADMAP.md) |
+| ARCHITECTURE.md | Layer contract | [ARCHITECTURE.md](../../ARCHITECTURE.md) |

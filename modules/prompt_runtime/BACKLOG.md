@@ -14,7 +14,7 @@ Last Updated: 2026-10-27
 
 ## Backlog Status
 
-### FR-RUNTIME-001
+### FR-PromptRuntime-001
 
 | Aspect | Detail |
 | --- | --- |
@@ -24,7 +24,7 @@ Last Updated: 2026-10-27
 | Evidence | `uv run python -m pytest modules/prompt/tests/ modules/prompt_runtime/tests/ modules/prompt/benches/ modules/prompt_runtime/benches/ -m "not benchmark"` → 298 passed (2026-10-27, branch `rakaarwaky/prompt-runtime-split-merge`). |
 | Updated | 2026-10-27 |
 
-### FR-RUNTIME-002
+### FR-PromptRuntime-002
 
 | Aspect | Detail |
 | --- | --- |
@@ -34,7 +34,7 @@ Last Updated: 2026-10-27
 | Evidence | `uv run python -m pytest modules/prompt/tests/ modules/prompt_runtime/tests/ modules/prompt/benches/ modules/prompt_runtime/benches/ -m "not benchmark"` → 298 passed (2026-10-27, branch `rakaarwaky/prompt-runtime-split-merge`). |
 | Updated | 2026-10-27 |
 
-### FR-RUNTIME-003
+### FR-PromptRuntime-003
 
 | Aspect | Detail |
 | --- | --- |
@@ -44,7 +44,7 @@ Last Updated: 2026-10-27
 | Evidence | `uv run python -m pytest modules/prompt/tests/ modules/prompt_runtime/tests/ modules/prompt/benches/ modules/prompt_runtime/benches/ -m "not benchmark"` → 298 passed (2026-10-27, branch `rakaarwaky/prompt-runtime-split-merge`). |
 | Updated | 2026-10-27 |
 
-### FR-RUNTIME-004
+### FR-PromptRuntime-004
 
 | Aspect | Detail |
 | --- | --- |
@@ -54,7 +54,7 @@ Last Updated: 2026-10-27
 | Evidence | `uv run python -m pytest modules/prompt/tests/ modules/prompt_runtime/tests/ modules/prompt/benches/ modules/prompt_runtime/benches/ -m "not benchmark"` → 298 passed (2026-10-27, branch `rakaarwaky/prompt-runtime-split-merge`). |
 | Updated | 2026-10-27 |
 
-### FR-RUNTIME-005
+### FR-PromptRuntime-005
 
 | Aspect | Detail |
 | --- | --- |
@@ -64,7 +64,7 @@ Last Updated: 2026-10-27
 | Evidence | `uv run python -m pytest modules/prompt/tests/ modules/prompt_runtime/tests/ modules/prompt/benches/ modules/prompt_runtime/benches/ -m "not benchmark"` → 298 passed (2026-10-27, branch `rakaarwaky/prompt-runtime-split-merge`). |
 | Updated | 2026-10-27 |
 
-### FR-RUNTIME-006
+### FR-PromptRuntime-006
 
 | Aspect | Detail |
 | --- | --- |

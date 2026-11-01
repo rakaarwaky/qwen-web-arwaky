@@ -1,155 +1,291 @@
 # CONFIG Functional Requirements Document
 
-## Reference
+## Feature Overview
 
-- PRD: [PRD.md](../../PRD.md)
-- Backlog: [BACKLOG.md](BACKLOG.md)
-
-## System Overview
-
-The config feature turns the operator's environment and parsed arguments
-into one validated runtime configuration. Seven capability seams answer the
-questions a run needs — what the host allows, whether a config can run,
-where its paths point, how many browsers it can carry, what one slot's
-widget values mean, how the run workspace is initialized, and whether the
-host is healthy enough to run at all — and the orchestrator folds their
-answers into a single config the other features read.
+The config feature turns the operator's environment and parsed arguments into one validated runtime configuration. Seven capability seams answer the questions a run needs — what the host allows, whether a config can run, where its paths point, how many browsers it can carry, what one slot's widget values mean, how the run workspace is initialized, and whether the host is healthy enough to run at all — and the orchestrator folds their answers into a single config the other features read.
 
 ## Functional Requirements
 
 ### FR-CONFIG-001: Resolve the operator environment
 
-- **Description**: Report what the host's environment resolves to for every policy the runtime obeys.
-- **Input**: The process environment, read through the environment seam.
-- **Output**: A sandbox verdict, a response-wait ceiling, a worker cap, a Swarm concurrency cap, and the pinned model name.
-- **Business Rules**:
-  - An explicit environment switch outranks host detection for the sandbox verdict, so an operator can pin a mode the host would otherwise choose.
-  - An unparseable or non-positive ceiling falls back to the built-in default instead of failing the boot.
-- **Edge Cases**: A non-Linux host reports the sandbox as available; a host whose seccomp filter is disabled reports the sandbox as unavailable.
-- **Error Handling**: A ceiling that cannot be read at all is not an error; the default applies and the pipeline boots.
+**Description:**
+
+Report what the host's environment resolves to for every policy the runtime obeys.
+
+#### Business Logic
+
+- An explicit environment switch outranks host detection for the sandbox verdict, so an operator can pin a mode the host would otherwise choose.
+- An unparseable or non-positive ceiling falls back to the built-in default instead of failing the boot.
+
+#### Edge Cases
+
+- A non-Linux host reports the sandbox as available; a host whose seccomp filter is disabled reports the sandbox as unavailable.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | The process environment, read through the environment seam. |
+| **Output** | A sandbox verdict, a response-wait ceiling, a worker cap, a Swarm concurrency cap, and the pinned model name. |
+| **Protocol** | `IConfigReadProtocol` / `IConfigInspectProtocol` — the config capability seams. |
+| **Method** | `sandbox_report`, `max_workers`, `model`, `request_timeout_sec`, `swarm_concurrency`, `swarm_headless` |
+| **Event** | none |
+| **Error** | A ceiling that cannot be read at all is not an error; the default applies and the pipeline boots. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| An environment override is set | The config resolves | The override outranks host detection for the sandbox verdict |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Ceiling default-fallback accuracy | 100% |
 
 ### FR-CONFIG-002: Report every problem that keeps a config from running
 
-- **Description**: Return all configuration problems at once instead of raising on the first.
-- **Input**: A built runtime configuration.
-- **Output**: The list of findings, each with a category, a severity, and an operator-facing sentence.
-- **Business Rules**:
-  - Field minimums are checked against the same thresholds the config itself enforces, so a config that built successfully produces only path findings.
-  - Findings carry the category that maps onto the operator runbook, so a message can name the doc that fixes it.
-- **Edge Cases**: A config with no problems produces an empty finding list, not an error.
-- **Error Handling**: No finding is raised as an exception; the caller decides whether a warning blocks the run.
+**Description:**
+
+Return all configuration problems at once instead of raising on the first.
+
+#### Business Logic
+
+- Field minimums are checked against the same thresholds the config itself enforces, so a config that built successfully produces only path findings.
+- Findings carry the category that maps onto the operator runbook, so a message can name the doc that fixes it.
+
+#### Edge Cases
+
+- A config with no problems produces an empty finding list, not an error.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | A built runtime configuration. |
+| **Output** | The list of findings, each with a category, a severity, and an operator-facing sentence. |
+| **Protocol** | `IConfigValidateProtocol` — the config capability seam. |
+| **Method** | `validate` |
+| **Event** | none |
+| **Error** | No finding is raised as an exception; the caller decides whether a warning blocks the run. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A config with several invalid fields | The validator runs | Every finding is reported in one call |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Finding completeness | 100% |
 
 ### FR-CONFIG-003: Resolve config paths and prove the host can use them
 
-- **Description**: Report every path a config names with its existence and writability verdict.
-- **Input**: A built runtime configuration.
-- **Output**: One resolved path per named field, plus the problems found while resolving them.
-- **Business Rules**:
-  - A directory the run has not created yet is not a problem when its nearest existing ancestor accepts a write.
-  - A read-only field only has to exist; a written field also has to accept a write.
-- **Edge Cases**: A field the config left unset is skipped rather than reported as missing.
-- **Error Handling**: A path that cannot be inspected at all is reported as a finding naming the path.
+**Description:**
+
+Report every path a config names with its existence and writability verdict.
+
+#### Business Logic
+
+- A directory the run has not created yet is not a problem when its nearest existing ancestor accepts a write.
+- A read-only field only has to exist; a written field also has to accept a write.
+
+#### Edge Cases
+
+- A field the config left unset is skipped rather than reported as missing.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | A built runtime configuration. |
+| **Output** | One resolved path per named field, plus the problems found while resolving them. |
+| **Protocol** | `IConfigPathProtocol` — the config capability seam. |
+| **Method** | `resolve_paths` |
+| **Event** | none |
+| **Error** | A path that cannot be inspected at all is reported as a finding naming the path. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A not-yet-existing output directory | The resolver runs | The path is accepted when its nearest existing ancestor accepts a write |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Path verdict accuracy | 100% |
 
 ### FR-CONFIG-004: Report host capacity
 
-- **Description**: Report how many concurrent browsers the host can carry.
-- **Input**: The host's CPU and memory characteristics.
-- **Output**: A capacity report naming the recommended worker ceiling.
-- **Business Rules**: The ceiling is derived from the host, so the same config never promises more parallelism than the machine can run.
-- **Edge Cases**: A host that reports no usable memory falls back to the single-worker default.
-- **Error Handling**: Capacity detection failure yields the conservative default rather than aborting the boot.
+**Description:**
+
+Report how many concurrent browsers the host can carry.
+
+#### Business Logic
+
+- The ceiling is derived from the host, so the same config never promises more parallelism than the machine can run.
+
+#### Edge Cases
+
+- A host that reports no usable memory falls back to the single-worker default.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | The host's CPU and memory characteristics. |
+| **Output** | A capacity report naming the recommended worker ceiling. |
+| **Protocol** | `IConfigInspectProtocol` — the config capability seam. |
+| **Method** | `report` |
+| **Event** | none |
+| **Error** | Capacity detection failure yields the conservative default rather than aborting the boot. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A host with no usable memory | The inspector runs | The ceiling falls back to the single-worker default |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Capacity-fallback accuracy | 100% |
 
 ### FR-CONFIG-005: Resolve a slot's widget values into a run plan
 
-- **Description**: Turn the raw values one interactive slot holds into an executable run plan, and discover the batch prompts a folder input names.
-- **Input**: The slot's raw widget values, or a folder path.
-- **Output**: A run plan naming the verb, paths, and flags; or the ordered list of batch prompts a folder holds.
-- **Business Rules**: One place decides what a slot's values mean, so the interactive surface and the non-interactive path cannot resolve the same values differently.
-  - Folder discovery respects the configured depth limits and sorts prompts deterministically.
-- **Edge Cases**: A folder holding no prompts yields an empty list rather than an error; a depth violation is reported against the file that caused it.
-- **Error Handling**: A folder that cannot be read surfaces a file error naming the path.
+**Description:**
+
+Turn the raw values one interactive slot holds into an executable run plan, and discover the batch prompts a folder input names.
+
+#### Business Logic
+
+- One place decides what a slot's values mean, so the interactive surface and the non-interactive path cannot resolve the same values differently.
+- Folder discovery respects the configured depth limits and sorts prompts deterministically.
+
+#### Edge Cases
+
+- A folder holding no prompts yields an empty list rather than an error; a depth violation is reported against the file that caused it.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | The slot's raw widget values, or a folder path. |
+| **Output** | A run plan naming the verb, paths, and flags; or the ordered list of batch prompts a folder holds. |
+| **Protocol** | `IConfigPlanProtocol` — the config capability seam. |
+| **Method** | `resolve_slot_run_plan`, `discover_batch_prompts` |
+| **Event** | none |
+| **Error** | A folder that cannot be read surfaces a file error naming the path. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A folder input holding three prompts | Discovery runs | The three prompts are listed in a deterministic order |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Deterministic batch-prompt ordering | 100% |
 
 ### FR-CONFIG-006: Initialize the run workspace
 
-- **Description**: Create the XDG storage directories, provision SKILL.md, create `.qwen-web-arwaky` symlinks, and write a self-contained nested `.qwen-web-arwaky/.gitignore` (ignores everything inside the workspace dir except itself) so a run has the local paths it expects. Legacy root `.gitignore` entries (`.qwen-web-arwaky/`, `.qwen-web/`) that older versions appended are cleaned up when the root file already exists; init never creates a root `.gitignore`.
-- **Input**: The target directory the operator named, or the working directory.
-- **Output**: The created workspace, or the paths that could not be created.
-- **Business Rules**:
-  - Session directories are created with owner-only permissions because they hold live login cookies.
-  - An existing directory is reused rather than recreated, so an initialized workspace survives re-initialization.
-- **Edge Cases**: A directory the host refuses to create surfaces a file error naming the path.
-- **Error Handling**: A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location.
+**Description:**
+
+Create the XDG storage directories, provision SKILL.md, create `.qwen-web-arwaky` symlinks, and write a self-contained nested `.qwen-web-arwaky/.gitignore` so a run has the local paths it expects.
+
+#### Business Logic
+
+- Session directories are created with owner-only permissions because they hold live login cookies.
+- An existing directory is reused rather than recreated, so an initialized workspace survives re-initialization.
+
+#### Edge Cases
+
+- A directory the host refuses to create surfaces a file error naming the path.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | The target directory the operator named, or the working directory. |
+| **Output** | The created workspace, or the paths that could not be created. |
+| **Protocol** | `IConfigWorkspaceProtocol` — the config capability seam. |
+| **Method** | `init_workspace` |
+| **Event** | none |
+| **Error** | A link that cannot be created surfaces a file error naming the target; the run proceeds with the default location. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A fresh workspace init | The initializer runs | Owner-only session directories are created and existing paths are reused |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Workspace-init idempotency | 100% |
 
 ### FR-CONFIG-007: Probe host health for the update smoke gate
 
-- **Description**: Run the non-interactive doctor diagnostics (Python version, Chromium binary reachability, workspace initialization, session pool status, output writability, host capacity, sandbox mode, environment contract, observability backends) and report each as a record.
-- **Input**: The process environment and host state; optionally the session pool aggregate.
-- **Output**: A tuple of health-probe records, each naming the check, its pass/fail verdict, an operator sentence, and a severity.
-- **Business Rules**: The checks run at gate-execution time so a post-update gate reflects the post-upgrade state (issue #506); an empty session pool is a legitimate "no session" result, not a probe failure.
-- **Edge Cases**: A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; a production host with no error tracking reports a warning, not a failure.
-- **Error Handling**: A check that cannot be probed reports the probe error in the detail sentence rather than raising.
+**Description:**
 
-## API Contract
+Run the non-interactive doctor diagnostics and report each as a record.
 
-### Protocol API
+#### Business Logic
 
-| Method | Input | Output | Error | Event | Description |
-|---|---|---|---|---|---|
-| `sandbox_report` | host environment | sandbox verdict with reason | none | none | Report the sandbox mode Chromium will launch under. |
-| `max_workers` | host environment | worker ceiling | none | none | Report the concurrency the host can carry. |
-| `model` | host environment | model name | none | none | Report the model the run pins. |
-| `request_timeout_sec` | host environment | response-wait ceiling | none | none | Report the wall-clock response ceiling. |
-| `swarm_concurrency` | host environment | fan-out ceiling | none | none | Report how many fan-out browsers may run at once. |
-| `swarm_headless` | host environment | fan-out browser visibility | none | none | Report whether fan-out browsers open a window. |
-| `validate` | built runtime config | list of findings | none | none | Report every problem that blocks a run. |
-| `resolve_paths` | built runtime config | resolved paths and findings | none | none | Report each named path and its host verdict. |
-| `report` | host characteristics | capacity report | none | none | Report the host's browser capacity. |
-| `resolve_slot_run_plan` | slot widget values | run plan | validation error | none | Resolve one slot's values into an executable plan. |
-| `discover_batch_prompts` | folder path | ordered prompt paths | file error | none | List the prompts a folder input names. |
-| `init_workspace` | target directory | created workspace | file error | none | Create XDG directories, SKILL.md, `.qwen-web-arwaky` symlinks, and a nested `.qwen-web-arwaky/.gitignore` that keeps the workspace dir local. |
-| `probe` | host state, optional session aggregate | health-probe records | none | none | Run the non-interactive doctor diagnostics and report each as a record for the update smoke gate. |
+- The checks run at gate-execution time so a post-update gate reflects the post-upgrade state.
+- An empty session pool is a legitimate "no session" result, not a probe failure.
 
-### Aggregate API
+#### Edge Cases
 
-| Method | Input | Output | Error | Event | Description |
-|---|---|---|---|---|---|
-| `execute` | config request naming the mode | config response carrying one validated runtime configuration | validation error | none | Single entry point every other feature calls to obtain its config. |
+- A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; a production host with no error tracking reports a warning, not a failure.
 
-## Integration Points
+#### Technical Specification
 
-| System | Direction | Purpose | Failure mode |
-|---|---|---|---|
-| Prompt orchestrators | out | Obtain the run configuration | validation error -> caller reports the finding |
-| Session orchestrators | out | Obtain sandbox and path verdicts | validation error -> caller refuses the run |
-| Doctor surface | in | Read the same verdicts a run will obey | none; diagnostics read only |
-| Interactive slot surfaces | in | Resolve slot widget values into a run plan | validation error -> slot reports the offending field |
+| Aspect | Detail |
+| --- | --- |
+| **Input** | The process environment and host state; optionally the session pool aggregate. |
+| **Output** | A tuple of health-probe records, each naming the check, its pass/fail verdict, an operator sentence, and a severity. |
+| **Protocol** | `IConfigDoctorProtocol` — the config capability seam. |
+| **Method** | `probe` |
+| **Event** | none |
+| **Error** | A check that cannot be probed reports the probe error in the detail sentence rather than raising. |
 
-## Non-functional Requirements
+#### Test
 
-| Metric | Target | Measurement method |
-|---|---|---|
-| Config build latency | no filesystem or network probe on the happy path | timing the build seam |
-| Finding completeness | every problem reported, not the first | finding count against a seeded multi-fault config |
-| Determinism | the same environment yields the same config every build | repeated-build equality check |
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| A host without a Chromium OS sandbox | The probe runs | The sandbox is reported as disabled with the deciding reason |
 
-## Test Scenarios
+#### Metric
 
-- An explicit sandbox switch overrides what the host detection would have chosen.
-- An unparseable response ceiling falls back to the default and the pipeline still boots.
-- A config whose output directory does not exist yet is accepted when its nearest existing ancestor accepts a write.
-- A config with several invalid fields reports every one of them in one call.
-- A folder input holding three prompts discovers them in a deterministic order.
-- A workspace init creates owner-only directories, provisions SKILL.md and symlinks, and reuses an existing workspace.
-- A host that cannot provide a Chromium OS sandbox reports the sandbox as disabled with the deciding reason; the update smoke gate reflects the post-upgrade state because the probe re-runs the checks at gate-execution time.
-- A host that reports no usable memory derives a ceiling of one worker, so an unmeasurable host runs serially instead of fanning out at the constant cap.
+| Target Metric | Value |
+| --- | --- |
+| Probe-report accuracy | 100% |
 
-## Assumptions & Constraints
+## Public Interface
 
-- The request-timeout ceiling is wall-clock, not an idle budget: a long thinking phase emits no forward event, so a short ceiling aborts healthy runs.
-- The capacity ceiling is advisory. A caller that raises it owns the consequences.
+| Aspect | Detail |
+| --- | --- |
+| Agent | `ConfigOrchestrator` |
+| Aggregate | `IConfigAggregate` |
+| Method | `execute` |
+| Request | `ConfigRequest` — names the config mode |
+| Response | `ConfigResponse` — carries one validated runtime configuration |
 
-## Glossary
+## Reference
 
-- **Run plan**: The verb, paths, and flags one interactive slot resolves to.
-- **Capacity report**: The host's browser concurrency ceiling and how it was derived.
-- **Sandbox verdict**: The mode Chromium will launch under, plus the reason it was chosen.
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD.md | Product requirements | [PRD.md](../../PRD.md) |
+| BACKLOG.md | Task tracking, implementation status | [BACKLOG.md](BACKLOG.md) |
+| ROADMAP.md | Roadmap status | [ROADMAP.md](../../ROADMAP.md) |
+| ARCHITECTURE.md | Layer contract | [ARCHITECTURE.md](../../ARCHITECTURE.md) |

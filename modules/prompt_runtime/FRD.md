@@ -11,7 +11,7 @@ a request verb to the capability that serves it.
 
 ## Functional Requirements
 
-### FR-RUNTIME-001: Inject prompt text into the chat input
+### FR-PromptRuntime-001: Inject prompt text into the chat input
 
 **Description:**
 
@@ -50,7 +50,7 @@ Locate the chat input on the live page and inject the prompt text through multi-
 | --- | --- |
 | Injection verification pass rate | 100% |
 
-### FR-RUNTIME-002: Dispatch the send action
+### FR-PromptRuntime-002: Dispatch the send action
 
 **Description:**
 
@@ -91,7 +91,7 @@ Click the send control on the live page and confirm the dispatch was acknowledge
 | --- | --- |
 | ACK gate pass rate | 100% |
 
-### FR-RUNTIME-003: Watch the response stream
+### FR-PromptRuntime-003: Watch the response stream
 
 **Description:**
 
@@ -133,7 +133,7 @@ Follow the response stream until a stable terminal state is reached, the stall d
 | --- | --- |
 | Stream verdict accuracy | 100% |
 
-### FR-RUNTIME-004: Upload an attachment
+### FR-PromptRuntime-004: Upload an attachment
 
 **Description:**
 
@@ -175,7 +175,7 @@ Validate an attachment file against the locked allowlist and byte ceiling, then 
 | --- | --- |
 | Pre-flight boundary accuracy | 100% |
 
-### FR-RUNTIME-005: Persist the response artifact
+### FR-PromptRuntime-005: Persist the response artifact
 
 **Description:**
 
@@ -218,7 +218,7 @@ Write the response text to the operator's named destination with a run-traceabil
 | --- | --- |
 | Artifact permission correctness | 100% |
 
-### FR-RUNTIME-006: Route any runtime verb through one aggregate door
+### FR-PromptRuntime-006: Route any runtime verb through one aggregate door
 
 **Description:**
 

@@ -1,53 +1,47 @@
 # Contributing
 
-## Principles
+## Contribution Overview
 
-- Read [`AGENTS.md`](AGENTS.md) before changing code. Architecture and naming rules are defined in [`ARCHITECTURE.md`](ARCHITECTURE.md).
-- Keep each change focused: one problem, one pull request.
-- A change is not done until the gates in [Quality Verification & PR Process](#quality-verification--pr-process) pass locally.
-- Editable installation (`pip install -e .`) is strictly forbidden. The runtime must remain decoupled and immutable from the repository working tree.
+Contribute to qwen-web-arwaky as a focused, test-first change: one problem, one pull request, one owning module under `modules/`. Read [AGENTS.md](AGENTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md) before touching code — the 7-layer rules and naming contract are enforced in CI at zero violations. A change is not done until the local gates below pass and the PR description names the evidence that proves it.
 
-## Development Setup
+## Contribution Guidelines
 
-For development dependencies and testing, sync via `uv` or use an isolated venv with immutable installation:
+- **Editable installation is forbidden.** The runtime must never execute from the repository source tree. All local development and testing uses an immutable `uv`-managed venv (`export UV_PROJECT_ENVIRONMENT="$PWD/.venv" && uv sync`); `pip install -e .` is rejected on review.
+- **Every code change ships its own test.** The test exercises the behavior, not the implementation. For a regression, add a minimal repro that fails before the fix and passes after.
+- **Keep module boundaries intact.** Files land in the vertical slice of the owning feature module; no cross-feature import shortcuts. If a change spans two modules, the root container wires it once.
+- **Update the spec in the same PR.** A behavior change updates the owning `FRD.md` or `DESIGN.md` and the module's `BACKLOG.md` row in the same commit.
+- **Never commit runtime data.** Generated responses, browser profiles, session files, and personal config stay out of the diff.
 
-```bash
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-uv sync
-```
+## Workflow
 
-The command succeeds when pip ends with a `Successfully installed` line (or reports that every package is already satisfied).
+| Step | Action | Detail |
+|------|--------|--------|
+| 1 | Pick the owning module | Read the module's `FRD.md`/`DESIGN.md` + `BACKLOG.md`; confirm the change belongs in that vertical slice |
+| 2 | Write a failing test | One focused test per behavior; run it to confirm the red |
+| 3 | Implement the fix | Keep the change inside the owning module; wire cross-module dependencies only through the root containers |
+| 4 | Update the spec | Refresh the `FRD.md`/`DESIGN.md` and the `BACKLOG.md` row in the same commit |
+| 5 | Run the local gates | `bash scripts/ci.sh` — must end with `All 7 gates passed`; this runs formatting, lint, type, security, architecture, template-hygiene, and the full test selection |
+| 6 | Open the PR | Description names the problem, the approach, and the verification command; no runtime data, no secrets, no personal paths |
+| 7 | CI + review | `ci.yml` (format, lint, lock drift, build, test, self-lint) and architecture review must pass before merge |
+| 8 | Merge | Squash merge into `main`; the auto-merge workflow handles the queue |
 
-### Feature Change
+## Commit Convention
 
-1. Add or update a test that demonstrates the intended behavior.
-2. Keep feature code in the correct vertical slice under `modules/`.
-3. Run the focused test while iterating.
-4. Run the local quality gates before opening a pull request.
-5. Update user-facing documentation when behavior, commands, or configuration changes.
+| Type | Usage | Example |
+|------|-------|---------|
+| `feat` | New behavior, new module capability | `feat(prompt): add extraction verdict to response payload` |
+| `fix` | Bug fix, regression repair | `fix(session): close leaked Chromium context on probe timeout` |
+| `refactor` | Behavior-preserving restructure | `refactor(config): move post-update smoke gate into capabilities_config_health_probe` |
+| `test` | Test or fixture changes only | `test(browser): add selector-regression lock for the new DOM` |
+| `docs` | Spec or doc update, no code change | `docs(ROADMAP): advance TUI-01 to Done with release evidence` |
+| `chore` | Build, deps, CI config, lockfile | `chore: bump playwright to 1.62.0 and regenerate uv.lock`
 
-See [`TEST.md`](TEST.md) for the full test strategy and browser-fixture workflow.
+## Reference
 
-### Documentation Change
-
-1. Change the specification document the change belongs to: `PRD.md`, `ARCHITECTURE.md`, a module `FRD.md`, or `ROADMAP.md`.
-2. Update the owning module's `BACKLOG.md` row in the same pull request, so a merged fix never leaves a stale row.
-3. Keep the reference links in `AGENTS.md` (`## Related Documents`) pointing at files that exist.
-
-## Quality Verification & PR Process
-
-```bash
-bash scripts/ci.sh
-```
-
-Success is the final message `All 7 gates passed — ready to merge`. The script runs formatting and lint checks, type checking, a security scan, architecture checks, template hygiene, and tests.
-
-To mirror the CI test job directly:
-
-```bash
-python -m pytest modules/shared/tests/ modules/cli/tests/ modules/mcp/tests/ modules/prompt/tests/ modules/session/tests/ modules/jobs/tests/ modules/browser/tests/ modules/config/tests/ modules/logging/tests/ modules/swarm/tests/ modules/update/tests/ -m "not benchmark" -v
-```
-
-Success is a pytest passed summary and exit status 0. Tests requiring a live authenticated Qwen session are excluded from this command.
-
-Open the pull request only after the gates pass. In its description, explain the problem, the approach, and the verification commands you ran. Do not include Qwen sessions, secrets, generated browser data, build outputs, or personal configuration.
+| Artifact | Purpose | Link |
+|----------|---------|------|
+| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
+| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| ROADMAP | What ships next, in order | [ROADMAP.md](ROADMAP.md) |
+| TEST | Test strategy, markers, and fixture conventions | [TEST.md](TEST.md) |
+| AGENTS | Agent operating guide, command gates | [AGENTS.md](AGENTS.md) |

@@ -1,13 +1,10 @@
 # ROADMAP — qwen-web-arwaky
 
-State: vocabulary below. Last Updated: 2026-10-24.
+Last Updated: 2026-10-25
 
-## Current Condition
+## Progress Overview
 
-- In Progress: `modules/tui` TUI-01 release-evidence recording (tracked in #721).
-- Done: `modules/prompt`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
-- Blocked: None
-- Next: None
+The core prompt, session, jobs, browser, config, logging, CLI, MCP, and update modules are all at Done. Swarm execution and the TUI release-evidence trail remain open; both are tracked in the feature roll-up below.
 
 ## State Definitions
 
@@ -36,9 +33,23 @@ One table: every feature row. Feature detail stays in each feature's `BACKLOG.md
 | `modules/mcp` | MCP Server Surface | P1 | Done | Spec: [DESIGN](modules/mcp/DESIGN.md) · Backlog: [BACKLOG](modules/mcp/BACKLOG.md) | None | 2026-10-25 |
 | `modules/update` | Product update | P2 | Done | Spec: [FRD](modules/update/FRD.md) · Backlog: [BACKLOG](modules/update/BACKLOG.md) | None | 2026-10-25 |
 
+## Current Condition
+
+- **In Progress**: `modules/tui` TUI-01 release-evidence recording (tracked in #721).
+- **Done**: `modules/prompt`, `modules/session`, `modules/jobs`, `modules/logging`, `modules/browser`, `modules/config`, `modules/update`, `modules/mcp`, and `modules/cli` roll-ups advanced to Done on 2026-10-25.
+- **Blocked**: None
+- **Next**: None
+
 ## Risk Register
 
 - Risk: attachment parsing or resend behavior triggers `SendDispatchError` or anti-bot verification in a release. Mitigation: `PROMPT-01`.
 - Risk: unresolved security and quality reports ship without current reproduction or explicit acceptance. Mitigation: `PROMPT-05`, `PROMPT-06`, `MCP-02`.
 - Risk: Qwen UI or model changes invalidate selectors, completion detection, or hardcoded model verification. Mitigation: `PROMPT-01`, `PROMPT-03`.
 - Risk: async job and swarm concurrency leak resources or stall callers. Mitigation: `PROMPT-02`, `MCP-01`.
+
+## Reference
+
+| Artifact | Purpose | Link |
+|----------|---------|------|
+| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
+| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |
