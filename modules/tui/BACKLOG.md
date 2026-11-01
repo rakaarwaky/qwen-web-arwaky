@@ -1,63 +1,103 @@
 # BACKLOG — Textual TUI Surface
 
-Feature prefix: `TUI-`. Last Updated: **2026-10-24**.
+Feature prefix: `TUI-`. Last Updated: 2026-10-25.
 
-State vocabulary, verification requirements, ownership rules, and ID policy are defined only in the root [ROADMAP](../../ROADMAP.md#state-definitions) and [Status Policy](../../ROADMAP.md#status-policy).
+DESIGN: [DESIGN.md](DESIGN.md)
+Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
+State: values from root [ROADMAP.md](../../ROADMAP.md).
 
-## Current Condition
+## Progress Overview
 
-- Done: `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` reports **138 passed** (15 test files) on branch `rakaarwaky/ux-tui-cli-surface`, 2026-10-21.
-- In Progress: `TUI-01` release evidence recording.
-- Next: `TUI-01`.
+The TUI surface is Done. `uv run python -m pytest modules/tui/tests/ -m "not benchmark" -q` → 175 passed (commit `2152c8a`, 2026-10-25); `DESIGN.md` is reworked to the aes-docs DESIGN contract and reports 0 findings. No row is in progress or blocked; every entry is Done.
 
-## Scenario Evidence
+## Backlog Status
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| TUI compose tree, slot tabs, modals | Automated | `modules/tui/tests/unit_surface_tui_app.py` `modules/tui/tests/unit_tui_modal_layout.py` `modules/tui/tests/unit_tui_confirm_modal_layout.py` | all tests | `73aee43` (29 passed) |
-| TUI log containment across terminal resizes | Automated | `modules/tui/tests/unit_tui_log_containment.py` | all tests | `73aee43` (34 passed) |
-| TUI toast region and click guards | Automated | `modules/tui/tests/unit_tui_toast_region_crash.py` `modules/tui/tests/unit_tui_handlers.py` | all tests | `73aee43` (9 passed) |
-| TUI session action button wiring | Automated | `modules/tui/tests/unit_tui_session_action_buttons.py` `modules/tui/tests/unit_tui_add_session_button_wiring.py` | all tests | `73aee43` (13 passed) |
-| UX remediation regressions (glyphs, locale gate, pane-gated keys, empty-state hint, verdict ACTION lines, retry guidance, carousel tiers, key-hint strip, Swarm START/RESTART) | Automated | `modules/tui/tests/unit_tui_ux_remediation.py` | all tests | `rakaarwaky/ux-tui-cli-surface`, 2026-10-21 (25 passed) |
-| Session-row button glyphs, tooltips, and the delete path | Automated | `modules/tui/tests/unit_tui_session_action_buttons.py` | all tests | `rakaarwaky/ux-tui-cli-surface`, 2026-10-21 (10 passed) |
+### DS-TUI-001
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | The theme is read through `THEME` in `modules/tui/src/surface_tui_css_view.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`); no raw hex lives in a widget. Verified `uv run lint-arwaky-cli docs modules/tui` → 0 DESIGN.md findings at commit `a00c66a`; `uv run python -m pytest modules/tui/tests/ -m "not benchmark" -q` → 175 passed (commit `2152c8a`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+### DS-TUI-002
 
-## Release Readiness
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Root type stops projected onto terminal attributes (weight, case, width, emphasis): `headline-*` → `.app-brand-title`, `.card-title`; `body-*` → `QwenTuiRichLog` stream; `label-*` → `.session-cell-status`, metric tile labels (JetBrains Mono). Verified `uv run python -m pytest modules/tui/tests/ -m "not benchmark" -q` → 175 passed (commit `2152c8a`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | 138 passed on branch `rakaarwaky/ux-tui-cli-surface`, 2026-10-21 |
-| Scenario evidence | Done | 6 scenarios mapped in Scenario Evidence |
-| Docs | Done | `DESIGN.md` reworked to the aes-docs DESIGN contract; `uv run lint-arwaky-cli docs modules/tui` reports no DESIGN.md findings at this commit |
-| Backlog items | In Progress | TUI-01 pending release recording |
+### DS-TUI-003
 
-## Deferred
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Layout regions implemented: brand row, `TabbedContent` panes (Overview, Sessions, Slot 1…N Chat, Swarm, Settings), and docked nav dock. Verified `uv run python -m pytest modules/tui/tests/unit_surface_tui_app.py -v` → compose tree passes (commit `73aee43`, 29 passed). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+### DS-TUI-004
 
-## Change Log
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Session-row actions render `↻` / `☐` / `×` with ASCII fallbacks `r` / `h` / `x` under the `_unicode_ok` gate; shipped labels come from `_GLYPHS` in `surface_tui_utils_component.py`; `NO_COLOR=1` never gates iconography (UX-2-001). Verified `uv run python -m pytest modules/tui/tests/unit_tui_session_action_buttons.py -v` → 10 passed (commit `73aee43`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Date | Change | By |
-|---|---|---|
-| 2026-10-25 | TUI-03 DESIGN.md rework closed (lint evidence at `a00c66a`); TUI-03 removed from In Progress/Next, only `TUI-01` release evidence remains open. | @qwen-web-arwaky |
-| 2026-10-24 | TUI-03 Done: `DESIGN.md` reworked to the aes-docs DESIGN contract; `uv run lint-arwaky-cli docs modules/tui` reports 0 DESIGN.md findings at `a00c66a` | @rakaarwaky |
-| 2026-10-25 | Evidence cells completed (three-proof rule). | @qwen-web-arwaky |
-| 2026-10-21 | UX remediation: 138 passed (15 test files); added `unit_tui_ux_remediation.py` (25 tests) and re-verified `unit_tui_session_action_buttons.py` (10 passed) | @rakaarwaky |
-| 2026-10-18 | Reworked this file to the aes-docs BACKLOG template: `TUI-` prefix, nine-column table, evidence-backed Done row, per-scenario commands and counts | @rakaarwaky |
+### DS-TUI-005
 
-## Backlog
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Cards render screen-card headline, metric tiles, body rows with status beacons, trailing action clusters, and state layer beacons or muted placeholders. Verified `uv run python -m pytest modules/tui/tests/ -m "not benchmark" -q` → 175 passed (commit `2152c8a`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| ID | Priority | State | Dependencies | Next Action | Updated |
-|---|---|---|---|---|---|
-| TUI-01 | P1 | Done | Ship the five shipped screens: Overview, Sessions, per-slot Chat, Swarm, and Settings under one token system. `uv run python -m pytest modules/tui/tests/ -m "not benchmark"` — 138 passed, 0 failed on `rakaarwaky/ux-tui-cli-surface`, 2026-10-21; compose tree in `surface_tui_compose_layout.py`, tokens in `surface_tui_css_view.py`. | Record a released version containing `modules/tui` via `gh release view` and attach the release evidence to this row. Evidence: `uv run python -m pytest modules/tui/tests/ -m "not benchmark" -q` → 175 passed (commit `2152c8a`, 2026-10-25). Release evidence pending (tracked in #721). | 2026-10-21 |
-| TUI-02 | P1 | Done | TUI modal layout and toast-region crash guard. `uv run python -m pytest modules/tui/tests/unit_tui_modal_layout.py modules/tui/tests/unit_tui_confirm_modal_layout.py modules/tui/tests/unit_tui_toast_region_crash.py -m "not benchmark"` — 10 passed, 0 failed on commit `73aee43`. | Verify the toast crash guard against the next Textual upgrade. | 2026-10-18 |
-| TUI-03 | P1 | Done | TUI visual and interaction contract for designers and surface engineers. `DESIGN.md` (this folder) is reworked to the aes-docs DESIGN contract: aligned `## Brand & Style` / `## Components` / `## Reference` H2s matching the sibling surface DESIGN docs, a token map that cites the root `DESIGN.md` palette table and `modules/tui/src/surface_tui_css_view.py` (`_COLORS` / `THEME` / `SEMANTIC_ALIASES`) as the single source of truth. `uv run lint-arwaky-cli docs modules/tui` — 0 DESIGN.md findings at commit `a00c66a`, 2026-10-24. | No action; keep the token map in step with `surface_tui_css_view.py` in the same commit when a value changes. | 2026-10-24 |
-| TUI-04 | P1 | Done | TUI log containment: the log panel keeps its height on every terminal size. `uv run python -m pytest modules/tui/tests/unit_tui_log_containment.py -m "not benchmark"` — 34 passed, 0 failed on commit `73aee43`. | No action; monitor for regressions in future Textual releases. | 2026-10-18 |
+### DS-TUI-006
 
-## Dependencies and Exit Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `notify()` toasts anchor above the nav dock, never block input, clicks guarded; pickers (`FilePickerModal`, `TemplatePickerModal`, `AddSessionModal`, `ConfirmModal`, `HelpScreen`) ship. Verified `uv run python -m pytest modules/tui/tests/unit_tui_toast_region_crash.py modules/tui/tests/unit_tui_handlers.py -v` → 9 passed (commit `73aee43`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-- TUI depends on the Root containers (`modules/root_cli_main_entry.py`) for orchestrator wiring; the TUI module never imports CLI code.
-- A row can become Done only with the exact verification command, its pass/fail counts, and the implementing commit recorded in `Dependencies`. `Done` evidence lives on the `Dependencies` cell of the row above.
+### DS-TUI-007
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Global bindings from `QwenTuiApp.BINDINGS` (`alt+0..9`, `ctrl+alt+0..9`, `enter`, `ctrl+x`, `ctrl+l`, `ctrl+q`, `?`, `a`, `r/e/d`, etc.); one focused widget at a time, focus ring is `accent`, modals capture and restore focus. Verified `uv run python -m pytest modules/tui/tests/unit_tui_handlers.py -v` (commit `73aee43`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
+
+### DS-TUI-008
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | Empty/error states: `session-empty` placeholder row, idle-slot `● READY` badge, swarm `swarm-file-name` reads "No file attached", `danger` FAILED envelope, `warning` EXPIRED badge. Verified `uv run python -m pytest modules/tui/tests/unit_tui_log_containment.py -m "not benchmark"` → 34 passed (commit `73aee43`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
+
+## Reference
+
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals and scope | [PRD.md](../../PRD.md) |
+| DESIGN | Surface specification | [DESIGN.md](DESIGN.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
+| Root Design | Obsidian Terminal theme (palette, type, spacing) | [DESIGN.md](../../DESIGN.md) |

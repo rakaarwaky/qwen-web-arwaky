@@ -3,58 +3,59 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-24
+Last Updated: 2026-10-25
 
-## Current Condition
+## Progress Overview
 
-- Done: `uv run python -m pytest modules/swarm/tests/ -v` at commit `00124e4`, on 2026-10-25.
-- In Progress: None.
-- Next Action: None; `FR-SWARM-001`, `FR-SWARM-002`, `FR-SWARM-003`, and `FR-SWARM-004` are all Done.
+The swarm feature is Done. `uv run python -m pytest modules/swarm/tests/ -v` passes at commit `00124e4`, on 2026-10-25; `FR-SWARM-001` through `FR-SWARM-004` are all Done with clamp, progress-envelope, and shortfall evidence. No row is in progress or blocked.
 
-## Backlog
+## Backlog Status
 
-| ID | Priority | State | Dependencies | Next Action | Evidence | Updated | FRD Ref |
-|---|---:|---|---|---|---|---|---|
-| FR-SWARM-001 | P1 | Done | None | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/acceptance_swarm_concurrency_clamp.py -v` — 2 passed. | 2026-10-25 | FR-SWARM-001 |
-| FR-SWARM-002 | P1 | Done | `MCP-01` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_progress_envelope.py -v` — 11 passed. | 2026-10-25 | FR-SWARM-002, FR-SWARM-003 |
-| FR-SWARM-003 | P2 | Done | `BROWSER-03` | — | `00124e4`: `uv run python -m pytest modules/swarm/tests/unit_swarm_session_shortfall.py -v` — 9 passed. | 2026-10-25 | FR-SWARM-001, FR-SWARM-004 |
-| FR-SWARM-004 | P2 | Done | `BROWSER-03` | — | `00124e4`: cancel stops the running legs and the shortfall report is pinned in `unit_agent_swarm_orchestrator.py`. | 2026-10-25 | FR-SWARM-004 |
+### FR-SWARM-001
 
-## Scenario Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/swarm/tests/acceptance_swarm_concurrency_clamp.py -v` → 2 passed (commit `00124e4`). A fan-out starts and a browser count above the ceiling clamps and reports. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| A fan-out starts and reports per-leg progress | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | start and snapshot | 2026-10-05 |
-| A cancel stops the running legs | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | cancel | 2026-10-05 |
-| A rate-limited session does not stop the other legs | Automated | `modules/swarm/tests/unit_agent_swarm_orchestrator.py` | leg isolation | 2026-10-05 |
-| A browser count above the ceiling clamps and reports | Automated | `modules/swarm/tests/acceptance_swarm_concurrency_clamp.py` | clamp and report | 2026-10-25 |
+### FR-SWARM-002
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/swarm/tests/unit_swarm_progress_envelope.py -v` → 11 passed (commit `00124e4`). Fan-out progress is published per leg through the progress envelope a poller consumes. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+### FR-SWARM-003
 
-## Dependencies
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/swarm/tests/unit_swarm_session_shortfall.py -v` → 9 passed (commit `00124e4`). One fan-out state is shared across the seams; a rate-limited session does not stop the other legs. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-- `MCP-01` owns the progress envelope a fan-out poller consumes.
-- `BROWSER-03` owns the per-leg session availability this feature clamps against.
-- `FR-JOBS-002` owns the backpressure a clamped fan-out can still hit.
+### FR-SWARM-004
 
-## Release Readiness
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/swarm/tests/unit_agent_swarm_orchestrator.py -v` covers cancel: cancel stops the running legs and the shortfall report is pinned. Evidence `uv run python -m pytest modules/swarm/tests/ -v` → passes (commit `00124e4`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | `uv run python -m pytest modules/swarm/tests/ -v` passes at `00124e4`, on 2026-10-25. |
-| Scenario evidence | Done | All 4 scenarios mapped; the clamp-and-report scenario landed in `SWARM-01`. |
-| Docs | Done | [FRD.md](FRD.md) is specification-only. |
+## Reference
 
-## Deferred
-
-None.
-
-## Change Log
-
-| Date | Change | By |
-|---|---|---|
-| 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
-| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
-| 2026-10-25 | Advanced `SWARM-01`, `SWARM-02`, `SWARM-03` to Done with clamp, progress-envelope, and shortfall evidence at `00124e4` (#761, #762, #763). | @qwen-web-arwaky |
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals and scope | [PRD.md](../../PRD.md) |
+| FRD | Functional requirements specification | [FRD.md](FRD.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |

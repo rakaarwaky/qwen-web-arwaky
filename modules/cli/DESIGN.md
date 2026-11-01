@@ -1,164 +1,82 @@
 # DESIGN — CLI Surface
 
-> Command-line interaction contract: subcommands, exit codes, envelopes, and
-> output formats.
-> Audience: CLI users, surface engineers.
-> Condition: [ROADMAP.md](../../ROADMAP.md) (workspace) + [BACKLOG.md](BACKLOG.md) (this surface).
+## Design Overview
 
-## Brand & Style
+A smart surface (AES406) for `qwen-web-arwaky`: command modules and controllers dispatch to Root container aggregates and carry no domain logic. Console output is plain text unless `--json` is set; the TUI visual token set lives in [modules/tui/DESIGN.md](../tui/DESIGN.md), not here.
 
-Smart surface (AES406). Command modules and controllers dispatch to Root
-container aggregates; they carry no domain logic. Console output is plain
-text unless `--json` is set; the TUI visual token set lives in
-[modules/tui/DESIGN.md](../tui/DESIGN.md), not here.
+## Design Requirements
 
-### Output Channels
+### DS-CLI-001: Output Channels
 
-| Channel | Usage |
-|---|---|
-| stdout | Human-readable reports, `--json` envelopes, success messages. |
-| stderr | Warnings, `[ERROR]` prefix failures, doctor diagnostic footers. |
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| stdout | Human-readable reports, `--json` envelopes, success messages | `stdout` | default sink |
+| stderr | Warnings, `[ERROR]`-prefixed failures, doctor diagnostic footers | `stderr` | diagnostic sink |
 
-## Components
+### DS-CLI-002: Entry Points
 
-### Entry Points
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| `qwen-web-arwaky` (no args, TTY) | Delegates to the TUI surface | `surface_cli_interactive_controller` | TUI import deferred into `run()` |
+| `init` | Workspace bootstrap under `--dir` | `surface_cli_init_command` | creates `.agents/skills`, `.qwen-web-arwaky` |
+| `doctor` | Environment and session-pool health; `--smoke`, `--deep` | `surface_cli_doctor_command` | pool is the single source of truth |
+| `session` | `list`, `login`, `health`, `remove`, `status` | `surface_cli_sessions_command` | `remove` confirms on a TTY |
+| `prompt` | `direct` (`-t`), `file` (`-i`), `attach` (`-i -a`) | `surface_cli_run_command` | inline, file-only, file+attachment |
+| `job` | `submit`, `status`, `list`, `cleanup` | `surface_cli_jobs_command` | `--json` on all |
+| `swarm` | `start`, `status`, `cancel` | `surface_cli_swarm_command` | `--json` on all |
+| `update` | `--check`, `--force`, `--rollback` | `surface_cli_update_command` | `--json` |
+| `observability` | `report`, `status` | `surface_cli_observability_command` | `--json` on all |
 
-| Command | Module | Behaviour |
-|---|---|---|
-| `qwen-web-arwaky` (no args, TTY) | `root_cli_main_entry` → `surface_cli_interactive_controller` | Delegates to the TUI surface (`modules/tui`); the CLI module never imports TUI code at module load — the controller's TUI import is deferred into `run()`, so headless CLI paths stay TUI-free. |
-| `qwen-web-arwaky` (no args, config given) | `surface_cli_run_command.dispatch_run` | Headless single-file pipeline run. |
-| `init` | `surface_cli_init_command` | Workspace bootstrap: creates `.agents/skills` and `.qwen-web-arwaky` under `--dir` (default: cwd). |
-| `doctor` | `surface_cli_doctor_command` | Environment and session-pool health checks (the pool is the single source of truth; the aggregate is required — `run_doctor(session)` is a required positional argument with no default, so an unwired call raises `TypeError`); `--smoke` adds a headless browser round-trip; `--json` prints the envelope. |
-| `session` | `surface_cli_sessions_command` | Subcommands: `list`, `login --name NAME`, `health`, `remove NAME [--force] [--keep-profile]`, `status`. `remove` confirms on a TTY unless `--json` / `--force` / `--keep-profile` is set (UX-4-003). |
-| `prompt direct` | `surface_cli_run_command` | `-t TEXT [-o FILE] [--headless] [--json]` — inline text prompt. |
-| `prompt file` | `surface_cli_run_command` | `-i FILE [-o FILE] [--headless] [--json]` — prompt file only. |
-| `prompt attach` | `surface_cli_run_command` | `-i FILE -a FILE [-o FILE] [--headless] [--json]` — prompt file plus attachment. |
-| `job` | `surface_cli_jobs_command` | Subcommands: `submit`, `status`, `list`, `cleanup`; `--json` available on all. |
-| `swarm` | `surface_cli_swarm_command` | Subcommands: `start`, `status`, `cancel`; `--json` available on all. |
-| `update` | `surface_cli_update_command` | Flags: `--check`, `--force`, `--json`, `--rollback VERSION`. |
-| `observability` | `surface_cli_observability_command` | Subcommands: `report`, `status`; `--json` available on all. |
-| `mcp` | `root_mcp_main_entry` | Starts the MCP stdio server; no exit code mapping from the CLI envelope — runs until the client disconnects. |
+### DS-CLI-003: Exit Codes
 
-### Subcommand Flag Matrix
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| `0` | Success envelope returned | `_result_exit_code` | success |
+| `1` | Failure envelope or unhandled exception | `_exit_code_for_result` | failure |
+| `2` | `argparse` usage error (missing flag, unknown subcommand) | argparse | usage signal |
+| `3` | `AuthRequiredError` / auth-failure envelope | `exit_code_for` | re-login needed |
+| `130` | `KeyboardInterrupt` | `exit_code_for` | SIGINT |
 
-Flags shared by every subcommand in the `prompt`, `job`, `swarm`,
-`observability`, and `session` groups are registered on the shared parent
-parser (or the group-level parser) and are uniformly available:
+### DS-CLI-004: Response Envelope
 
-| Flag | Default | Notes |
-|---|---|---|
-| `--json` | off | Print the response envelope verbatim as JSON on stdout. Available on every `job`, `swarm`, `observability`, and `session` subcommand — including `session login`, which then runs exactly one login and emits the success envelope without the banner or the add-another re-prompt. |
-| `--headless` / `--no-headless` | on | BooleanOptionalAction; off (headed) mode opens a visible browser. |
-| `-o FILE` / `--output-path` | `None` | Destination for the Markdown response; omitted only for `job submit` which stores the record in the jobs folder. |
-| `--deep` | off | On `doctor` only; runs the heavy Playwright probe (alias: `QWEN_DOCTOR_DEEP=1`). |
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Success | `--json` or human-readable default | `success_response` | `{ "success": true, "message": "..." }` |
+| Failure | Mapped to the exit code | `error_response` | `{ "success": false, "message": "...", "error_code": "..." }` |
 
-`session login` is the only interactive subcommand that opens a browser.
-`session remove` is interactive in one narrow case: on a TTY, without
-`--json`, `--force`, or `--keep-profile`, it prompts a `[y/N]` confirmation
-(`_remove_confirmed`) before deleting the profile — anything but `y` / `yes`
-aborts with exit 0 and a closed stdin aborts instead of raising. Every other
-subcommand is non-interactive.
+### DS-CLI-005: Error Reference Codes
 
-### Exit Codes
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Validation failure | Missing argument, bad path, unknown id | `cli-400` | reject before dispatch |
+| Processing failure | Request well formed, pipeline could not complete | `cli-422` | prompt / self-update |
+| Saturated pool | Worker pool refused a job submit | `cli-429` | `JobQueueFullError`, retry hint |
+| Unhandled runtime failure | Default from `error_response` | `cli-500` | generic runbook |
+| Update-specific failure | Check or rollback machinery errored | `cli-502` | update runbook |
+| Auth required | Session expired | `auth-required` | `session login` |
 
-| Code | Trigger | Source |
-|---|---|---|
-| `0` | Success envelope returned | `root_cli_main_entry._result_exit_code` |
-| `1` | Failure envelope returned, or unhandled exception caught by `safe_handle` | `root_cli_main_entry._exit_code_for_result`; `utility_core_exit.exit_code_for` |
-| `2` | `argparse` usage error (missing required flag, unknown subcommand) | argparse default; code `2` is exclusively argparse's usage signal |
-| `3` | `AuthRequiredError` or an auth-failure envelope (session expired, re-login needed) | `utility_core_exit.exit_code_for`; `root_cli_main_entry._exit_code_for_result` |
-| `130` | `KeyboardInterrupt` | `utility_core_exit.exit_code_for` |
+### DS-CLI-006: Shared Flags
 
-### Response Envelope
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| `--json` | Print the envelope verbatim on stdout | off | available on every subcommand |
+| `--headless` / `--no-headless` | Headless by default; off opens a visible browser | on | `BooleanOptionalAction` |
+| `-o FILE` | Destination for the Markdown response | `None` | omitted only for `job submit` |
+| `--deep` | Heavy Playwright probe on `doctor` | off | alias `QWEN_DOCTOR_DEEP=1` |
 
-Every non-interactive command returns a standard envelope from
-`utility_response_normalizer` (`success_response` / `error_response`):
+### DS-CLI-007: Status Glyphs
 
-```json
-{ "success": true,  "message": "..." }
-{ "success": false, "message": "...", "error_code": "cli-500" }
-```
-
-- `--json` prints the envelope verbatim to stdout and exits with the mapped code.
-- Without `--json`, human-readable output is printed instead; failures are
-  prefixed `[ERROR]` on stderr and the exit code is still mapped from the
-  envelope.
-
-Error reference codes used by the CLI surface:
-
-| `error_code` | Meaning |
-|---|---|
-| `cli-400` | Validation failure (missing required argument, bad path, unknown id). |
-| `cli-422` | Processing failure: the request was well formed but the pipeline could not complete it (prompt processing, a failed self-update). |
-| `cli-429` | Saturated worker pool refused a job submit (`JobQueueFullError`); message carries the retry hint. |
-| `cli-500` | Unhandled runtime failure (default from `error_response`). |
-| `cli-502` | Update-specific failure: the check or rollback machinery itself errored; routes to the update runbook, not the generic one. |
-| `auth-required` | Session has expired; re-run `qwen-web-arwaky session login`. |
-
-### Output Formats
-
-| Format | Trigger | Shape |
-|---|---|---|
-| Plain text (default) | No `--json` | One-line status per operation; `doctor` prints a multi-line check table with `✓` / `⚠` / `✗` glyphs; the `session list` / `session status` pool table fits `shutil.get_terminal_size()` with `…` truncation measured in display columns (wide glyphs included). |
-| JSON envelope | `--json` | `{"success": bool, "message": str, "error_code"?: str}` on stdout; failures also log a one-line summary to stderr. |
-| Markdown file | `-o FILE` on prompt subcommands | The response text, written as Markdown to the named path; not emitted to stdout. |
-| Jobs status table | `job list` / `job status` | Human-readable table with `RUNNING` / `COMPLETED` / `FAILED` status per record; `--json` prints the raw `JobRecord` dict. |
-| Swarm progress report | `swarm start` / `swarm status` | Compact multi-line report with `⌬ Swarm` header, per-agent status icons (`✓` / `✗` / `…`), and progress counts; `--json` prints the `SwarmSnapshot` dict. |
-| Update report | `update` / `update --check` | Step list with `✓` / `✗` / `…` icons and detail lines; `--json` prints the `UpdateReport` dict. |
-
-Canonical success JSON schemas (the `--json` payloads; failure payloads are
-always the fixed-key envelope above):
-
-```json
-// job submit
-{"success": true, "job_id": "<id>"}
-// job list
-{"success": true, "total": <int>, "jobs": [{"job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>, "input_file": "<path>", "output_file": "<path>"}]}
-// job status
-{"success": true, "job_id": "<id>", "status": "RUNNING|COMPLETED|FAILED", "completed": <bool>}
-// job cleanup
-{"success": true, "removed": <int>}
-// swarm start
-{"success": true, "swarm_id": "<id>", "status": "<status>", "input_path": "<path>", "root_path": "<path>", "browser_concurrency": <int>, "completed_count": <int>, "failed_count": <int>, "agents": [{"agent_id": "<id>", "status": "<status>", "attempt": <int>, "error": "<string|null>"}]}
-// swarm status
-{"success": true, "swarm_id": "<id>", "status": "<status>", "completed_count": <int>, "failed_count": <int>, "agents": [{"agent_id": "<id>", "status": "<status>", "attempt": <int>, "error": "<string|null>"}]}
-// swarm cancel
-{"success": true, "swarm_id": "<id>", "status": "<status>"}
-// observability report
-{"success": true, "report_path": "<path>"}
-// observability status
-{"success": true, "status_path": "<path>", "status"?: <object>, "metrics"?: {"total_executions": <int>, "successful_executions": <int>, "success_rate": <number>, "counters": {<key>: <int>}}}
-// update check / update / update --rollback
-{"success": true, "message": "<formatted report>"}
-// session list
-{"success": true, "sessions": [{"session_id": "<id>", "name": "<name>", "status": "active|limited|unknown", "is_healthy": <bool>, "is_limited": <bool>, "last_used": "<iso8601|null>"}]}
-// session status
-{"success": true, "sessions": [{"session_id": "<id>", "name": "<name>", "status": "active|limited|unknown", "total_requests": <int>, "failed_requests": <int>}], "healthy": <int>, "limited": <int>, "unknown": <int>}
-// session health
-{"success": true, "message": "<summary>", "states": [{"session_id": "<id>", "status": "active|limited|unknown", "is_healthy": <bool>}]}
-// session login
-{"success": true, "message": "Session 'X' saved"}
-// session remove
-{"success": true, "message": "Removed session 'X'"}
-```
-
-`session login --json` runs exactly one headed login: no banner, no
-add-another re-prompt, and the fixed-key envelope above on stdout. Without
-`--json` the banner and the iterative "add another?" prompt drive a
-multi-login session.
-
-Status glyphs come from the one shared object both surfaces read:
-`STATUS_GLYPHS` is declared in the shared Taxonomy layer
-(`modules/shared/src/common/taxonomy_core_constant.py`) and re-exported by
-`surface_cli_json_hook` (`from … import STATUS_GLYPHS`; UX-3-002), so the
-CLI and the TUI cannot drift apart. `✓` / `✗` / `⚠` for results, `●` /
-`◐` / `⛔` / `○` for health, `…` pending. Glyphs are emitted
-unpainted on the CLI; ANSI color is owned by the TUI layer
-(`modules/tui/DESIGN.md`).
+| Variant | Use case | Token | Value |
+| --- | --- | --- | --- |
+| Result glyphs | ✓ / ✗ / ⚠ | `STATUS_GLYPHS` | shared Taxonomy object |
+| Health glyphs | ● / ◐ / ⛔ / ○ | `STATUS_GLYPHS` | `surface_cli_json_hook` re-export |
 
 ## Reference
 
-- [BACKLOG.md](BACKLOG.md)
-- [ROADMAP.md](../../ROADMAP.md)
-- [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- [DESIGN.md (TUI)](../tui/DESIGN.md) — visual tokens for the interactive TUI surface.
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals, user stories, and scope | [PRD.md](../../PRD.md) |
+| Backlog | Task tracking, epics, and implementation status | [BACKLOG.md](BACKLOG.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
+| TUI Design | Visual tokens for the interactive TUI surface | [DESIGN.md](../tui/DESIGN.md) |

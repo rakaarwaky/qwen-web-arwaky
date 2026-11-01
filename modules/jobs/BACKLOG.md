@@ -3,55 +3,39 @@
 FRD: [FRD.md](FRD.md)
 Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
-Last Updated: 2026-10-24
+Last Updated: 2026-10-25
 
-## Current Condition
+## Progress Overview
 
-- Done: `uv run python -m pytest modules/jobs/tests/ -v` at commit `refactor/aes-zero-violations`, on 2026-10-05.
-- In Progress: None.
-- Next Action: None. `FR-JOBS-001` shipped on 2026-10-22; both FR-JOBS-001 and FR-JOBS-002 are Done.
+The jobs feature is Done. `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit `9685d84`) covers background-job execution and the per-run status-file envelope. No row is in progress or blocked; every backlog entry is Done.
 
-## Backlog
+## Backlog Status
 
-| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
-|---|---:|---|---|---|---|---|
-| FR-JOBS-001 | P0 | Done | None | Zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule; proven by `acceptance_job_zombie_reconciliation.py`. Evidence: `uv run python -m pytest modules/jobs/tests/acceptance_job_zombie_reconciliation.py -v` → 7 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001 |
-| FR-JOBS-002 | P1 | Done | `MCP-01` | The saturated-pool envelope shipped: MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth`, CLI `cli-429`; covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. Evidence: `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit 9685d84). | 2026-10-25 | FR-JOBS-001, FR-JOBS-002 |
-| FR-JOBS-002 | P2 | Done | `LOGGING-02` | Single owner: `modules/shared/tests/contract_status_schema.py` pins the schema-version-2 key set (base + fully-populated + omitted-optionals); cross-referenced by the logging status-file row. Evidence: `uv run python -m pytest modules/shared/tests/contract_status_schema.py -v` → 3 passed (2026-10-25, commit 16de58b). | 2026-10-25 | FR-JOBS-002 |
+### FR-JOBS-001
 
-## Scenario Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/jobs/tests/acceptance_job_zombie_reconciliation.py -v` → 7 passed (2026-10-25, commit `9685d84`). Zombie reconciliation accepts a `dead_pid OR stale heartbeat` rule. |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| A pool at its pending ceiling rejects a submission | Automated | `modules/jobs/tests/unit_agent_job_backpressure.py` | queue rejection | 2026-10-05 |
-| An absent status file reads back as no mapping | Automated | `modules/jobs/tests/unit_capability_job_storage.py` | status read | 2026-10-05 |
-| A restart reconciles every zombie record | Automated | `modules/jobs/tests/acceptance_job_zombie_reconciliation.py` | `test_acceptance_seeded_zombies_are_terminal_before_the_first_poll`, `test_acceptance_a_recycled_pid_is_reconciled_by_heartbeat_staleness` | 2026-10-22 |
+### FR-JOBS-002
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Done | `uv run python -m pytest modules/jobs/tests/ -v` → 100 passed (2026-10-25, commit `9685d84`); the saturated-pool envelope ships MCP `QUEUE_FULL` with `retry_after_sec`/`queue_depth` and CLI `cli-429`, covered by `unit_mcp_response_envelope.py` and `unit_surface_cli_jobs_command.py`. The status-file schema is pinned by `uv run python -m pytest modules/shared/tests/contract_status_schema.py -v` → 3 passed (commit `16de58b`). |
+| In Progress | None |
+| Risk | None |
+| Updated | 2026-10-25 |
 
-None.
+## Reference
 
-## Dependencies
-
-- `MCP-01` owns the MCP request/response boundary the backpressure envelope crosses.
-- `SHARED-01` owns the session backup the job records reference.
-
-## Release Readiness
-
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | `uv run python -m pytest modules/jobs/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | All 3 scenarios mapped; the former `JOBS-01` gap closed on 2026-10-22. |
-| Docs | Done | [FRD.md](FRD.md) is specification-only. |
-
-## Deferred
-
-None.
-
-## Change Log
-
-| Date | Change | By |
-|---|---|---|
-| 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
-| 2026-10-14 | FRD requirements matched to the two declared capability seams; folder compilation left to the feature whose contract declares it. | @qwen-web-arwaky |
-| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD | Business goals and scope | [PRD.md](../../PRD.md) |
+| FRD | Functional requirements specification | [FRD.md](FRD.md) |
+| Roadmap | Timeline, phasing, and dependencies | [ROADMAP.md](../../ROADMAP.md) |
+| Architecture | System boundaries, tech stack, and infra | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
