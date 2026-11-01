@@ -5,73 +5,140 @@ Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 State: values from root [ROADMAP.md](../../ROADMAP.md).
 Last Updated: 2026-10-24
 
-## Current Condition
+## Progress Overview
 
 - Done: `uv run python -m pytest modules/prompt/tests/ -m "not benchmark and not e2e" -q` green on 2026-10-24 (PROMPT-01 dispatch retry budget coordinated with CONFIG-02).
 - In Progress: None.
+- Blocked: None.
 - Next Action: None — every backlog row is Done.
 
-## Backlog
+## Backlog Status
 
-| ID | Priority | State | Dependencies | Next Action | Updated | FRD Ref |
-|---|---:|---|---|---|---|---|
-| FR-PROMPT-001 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-002 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-003 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-004 | P1 | Done | None | Covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_agent_cancel_terminal.py -v` → 14 passed (2026-10-25, commit 2152c8a). | 2026-10-22 | FR-PROMPT-004, FR-PROMPT-005 |
-| FR-PROMPT-005 | P1 | Done | None | Covered by `modules/prompt/tests/unit_agent_cancel_terminal.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_agent_cancel_terminal.py -v` → 14 passed (2026-10-25, commit 2152c8a). | 2026-10-22 | FR-PROMPT-004, FR-PROMPT-005 |
-| FR-PROMPT-006 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-007 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-008 | P2 | Done | `SHARED-02` | The pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). | 2026-10-22 | FR-PROMPT-008, FR-PROMPT-011, FR-PROMPT-012 |
-| FR-PROMPT-009 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-010 | P1 | Done | `CONFIG-02` | Retry budget coordinated with CONFIG-02; stall-ceiling interaction pinned by `unit_transcript_selector_regression.py`, `unit_agent_shared_flow_retry.py`, and `unit_prompt_dispatch_retry_budget.py`. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). | 2026-10-25 | FR-PROMPT-001, FR-PROMPT-002, FR-PROMPT-003, FR-PROMPT-006, FR-PROMPT-007, FR-PROMPT-009, FR-PROMPT-010 |
-| FR-PROMPT-011 | P2 | Done | `SHARED-02` | The pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). | 2026-10-22 | FR-PROMPT-008, FR-PROMPT-011, FR-PROMPT-012 |
-| FR-PROMPT-012 | P2 | Done | `SHARED-02` | The pinned transcript fixture and `unit_transcript_selector_regression.py` fail the prompt suite on selector drift. Evidence: `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). | 2026-10-22 | FR-PROMPT-008, FR-PROMPT-011, FR-PROMPT-012 |
+### FR-PROMPT-001
 
-## Scenario Evidence
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
 
-| Scenario | Kind | Test file | Test name | Last verified |
-|---|---|---|---|---|
-| A direct prompt produces a response file at the named destination | Automated | `modules/prompt/tests/unit_agent_direct_prompt.py` | direct prompt save | 2026-10-22 |
-| A saved response carries its run metadata outside the output directory | Automated | `modules/prompt_runtime/tests/dogfood_output_saver.py` | a saved response carries its run metadata | 2026-10-22 |
-| A stalled stream reports `stalled` (and saves the partial) | Automated | `modules/prompt_runtime/tests/unit_capability_stream_monitor.py` | stall detection | 2026-10-22 |
-| A hard response timeout reports `incomplete` | Automated | `modules/prompt_runtime/tests/unit_capability_stream_monitor.py` | hard cutoff | 2026-10-22 |
-| An attachment over the upload limit is rejected | Automated | `modules/prompt_runtime/tests/unit_capability_file_uploader.py` | upload limit | 2026-10-05 |
-| A cancel on a terminal pipeline reports zero | Automated | `modules/prompt/tests/unit_agent_cancel_terminal.py` | `test_cancel_on_a_terminal_pipeline_reports_zero` | 2026-10-22 |
-| A cancel on a file pipeline reports one stopped pipeline | Automated | `modules/prompt/tests/unit_agent_cancel_terminal.py` | `test_cancel_on_an_in_flight_file_pipeline_reports_one_stopped_pipeline` | 2026-10-22 |
-| A response file survives a mid-stream extraction failure | Automated | `modules/prompt/tests/unit_agent_prompt_file.py` | `test_stalled_stream_saves_the_partial_artifact_with_a_stalled_verdict` | 2026-10-22 |
-| A cancel for a run with no active pipeline is a no-op and does not affect sibling runs | Automated | `modules/prompt/tests/unit_agent_cancel_terminal.py` | `test_cancel_on_a_terminal_pipeline_reports_zero`, `test_cancel_on_one_pipeline_leaves_the_sibling_run_alone` | 2026-10-22 |
+### FR-PROMPT-002
 
-## Blockers
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
 
-None.
+### FR-PROMPT-003
 
-## Dependencies
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
 
-- `CONFIG-02` owns the response ceiling this feature's stall detector coordinates with.
-- `SHARED-02` owns the pinned DOM helpers the stream monitor reads.
-- `JOBS-01` owns the backpressure this feature's job submissions encounter.
+### FR-PROMPT-004
 
-## Release Readiness
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_agent_cancel_terminal.py -v` → 14 passed (2026-10-25, commit 2152c8a). |
+| Updated | 2026-10-22 |
 
-| Area | Status | Notes |
-|---|---|---|
-| Tests | Done | `uv run python -m pytest modules/prompt/tests/ -v` passes at `refactor/aes-zero-violations`. |
-| Scenario evidence | Done | 6 of 6 FRD scenarios mapped across 7 automated rows; no gaps. |
-| Docs | Done | [FRD.md](FRD.md) is specification-only. |
+### FR-PROMPT-005
 
-## Deferred
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | None |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_agent_cancel_terminal.py -v` → 14 passed (2026-10-25, commit 2152c8a). |
+| Updated | 2026-10-22 |
 
-None.
+### FR-PROMPT-006
 
-## Change Log
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
 
-| Date | Change | By |
-|---|---|---|
-| 2026-10-25 | Closed FR-orphan gaps: FR-PROMPT-002/007/009/010 attached to PROMPT-01, FR-PROMPT-011/012 to PROMPT-03; ROADMAP roll-up advanced to Done. | @qwen-web-arwaky |
-| 2026-10-25 | Evidence cells completed for PROMPT-01/02/03 (three-proof rule: command + pass-result + commit SHA). | @qwen-web-arwaky |
-| 2026-10-24 | Added FRD Ref column mapping backlog rows to FR IDs. | @qwen-web-arwaky |
-| 2026-10-24 | PROMPT-01 closed: dispatch retry budget coordinated with CONFIG-02 (`unit_prompt_dispatch_retry_budget.py`). | @qwen-web-arwaky |
-| 2026-10-22 | Scenario evidence completed (7 automated rows, 0 gaps); `PROMPT-02`/`PROMPT-03` closed; `PROMPT-01` stall-ceiling pinning done, retry budget remains with `CONFIG-02`. | @qwen-web-arwaky |
-| 2026-10-05 | Feature FRD and BACKLOG created alongside the AES702 doc pair. | @qwen-web-arwaky |
-| 2026-10-22 | Sidecars moved to `DEFAULT_METADATA_DIR` (XDG state `meta/`); direct-prompt outputs named `direct_*` instead of `tmpXXXX_*` (FR-PROMPT-009). | @qwen-web-arwaky |
+### FR-PROMPT-007
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
+
+### FR-PROMPT-008
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `SHARED-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). |
+| Updated | 2026-10-22 |
+
+### FR-PROMPT-009
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
+
+### FR-PROMPT-010
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P1 |
+| Dependencies | `CONFIG-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py modules/prompt/tests/unit_agent_shared_flow_retry.py modules/prompt/tests/unit_prompt_dispatch_retry_budget.py -v` → 25 passed (2026-10-25, commit d0ba69e). |
+| Updated | 2026-10-25 |
+
+### FR-PROMPT-011
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `SHARED-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). |
+| Updated | 2026-10-22 |
+
+### FR-PROMPT-012
+
+| Aspect | Detail |
+| --- | --- |
+| State | Done |
+| Priority | P2 |
+| Dependencies | `SHARED-02` |
+| Evidence | `uv run python -m pytest modules/prompt/tests/unit_transcript_selector_regression.py -v` → 14 passed (2026-10-25, commit 2152c8a). |
+| Updated | 2026-10-22 |
+
+## Reference
+
+| Artifact | Purpose | Link |
+| --- | --- | --- |
+| PRD.md | Product requirements | [PRD.md](../../PRD.md) |
+| FRD.md | Feature requirements | [FRD.md](FRD.md) |
+| ROADMAP.md | Roadmap status | [ROADMAP.md](../../ROADMAP.md) |
+| ARCHITECTURE.md | Layer contract | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
