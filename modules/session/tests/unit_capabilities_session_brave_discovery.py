@@ -72,7 +72,7 @@ def _discover_with_root(root: Path | None) -> list[BraveProfileInfo]:
     flatpak_root = root if root is not None else Path("/tmp/no-brave")
     with (
         patch(f"{UTILS}._brave_data_root", return_value=root),
-        patch(f"{MODULE}._FLATPAK_ROOT", flatpak_root),
+        patch(f"{MODULE}.FLATPAK_ROOT", flatpak_root),
     ):
         return discovery.discover()
 
