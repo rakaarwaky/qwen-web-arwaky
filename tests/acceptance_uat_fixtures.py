@@ -1,6 +1,6 @@
 """UAT fixtures tests (BA-5-001).
 
-These tests run the deterministic UAT fixtures from tests/uat_fixtures.py
+These tests run the deterministic UAT fixtures from tests/fixture_uat_records.py
 against controlled inputs and verify the recorded evidence structure.
 """
 

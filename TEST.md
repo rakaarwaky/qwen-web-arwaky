@@ -66,9 +66,9 @@ Key elements mirrored:
 ### Pipeline fixtures (`tests/fixtures/input|output|log/`)
 `tests/fixtures` is a symlink to `modules/prompt/tests/fixtures/`, the
 **production-mirrored runtime directories** (1:1 with `input/`, `output/`,
-`log/`). Golden task content is pinned in `conftest.py`
+`log/`). Golden task content is pinned in `fixture_browser_conftest.py`
 `_GOLDEN_TASKS` and restored by `restore_fixture_state`
-(`tests/pipeline_fixtures.py`) before every test.
+(`tests/fixture_pipeline_state.py`) before every test.
 
 Role fixtures (real source-review prompts, **not** injection payloads):
 - `role-architect/todo/task_001.md` — auth module layer-boundary review
@@ -198,14 +198,14 @@ and a real display.
 
 ```
 tests/                                  # fixture state + shared helper scripts — NOT a pytest root
-├── conftest.py                          # browser/behavior fixtures for the local fixture page
+├── fixture_browser_conftest.py                          # browser/behavior fixtures for the local fixture page
 ├── fixtures/                            # symlink → modules/prompt/tests/fixtures/
 │   ├── qwen_fixture.html                # DOM mirror for behavior tests
 │   ├── input/                           # 1:1 production mirror (real task prompts)
 │   ├── output/
 │   └── log/
-├── helpers.py                           # thin named wrappers shared by module test dirs
-├── pipeline_fixtures.py                 # fixture state management (restore_fixture_state)
+├── fixture_shared_helpers.py                           # thin named wrappers shared by module test dirs
+├── fixture_pipeline_state.py                 # fixture state management (restore_fixture_state)
 
 modules/<name>/tests/                    # the pytest roots — one per AES member
 
@@ -238,7 +238,7 @@ and a preferred harness; when adding code, extend the matching pattern.
 | CLI surface | `modules/cli/tests/integration_surface_*.py`, `modules/cli/tests/unit_surface_cli_controller.py` | subprocess argv tests or handler-level mocks | New flag/subcommand: parse-level tests + handler wiring checks. |
 | Update Manager | `tests/unit_surface_cli_update_command.py`, `modules/update/tests/unit_update_manager_subprocess.py` | patch `_run_subprocess`, `_fetch_json`, `_editable_source_dir` — never spawn real pip/git | New pipeline step: fail-closed refusal case + happy path with mocked transcripts. |
 | Swarm | `tests/unit_agent_swarm_orchestrator.py` | fake `IAttachmentPromptAggregate`, real `ThreadPoolExecutor` on tmp dirs | New transition: manifest snapshot after each state change. |
-| End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/pipeline_fixtures.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |
+| End-to-end | `tests/contract_qwen_auto.py` (behavior lock), `tests/fixture_pipeline_state.py` | fixture HTML replay, headless Chromium fixture server | New UI behavior: extend fixture + lock the behavior map. |
 
 **Rules of thumb**
 
