@@ -12,6 +12,7 @@ Seams:
 - ``ISessionLimitCheckerProtocol``  → ``SessionLimitChecker``   (is the Qwen page rate-limited?)
 - ``ISessionRotatorProtocol``       → ``SessionRotator``         (round-robin selection)
 - ``ISessionRenewalProtocol``       → ``SessionRenewer``        (token renewal, self-heal)
+- ``ISessionBraveDiscoveryProtocol`` → ``SessionBraveDiscovery`` (discover Brave browser profiles)
 
 The outward export surface for outer layers is ``ISessionAggregate``
 (validate/delete) in ``contract_session_aggregate.py``. Rotation has no
@@ -26,6 +27,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 
 from modules.shared.src.common.taxonomy_core_vo import AppConfig
+from modules.shared.src.session.taxonomy_session_brave_vo import BraveProfileInfo
 from modules.shared.src.session.taxonomy_session_vo import (
     RotatorRequest,
     RotatorResponse,
@@ -54,6 +56,26 @@ class IProfilePreparerProtocol(ABC):
         For login mode, yields the master session path directly.
         For standard modes, clones the master into an ephemeral temp dir
         and yields the clone path (cleaned up on exit).
+        """
+        ...
+
+
+class ISessionBraveDiscoveryProtocol(ABC):
+    """Brave browser profile discovery contract.
+
+    Discovers Brave Flatpak (and system) user-data directories whose
+    Default/Cookies carry auth-session and refresh_token cookies. Brave
+    profiles are read-only masters: qwen never writes to a live Brave
+    profile — runs clone to ephemeral temp dirs instead.
+    """
+
+    @abstractmethod
+    def discover(self) -> list[BraveProfileInfo]:
+        """Return every discoverable Brave profile holding Chromium content.
+
+        Never raises: returns an empty list when no Brave installation is
+        found. Profiles come from the Flatpak data/config trees under
+        ``~/.var/app/com.brave.Browser`` by default.
         """
         ...
 
@@ -157,6 +179,16 @@ class ISessionManagerProtocol(ABC):
     @abstractmethod
     def mark_used(self, session_id: SessionId, *, success: bool = True) -> None:
         """Record a completed request against the session under the pool lock."""
+        ...
+
+    @abstractmethod
+    def register_brave_profile(self, brave_profile_info: BraveProfileInfo) -> SessionInfo:
+        """Register a discovered Brave profile as a session in the pool.
+
+        Records the Brave master profile path as the session path with
+        status ``AUTH_REQUIRED`` until validated. Idempotent: when an entry
+        with the same path already exists, only its name is updated.
+        """
         ...
 
 
@@ -275,6 +307,7 @@ __all__ = [
     "ISessionRotatorProtocol",
     "ISessionRenewalProtocol",
     "IProfilePreparerProtocol",
+    "ISessionBraveDiscoveryProtocol",
 ]
 
 # Layer-symbol registry (runtime reference for harness/loader introspection).
@@ -285,4 +318,5 @@ _layer_symbols = {
     "ISessionRotatorProtocol": ISessionRotatorProtocol,
     "ISessionRenewalProtocol": ISessionRenewalProtocol,
     "IProfilePreparerProtocol": IProfilePreparerProtocol,
+    "ISessionBraveDiscoveryProtocol": ISessionBraveDiscoveryProtocol,
 }

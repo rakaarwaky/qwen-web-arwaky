@@ -16,7 +16,8 @@ from modules.shared.src.common.taxonomy_core_constant import DEFAULT_SESSION_OLD
 from modules.shared.src.common.taxonomy_core_error import QwenCliError
 from modules.shared.src.common.utility_io_writer import exclusive_file_lock
 from modules.shared.src.common.utility_logger_factory import get_logger
-from modules.shared.src.session.contract_session_protocol import ISessionManagerProtocol
+from modules.shared.src.session.contract_session_protocol import ISessionBraveDiscoveryProtocol, ISessionManagerProtocol
+from modules.shared.src.session.taxonomy_session_brave_vo import BraveProfileInfo
 from modules.shared.src.session.taxonomy_session_vo import (
     SessionInfo,
     SessionList,
@@ -24,6 +25,8 @@ from modules.shared.src.session.taxonomy_session_vo import (
     SessionReason,
     SessionStatus,
 )
+from modules.shared.src.session.utility_session_brave_paths import is_brave_profile_path
+from modules.shared.src.session.utility_session_cloner import clone_session_profile
 
 log = get_logger("session_manager")
 
@@ -34,8 +37,14 @@ log = get_logger("session_manager")
 class SessionManager(ISessionManagerProtocol):
     """Manages Qwen session storage and CRUD operations."""
 
-    def __init__(self, base_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        base_dir: Path | None = None,
+        *,
+        brave_discovery: ISessionBraveDiscoveryProtocol | None = None,
+    ) -> None:
         self._base_dir = base_dir or SESSIONS_DIR
+        self._brave_discovery = brave_discovery
         self._ensure_dirs()
 
     # Block 2: Protocol Method Implementation
@@ -223,6 +232,34 @@ class SessionManager(ISessionManagerProtocol):
             self.save_pool(pool)
             return info
 
+    def import_brave_profile(
+        self, brave_profile_dir: Path, name: str | None = None
+    ) -> SessionInfo:
+        """Import a read-only Brave profile into the qwen session pool.
+
+        Copies the Brave profile into ``SESSIONS_DIR`` so qwen owns a
+        writable clone (never writes back to the live Brave profile). The
+        clone is then registered in the session pool under *name* (or the
+        Brave profile's display name when *name* is None). Returns the
+        stored :class:`SessionInfo`; idempotent by target path.
+        """
+        target_dir = SESSIONS_DIR / (name or brave_profile_dir.name)
+        with self._pool_lock():
+            pool = self._load_pool_under_lock()
+            for s in pool.sessions:
+                if s.path == target_dir:
+                    return s
+            clone_session_profile(brave_profile_dir, target_dir)
+            info = SessionInfo(
+                session_id=self._next_session_id(pool.sessions),
+                name=name or brave_profile_dir.name,
+                path=target_dir,
+                status=SessionStatus.AUTH_REQUIRED,
+            )
+            pool.add_session(info)
+            self.save_pool(pool)
+            return info
+
     def remove_session(self, session_id: str) -> bool:
         """Remove a session by ID."""
         with self._pool_lock():
@@ -281,6 +318,51 @@ class SessionManager(ISessionManagerProtocol):
                 "Deletion may be partial — remove the remaining directory manually."
             ) from exc
         return True
+
+    def register_brave_profile(self, brave_profile_info: BraveProfileInfo) -> SessionInfo:
+        """Register a discovered Brave profile as a session in the pool.
+
+        Records the Brave master profile path as the session path with
+        status ``AUTH_REQUIRED`` until validated. Idempotent: when an entry
+        with the same path already exists, only its name is updated.
+        """
+        path = brave_profile_info.path
+        name = brave_profile_info.name
+        with self._pool_lock():
+            pool = self._load_pool_under_lock()
+            for i, s in enumerate(pool.sessions):
+                if s.path == path:
+                    pool.sessions[i] = s.with_name(name)
+                    self.save_pool(pool)
+                    return pool.sessions[i]
+            session_id = self._next_session_id(pool.sessions)
+            info = SessionInfo(
+                session_id=session_id,
+                name=name,
+                path=path,
+                status=SessionStatus.AUTH_REQUIRED,
+            )
+            pool.add_session(info)
+            self.save_pool(pool)
+            log.info(
+                "brave_profile_registered name=%s path=%s",
+                name,
+                path,
+            )
+            return info
+
+    def discover_brave_profiles(self) -> list[BraveProfileInfo]:
+        """Delegate Brave profile discovery to the injected discovery capability.
+
+        Falls back to an empty list when no discovery capability is wired.
+        """
+        if self._brave_discovery is None:
+            return []
+        return self._brave_discovery.discover()
+
+    def is_brave_profile(self, path: Path) -> bool:
+        """True when *path* is a Brave master profile directory."""
+        return is_brave_profile_path(path)
 
     def find_pool_profile_with_content(self) -> Path | None:
         """Return the first pool session path holding real Chromium content.

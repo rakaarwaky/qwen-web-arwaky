@@ -33,6 +33,7 @@ from modules.shared.src.config.utility_config_app_factory import build_app_confi
 from modules.shared.src.logging.contract_logging_protocol import IObservabilityProtocol
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
+    ISessionBraveDiscoveryProtocol,
     ISessionLimitCheckerProtocol,
     ISessionLoginCheckerProtocol,
     ISessionManagerProtocol,
@@ -70,6 +71,7 @@ class SessionOrchestrator(ISessionAggregate):
         login_checker: ISessionLoginCheckerProtocol | None = None,
         limit_checker: ISessionLimitCheckerProtocol | None = None,
         rotator: ISessionRotatorProtocol | None = None,
+        brave_discovery: ISessionBraveDiscoveryProtocol | None = None,
         *,
         browser: IBrowserLifecycleProtocol | IBrowserNavigationProtocol | None = None,
         browser_lifecycle: IBrowserLifecycleProtocol | None = None,
@@ -104,6 +106,7 @@ class SessionOrchestrator(ISessionAggregate):
         self._login_checker = login_checker
         self._limit_checker = limit_checker
         self._rotator = rotator
+        self._brave_discovery = brave_discovery
 
     # Block 2: Protocol Method Implementation
 
@@ -202,6 +205,10 @@ class SessionOrchestrator(ISessionAggregate):
             )
         if request.verb == "rotate":
             return self._rotate(request.exclude_ids)
+        if request.verb == "brave_list":
+            return self._brave_list()
+        if request.verb == "brave_import":
+            return self._brave_import()
         return SessionResponse(error=f"unknown session verb: {request.verb!r}")
 
     def _run_pool_checks(
@@ -449,6 +456,69 @@ class SessionOrchestrator(ISessionAggregate):
             )
         return SessionResponse(error=response.error or "rotation produced no session")
 
+    def _brave_list(self) -> SessionResponse:
+        """List every discoverable Brave profile on the host.
+
+        Returns each profile's path, display name, source (flatpak/system),
+        and whether it is a regular browser profile vs a web-app-hub PWA.
+        """
+        if self._brave_discovery is None:
+            return SessionResponse(error="brave discovery not wired")
+        profiles = self._brave_discovery.discover()
+        return SessionResponse(
+            valid=bool(profiles),
+            message=f"{len(profiles)} Brave profile(s) discovered",
+            brave_profiles=profiles,
+        )
+
+    def _brave_import(self) -> SessionResponse:
+        """Import the first regular-browser Brave profile into the session pool.
+
+        Copies the Brave master profile into SESSIONS_DIR and registers it.
+        Pass ``name`` to name the session explicitly.
+        """
+        if self._brave_discovery is None or self._sessions is None:
+            return SessionResponse(error="brave discovery or session pool not wired")
+        profiles = self._brave_discovery.discover()
+        regular = [p for p in profiles if p.is_regular_browser]
+        if not regular:
+            return SessionResponse(error="no regular-browser Brave profile found")
+        target = regular[0]
+        try:
+            registered = self._sessions.register_brave_profile(target)
+        except Exception as exc:
+            return SessionResponse(error=f"brave import failed: {exc}")
+        return SessionResponse(
+            valid=True,
+            message=f"imported Brave profile '{target.name}' into session '{registered.name}'",
+            profile_path=str(registered.path),
+        )
+
+    def _is_brave_path(self, profile_path: Path | None) -> bool:
+        """True when *profile_path* resolves to a Brave master profile.
+
+        Only returns True for paths under a known Brave user-data root
+        (Flatpak config/data trees), so non-Brave test profiles are not
+        treated as read-only masters.
+        """
+        if profile_path is None:
+            return False
+        resolved = profile_path.resolve()
+        for root in self._candidate_brave_roots():
+            try:
+                root_resolved = root.resolve()
+            except OSError:
+                continue
+            if resolved == root_resolved or root_resolved in resolved.parents:
+                return True
+        return False
+
+    @staticmethod
+    def _candidate_brave_roots() -> list[Path]:
+        """Return candidate Brave user-data roots."""
+        home = Path.home()
+        return [home / ".var" / "app" / "com.brave.Browser"]
+
     def _delete(self, session_path: Path | None, *, force: bool, name: str | None = None) -> str:
         """Delete the saved Chromium profile for an explicit target.
 
@@ -529,7 +599,12 @@ class SessionOrchestrator(ISessionAggregate):
             log_debug("saved_session_validation_failed")
 
         # Initial check failed — attempt a transparent renewal before reporting
-        # the session as invalid.
+        # the session as invalid. Brave master profiles are read-only: qwen
+        # never writes to a live Brave profile, so renewal (which persists
+        # cookies back to the master) is skipped and the operator is directed
+        # to ``session login`` instead.
+        if self._is_brave_path(cfg.session_path):
+            return False
         if self._renewer is not None:
             try:
                 self._renewer.renew_session_if_stale(validation_cfg)

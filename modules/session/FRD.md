@@ -269,6 +269,60 @@ Path.
 | --- | --- |
 | Mode→clone decision correctness | 100% |
 
+### FR-Session-007: Source login sessions from Brave browser profiles
+
+**Description:**
+
+Discover existing Brave browser profiles (Flatpak and system installs) and
+register them as qwen-web-arwaky login sessions. Brave profiles are
+read-only masters: qwen never writes to a live Brave profile. Importing
+clones the master to an ephemeral temp dir so qwen writes never land in a
+running Brave browser.
+
+#### Business Logic
+
+- `find_brave_profiles()` scans `~/.var/app/com.brave.Browser` (Flatpak) plus any `QWEN_BRAVE_DATA_DIR` override, covering `config/BraveSoftware/Brave-Browser/<profile>/` and `data/web-app-hub/profiles/<hash>/`.
+- A profile directory matches when it carries `Default/Cookies`, `Local State`, or root-level `Cookies` (regular Brave profiles keep the cookie jar at the profile root).
+- `brave_profile_name()` reads the display name from `Local State` (`profile.info.<dir>.name`), falling back to the directory name.
+- Discovered profiles are reported via `ISessionBraveDiscoveryProtocol.discover()` returning `list[BraveProfileInfo]` (path, name, source, is_regular_browser, is_web_app_hub). Best-effort: missing directories return an empty list and never raise.
+- `SessionManager.register_brave_profile()` records the Brave master path as the session path with `SessionStatus.AUTH_REQUIRED` until validated. Idempotent by path.
+- Validation/check_health may probe a Brave path headless (read-only OK), but renewal MUST NOT run against a live Brave profile — it raises `AuthRequiredError` directing the operator to `session login`.
+- The profile preparer forces an ephemeral clone for Brave masters even in login mode (never exposes the live Brave path as writable).
+- CLI exposes `session brave-list` and `session brave-import --name <name> --brave-profile <path>`.
+
+#### Edge Cases
+
+- No Brave installation → `discover()` returns an empty list.
+- A Brave profile whose path is already registered → name updated in place, no duplicate row.
+- A non-Brave path passed to `brave-import` → error `brave profile not discovered`.
+
+#### Technical Specification
+
+| Aspect | Detail |
+| --- | --- |
+| **Input** | A Brave profile path (or none for `brave_list`, which lists all discovered profiles). |
+| **Output** | `brave_list`: `list[BraveProfileInfo]`. `brave_import`: the registered `SessionInfo` (path = Brave master, status `AUTH_REQUIRED`). |
+| **Protocol** | `ISessionBraveDiscoveryProtocol` — `discover() -> list[BraveProfileInfo]`. |
+| **Method** | `discover`, `register_brave_profile`, `discover_brave_profiles`, `is_brave_profile`. |
+| **Event` | `brave_profile_registered` — logged when a Brave profile is added to the pool. |
+| **Error` | Renewal against a live Brave path raises `AuthRequiredError`; unknown Brave path on import returns an error response. |
+
+#### Test
+
+| Context | When Action | Then Observable Result |
+| --- | --- | --- |
+| No Brave data root | `discover()` runs | Returns an empty list, never raises |
+| Flatpak Brave profiles exist | `discover()` runs | Returns each profile with `source=flatpak` |
+| A Brave profile is imported | `register_brave_profile` runs | Pool entry with `path` = Brave master, `status=AUTH_REQUIRED` |
+| A Brave master is prepared in login mode | `prepare` runs | Yields an ephemeral clone, not the live Brave path |
+| Renewal targets a Brave path | `renew_session_if_stale` runs | Raises `AuthRequiredError` directing to `session login` |
+
+#### Metric
+
+| Target Metric | Value |
+| --- | --- |
+| Brave discovery correctness on this machine | 100% |
+
 ## Public Interface
 
 | Aspect | Detail |
@@ -276,8 +330,8 @@ Path.
 | Agent | `SessionOrchestrator` |
 | Aggregate | `ISessionAggregate` |
 | Method | `execute` |
-| Request | `SessionRequest` — verbs `check_health`, `rotate`, `delete`, `login` |
-| Response | `SessionResponse` — carries the valid flag, health verdicts, per-session reasons, and the reasoned `no_eligible_session` outcome |
+| Request | `SessionRequest` — verbs `check_health`, `rotate`, `delete`, `login`, `brave_list`, `brave_import` |
+| Response | `SessionResponse` — carries the valid flag, health verdicts, per-session reasons, the reasoned `no_eligible_session` outcome, and discovered/imported Brave profiles |
 
 ## Reference
 

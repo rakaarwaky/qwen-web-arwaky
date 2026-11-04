@@ -29,6 +29,8 @@ class ProfilePreparer(IProfilePreparerProtocol):
     - standard runs/jobs → an ephemeral clone of the master profile so
       multiple browser processes can run concurrently without SingletonLock
       conflicts.
+    - Brave master profile → always an ephemeral clone, never the live path,
+      so qwen writes never land in a running Brave browser profile.
     """
 
     # Block 1: Class Definition & Constructor
@@ -50,18 +52,22 @@ class ProfilePreparer(IProfilePreparerProtocol):
 
     @contextmanager
     def _prepare(self, cfg: AppConfig) -> Iterator[Path]:
+        from modules.shared.src.session.utility_session_brave_paths import is_brave_profile_path
+
         master_session = cfg.session_path
         mode = getattr(cfg, "mode", "")
-        if mode == "login":
+        if mode == "login" and not is_brave_profile_path(master_session):
             log.debug("profile_preparer_login_mode_master_path", path=str(master_session))
             yield master_session
             return
-        with create_ephemeral_session(master_session, mode=mode) as session_dir:
-            log.debug(
-                "profile_preparer_standard_mode_clone",
-                master=str(master_session),
-                clone=str(session_dir),
-            )
+        # Brave master profiles are always cloned (even in login mode) so
+        # qwen writes never land in a live Brave browser profile.
+        if mode == "login":
+            log.debug("profile_preparer_login_mode_brave_clone", master=str(master_session))
+        else:
+            log.debug("profile_preparer_standard_mode_clone", master=str(master_session))
+        with create_ephemeral_session(master_session, mode="standard") as session_dir:
+            log.debug("profile_preparer_ephemeral_clone_yielded", clone=str(session_dir))
             yield session_dir
 
     # Block 3: Dunder Methods, Factories & Helpers
