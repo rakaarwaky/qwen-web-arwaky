@@ -71,6 +71,28 @@ The session feature is Done. `uv run python -m pytest modules/session/tests/ -v`
 | Risk | None |
 | Updated | 2026-10-25 |
 
+### FR-Session-007: Brave session sourcing
+
+| Aspect | Detail |
+| --- | --- |
+| State | In Progress |
+| Done | `modules/shared/src/session/utility_session_brave_paths.py` — Brave path constants + `find_brave_profiles()` scanner with `brave_profile_name()` and `is_brave_profile_path()`. Marker detection reconciled: root-level `Cookies` (regular Brave profiles) accepted alongside `Default/Cookies` and `Local State`. |
+| | `modules/shared/src/session/taxonomy_session_brave_vo.py` — `BraveProfileInfo` frozen dataclass (path, name, source, is_regular_browser, is_web_app_hub). |
+| | `modules/session/src/capabilities_session_brave_discovery.py` — `SessionBraveDiscovery` implementing `ISessionBraveDiscoveryProtocol`; best-effort, never raises. |
+| | `modules/session/tests/unit_capabilities_session_brave_discovery.py` — unit tests (empty when no brave dirs, finds profiles, reads names). |
+| | `modules/session/tests/integration_session_brave_import.py` — integration test: fake Brave profile, import via SessionManager, verify pool entry + ephemeral clone. |
+| | `modules/shared/src/session/contract_session_protocol.py` — `ISessionBraveDiscoveryProtocol` added; `brave_profile_path` field on `SessionRequest`; `brave_profiles` on `SessionResponse`. |
+| | `modules/shared/src/session/taxonomy_session_vo.py` — `brave_profile_path` and `brave_profiles` fields; `BraveProfileInfo` in `__all__`. |
+| | `modules/session/src/capabilities_session_manager.py` — `register_brave_profile`, `discover_brave_profiles`, `is_brave_profile`; constructor takes `brave_discovery`. |
+| | `modules/session/src/capabilities_session_profile_preparer.py` — Brave master always cloned to ephemeral even in login mode. |
+| | `modules/session/src/agent_session_orchestrator.py` — verbs `brave_list`/`brave_import`; `_validate_saved_session` skips renewal on Brave paths. |
+| | `modules/cli/src/surface_cli_sessions_command.py` — `brave-list` and `brave-import` subcommands + handlers. |
+| | `modules/root_core_container.py` — `BraveProfileDiscovery` constructed and injected into `SessionManager` and `SessionOrchestrator`. |
+| | `modules/session/FRD.md` — FR-Session-007 added. |
+| In Progress | `uv run python -m pytest modules/session/tests/ -q`; `ruff check modules`; `mypy modules`; commit on `brave/session-sourcing`. |
+| Risk | None |
+| Updated | 2026-11-04 |
+
 ## Reference
 
 | Artifact | Purpose | Link |

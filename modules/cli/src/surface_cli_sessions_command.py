@@ -149,6 +149,24 @@ def register_sessions_subparser(subparsers: Any) -> None:
     status_parser = sessions_sub.add_parser("status", help="Show detailed session status")
     status_parser.add_argument("--json", action="store_true", help="Format output as JSON")
 
+    # Brave list command
+    brave_list_parser = sessions_sub.add_parser("brave-list", help="List discoverable Brave browser profiles")
+    brave_list_parser.add_argument("--json", action="store_true", help="Format output as JSON")
+
+    # Brave import command
+    brave_import_parser = sessions_sub.add_parser("brave-import", help="Import a Brave profile into the session pool")
+    brave_import_parser.add_argument("--json", action="store_true", help="Format output as JSON")
+    brave_import_parser.add_argument(
+        "--name",
+        required=False,
+        help="Session name for the imported Brave profile (defaults to Brave profile name)",
+    )
+    brave_import_parser.add_argument(
+        "--brave-profile",
+        required=False,
+        help="Brave master profile path to import (required unless auto-discovery finds exactly one)",
+    )
+
 
 def handle_sessions(args: argparse.Namespace, session: ISessionAggregate | None = None) -> int:
     """Handle sessions subcommand via the session aggregate.
@@ -175,6 +193,10 @@ def handle_sessions(args: argparse.Namespace, session: ISessionAggregate | None 
         return cmd_remove(session, args, json_output)
     if args.session_command == "status":
         return cmd_status(session, json_output)
+    if args.session_command == "brave-list":
+        return cmd_brave_list(session, json_output)
+    if args.session_command == "brave-import":
+        return cmd_brave_import(session, args, json_output)
 
     print("Use 'qwen-web-arwaky session --help' for usage")
     return 1
@@ -528,6 +550,68 @@ def cmd_status(session: ISessionAggregate, json_output: bool = False) -> int:
     print(f"Auth Required: {sum(1 for s in pool if s.is_auth_required)}")
     print()
 
+    return 0
+
+
+def cmd_brave_list(session: ISessionAggregate, json_output: bool = False) -> int:
+    """List discoverable Brave browser profiles."""
+    response = session.execute(SessionRequest(verb="brave_list"))
+    if response.error:
+        return _fail_json(str(response.error), "cli-500", json_output)
+    profiles = list(response.brave_profiles or [])
+    if json_output:
+        print(
+            json.dumps(
+                {
+                    "success": True,
+                    "brave_profiles": [
+                        {
+                            "path": str(p.path),
+                            "name": p.name,
+                            "source": p.source,
+                            "is_regular_browser": p.is_regular_browser,
+                            "is_web_app_hub": p.is_web_app_hub,
+                        }
+                        for p in profiles
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return 0
+    print("\n🦁 Brave Profiles")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    if not profiles:
+        print("No Brave profiles discovered.")
+        print()
+        return 0
+    for p in profiles:
+        marker = "browser" if p.is_regular_browser else "pwa"
+        print(f"  {p.name} [{marker}]  source={p.source}")
+        print(f"    path: {p.path}")
+    print()
+    return 0
+
+
+def cmd_brave_import(session: ISessionAggregate, args: argparse.Namespace, json_output: bool = False) -> int:
+    """Import a Brave profile into the session pool."""
+    brave_profile_path = getattr(args, "brave_profile", None)
+    name = getattr(args, "name", None) or ""
+    response = session.execute(SessionRequest(verb="brave_import", name=name, brave_profile_path=brave_profile_path))
+    if response.error:
+        return _fail_json(str(response.error), "cli-500", json_output)
+    if json_output:
+        print(
+            json.dumps(
+                {"success": True, "message": response.message, "profile_path": response.profile_path},
+                indent=2,
+            )
+        )
+        return 0
+    print(f"\n{status_glyph('ok')} {response.message}")
+    if response.profile_path:
+        print(f"   Path: {response.profile_path}")
+    print()
     return 0
 
 

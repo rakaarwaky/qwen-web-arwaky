@@ -65,6 +65,7 @@ from modules.prompt_runtime.src.capabilities_prompt_injector import PromptInject
 from modules.prompt_runtime.src.capabilities_send_dispatcher import SendDispatcher
 from modules.prompt_runtime.src.capabilities_stream_monitor import StreamMonitor
 from modules.session.src.agent_session_orchestrator import SessionOrchestrator
+from modules.session.src.capabilities_session_brave_discovery import SessionBraveDiscovery
 from modules.session.src.capabilities_session_limit_checker import SessionLimitChecker
 from modules.session.src.capabilities_session_login_checker import SessionLoginChecker
 from modules.session.src.capabilities_session_manager import SessionManager
@@ -102,6 +103,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
 from modules.shared.src.prompt_runtime.contract_prompt_runtime_aggregate import IPromptRuntimeAggregate
 from modules.shared.src.session.contract_session_aggregate import ISessionAggregate
 from modules.shared.src.session.contract_session_protocol import (
+    ISessionBraveDiscoveryProtocol,
     ISessionManagerProtocol,
     ISessionRenewalProtocol,
     ISessionRotatorProtocol,
@@ -217,7 +219,8 @@ class SharedContainer:
             saver=self.saver,
         )
         self.workspace = WorkspaceProvisioner()
-        self.session_manager: ISessionManagerProtocol = SessionManager()
+        self.session_brave_discovery: ISessionBraveDiscoveryProtocol = SessionBraveDiscovery()
+        self.session_manager: ISessionManagerProtocol = SessionManager(brave_discovery=self.session_brave_discovery)
         self.profile_preparer: ProfilePreparer = ProfilePreparer()
         # Session infrastructure (login + limit checkers, renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.
@@ -332,6 +335,7 @@ class SharedContainer:
             login_checker=self.session_login_checker,
             limit_checker=self.session_limit_checker,
             rotator=self.session_rotator,
+            brave_discovery=self.session_brave_discovery,
         )
         # updater_verify and the update aggregate depend on the session orchestrator
         # (smoke gate) so they are composed after it.

@@ -8,6 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, NewType, TypeAlias
 
+from modules.shared.src.session.taxonomy_session_brave_vo import BraveProfileInfo
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -273,11 +275,19 @@ class SessionRequest:
 
     ``exclude_ids`` is read only by the ``rotate`` verb, which forwards it
     to the rotator so sessions already tried in this turn are skipped.
+
+    ``brave_profile_path`` is read only by the ``brave_import`` verb, which
+    names the Brave master profile to import into the session pool as a
+    ``AUTH_REQUIRED`` session. The ``brave_list`` verb reads none of these
+    fields and returns discovered Brave profiles directly.
     """
 
     verb: str = "validate"
     session_path: Path | None = None
     force: bool = False
+    #: ``brave_import`` verb: the Brave master profile directory to import
+    #: into the session pool as an AUTH_REQUIRED session.
+    brave_profile_path: Path | None = None
     #: Named account the ``login`` verb registers in the pool. ``delete``
     #: also resolves it through the pool when no ``session_path`` is set, so
     #: a deletion target is always explicit; ignored by ``validate``.
@@ -311,7 +321,8 @@ class SessionResponse:
     session. ``sessions`` carries the pool listing for ``list_sessions``;
     ``removed`` reports whether ``remove_session`` dropped a pool entry.
     ``throttled`` reports whether the ``rotate`` verb found every pooled
-    session rate-limited.
+    session rate-limited. ``brave_profiles`` carries the discovered Brave
+    profile list for the ``brave_list`` verb.
     """
 
     valid: bool = False
@@ -335,9 +346,12 @@ class SessionResponse:
     #: True when the ``rotate`` verb exhausted the pool (every session
     #: rate-limited) instead of selecting one.
     throttled: bool = False
+    #: Discovered Brave profiles, set by the ``brave_list`` verb.
+    brave_profiles: list[BraveProfileInfo] | None = None
 
 
 __all__ = [
+    "BraveProfileInfo",
     "HealthReason",
     "RotatorRequest",
     "RotatorResponse",
