@@ -7,6 +7,7 @@ output — the underlying class/function is what actually matters.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock
 
 from modules.browser.src.agent_browser_orchestrator import BrowserOrchestrator
@@ -187,4 +188,4 @@ def make_test_orchestrator(**overrides) -> DirectPromptAdapter:
         flow=MagicMock(),
     )
     defaults.update(overrides)
-    return DirectPromptAdapter(**defaults)  # type: ignore[arg-type]
+    return cast(DirectPromptAdapter, DirectPromptAdapter(**defaults))
