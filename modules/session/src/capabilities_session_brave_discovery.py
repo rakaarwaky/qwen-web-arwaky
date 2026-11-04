@@ -9,10 +9,10 @@ AES201: capability layer imports contracts, taxonomy, and utilities only.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from modules.shared.src.session.contract_session_protocol import ISessionBraveDiscoveryProtocol
+from modules.shared.src.session.taxonomy_session_brave_constant import FLATPAK_ROOT
 from modules.shared.src.session.taxonomy_session_brave_vo import BraveProfileInfo
 from modules.shared.src.session.utility_session_brave_paths import (
     SOURCE_FLATPAK,
@@ -21,12 +21,13 @@ from modules.shared.src.session.utility_session_brave_paths import (
     find_brave_profiles,
 )
 
-#: Flatpak data root prefix used to label the source of a discovered profile.
-_FLATPAK_ROOT = Path(os.path.expanduser("~/.var/app/com.brave.Browser"))
+# Block 1: Class Definition & Constructor
 
 
 class SessionBraveDiscovery(ISessionBraveDiscoveryProtocol):
     """Discovers existing Brave profiles and registers them as candidate sessions."""
+
+    # Block 2: Protocol Method Implementation
 
     def discover(self) -> list[BraveProfileInfo]:
         """Return every discoverable Brave profile as :class:`BraveProfileInfo`.
@@ -36,7 +37,7 @@ class SessionBraveDiscovery(ISessionBraveDiscoveryProtocol):
         profiles: list[BraveProfileInfo] = []
         for profile_dir in find_brave_profiles():
             resolved = profile_dir.resolve()
-            is_flatpak = _is_under(resolved, _FLATPAK_ROOT)
+            is_flatpak = _is_under(resolved, FLATPAK_ROOT)
             source = SOURCE_FLATPAK if is_flatpak else SOURCE_SYSTEM
             is_web_app_hub = any(part == "web-app-hub" for part in resolved.parts)
             profiles.append(
@@ -49,6 +50,9 @@ class SessionBraveDiscovery(ISessionBraveDiscoveryProtocol):
                 )
             )
         return profiles
+
+
+# Block 3: Dunder Methods, Factories & Helpers
 
 
 def _is_under(path: Path, root: Path) -> bool:

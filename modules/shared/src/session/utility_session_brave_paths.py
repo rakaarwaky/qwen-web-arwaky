@@ -14,9 +14,7 @@ import os
 from pathlib import Path
 
 #: Brave Flatpak data root candidates. The first existing one wins.
-BRAVE_DATA_DIR_CANDIDATES: tuple[str, ...] = (
-    os.path.expanduser("~/.var/app/com.brave.Browser"),
-)
+BRAVE_DATA_DIR_CANDIDATES: tuple[str, ...] = (os.path.expanduser("~/.var/app/com.brave.Browser"),)
 
 #: Environment override for the Brave data root.
 BRAVE_DATA_DIR_ENV = "QWEN_BRAVE_DATA_DIR"

@@ -150,15 +150,11 @@ def register_sessions_subparser(subparsers: Any) -> None:
     status_parser.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # Brave list command
-    brave_list_parser = sessions_sub.add_parser(
-        "brave-list", help="List discoverable Brave browser profiles"
-    )
+    brave_list_parser = sessions_sub.add_parser("brave-list", help="List discoverable Brave browser profiles")
     brave_list_parser.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # Brave import command
-    brave_import_parser = sessions_sub.add_parser(
-        "brave-import", help="Import a Brave profile into the session pool"
-    )
+    brave_import_parser = sessions_sub.add_parser("brave-import", help="Import a Brave profile into the session pool")
     brave_import_parser.add_argument("--json", action="store_true", help="Format output as JSON")
     brave_import_parser.add_argument(
         "--name",
@@ -597,15 +593,11 @@ def cmd_brave_list(session: ISessionAggregate, json_output: bool = False) -> int
     return 0
 
 
-def cmd_brave_import(
-    session: ISessionAggregate, args: argparse.Namespace, json_output: bool = False
-) -> int:
+def cmd_brave_import(session: ISessionAggregate, args: argparse.Namespace, json_output: bool = False) -> int:
     """Import a Brave profile into the session pool."""
     brave_profile_path = getattr(args, "brave_profile", None)
     name = getattr(args, "name", None) or ""
-    response = session.execute(
-        SessionRequest(verb="brave_import", name=name, brave_profile_path=brave_profile_path)
-    )
+    response = session.execute(SessionRequest(verb="brave_import", name=name, brave_profile_path=brave_profile_path))
     if response.error:
         return _fail_json(str(response.error), "cli-500", json_output)
     if json_output:

@@ -220,9 +220,7 @@ class SharedContainer:
         )
         self.workspace = WorkspaceProvisioner()
         self.session_brave_discovery: ISessionBraveDiscoveryProtocol = SessionBraveDiscovery()
-        self.session_manager: ISessionManagerProtocol = SessionManager(
-            brave_discovery=self.session_brave_discovery
-        )
+        self.session_manager: ISessionManagerProtocol = SessionManager(brave_discovery=self.session_brave_discovery)
         self.profile_preparer: ProfilePreparer = ProfilePreparer()
         # Session infrastructure (login + limit checkers, renewer) is composed here;
         # the rotator and session aggregate follow later after the prompt adapters.

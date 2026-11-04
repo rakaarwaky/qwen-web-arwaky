@@ -232,9 +232,7 @@ class SessionManager(ISessionManagerProtocol):
             self.save_pool(pool)
             return info
 
-    def import_brave_profile(
-        self, brave_profile_dir: Path, name: str | None = None
-    ) -> SessionInfo:
+    def import_brave_profile(self, brave_profile_dir: Path, name: str | None = None) -> SessionInfo:
         """Import a read-only Brave profile into the qwen session pool.
 
         Copies the Brave profile into ``SESSIONS_DIR`` so qwen owns a
