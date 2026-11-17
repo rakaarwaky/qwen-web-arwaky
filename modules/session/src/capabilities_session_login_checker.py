@@ -41,9 +41,7 @@ if TYPE_CHECKING:
     from modules.shared.src.browser.contract_browser_protocol import IBrowserLifecycleProtocol
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class SessionLoginChecker(ISessionLoginCheckerProtocol):
     """Probes whether the Qwen chat page behind a session is authenticated."""
 
@@ -65,8 +63,7 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
         self._session_cfg = session_cfg
         self._new_cancel: Callable[[], threading.Event] = threading.Event
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         """Probe *session* and return the login verdict (ACTIVE or AUTH_REQUIRED).
 
@@ -151,8 +148,7 @@ class SessionLoginChecker(ISessionLoginCheckerProtocol):
             inline_prompt_text=base.inline_prompt_text,
         )
 
-    # Block 3: Dunder Methods, Factories, Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _probe_login(
         self,
         cfg: AppConfig,

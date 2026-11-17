@@ -24,7 +24,7 @@ from modules.shared.src.swarm.taxonomy_swarm_vo import SwarmId, SwarmSnapshot
 log = logging.getLogger(__name__)
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class SwarmProgressRunner(ISwarmProgressProtocol):
     """Report the live state of a running fan-out.
 
@@ -42,12 +42,11 @@ class SwarmProgressRunner(ISwarmProgressProtocol):
         """
         self._registry = registry
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def snapshot(self, swarm_id: SwarmId) -> SwarmSnapshot | None:
         """Return the latest snapshot for a swarm, or None when absent."""
         return self._registry.get_snapshot(swarm_id)
 
-    # Block 3: Constructors, Std Traits, Helpers
 
-
+# ─── Block 3: Module Helpers ───
 __all__ = ["SwarmProgressRunner"]

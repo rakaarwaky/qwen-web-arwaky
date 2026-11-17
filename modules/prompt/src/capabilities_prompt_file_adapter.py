@@ -71,9 +71,7 @@ def new_run_state(cancel_event: CancelToken | None = None) -> RunState:
     return RunState()
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class PromptFileAdapter(IPromptFileProtocol):
     """Orchestrates prompt file execution (without document attachment)."""
 
@@ -101,8 +99,7 @@ class PromptFileAdapter(IPromptFileProtocol):
         self._flow = flow
         self._cancel = cancel
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def request_cancel(self, cancel_event: CancelToken) -> bool:
         """Cancel the in-flight run identified by its cancel event.
 
@@ -225,8 +222,7 @@ class PromptFileAdapter(IPromptFileProtocol):
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _execute_file_on_page(
         self,
         page: Page,

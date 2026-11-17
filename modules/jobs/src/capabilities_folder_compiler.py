@@ -21,7 +21,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import IFolderCompilePro
 log = get_logger("capabilities_folder_compiler")
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class FolderCompiler(IFolderCompileProtocol):
     """Compile folder contents into a single markdown file for attachment."""
 
@@ -36,7 +36,7 @@ class FolderCompiler(IFolderCompileProtocol):
         else:
             self.input_dir = Path.cwd() / LOCAL_WS_DIR / "input"
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def compile_folder(
         self,
         folder_path: Path,
@@ -142,7 +142,7 @@ class FolderCompiler(IFolderCompileProtocol):
         """Check if path is a directory (not a file)."""
         return Path(path).is_dir()
 
-    # Block 3: Dunder Methods, Factories, Helpers
+    # ─── Block 3: Module Helpers ───
     def _generate_output_path(self, folder_path: Path) -> Path:
         """Generate output path with timestamp: .qwen-web-arwaky/input/{folder_name}_{timestamp}.md"""
         timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")

@@ -31,9 +31,7 @@ from modules.shared.src.session.utility_session_cloner import clone_session_prof
 log = get_logger("session_manager")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class SessionManager(ISessionManagerProtocol):
     """Manages Qwen session storage and CRUD operations."""
 
@@ -47,8 +45,7 @@ class SessionManager(ISessionManagerProtocol):
         self._brave_discovery = brave_discovery
         self._ensure_dirs()
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def load_pool(self) -> SessionPool:
         """Load session pool from disk, auto-discovering profile dirs on disk.
 
@@ -419,8 +416,7 @@ class SessionManager(ISessionManagerProtocol):
             pool.sessions = [s.with_usage(success=success) if s.session_id == session_id else s for s in pool.sessions]
             self.save_pool(pool)
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     @contextlib.contextmanager
     def _pool_lock(self) -> Iterator[None]:
         """Serialize the load→mutate→save cycle against other processes.

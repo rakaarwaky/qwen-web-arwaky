@@ -68,7 +68,7 @@ qwen-web-arwaky is a Python CLI and MCP server that automates `chat.qwen.ai` thr
 
 ## Project Requirements
 
-### PR-QWA-001: Direct prompt execution
+### PR-QWA-001: Direct prompt execution — browser
 
 #### User Stories
 
@@ -86,7 +86,7 @@ A direct-text acceptance run returns a complete result location on success and a
 2. Receive one terminal success or explicit failure outcome.
 3. On success, the result location is reported; on failure, a reason plus recovery action is reported.
 
-### PR-QWA-002: Prompt-file execution
+### PR-QWA-002: Prompt-file execution — cli
 
 #### User Stories
 
@@ -104,7 +104,7 @@ The accepted file's full prompt is represented in the completed run; a missing o
 2. The file's full prompt is represented in the completed run.
 3. A missing or unreadable file is rejected before submission.
 
-### PR-QWA-003: Prompt with document execution
+### PR-QWA-003: Prompt with document execution — config
 
 #### User Stories
 
@@ -122,7 +122,7 @@ The run does not send the prompt until the document is reported ready; an unusab
 2. The document is reported ready before the prompt is sent.
 3. An unusable document produces an explicit failure at the pre-flight validation stage.
 
-### PR-QWA-004: Authenticated session handling
+### PR-QWA-004: Authenticated session handling — jobs
 
 #### User Stories
 
@@ -140,7 +140,7 @@ A valid saved session permits a headless acceptance run; an invalid session retu
 2. Reuse the saved session for a headless run.
 3. An invalid session returns an authentication-required outcome with a login action.
 
-### PR-QWA-005: Isolated conversation context
+### PR-QWA-005: Isolated conversation context — logging
 
 #### User Stories
 
@@ -158,7 +158,7 @@ Every new run starts without prior conversation content affecting its request; t
 2. The run record shows it began in a new conversation.
 3. A second run with contradictory context also shows a new conversation.
 
-### PR-QWA-006: Complete response detection
+### PR-QWA-006: Complete response detection — mcp
 
 #### User Stories
 
@@ -176,7 +176,7 @@ A run waits for a terminal response; a fixture that pauses mid-response yields n
 2. A paused stream yields no success until generation ends.
 3. A run exceeding its time budget yields an explicit timeout.
 
-### PR-QWA-007: Durable local results
+### PR-QWA-007: Durable local results — prompt
 
 #### User Stories
 
@@ -194,7 +194,7 @@ A successful run stores the complete response and a traceable run record; forced
 2. The complete response and a traceable run record are stored.
 3. Forced interruption leaves either the prior or the new complete destination, never a truncated artifact.
 
-### PR-QWA-008: Safe local path boundaries
+### PR-QWA-008: Safe local path boundaries — prompt_runtime
 
 #### User Stories
 
@@ -212,7 +212,7 @@ Agent-initiated file work remains within the operator-approved workspace; an inp
 2. A path inside the workspace is accepted.
 3. A path resolving outside the workspace is rejected before submission or write.
 
-### PR-QWA-009: Asynchronous job control
+### PR-QWA-009: Asynchronous job control — session
 
 #### User Stories
 
@@ -230,7 +230,7 @@ An agent can queue a long-running prompt, receive a tracking identifier, and lat
 2. Receive a tracking identifier within the Goal 4 target.
 3. Poll for the terminal state (completed or failed).
 
-### PR-QWA-010: Concurrent-run isolation
+### PR-QWA-010: Concurrent-run isolation — swarm
 
 #### User Stories
 
@@ -248,7 +248,7 @@ Multiple accepted runs progress independently within configured resource limits;
 2. Force one failure.
 3. Every unaffected run completes its own terminal outcome.
 
-### PR-QWA-011: Folder prompt preparation
+### PR-QWA-011: Folder prompt preparation — tui
 
 #### User Stories
 
@@ -266,7 +266,7 @@ A supported local folder compiles into one ordered prompt document while preserv
 2. The folder compiles into one ordered prompt document.
 3. Every unresolved or out-of-bound reference is reported.
 
-### PR-QWA-012: Workspace readiness diagnostics
+### PR-QWA-012: Workspace readiness diagnostics — update
 
 #### User Stories
 
@@ -284,117 +284,12 @@ Each deliberately missing prerequisite is reported separately with one correctiv
 2. Each missing prerequisite is reported separately.
 3. Each report carries one corrective action and a non-success outcome.
 
-### PR-QWA-013: Interactive terminal operation
 
-#### User Stories
+---
 
-| As a | I want | So that | Priority |
-|------|--------|---------|----------|
-| Automation operator at a terminal | configure and monitor multiple prompt runs without memorizing command syntax | start, distinguish, and review the terminal state of at least two runs using only the interactive interface | P1 |
-
-#### Proposed Solution
-
-The operator can start, distinguish, and review the terminal state of at least two runs using only the interactive interface.
-
-#### Main User Flow
-
-1. Open the interactive terminal.
-2. Start at least two prompt runs.
-3. Distinguish and review the terminal state of each.
-
-### PR-QWA-014: Optional external observability
-
-#### User Stories
-
-| As a | I want | So that | Priority |
-|------|--------|---------|----------|
-| Automation operator | forward run health and failure information to a configured monitoring destination without making that destination mandatory | a configured acceptance run emits monitoring data, while an unavailable destination does not prevent the run from reaching its own terminal outcome | P2 |
-
-#### Proposed Solution
-
-A configured acceptance run emits monitoring data; an unavailable destination does not prevent the run from reaching its own terminal outcome.
-
-#### Main User Flow
-
-1. Configure a monitoring destination.
-2. A run emits monitoring data.
-3. An unavailable destination does not block the terminal outcome.
-
-### PR-QWA-015: Guided product updates
-
-#### User Stories
-
-| As a | I want | So that | Priority |
-|------|--------|---------|----------|
-| Automation operator | check for an available release and preview the proposed change before approving it | a preview reports the current and proposed versions without changing installed files | P2 |
-
-#### Proposed Solution
-
-A preview reports the current and proposed versions without changing installed files.
-
-#### Main User Flow
-
-1. Check for an available release.
-2. Preview the proposed change.
-3. Approve or decline without changing installed files.
-
-### PR-QWA-016: Machine-readable diagnostics
-
-#### User Stories
-
-| As a | I want | So that | Priority |
-|------|--------|---------|----------|
-| AI coding agent | consume readiness and failure reports without parsing human prose | every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action | P2 |
-
-#### Proposed Solution
-
-Every diagnostic outcome in the acceptance matrix can be decoded into a stable status, issue, and suggested action.
-
-#### Main User Flow
-
-1. Trigger a diagnostic outcome.
-2. The outcome is emitted as a stable status, issue, and suggested action.
-3. The agent decodes it without parsing human prose.
-
-### Non-functional Requirements (High-level)
-
-| Category | Commitment | Detail lives in |
-|----------|------------|-----------------|
-| Reliability | Accepted work reaches one explicit terminal outcome, and unrelated runs remain isolated | [Prompt FRD](modules/prompt/FRD.md) for F-005–F-007 and F-010 |
-| Performance | User-facing submission and monitoring remain responsive during long work | [Prompt FRD](modules/prompt/FRD.md) for F-006 and F-009 |
-| Security & privacy | Sessions and generated artifacts remain local by default, sensitive values are not emitted, and workspace boundaries are enforced | [Session FRD](modules/session/FRD.md) for F-004 and F-008; [Prompt FRD](modules/prompt/FRD.md) for F-007 |
-| Compatibility | Primary workflows expose equivalent outcomes to people and local agent clients | [CLI DESIGN](modules/cli/DESIGN.md) and [MCP DESIGN](modules/mcp/DESIGN.md) |
-| Maintainability | Upstream website changes fail explicitly and can be reproduced with controlled acceptance scenarios | [Prompt FRD](modules/prompt/FRD.md) for F-003 and F-006 |
-| Accessibility | Interactive operation remains understandable without color-only status or memorized commands | [CLI DESIGN](modules/cli/DESIGN.md) for F-013 |
-
-### Requirement Ownership Map
-
-Every F-00x requirement maps to a current owning document. Shared ownership is allowed where noted; the owning document wins on a requirement conflict. For cross-feature behavior, Product owns the business outcome and Engineering owns the enforcement point.
-
-| Requirement | Owning document | Notes |
-|---|---|---|
-| F-001 Direct prompt execution | [Prompt FRD](modules/prompt/FRD.md) FR-PROMPT-001 | CLI and MCP surfaces inherit via [CLI DESIGN](modules/cli/DESIGN.md) and [MCP DESIGN](modules/mcp/DESIGN.md) |
-| F-002 Prompt-file execution | [Prompt FRD](modules/prompt/FRD.md) FR-PROMPT-002 | — |
-| F-003 Prompt with document execution | [Prompt FRD](modules/prompt/FRD.md) FR-PROMPT-003 + shared pre-flight validation | Supported-format allowlist and exact-byte ceiling are shared by CLI/MCP |
-| F-004 Authenticated session handling | [Session FRD](modules/session/FRD.md) FR-SESSION-001 / FR-SESSION-004 | Health verdicts, reasons, and recovery actions |
-| F-005 Isolated conversation context | [Prompt FRD](modules/prompt/FRD.md) | — |
-| F-006 Complete response detection | [Prompt FRD](modules/prompt/FRD.md) FR-PROMPT-006 | — |
-| F-007 Durable local results | [Prompt FRD](modules/prompt/FRD.md) + [Logging module](modules/logging/BACKLOG.md) | Run records and response persistence |
-| F-008 Safe local path boundaries | [Session FRD](modules/session/FRD.md) + [MCP hardening](modules/mcp/BACKLOG.md) | Workspace root enforcement on both surfaces |
-| F-009 Asynchronous job control | [Prompt FRD](modules/prompt/FRD.md) + [Jobs module](modules/jobs/BACKLOG.md) | Shared by CLI/MCP |
-| F-010 Concurrent-run isolation | [Prompt FRD](modules/prompt/FRD.md) + [Swarm module](modules/swarm/BACKLOG.md) | — |
-| F-011 Folder prompt preparation | [Prompt FRD](modules/prompt/FRD.md) + [Jobs module](modules/jobs/BACKLOG.md) | Folder compilation |
-| F-012 Workspace readiness diagnostics | [CLI DESIGN](modules/cli/DESIGN.md) doctor command | — |
-| F-013 Interactive terminal operation | [CLI DESIGN](modules/cli/DESIGN.md) + [TUI module](modules/tui/BACKLOG.md) | — |
-| F-014 Optional external observability | [Logging module](modules/logging/BACKLOG.md) | — |
-| F-015 Guided product updates | [Update module](modules/update/BACKLOG.md) | — |
-| F-016 Machine-readable diagnostics | [MCP DESIGN](modules/mcp/DESIGN.md) + [CLI DESIGN](modules/cli/DESIGN.md) | Stable status/issue/action payloads |
 
 ## Reference
 
-| Artifact | Purpose | Link |
-|----------|---------|------|
-| PRD | Product scope, requirements, and success metrics | [PRD.md](PRD.md) |
-| ARCHITECTURE | Layer boundaries and allowed dependencies | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| ROADMAP | What ships next, in order | [ROADMAP.md](ROADMAP.md) |
-| BACKLOG | What is true now, with evidence | [modules/prompt/BACKLOG.md](modules/prompt/BACKLOG.md) |
+- PRD: [PRD.md](PRD.md)
+- ROADMAP: [ROADMAP.md](ROADMAP.md)
+- ARCHITECTURE: [ARCHITECTURE.md](ARCHITECTURE.md)

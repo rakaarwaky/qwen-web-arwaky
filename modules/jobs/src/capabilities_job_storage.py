@@ -36,9 +36,7 @@ _unsafe_filename_chars = re.compile(r"[^A-Za-z0-9_.\-]")
 _max_job_filename_len = 200
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class JobStorage(IJobStorageProtocol):
     """File-backed job state persistence adhering to XDG state specification."""
 
@@ -65,8 +63,7 @@ class JobStorage(IJobStorageProtocol):
             self.reconcile_zombies()
             self._reconciled = True
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def save_job(self, record: JobRecord) -> None:
         """Persist a job record to an atomic JSON file."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -269,8 +266,7 @@ class JobStorage(IJobStorageProtocol):
                 records.append(rec)
         return records
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _job_file_path(self, job_id: JobId | str) -> Path:
         """Map a job ID onto a filesystem-safe path inside the storage dir.
 

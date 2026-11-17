@@ -33,14 +33,11 @@ from modules.shared.src.config.utility_config_app_factory import (
 SlotInputError: type[SlotInputValue] = SlotInputValue
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class SlotRunPlanResolver(IConfigSlotPlanProtocol):
     """Resolve raw slot widget values into an executable run plan."""
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def resolve_slot_run_plan(
         self,
         prompt_val: PromptText,
@@ -125,9 +122,7 @@ class SlotRunPlanResolver(IConfigSlotPlanProtocol):
         return BatchPromptOutcome(files=files)
 
 
-# Block 3: Dunder Methods, Factories & Helpers
-
-
+# ─── Block 3: Module Helpers ───
 def _output_dir_write_error(out_path: Path) -> str | None:
     """Return an actionable message when *out_path* cannot be written to.
 

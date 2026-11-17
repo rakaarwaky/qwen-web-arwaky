@@ -39,9 +39,7 @@ from modules.shared.src.update.utility_update_version import compare_versions
 log = get_logger("capabilities_update_verify")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class UpdateVerifyCapability(IUpdateVerifyProtocol):
     """FR-UPDATE-003: run the full pipeline and verify the post-update state."""
 
@@ -60,8 +58,7 @@ class UpdateVerifyCapability(IUpdateVerifyProtocol):
         self.package_name = package_name
         self._smoke_gate = smoke_gate or (lambda: ())
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def perform_update(self, force: ForceFlag = ForceFlag(False)) -> UpdateReport:
         """Run the full update pipeline and return the aggregated report."""
         forced = bool(force)
@@ -196,8 +193,7 @@ class UpdateVerifyCapability(IUpdateVerifyProtocol):
             rollback_status=rollback_status,
         )
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _snapshot_dir(self) -> Path:
         """Return the directory holding pre-upgrade environment snapshots."""
         return XDG_STATE_HOME / "update-snapshots"

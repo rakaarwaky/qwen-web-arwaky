@@ -57,7 +57,7 @@ from modules.shared.src.swarm.utility_swarm_runner_base import (
 log = logging.getLogger(__name__)
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class SwarmRunner(ISwarmStartProtocol):
     """Start a fan-out of every discovered role template over one attachment.
 
@@ -107,7 +107,7 @@ class SwarmRunner(ISwarmStartProtocol):
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     @property
     def browser_concurrency(self) -> BrowserCount:
         """Configured browser concurrency for a single Swarm run."""
@@ -165,7 +165,7 @@ class SwarmRunner(ISwarmStartProtocol):
             executor.submit(self._run_agent, swarm_id, role)
         return running or snapshot
 
-    # Block 3: Constructors, Std Traits, Helpers
+    # ─── Block 3: Module Helpers ───
     def _update_agent(
         self,
         swarm_id: SwarmId,

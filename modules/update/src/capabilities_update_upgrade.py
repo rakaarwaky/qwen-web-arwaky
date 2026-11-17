@@ -25,9 +25,7 @@ from modules.shared.src.update.utility_update_version import compare_versions
 log = get_logger("capabilities_update_upgrade")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
     """FR-UPDATE-002: upgrade the package and synchronise the browser build."""
 
@@ -42,8 +40,7 @@ class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
         self.pip_timeout_sec = pip_timeout_sec
         self.browser_timeout_sec = browser_timeout_sec
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def upgrade_package(
         self,
         force: ForceFlag = ForceFlag(False),
@@ -156,8 +153,7 @@ class UpdateUpgradeCapability(IUpdateUpgradeProtocol):
         """Expose the shared Chromium-presence check (used by the verify gate)."""
         return chromium_present()
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         return f"UpdateUpgradeCapability(package={self.package_name!r})"
 

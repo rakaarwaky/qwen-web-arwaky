@@ -60,9 +60,7 @@ _NOISE_CONSOLE_PATTERNS: frozenset[str] = frozenset(
 )
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class BrowserDiagnostics(IBrowserDiagnosticsProtocol):
     """Page and context diagnostics wiring: asset-abort route, page-creation
     hook, per-page listeners, URL scrubbing, and noise demotion.
@@ -80,8 +78,7 @@ class BrowserDiagnostics(IBrowserDiagnosticsProtocol):
         """
         self._chat_url = CHAT_URL
 
-    # Block 2: Public Contract
-
+    # ─── Block 2: Module Contract ───
     def wire_diagnostics(self, ctx: BrowserContext) -> None:
         """Attach all diagnostics to *ctx*: the context-level asset-abort
         route, the page-creation hook, URL scrubbing, and third-party noise
@@ -165,8 +162,7 @@ class BrowserDiagnostics(IBrowserDiagnosticsProtocol):
         """
         return page_is_expired(page)
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         """Return string representation of BrowserDiagnostics."""
         return "BrowserDiagnostics()"

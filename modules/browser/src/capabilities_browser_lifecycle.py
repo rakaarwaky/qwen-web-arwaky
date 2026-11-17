@@ -56,9 +56,7 @@ from modules.shared.src.update.utility_update_browser_binary import find_chrome_
 log = get_logger("browser")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class BrowserLifecycle(IBrowserLifecycleProtocol):
     """Launch/teardown, ephemeral-context probes, and master-profile renewal.
 
@@ -97,8 +95,7 @@ class BrowserLifecycle(IBrowserLifecycleProtocol):
         """Assign the navigation view (used by the container to break the DI cycle)."""
         self._navigation = value
 
-    # Block 2: Public Contract
-
+    # ─── Block 2: Module Contract ───
     @contextmanager
     def browser_session(
         self, cfg: AppConfig, session_path: Path | None = None, executable_path: str | None = None
@@ -234,8 +231,7 @@ class BrowserLifecycle(IBrowserLifecycleProtocol):
         with self._open_chat_page(cfg, _mode="login", strict_auth=True):
             pass
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     @contextmanager
     def _open_chat_page(
         self,
