@@ -503,4 +503,4 @@ project-root/
 
 ### AES705 — Member-Root Placement
 
-### AES706 — PR Folder Mapping
+### AES706 — PR ID Folder Mapping
