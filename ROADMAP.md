@@ -109,7 +109,7 @@ Feature detail stays in each feature's `BACKLOG.md`; per [`ARCHITECTURE.md`](ARC
 | Spec         | [FRD](modules/jobs/FRD.md)                                                                                |
 | Backlog      | [BACKLOG](modules/jobs/BACKLOG.md)                                                                        |
 
-### PR-QWA-010: Concurrent-run isolation — shared
+### PR-QWA-010: Concurrent-run isolation — swarm
 
 | Aspect       | Detail                                                                                                    |
 |--------------|----------------------------------------------------------------------------------------------------------|
@@ -120,7 +120,7 @@ Feature detail stays in each feature's `BACKLOG.md`; per [`ARCHITECTURE.md`](ARC
 | Spec         | [FRD](modules/swarm/FRD.md)                                                                               |
 | Backlog      | [BACKLOG](modules/swarm/BACKLOG.md)                                                                      |
 
-### PR-QWA-011: Folder prompt preparation — swarm
+### PR-QWA-011: Folder prompt preparation — tui
 
 | Aspect       | Detail                                                                                                    |
 |--------------|----------------------------------------------------------------------------------------------------------|
@@ -131,7 +131,7 @@ Feature detail stays in each feature's `BACKLOG.md`; per [`ARCHITECTURE.md`](ARC
 | Spec         | [FRD](modules/jobs/FRD.md)                                                                                |
 | Backlog      | [BACKLOG](modules/jobs/BACKLOG.md)                                                                        |
 
-### PR-QWA-012: Workspace readiness diagnostics — tui
+### PR-QWA-012: Workspace readiness diagnostics — update
 
 | Aspect       | Detail                                                                                                    |
 |--------------|----------------------------------------------------------------------------------------------------------|

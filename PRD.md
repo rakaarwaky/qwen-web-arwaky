@@ -230,7 +230,7 @@ An agent can queue a long-running prompt, receive a tracking identifier, and lat
 2. Receive a tracking identifier within the Goal 4 target.
 3. Poll for the terminal state (completed or failed).
 
-### PR-QWA-010: Concurrent-run isolation — shared
+### PR-QWA-010: Concurrent-run isolation — swarm
 
 #### User Stories
 
@@ -248,7 +248,7 @@ Multiple accepted runs progress independently within configured resource limits;
 2. Force one failure.
 3. Every unaffected run completes its own terminal outcome.
 
-### PR-QWA-011: Folder prompt preparation — swarm
+### PR-QWA-011: Folder prompt preparation — tui
 
 #### User Stories
 
@@ -266,7 +266,7 @@ A supported local folder compiles into one ordered prompt document while preserv
 2. The folder compiles into one ordered prompt document.
 3. Every unresolved or out-of-bound reference is reported.
 
-### PR-QWA-012: Workspace readiness diagnostics — tui
+### PR-QWA-012: Workspace readiness diagnostics — update
 
 #### User Stories
 
