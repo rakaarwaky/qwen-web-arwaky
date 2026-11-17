@@ -474,14 +474,6 @@ Group 7 enforces folder structure invariants to maintain vertical slicing and la
 
 ### Terms
 
-| Term | Meaning |
-| ---- | ------- |
-| Project Workspaces | Project root containing all configuration and language members |
-| Workspace Member | One self-contained crate, package, or module inside the workspace |
-| Crates directory | Rust workspace members |
-| Packages directory | TypeScript or JavaScript packages |
-| Modules directory | Python modules |
-
 ### Vertical Slicing Layout
 
 AI agents frequently make this mistake: do NOT create `surface/`, `taxonomy/`, `contract/`, `capabilities/`, `utility/`, `agent/` folders. The correct structure groups files by feature, with layers as filenames, not directories.
@@ -501,62 +493,14 @@ project-root/
 
 ### Member Types
 
-| Member Type | Example Path | Carries | Belongs in | Documents |
-| ----------- | ----------- | ------- | ---------- | --------- |
-| Features | `crates/<name-features>/` | `capabilities_*` + `agent_*_orchestrator` | a feature folder | `FRD.md` + `BACKLOG.md` |
-| Surface | `crates/<name-surfaces>/` | `surface_*` | a surface folder | `DESIGN.md` + `BACKLOG.md` |
-| Shared | `crates/shared/<domain>/` | `contract_*` + `taxonomy_*` + `utility_*` | the shared folder | `DATA.md` + `BACKLOG.md` |
-
 ### AES701 — Shared Folder Purity
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | A shared folder holds a `capabilities_*`, `agent_*`, or `surface_*` file (`shared_has_forbidden_files`), or lacks its DATA.md + BACKLOG.md doc pair (`shared_missing_doc_pair`) |
-| Scope | `shared/` layer folders under member dirs |
-| Fix | Move misplaced layer files to a feature or surface folder; add DATA.md and BACKLOG.md |
 
 ### AES702 — Feature Folder Health
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `feature_missing_agent` (capabilities but no orchestrator), `feature_missing_capability` (orchestrator but no capabilities), `feature_has_forbidden_files` (foreign layer file), `feature_missing_doc_pair` (no FRD.md/BACKLOG.md), `feature_missing_root_container` (no `root_*` composition), `feature_missing_shared_subfolder` (no `shared/src/<feature>/` mirror), `doc_pair_without_orchestrator` |
-| Scope | Member subdirectories (`crates/`, `modules/`, `packages/`) |
-| Fix | Add the missing orchestrator/capabilities file, remove foreign files, add the doc pair, add a `root_*` composition file, or mirror into `shared/src/<feature>/` |
-
 ### AES703 — Surface Folder Purity
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `surface_has_misplaced_files` (holds a `capabilities_*`, `agent_*`, or `utility_*` file), `surface_missing_design_md`, or `surface_missing_backlog_md` |
-| Scope | Surface-dominated folders under member dirs |
-| Fix | Move capability/agent/utility files out; add DESIGN.md and BACKLOG.md |
 
 ### AES704 — Test Suite Coverage
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `test_suite_missing_tests_dir`, `test_suite_missing_bench_dir`, or `test_suite_missing_category` (no file carries a required test prefix) |
-| Scope | Folders owning `capabilities_*` or `agent_*_orchestrator` source |
-| Fix | Add missing test files/benches with one of the required prefixes (see AES103 Legal Test Prefixes) plus a `bench_` file |
-
 ### AES705 — Member-Root Placement
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | A member dir (`crates/`, `modules/`, `packages/`) root holds a `capabilities_*`, `agent_*`, `surface_*`, or `utility_*` file |
-| Scope | Member root level only |
-| Fix | Move the layer file per Member Types "Belongs in" (see above) |
-
-### AES706 — PR ID Folder Mapping
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `pr_missing_frd` (a module folder holds no FRD.md), `pr_fr_id_mismatch` (a module folder's FRD carries an FR id whose prefix does not match the folder name), `pr_id_mismatch` (a `PR-<segment>-001..N` id does not map to a crate folder by order, or its heading title names a different folder), or `pr_folder_without_id` (a crate folder position no `PR-<segment>` id reaches) |
-| Scope | `PRD.md`, `ROADMAP.md`, and feature module folders under `crates/` / `modules/` / `packages/`. `<segment>` is the project's own id token (`LA`, `PSD`, `CALC`, …); each member dir is ordered on its own, so a Python sequence is never compared against TypeScript folders, and caches/build output (`__pycache__`, `node_modules`, `target`, `dist`, …) never take a position |
-| Fix | Create the missing module folder, rename mismatched FR ids to `FR-<Feature>-NNN`, or add the missing FRD.md |
+### AES706 — PR Folder Mapping
