@@ -22,7 +22,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import IRunCancelProtoco
 log = get_logger("capabilities_run_cancel_registry")
 
 
-# Block 1: Class Definition & Constructor
+# ─── Block 1: Module Declaration ───
 class RunCancelRegistry:
     """Thread-safe registry of active runs keyed by their run_id.
 
@@ -44,7 +44,7 @@ class RunCancelRegistry:
         self._event_index: dict[CancelToken, RunId] = {}
         self._lock = threading.Lock()
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def register(self, run_state: RunState) -> None:
         """Track a newly started in-flight run.
 
@@ -138,7 +138,7 @@ class RunCancelRegistry:
             return False
         return self.cancel_run(run_id)
 
-    # Block 3: Dunder Methods, Factories, Helpers
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         return f"RunCancelRegistry(active={len(self._states)})"
 

@@ -77,9 +77,7 @@ def new_run_state(cancel_event: CancelToken | None = None) -> RunState:
     return RunState()
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class AttachmentPromptAdapter(IAttachmentPromptProtocol):
     """Orchestrates prompt execution with document file attachment."""
 
@@ -111,8 +109,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
         self._folder_adapter = folder_adapter
         self._cancel = cancel
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def request_cancel(self, cancel_event: CancelToken) -> bool:
         """Cancel the in-flight run identified by its cancel event.
 
@@ -249,8 +246,7 @@ class AttachmentPromptAdapter(IAttachmentPromptProtocol):
             self._observability.detach_run_log(RunId(ctx.run_id))
             self._observability.clear_run_context()
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _execute_attachment_on_page(
         self,
         page: Page,

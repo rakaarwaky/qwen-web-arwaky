@@ -35,9 +35,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import ISaverProtocol
 log = get_logger("capabilities_saver")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class Saver(ISaverProtocol):
     """Atomic file writer with metadata traceability header and JSON sidecar.
 
@@ -60,7 +58,7 @@ class Saver(ISaverProtocol):
         self.atomic_write = atomic_write
         self.metadata_dir = metadata_dir if metadata_dir is not None else DEFAULT_METADATA_DIR
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def write_output(
         self,
         path: Path,
@@ -139,8 +137,7 @@ class Saver(ISaverProtocol):
 
         log.info("output_file_written: %s", path.name)
 
-    # Block 3: Dunder Methods, Factories, Helpers
-
+    # ─── Block 3: Module Helpers ───
     @staticmethod
     def _unique_directory_path(directory: Path, run_id: str) -> Path:
         """Name a response file inside *directory* that cannot collide.

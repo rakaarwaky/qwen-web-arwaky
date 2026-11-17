@@ -19,9 +19,8 @@ from modules.shared.src.common.utility_io_writer import atomic_write_json, ensur
 from modules.shared.src.jobs.contract_jobs_protocol import IStatusProtocol
 from modules.shared.src.logging.taxonomy_logging_vo import MetricsSnapshot
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class StatusFileWriter(IStatusProtocol):
     """Atomic JSON status file for systemd / monitoring tools."""
 
@@ -29,8 +28,7 @@ class StatusFileWriter(IStatusProtocol):
         self._status_path = status_path
         ensure_dir(self._status_path)
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def write(self, **kwargs: Any) -> None:
         """Atomically write the status JSON from keyword fields.
 
@@ -106,8 +104,7 @@ class StatusFileWriter(IStatusProtocol):
         except (OSError, ValueError):
             return None
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         return "StatusFileWriter()"
 

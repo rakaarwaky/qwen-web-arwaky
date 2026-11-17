@@ -42,9 +42,7 @@ if TYPE_CHECKING:
 _compiled_patterns = [re.compile(p, re.IGNORECASE) for p in RATE_LIMIT_PATTERNS]
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class SessionLimitChecker(ISessionLimitCheckerProtocol):
     """Probes whether the Qwen chat page behind a session is rate-limited."""
 
@@ -66,8 +64,7 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
         self._session_cfg = session_cfg
         self._new_cancel: Callable[[], threading.Event] = threading.Event
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     async def check_session(self, session: SessionInfo) -> SessionHealthResult:
         """Probe *session* and return the limit verdict (ACTIVE or LIMITED).
 
@@ -146,8 +143,7 @@ class SessionLimitChecker(ISessionLimitCheckerProtocol):
             inline_prompt_text=base.inline_prompt_text,
         )
 
-    # Block 3: Dunder Methods, Factories, Helpers
-
+    # ─── Block 3: Module Helpers ───
     @staticmethod
     def _extract_limit_evidence(page: Page) -> str | None:
         """Extract matching rate-limit evidence from page body text."""

@@ -68,9 +68,7 @@ from modules.shared.src.logging.contract_logging_protocol import IMetricsProtoco
 # does not import its peer capabilities (AES201).
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class ObservabilitySetup(IObservabilityProtocol):
     """Full observability bootstrap: Sentry → OTel → structlog → status → hooks.
 
@@ -93,8 +91,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         self._run_handlers: dict[str, RotatingFileHandler] = {}
         self._formatter: Any = None
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     @property
     def metrics(self) -> IMetricsProtocol:
         """Return the persistent execution metrics collector."""
@@ -149,8 +146,7 @@ class ObservabilitySetup(IObservabilityProtocol):
                 os.getenv("ENVIRONMENT", "production"),
             )
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _configure_sentry(self) -> None:
         """Configure Sentry and log an explicit degraded event when it is off.
 
@@ -473,9 +469,7 @@ class ObservabilitySetup(IObservabilityProtocol):
         return f"ObservabilitySetup(log_path={self._log_path!r})"
 
 
-# ─── Module-level helper functions ──────────────────────────────────────────
-
-
+# Module-level helper functions
 def _category_from_record(payload: dict[str, Any]) -> str:
     """Return the error category of a JSONL log record.
 
@@ -626,7 +620,7 @@ def _thread_excepthook(args: Any) -> None:
     _report_critical(logger, args.exc_value, "unhandled_exception_in_thread")
 
 
-# ─── Security audit channel (issue #354) ───────────────────────────────────
+# Security audit channel (issue #354)
 # Authentication failures and CAPTCHA challenges are security signals: they can
 # indicate a session-hijack attempt, account lockout, or automation abuse. The
 # audit logger records every event on the ``security.audit`` channel so an
@@ -707,9 +701,7 @@ def _report_critical(logger: Any, exc_value: BaseException, event_name: str) -> 
         sentry_sdk.capture_exception(exc_value)
 
 
-# ─── OTel span scrubber (issue #352) ────────────────────────────────────────
-
-
+# OTel span scrubber (issue #352)
 def _make_scrubbed_exporter(exporter: Any) -> Any:
     """Wrap an OTel span exporter so every batch has host paths scrubbed first.
 

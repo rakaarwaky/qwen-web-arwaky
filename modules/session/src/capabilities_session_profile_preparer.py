@@ -33,14 +33,12 @@ class ProfilePreparer(IProfilePreparerProtocol):
       so qwen writes never land in a running Brave browser profile.
     """
 
-    # Block 1: Class Definition & Constructor
-
+    # ─── Block 1: Module Declaration ───
     def __init__(self) -> None:
         """Initialize the profile preparer."""
         return None
 
-    # Block 2: Protocol Trait Implementation
-
+    # ─── Block 2: Module Contract ───
     def prepare(self, cfg: AppConfig) -> AbstractContextManager[Path]:
         """Return a context manager that yields a prepared session profile path.
 
@@ -70,8 +68,7 @@ class ProfilePreparer(IProfilePreparerProtocol):
             log.debug("profile_preparer_ephemeral_clone_yielded", clone=str(session_dir))
             yield session_dir
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         """Return string representation of ProfilePreparer."""
         return "ProfilePreparer()"

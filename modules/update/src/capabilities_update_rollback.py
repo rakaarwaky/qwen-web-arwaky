@@ -26,9 +26,7 @@ from modules.shared.src.update.utility_update_subprocess import run_subprocess, 
 log = get_logger("capabilities_update_rollback")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class UpdateRollbackCapability(IUpdateRollbackProtocol):
     """FR-UPDATE-004: restore the previous release in reverse order."""
 
@@ -43,8 +41,7 @@ class UpdateRollbackCapability(IUpdateRollbackProtocol):
         self.package_name = package_name
         self.pip_timeout_sec = pip_timeout_sec
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def rollback_to(self, previous_version: VersionString) -> tuple[UpdateStepResult, ...]:
         """Reinstall the previous release and reconcile the pre-upgrade dependency snapshot.
 
@@ -112,8 +109,7 @@ class UpdateRollbackCapability(IUpdateRollbackProtocol):
         except Exception as exc:
             return (UpdateStepResult("rollback", True, False, str(exc)),)
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _snapshot_dir(self) -> Path:
         """Return the directory holding pre-upgrade environment snapshots."""
         from modules.shared.src.common.taxonomy_core_constant import XDG_STATE_HOME

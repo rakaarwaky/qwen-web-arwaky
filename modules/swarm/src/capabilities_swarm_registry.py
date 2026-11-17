@@ -28,7 +28,7 @@ from modules.shared.src.swarm.utility_swarm_runner_base import write_manifest
 log = logging.getLogger(__name__)
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class SwarmRegistry(ISwarmRegistryProtocol):
     """Thread-safe store of every in-flight and finished swarm run.
 
@@ -47,7 +47,7 @@ class SwarmRegistry(ISwarmRegistryProtocol):
         self._attachments: dict[SwarmId, FilePath] = {}
         self._executors: dict[SwarmId, TaskExecutor] = {}
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def open_run(
         self,
         snapshot: SwarmSnapshot,
@@ -124,7 +124,7 @@ class SwarmRegistry(ISwarmRegistryProtocol):
             self._attachments.pop(swarm_id, None)
             return self._executors.pop(swarm_id, None)
 
-    # Block 3: Constructors, Std Traits, Helpers
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         """Report how many runs this registry currently tracks."""
         return f"SwarmRegistry(runs={len(self._snapshots)})"

@@ -56,9 +56,7 @@ from modules.shared.src.common.utility_logger_factory import get_logger
 log = get_logger("browser.navigation")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class BrowserNavigation(IBrowserNavigationProtocol):
     """Page navigation, authentication assert, and new-chat reset.
 
@@ -84,8 +82,7 @@ class BrowserNavigation(IBrowserNavigationProtocol):
         self._model_policy = model_policy
         self._lifecycle = lifecycle
 
-    # Block 2: Public Contract
-
+    # ─── Block 2: Module Contract ───
     def open_chat_page(self, page: Page, *, strict: bool = True) -> None:
         """Navigate *page* to the chat URL and assert authentication.
 
@@ -189,8 +186,7 @@ class BrowserNavigation(IBrowserNavigationProtocol):
         with self._open_chat_page_standalone(cfg) as page:
             yield page
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _goto_chat(
         self,
         page: Page,

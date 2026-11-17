@@ -51,14 +51,12 @@ from modules.shared.src.prompt.contract_prompt_protocol import (
 )
 from modules.shared.src.prompt.taxonomy_prompt_vo import ExtractionVerdict, PromptResponse, StreamVerdict
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class PromptFlowDispatcher(IPromptFlowProtocol):
     """Drives the shared prompt dispatch and response-wait flow."""
 
-    # ─── Block 2: Protocol Method Implementation ───────────────────────────
-
+    # ─── Block 2: Module Contract ───
     def dispatch_and_wait_for_response(
         self,
         page: Page,
@@ -185,8 +183,7 @@ class PromptFlowDispatcher(IPromptFlowProtocol):
             raise RunCancelledError("Cancelled by user while waiting for response") from last_error
         raise last_error
 
-    # ─── Block 3: Dunder Methods, Factories, Helpers ───────────────────────
-
+    # ─── Block 3: Module Helpers ───
     @staticmethod
     def _attempt_boundary_index(emitter: LifecycleEmitter) -> int:
         """Index of the last event belonging to the pre-attempt phase.

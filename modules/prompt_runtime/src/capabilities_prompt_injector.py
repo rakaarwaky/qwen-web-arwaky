@@ -19,9 +19,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import IInjectionProtoco
 log = get_logger("capabilities_prompt_injector")
 
 
-# Block 1: Class Definition & Constructor
-
-
+# ─── Block 1: Module Declaration ───
 class PromptInjector(IInjectionProtocol):
     """Multi-strategy DOM text injection with verification."""
 
@@ -29,7 +27,7 @@ class PromptInjector(IInjectionProtocol):
         """Initialize with an InjectorConfig VO."""
         self.config = config
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def find_input(self, page: Page, config: InjectorConfig | None = None) -> Any:
         """Find input element using selector fallbacks."""
         cfg = config or self.config
@@ -135,8 +133,7 @@ class PromptInjector(IInjectionProtocol):
 
         raise PromptInjectionError("All strategies executed but input verification failed.")
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def _verify_injection(self, el: Any) -> bool:
         """Verify that text is non-empty inside the input element."""
         try:

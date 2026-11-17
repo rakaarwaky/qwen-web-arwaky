@@ -48,7 +48,7 @@ The Agentic Engineering System is a layered, AI-native architecture pattern. It 
 | AES703 | Structure | Surface Folder Purity | MEDIUM          |
 | AES704 | Structure | Test Suite Coverage   | MEDIUM          |
 | AES705 | Structure | Member-Root Placement | MEDIUM          |
-| AES706 | Structure | PR-LA Folder Mapping  | MEDIUM          |
+| AES706 | Structure | PR ID Folder Mapping  | MEDIUM          |
 
 ---
 
@@ -133,10 +133,10 @@ Group 2 enforces layer dependency boundaries to maintain architectural integrity
 | ----- | ----- |
 | Severity | CRITICAL |
 | Fires when | An import violates the allowed/mandatory/forbidden triple for the file's filename-prefix layer scope |
-| Scope | Every scanned source file whose stem maps to one of the 13 layer scopes |
+| Scope | Every scanned source file whose stem maps to one of the 11 layer scopes |
 | Fix | Remove or redirect the import to a layer the scope's Allowed cell permits |
 
-#### Import Matrix (13 Scopes)
+#### Import Matrix (11 Scopes)
 
 | # | Scope | Allowed | Mandatory | Forbidden |
 | - | ----- | ------- | --------- | --------- |
@@ -149,10 +149,8 @@ Group 2 enforces layer dependency boundaries to maintain architectural integrity
 | 7 | `contract(aggregate)` | `taxonomy,contract` | `taxonomy` | `agent,surface,capabilities,root` |
 | 8 | `capabilities` | `taxonomy,contract,utility` | `taxonomy,contract(protocol)` | `surface,agent,capabilities,root` |
 | 9 | `agent(orchestrator)` | `taxonomy,contract(aggregate),contract(protocol),utility` | `taxonomy,contract(aggregate)` | `surface,capabilities,root` |
-| 10 | `root` | `taxonomy,contract,capabilities,agent,surface` | — | — |
-| 11 | `surface(command|controller|page)` | `taxonomy,contract(aggregate),utility` | — | `agent,capabilities,contract(protocol),root` |
-| 12 | `surface(hook|store|action|screen|router)` | `taxonomy,contract(aggregate),utility` | — | `agent,capabilities,contract(protocol),surface(command|controller|page|entry),root` |
-| 13 | `surface(component|view|layout)` | `taxonomy,contract(aggregate),utility` | — | `agent,contract,capabilities,surface(command|controller|page|entry|hook|store|action|screen|router),root` |
+| 10 | `surface` | `taxonomy,contract(aggregate),utility,surface` | — | `contract(protocol),capabilities,agent,root` |
+| 11 | `root` | `taxonomy,contract,capabilities,agent,surface` | — | — |
 
 ### AES202 — Mandatory Import
 
@@ -195,13 +193,65 @@ Group 3 enforces file size limits and content quality standards to maintain code
 
 ### AES301 / AES302 — File Line-Count Limits
 
+| Field | Value |
+| ----- | ----- |
+| Severity | HIGH |
+| Fires when (AES301) | File exceeds the maximum allowed line count (default: 1000) |
+| Fix (AES301) | Split into smaller files |
+| Fires when (AES302) | File is below the minimum required line count (default: 5) |
+| Fix (AES302) | Merge into a related module or add more documentation |
+| Scope | Every scanned source file; barrel/entry files and `*_constant` files are excepted |
+
 ### AES303 — Mandatory Definition
 
 Skipped for `utility`/`surface` layers; active for taxonomy/contract/capabilities/agent/root.
 
+| Field | Value |
+| ----- | ----- |
+| Severity | HIGH (missing) / MEDIUM (empty) |
+| Fires when | A source file has no struct/enum/trait/class definition, or a definition is empty |
+| Scope | Every scanned source file except `utility` and `surface` layers; barrel/entry files, `*_constant.rs`, `*_constant.py`, `main.rs`, `main.py`, `py.typed` are excepted |
+| Fix | Group functions into a struct or implement an interface; remove empty definitions |
+| Layer note | The mandatory-definition sub-check is exempt for `utility` and `surface` layers (stateless pure functions and function dispatchers); it stays active for taxonomy, contract, capabilities, agent, and root. Dead-inheritance (sub-check 2) is unchanged. |
+
+#### Sub-checks
+
+| # | Sub-check | Severity | Violation name | Fires when |
+| - | --------- | -------- | -------------- | ---------- |
+| 1 | Missing definition | HIGH | `MANDATORY_DEFINITION` | File has no struct/enum/trait/class at all |
+| 2 | Empty / dead definition | MEDIUM | `DEAD_INHERITANCE` | `struct Foo;`, `impl X for Y {}`, `class Foo: pass`, `class Foo {}` |
+
 ### AES304 — Bypass Comment
 
+| Field | Value |
+| ----- | ----- |
+| Severity | CRITICAL |
+| Fires when | A forbidden bypass pattern is detected |
+| Fix | Use proper error handling |
+
+#### Forbidden Bypass Patterns
+
+| Pattern | Violation kind |
+| ------- | -------------- |
+| `#[allow(...)]` | `BYPASS_COMMENT` |
+| `unwrap()` / `expect()` | `UNWRAP_EXPECT` |
+| `panic!` | `PANIC` |
+| `todo` | `TODO` |
+| `unimplemented` / `unreachable` | `UNIMPLEMENTED` |
+| `noqa` / `type: ignore` / `eslint-disable` / `ts-ignore` / `ts-expect-error` | `BYPASS_COMMENT` |
+| `FIXME` / `HACK` / `XXX` | `BYPASS_COMMENT` |
+| `raise NotImplementedError` / `assert False` | `UNIMPLEMENTED` / `PANIC` |
+| `throw new Error(...)` / `throw new TypeError(...)` / `throw new RangeError(...)` / `throw new ReferenceError(...)` / `throw new SyntaxError(...)` | `PANIC` |
+
 ### AES305 — Duplication Code
+
+| Field | Value |
+| ----- | ----- |
+| Severity | MEDIUM |
+| Fires when | A file's share of shared normalized content windows exceeds the duplication threshold |
+| Default thresholds | identical: 75%; similar: 75% (both tiers equal — structural near-duplication in the 50–75% band, e.g. a deliberate family of sibling files sharing a common skeleton, is not a violation) |
+| Scope | Every scanned source file; import-only windows are excluded |
+| Fix | Extract duplicated logic into shared utilities |
 
 ---
 
@@ -424,14 +474,6 @@ Group 7 enforces folder structure invariants to maintain vertical slicing and la
 
 ### Terms
 
-| Term | Meaning |
-| ---- | ------- |
-| Project Workspaces | Project root containing all configuration and language members |
-| Workspace Member | One self-contained crate, package, or module inside the workspace |
-| Crates directory | Rust workspace members |
-| Packages directory | TypeScript or JavaScript packages |
-| Modules directory | Python modules |
-
 ### Vertical Slicing Layout
 
 AI agents frequently make this mistake: do NOT create `surface/`, `taxonomy/`, `contract/`, `capabilities/`, `utility/`, `agent/` folders. The correct structure groups files by feature, with layers as filenames, not directories.
@@ -451,73 +493,14 @@ project-root/
 
 ### Member Types
 
-| Member Type | Example Path | Carries | Belongs in | Documents |
-| ----------- | ----------- | ------- | ---------- | --------- |
-| Features | `crates/<name-features>/` | `capabilities_*` + `agent_*_orchestrator` | a feature folder | `FRD.md` + `BACKLOG.md` |
-| Surface | `crates/<name-surfaces>/` | `surface_*` | a surface folder | `DESIGN.md` + `BACKLOG.md` |
-| Shared | `crates/shared/<domain>/` | `contract_*` + `taxonomy_*` + `utility_*` | the shared folder | `DATA.md` + `BACKLOG.md` |
-
 ### AES701 — Shared Folder Purity
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | A shared folder holds a `capabilities_*`, `agent_*`, or `surface_*` file (`shared_has_forbidden_files`), or lacks its DATA.md + BACKLOG.md doc pair (`shared_missing_doc_pair`) |
-| Scope | `shared/` layer folders under member dirs |
-| Fix | Move misplaced layer files to a feature or surface folder; add DATA.md and BACKLOG.md |
 
 ### AES702 — Feature Folder Health
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `feature_missing_agent` (capabilities but no orchestrator), `feature_missing_capability` (orchestrator but no capabilities), `feature_has_forbidden_files` (foreign layer file), `feature_missing_doc_pair` (no FRD.md/BACKLOG.md), `feature_missing_root_container` (no `root_*` composition), `feature_missing_shared_subfolder` (no `shared/src/<feature>/` mirror), `doc_pair_without_orchestrator` |
-| Scope | Member subdirectories (`crates/`, `modules/`, `packages/`) |
-| Fix | Add the missing orchestrator/capabilities file, remove foreign files, add the doc pair, add a `root_*` composition file, or mirror into `shared/src/<feature>/` |
-
-**Cross-module composition (split modules):** when one feature folder
-is split into sibling modules that share a single contract/aggregate
-layer (e.g. `skills/skill-authoring/skill-design/modules/skills_design`
-+ `skills/skill-authoring/skill-traces/modules/skills_traces` share
-`modules/shared/src/skills`), the composition root of one module MAY
-import the capability class of the sibling module to wire it into the
-shared agent. Only the root/agent layers of a split may cross module
-boundaries; capability layers never import a sibling module's
-capability, and each split module keeps its own `FRD.md` +
-`BACKLOG.md` doc pair (AES702).
-
 ### AES703 — Surface Folder Purity
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `surface_has_misplaced_files` (holds a `capabilities_*`, `agent_*`, or `utility_*` file), `surface_missing_design_md`, or `surface_missing_backlog_md` |
-| Scope | Surface-dominated folders under member dirs |
-| Fix | Move capability/agent/utility files out; add DESIGN.md and BACKLOG.md |
 
 ### AES704 — Test Suite Coverage
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `test_suite_missing_tests_dir`, `test_suite_missing_bench_dir`, or `test_suite_missing_category` (no file carries a required test prefix) |
-| Scope | Folders owning `capabilities_*` or `agent_*_orchestrator` source |
-| Fix | Add missing test files/benches with one of the required prefixes (see AES103 Legal Test Prefixes) plus a `bench_` file |
-
 ### AES705 — Member-Root Placement
 
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | A member dir (`crates/`, `modules/`, `packages/`) root holds a `capabilities_*`, `agent_*`, `surface_*`, or `utility_*` file |
-| Scope | Member root level only |
-| Fix | Move the layer file per Member Types "Belongs in" (see above) |
-
 ### AES706 — PR Folder Mapping
-
-| Field | Value |
-| ----- | ----- |
-| Severity | MEDIUM (report) |
-| Fires when | `pr_la_missing_frd` (a module folder holds no FRD.md), `pr_la_fr_id_mismatch` (a module folder's FRD carries an FR id whose prefix does not match the folder name), or `pr_la_id_mismatch` (a `PR-LA-001..N` id does not map to an existing crate folder by order) |
-| Scope | `PRD.md`, `ROADMAP.md`, and feature module folders under `crates/` / `modules/` / `packages/` |
-| Fix | Create the missing module folder, rename mismatched FR ids to `FR-<Feature>-NNN`, or add the missing FRD.md |

@@ -18,14 +18,12 @@ from modules.shared.src.common.taxonomy_core_vo import AppConfig
 from modules.shared.src.config.contract_config_protocol import IConfigValidatorProtocol
 from modules.shared.src.config.taxonomy_config_vo import ConfigCategory, ConfigIssue, ConfigIssues
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class ConfigValidator(IConfigValidatorProtocol):
     """Report every problem that keeps an ``AppConfig`` from running."""
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def validate(self, app_config: AppConfig) -> ConfigIssues:
         """Return the issues in *app_config*; empty when it can run.
 
@@ -86,8 +84,7 @@ class ConfigValidator(IConfigValidatorProtocol):
 
         return ConfigIssues(issues=tuple(issues))
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     @staticmethod
     def _path_issues(field: str, path: Path) -> list[ConfigIssue]:
         """Return the findings one config path contributes, empty when it is usable.

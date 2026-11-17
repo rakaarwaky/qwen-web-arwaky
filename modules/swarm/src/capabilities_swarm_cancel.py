@@ -29,7 +29,7 @@ from modules.shared.src.swarm.utility_swarm_runner_base import mark_cancelled
 log = logging.getLogger(__name__)
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class SwarmCancelRunner(ISwarmCancelProtocol):
     """Cancel a running fan-out on behalf of the swarm orchestrator.
 
@@ -52,7 +52,7 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
         self._registry = registry
         self._attachment = attachment
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def cancel(self, swarm_id: SwarmId) -> None:
         """Stop active browser contexts and prevent queued work from running."""
         if self._registry.get_snapshot(swarm_id) is None:
@@ -67,7 +67,7 @@ class SwarmCancelRunner(ISwarmCancelProtocol):
         if executor is not None:
             executor.shutdown(wait=False, cancel_futures=True)
 
-    # Block 3: Constructors, Std Traits, Helpers
+    # ─── Block 3: Module Helpers ───
     def _request_attachment_cancel(self, event: CancelToken) -> None:
         """Forward a cancel event to the attachment aggregate via its typed seam.
 

@@ -21,14 +21,12 @@ from modules.shared.src.session.utility_session_brave_paths import (
     find_brave_profiles,
 )
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class SessionBraveDiscovery(ISessionBraveDiscoveryProtocol):
     """Discovers existing Brave profiles and registers them as candidate sessions."""
 
-    # Block 2: Protocol Method Implementation
-
+    # ─── Block 2: Module Contract ───
     def discover(self) -> list[BraveProfileInfo]:
         """Return every discoverable Brave profile as :class:`BraveProfileInfo`.
 
@@ -52,9 +50,7 @@ class SessionBraveDiscovery(ISessionBraveDiscoveryProtocol):
         return profiles
 
 
-# Block 3: Dunder Methods, Factories & Helpers
-
-
+# ─── Block 3: Module Helpers ───
 def _is_under(path: Path, root: Path) -> bool:
     """True when *path* is *root* or lives beneath it."""
     try:

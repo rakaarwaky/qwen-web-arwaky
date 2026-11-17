@@ -29,9 +29,8 @@ from modules.shared.src.common.utility_logger_factory import get_logger
 
 log = get_logger("browser.model_policy")
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class BrowserModelPolicy(IBrowserModelPolicyProtocol):
     """Model selection/verification policy behind the browser contract."""
 
@@ -39,8 +38,7 @@ class BrowserModelPolicy(IBrowserModelPolicyProtocol):
         """Initialize BrowserModelPolicy."""
         pass
 
-    # Block 2: Public Contract
-
+    # ─── Block 2: Module Contract ───
     def select_model(self, page: Page, emitter: LifecycleEmitter) -> ModelLabel:
         """Read/select the default model on *page*; return the chosen label.
 
@@ -68,8 +66,7 @@ class BrowserModelPolicy(IBrowserModelPolicyProtocol):
         """Return the per-run target model the picker helpers should read."""
         return target_model()
 
-    # Block 3: Dunder Methods, Factories & Helpers
-
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         """Return string representation of BrowserModelPolicy."""
         return "BrowserModelPolicy()"

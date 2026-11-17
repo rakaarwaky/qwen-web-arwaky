@@ -33,9 +33,8 @@ from modules.shared.src.prompt.contract_prompt_protocol import ISendProtocol
 
 log = get_logger("capabilities_send_dispatcher")
 
-# Block 1: Class Definition & Constructor
 
-
+# ─── Block 1: Module Declaration ───
 class SendDispatcher(ISendProtocol):
     """Multi-strategy send button trigger with keyboard fallback."""
 
@@ -47,8 +46,7 @@ class SendDispatcher(ISendProtocol):
         self.click_timeout_ms = click_timeout_ms
         self.try_enter_key_fallback = try_enter_key_fallback
 
-    # ─── Block 2: Public Contract (ISendProtocol ONLY) ──
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def click_send(
         self,
         page: Page,
@@ -135,7 +133,7 @@ class SendDispatcher(ISendProtocol):
 
         raise SendDispatchError("Send control dispatch timed out waiting for document parsing or user turn ACK")
 
-    # Block 3: Dunder Methods, Factories, Helpers
+    # ─── Block 3: Module Helpers ───
     def _wait_for_dispatch_ack(
         self,
         page: Page,
@@ -236,8 +234,6 @@ class SendDispatcher(ISendProtocol):
     def latest_message_text(self, page: Page) -> ResponseText | None:
         """Get the longest text block on page excluding input/UI chrome."""
         return latest_message_text(page)
-
-    # ─── Block 3: Dunder Methods, Factories & Helpers ─────
 
     def __repr__(self) -> str:
         """Return string representation of SendDispatcher."""

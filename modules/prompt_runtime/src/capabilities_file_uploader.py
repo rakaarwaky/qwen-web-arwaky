@@ -34,7 +34,7 @@ from modules.shared.src.prompt.contract_prompt_protocol import IUploadProtocol
 
 log = get_logger("capabilities_file_uploader")
 
-# ─── BE-4-001: single-evaluate DOM probes ───────────────────────────────────
+# BE-4-001: single-evaluate DOM probes
 #: One Chromium IPC round-trip answers "how many visible attachment cards show
 #: this exact filename" across all eight (selector, expected) families. Both
 #: sides of the comparison normalize identically: collapse every whitespace
@@ -140,7 +140,7 @@ JS_PARSE_READINESS: str = r"""
 """
 
 
-# ─── Block 1: Class Definition & Constructor ────────────
+# ─── Block 1: Module Declaration ───
 class FileUploader(IUploadProtocol):
     """Resilient file upload with validation, retry, and DOM recovery."""
 
@@ -164,7 +164,7 @@ class FileUploader(IUploadProtocol):
         self.card_selectors = self.config.card_selectors
         self.last_error: Exception | None = None
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def upload_attachment(
         self,
         page: Page,
@@ -264,8 +264,7 @@ class FileUploader(IUploadProtocol):
         limit = max_size_bytes if max_size_bytes is not None else self.max_size_bytes
         return FileSizeBytes(validate_file(filepath, max_size_bytes=limit))
 
-    # Block 3: Dunder Methods, Factories, Helpers
-
+    # ─── Block 3: Module Helpers ───
     # ── Helper for Step 2: Execute single upload attempt ──
     def _try_upload_attempt(self, page: Page, filepath: Path) -> bool:
         """Execute a single attempt to attach a file via the Qwen Web UI."""

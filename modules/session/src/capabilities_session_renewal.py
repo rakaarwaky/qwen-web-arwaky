@@ -32,7 +32,7 @@ class SessionRenewalError(QwenCliError):
     """Raised when a session renewal attempt fails but the caller can retry."""
 
 
-# Block 1: Class Definition & Constructor
+# ─── Block 1: Module Declaration ───
 class SessionRenewer(ISessionRenewalProtocol):
     """Detects stale auth sessions and renews them via browser self-heal.
 
@@ -52,7 +52,7 @@ class SessionRenewer(ISessionRenewalProtocol):
         self._browser_lifecycle = browser_lifecycle
         self._observability = observability
 
-    # Block 2: Protocol Method Implementation
+    # ─── Block 2: Module Contract ───
     def renew_session_if_stale(
         self,
         cfg: AppConfig,
@@ -129,7 +129,7 @@ class SessionRenewer(ISessionRenewalProtocol):
         )
         return True
 
-    # Block 3: Dunder Methods, Factories & Helpers
+    # ─── Block 3: Module Helpers ───
     def __repr__(self) -> str:
         return f"SessionRenewer(browser_lifecycle={self._browser_lifecycle!r}, observability={self._observability!r})"
 
