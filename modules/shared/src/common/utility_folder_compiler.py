@@ -713,18 +713,37 @@ def _resolve_import(filepath: Path, spec: str, folder_path: Path) -> Path | None
 _WORKSPACE_ROOT_ENV = "QWEN_WORKSPACE_ROOT"
 
 
+def _find_git_root(start: Path) -> Path | None:
+    """Nearest ancestor of ``start`` with ``.git`` (dir or file); ``None`` if none before home or filesystem root."""
+    home = Path.home().resolve()
+
+    for cand in (start.resolve(), *start.resolve().parents):
+        if cand == home or cand.parent == cand:
+            return None
+        if (cand / ".git").exists():
+            return cand
+    return None
+
+
 def _resolve_boundary_root(folder_path: Path, boundary_root: Path | None) -> Path:
     """Resolve the confinement boundary for import resolution.
 
-    Precedence: explicit ``boundary_root`` → ``QWEN_WORKSPACE_ROOT`` env var
-    (the same root the MCP surface validates attachment paths against) →
-    ``folder_path.parent`` (CLI default: sibling imports keep working).
+    Precedence:
+    1. Explicit ``boundary_root`` parameter.
+    2. ``QWEN_WORKSPACE_ROOT`` env var (the MCP surface's workspace root).
+    3. Git repo root (when ``folder_path`` is inside a git repo) — so
+       cross-folder references like PRD.md or ROADMAP.md at the repo root
+       are included when linked from a module folder.
+    4. ``folder_path.parent`` (CLI default when not in a git repo).
     """
     if boundary_root is not None:
         return Path(boundary_root).expanduser().resolve()
     env_root = os.environ.get(_WORKSPACE_ROOT_ENV, "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
+    git_root = _find_git_root(folder_path)
+    if git_root is not None:
+        return git_root
     return folder_path.parent.resolve()
 
 
@@ -742,6 +761,19 @@ def collect_folder_files_with_imports(
     wikilinks) and resolved relative to the importing file (and the folder
     root where the language allows). External dependencies are included
     recursively with cycle protection, up to ``import_depth`` hops.
+
+    Default boundary precedence: explicit ``boundary_root`` >
+    ``QWEN_WORKSPACE_ROOT`` env var > git repo root (when the scanned folder
+    lives inside one) > ``folder_path.parent``. When inside a git repo, **any
+    importable file** under the repo root linked from module files is pulled
+    into the compiled output — not just ``.md`` docs — so files like
+    ``internal_keys.yaml`` or ``app_config.json`` that don't match
+    ``_SECRET_KEYWORDS`` can be exfiltrated. Users compiling folders that
+    link to credential files should tighten the boundary via
+    ``QWEN_WORKSPACE_ROOT``. In a monorepo with a single ``.git`` at the top,
+    compiling ``projects/A/src`` sets the boundary to the monorepo root, so
+    links into ``projects/B`` resolve; use ``QWEN_WORKSPACE_ROOT`` to scope
+    to one sub-project.
 
     Security (issue #342): the compiled output is uploaded to a third-party
     service, and the MCP surface validates only the *initial* attachment
