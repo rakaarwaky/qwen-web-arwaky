@@ -8,6 +8,7 @@ import pytest
 
 from modules.jobs.src.capabilities_folder_compiler import FolderCompiler
 from modules.shared.src.common.utility_folder_compiler import (
+    _find_git_root,
     collect_folder_files,
     collect_folder_files_with_imports,
     compile_files_to_markdown,
@@ -491,3 +492,157 @@ class TestImportBoundaryConfinement:
         files = collect_folder_files(root)
         rel_names = sorted(f.relative_to(root).as_posix() for f in files)
         assert rel_names == ["main.py", "pkg/helper.py"]
+
+
+class TestGitRootBoundary:
+    """Default boundary = git repo root when the scanned folder is inside one.
+
+    Keeps cross-folder references like ``PRD.md`` at the repo root reachable
+    from a module folder, while still confining imports to the repo.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _hermetic_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Pin ``Path.home`` to a non-ancestor directory so the home-stop never
+        fires mid-walk and tests are hermetic regardless of CI state."""
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: (tmp_path / "fake_home").resolve()))
+
+    def test_default_boundary_is_git_root_when_inside_git_repo(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        target = repo / "modules" / "memory"
+        _write(target / "index.md", "# Memory\n\nSee [PRD](../../PRD.md).\n")
+        prd = _write(repo / "PRD.md", "# PRD\n\nProduct requirements.\n")
+
+        assert _find_git_root(target) == repo.resolve()
+        files, origins = collect_folder_files_with_imports(target)
+        assert prd in files
+        assert origins[prd] == ("index.md",)
+
+    def test_git_root_fallback_when_no_git_dir(self, tmp_path: Path) -> None:
+        # No .git anywhere up the chain: boundary = folder.parent.
+        # A Python import resolved under tmp_path (a sibling of folder.parent)
+        # escapes the fallback boundary and must be refused.
+        target = tmp_path / "modules" / "memory"
+        _write(target / "a.py", "from ...outside import secret\n")
+        _write(tmp_path / "outside.py", "secret = 'should not be included'\n")
+
+        assert _find_git_root(target) is None
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(target, skipped=skipped)
+        assert {f.name for f in files} == {"a.py"}
+        assert [p.name for p in skipped] == ["outside.py"]
+
+    def test_explicit_boundary_still_wins(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        target = repo / "modules" / "memory"
+        narrow = repo / "narrow"
+        _write(target / "index.md", "# Memory\n\nSee [narrow](../narrow/x.md) and [wide](../../wide.md).\n")
+        _write(narrow / "x.md", "narrow file\n")
+        _write(repo / "wide.md", "wide file\n")
+
+        files, _ = collect_folder_files_with_imports(target, boundary_root=narrow)
+        names = {f.name for f in files}
+        assert "x.md" in names
+        assert "wide.md" not in names
+
+    def test_env_var_still_wins(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        target = repo / "modules" / "memory"
+        ws = tmp_path / "ws"
+        _write(target / "index.md", "# Memory\n\nSee [escape](../../../ws/keep.md) and [out](../../../repo_out.md).\n")
+        _write(ws / "keep.md", "kept by env boundary\n")
+        _write(tmp_path / "repo_out.md", "refused by env boundary\n")
+        monkeypatch.setenv("QWEN_WORKSPACE_ROOT", str(ws))
+
+        skipped: list[Path] = []
+        files, _ = collect_folder_files_with_imports(target, skipped=skipped)
+        names = {f.name for f in files}
+        assert "keep.md" in names
+        assert "repo_out.md" not in names
+        assert [p.name for p in skipped] == ["repo_out.md"]
+
+    def test_git_file_for_worktree(self, tmp_path: Path) -> None:
+        # A .git file (not dir) marks a git worktree/submodule root.
+        repo = tmp_path / "worktree"
+        repo.mkdir()
+        (repo / ".git").write_text("gitdir: ../actual.git\n", encoding="utf-8")
+        target = repo / "modules" / "memory"
+        _write(target / "index.md", "# Memory\n\nSee [PRD](../../PRD.md).\n")
+        prd = _write(repo / "PRD.md", "# PRD\n\nfrom worktree\n")
+
+        assert _find_git_root(target) == repo.resolve()
+        files, origins = collect_folder_files_with_imports(target)
+        assert prd in files
+        assert origins[prd] == ("index.md",)
+
+    def test_find_git_root_none_when_no_git_and_home_is_ancestor(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_find_git_root returns None when no .git exists from start up to home."""
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path.resolve()))
+        target = tmp_path / "a" / "b"
+        target.mkdir(parents=True)
+        assert _find_git_root(target) is None
+
+    def test_find_git_root_returns_git_root(self, tmp_path: Path) -> None:
+        """_find_git_root returns the repo root when .git exists at an ancestor."""
+        repo = tmp_path / "repo"
+        (repo / ".git").mkdir(parents=True)
+        target = repo / "src" / "deep"
+        target.mkdir(parents=True)
+        assert _find_git_root(target) == repo.resolve()
+
+    def test_find_git_root_git_file(self, tmp_path: Path) -> None:
+        """_find_git_root recognises a .git *file* (worktree/submodule)."""
+        repo = tmp_path / "wt"
+        repo.mkdir()
+        (repo / ".git").write_text("gitdir: /elsewhere\n", encoding="utf-8")
+        target = repo / "pkg"
+        target.mkdir()
+        assert _find_git_root(target) == repo.resolve()
+
+    def test_find_git_root_none_no_git(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_find_git_root returns None when no .git exists anywhere up to home."""
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path.resolve()))
+        target = tmp_path / "plain"
+        target.mkdir()
+        assert _find_git_root(target) is None
+
+    def test_find_git_root_stops_at_filesystem_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify the filesystem-root stop fires (walk reaches / and returns None).
+
+        home is pinned to a sibling of tmp_path (NOT an ancestor) so the home-stop
+        does not fire mid-walk and the walk climbs all the way to /. This proves
+        the root check fires before any .git check at / (a /.git can never be
+        returned as the boundary).
+        """
+        sibling = tmp_path.parent / "sibling_home_for_root_test"
+        sibling.mkdir(exist_ok=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: sibling.resolve()))
+        target = tmp_path / "sub" / "dir"
+        target.mkdir(parents=True)
+        result = _find_git_root(target)
+        assert result is None
+        assert result != Path("/")
+
+    def test_target_folder_is_git_repo_root(self, tmp_path: Path) -> None:
+        """When the target folder itself is the git repo root, boundary = that root.
+
+        A sibling file at the repo root is included in the compiled output.
+        """
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        _write(repo / "index.md", "# Home\n\nSee [spec](spec.md).\n")
+        spec = _write(repo / "spec.md", "# Spec\n\nRequirements.\n")
+
+        assert _find_git_root(repo) == repo.resolve()
+        files, origins = collect_folder_files_with_imports(repo)
+        assert spec in files
+        assert origins[spec] == ()

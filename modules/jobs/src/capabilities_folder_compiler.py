@@ -68,9 +68,17 @@ class FolderCompiler(IFolderCompileProtocol):
             boundary_root: Confinement boundary for import resolution
                 (issue #342). Resolved imports outside this root are refused
                 because the compiled output is uploaded to a third-party
-                service. Defaults to the ``QWEN_WORKSPACE_ROOT`` env var when
-                set (matching the MCP workspace boundary), else the scanned
-                folder's parent.
+                service. Default precedence: this parameter >
+                ``QWEN_WORKSPACE_ROOT`` env var (matching the MCP workspace
+                boundary) > git repo root when the scanned folder lives
+                inside one (so cross-folder references like PRD.md at the
+                repo root are included) > the scanned folder's parent.
+                Inside a git repo, **any** importable file under the repo
+                root linked from module files is pulled into the output —
+                not just ``.md`` docs. In a monorepo, compiling
+                ``projects/A/src`` scopes to the monorepo root, so links
+                into ``projects/B`` resolve; set ``QWEN_WORKSPACE_ROOT`` to
+                tighten to a single sub-project.
 
         Returns:
             Path to the compiled markdown file.
