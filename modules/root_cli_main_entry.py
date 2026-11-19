@@ -16,6 +16,7 @@ Usage:
   qwen-web-arwaky job                               {submit|status|list|cleanup}
   qwen-web-arwaky swarm                             {start|status|cancel}
   qwen-web-arwaky observability                     {report|status}
+  qwen-web-arwaky folder <path>
   qwen-web-arwaky mcp
 """
 
@@ -29,6 +30,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
+from modules.cli.src.surface_cli_folder_command import handle_folder_command
 from modules.cli.src.surface_cli_init_command import handle as handle_init_command
 from modules.cli.src.surface_cli_interactive_controller import InteractiveController
 from modules.cli.src.surface_cli_jobs_command import handle_jobs_command
@@ -249,6 +251,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     obs_report.add_argument("--json", action="store_true", help="Format output as JSON")
     obs_status = obs_sub.add_parser("status", help="Show current status file contents")
     obs_status.add_argument("--json", action="store_true", help="Format output as JSON")
+
+    # ── folder ────────────────────────────────────────────────────────────────
+    p_folder = sub.add_parser(
+        "folder",
+        help="Compile a folder to a single Markdown file (no Qwen round-trip)",
+        parents=[parent],
+    )
+    p_folder.add_argument("folder_path", help="Path to the folder to compile (must be a directory)")
 
     return p.parse_args(argv)
 
@@ -533,6 +543,9 @@ def _dispatch(
     if action == "session":
         return handle_sessions(args, container.agent_session_orchestrator)
 
+    if action == "folder":
+        return handle_folder_command(args, container.folder_compiler)
+
     if cfg is None:
         print(f"{_ERROR_PREFIX} Missing CLI configuration.", file=sys.stderr)
         return 1
@@ -588,7 +601,7 @@ def main(argv: list[str] | None = None) -> int:
     if args is not None:
         action = getattr(args, "action", None)
         # actions that do not need an AppConfig (no prompt path, no browser run)
-        no_cfg_actions = ("init", "job", "swarm", "observability", "session")
+        no_cfg_actions = ("init", "job", "swarm", "observability", "session", "folder")
         if action not in no_cfg_actions:
             try:
                 cfg = _build_config(args)

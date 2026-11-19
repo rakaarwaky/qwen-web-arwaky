@@ -72,6 +72,7 @@ Then run the remaining `python ...` and `qwen-web-arwaky --help` commands from t
 | `qwen-web-arwaky prompt file -i prompt.md -o output.md` | Send a Markdown prompt file. | `output.md` contains the Qwen response. |
 | `qwen-web-arwaky prompt attach -i prompt.md -a document.pdf -o output.md` | Send a prompt with an attachment. | `output.md` contains the Qwen response. |
 | `qwen-web-arwaky job submit -i prompt.md` | Queue a background prompt job. | The job ID prints with a poll hint. |
+| `qwen-web-arwaky folder <path>` | Compile a folder to a single Markdown file. | The `.qwen-web-arwaky/input/` path prints on success. |
 | `qwen-web-arwaky job status <job-id>` | Query one background job. | The job record prints. |
 | `qwen-web-arwaky job list` | List recent background jobs. | The recent-jobs table prints. |
 | `qwen-web-arwaky swarm start <path>` | Fan a file or folder out across role templates. | The Swarm snapshot prints with a poll hint. |
