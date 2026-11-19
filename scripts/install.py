@@ -137,6 +137,32 @@ def install_package(python_bin: Path) -> None:
         shutil.rmtree(build_dir, ignore_errors=True)
 
 
+def setup_uv_tool() -> None:
+    """Sync the uv-tool-managed runtime so ``qwen-web-arwaky``/``qwa`` on PATH
+    match the checkout just installed into the XDG venv.
+
+    The PATH entry points symlink into ``~/.local/share/uv/tools/qwen-web-arwaky/``,
+    which is *not* the XDG venv this script installs into. Keeping them in sync
+    avoids the "ran install.sh but PATH still runs the stale build" case. Only
+    runs when ``uv`` is on PATH; skipped otherwise.
+    """
+    if shutil.which("uv") is None:
+        log("⏭ [install] ``uv`` not on PATH; skipping uv-tool runtime sync")
+        return
+    log("📦 [install] Syncing uv-tool-managed runtime (the one on PATH)...")
+    subprocess.run(
+        [
+            "uv",
+            "tool",
+            "install",
+            "--force",
+            "--reinstall",
+            str(PROJECT_ROOT),
+        ],
+        check=False,
+    )
+
+
 def _pw_env() -> dict[str, str]:
     """Build the environment for playwright install with a workable socket timeout."""
     env = os.environ.copy()
@@ -429,6 +455,7 @@ def main() -> None:
     install_package(python_bin)
     install_playwright(python_bin)
     setup_xdg_directories(python_bin)
+    setup_uv_tool()
     setup_bin_links(python_bin)
 
     log("\n✅ [install] Setup complete!")
