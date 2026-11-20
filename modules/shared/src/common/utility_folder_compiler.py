@@ -335,7 +335,7 @@ _IMPORTABLE_SUFFIXES: frozenset[str] = frozenset(
 _TS_EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
 _TS_INDEX_EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 
-_PY_MODULE = re.compile(r"^\s*(?:from\s+([.\w]+)\s+import\s+[\w,*\s]+|import\s+([.\w]+))", re.MULTILINE)
+_PY_MODULE = re.compile(r"^\s*(?:from\s+([.\w]+)\s+import\s+[^\n]+|import\s+([.\w]+))", re.MULTILINE)
 _JS_IMPORT = re.compile(
     r"""(?:import|export)\s+[^'"']*?from\s*['"']([^'"']+)['"']"""
     r"""|import\s*['"']([^'"']+)['"']"""
