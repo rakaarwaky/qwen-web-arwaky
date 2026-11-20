@@ -50,6 +50,117 @@ class TestCollectFolderFilesWithImports:
         files, _ = collect_folder_files_with_imports(target)
         assert any(f.name == "util.py" for f in files)
 
+    def test_python_consecutive_from_imports(self, tmp_path: Path) -> None:
+        # Regression: the old regex consumed the newline + next "from ..." line
+        # because ``\s`` matched the line terminator, skipping every import after
+        # the first. Three consecutive lines strengthen the regression.
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(
+            target / "a.py",
+            "from utils.first import run_first\n"
+            "from utils.second import run_second\n"
+            "from utils.third import run_third\n"
+            "\ndef main():\n    run_first()\n    run_second()\n    run_third()\n",
+        )
+        _write(ext / "first.py", "def run_first():\n    pass\n")
+        _write(ext / "second.py", "def run_second():\n    pass\n")
+        _write(ext / "third.py", "def run_third():\n    pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "first.py" in names
+        assert "second.py" in names
+        assert "third.py" in names
+        first = next(f for f in files if f.name == "first.py")
+        second = next(f for f in files if f.name == "second.py")
+        third = next(f for f in files if f.name == "third.py")
+        assert origins[first] == ("a.py",)
+        assert origins[second] == ("a.py",)
+        assert origins[third] == ("a.py",)
+
+    def test_python_aliased_imports(self, tmp_path: Path) -> None:
+        # ``import x as y`` and ``from x import y as z`` resolve to the module
+        # path (everything before `` as ``), not the alias.
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(
+            target / "a.py",
+            "import utils.first as f1\nfrom utils.second import run_second as rs\n",
+        )
+        _write(ext / "first.py", "def run_first():\n    pass\n")
+        _write(ext / "second.py", "def run_second():\n    pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "first.py" in names
+        assert "second.py" in names
+        first = next(f for f in files if f.name == "first.py")
+        second = next(f for f in files if f.name == "second.py")
+        assert origins[first] == ("a.py",)
+        assert origins[second] == ("a.py",)
+
+    def test_python_parenthesized_single_line(self, tmp_path: Path) -> None:
+        # Single-line parenthesized import: ``from x import (a, b)``.
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(target / "a.py", "from utils.helper import (run_one, run_two)\n")
+        _write(ext / "helper.py", "def run_one(): pass\ndef run_two(): pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "helper.py" in names
+        helper = next(f for f in files if f.name == "helper.py")
+        assert origins[helper] == ("a.py",)
+
+    def test_python_mixed_parenthesized_and_plain_imports(self, tmp_path: Path) -> None:
+        # One file with both parenthesized and plain imports; all modules resolved.
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(
+            target / "a.py",
+            "from utils.helper import (\n    run_one,\n)\nfrom utils.second import run_second\n",
+        )
+        _write(ext / "helper.py", "def run_one(): pass\n")
+        _write(ext / "second.py", "def run_second(): pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "helper.py" in names
+        assert "second.py" in names
+        helper = next(f for f in files if f.name == "helper.py")
+        second = next(f for f in files if f.name == "second.py")
+        assert origins[helper] == ("a.py",)
+        assert origins[second] == ("a.py",)
+
+    def test_python_import_with_trailing_comment(self, tmp_path: Path) -> None:
+        # Trailing comment after an import must not prevent module resolution.
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(target / "a.py", "from utils.helper import run_one  # needed for caching\n")
+        _write(ext / "helper.py", "def run_one():\n    pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "helper.py" in names
+        helper = next(f for f in files if f.name == "helper.py")
+        assert origins[helper] == ("a.py",)
+
+    def test_python_parenthesized_from_import(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        ext = tmp_path / "utils"
+        _write(
+            target / "a.py",
+            "from utils.helper import (\n    run_one,\n    run_two,\n)\n\ndef main():\n    run_one()\n    run_two()\n",
+        )
+        _write(ext / "helper.py", "def run_one(): pass\ndef run_two(): pass\n")
+
+        files, origins = collect_folder_files_with_imports(target)
+        names = {f.name for f in files}
+        assert "helper.py" in names
+        helper = next(f for f in files if f.name == "helper.py")
+        assert origins[helper] == ("a.py",)
+
     def test_js_import_from_outside(self, tmp_path: Path) -> None:
         target = tmp_path / "app"
         lib = tmp_path / "lib"
